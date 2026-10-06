@@ -26,6 +26,8 @@ require (
 	google.golang.org/protobuf v1.36.11
 )
 
+require github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
+
 require (
 	github.com/alecthomas/chroma/v2 v2.27.0 // indirect
 	github.com/asticode/go-astikit v0.30.0 // indirect
@@ -58,6 +60,7 @@ require (
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef
 	github.com/tdewolff/parse/v2 v2.8.16 // indirect
+	github.com/tfriedel6/canvas v0.12.1
 	github.com/tphakala/simd v1.9.0 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	github.com/yuin/goldmark v1.8.5 // indirect
