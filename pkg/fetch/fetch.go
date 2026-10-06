@@ -13,6 +13,7 @@ package fetch
 import (
 	"crypto/tls"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -67,3 +68,9 @@ func lax() http.RoundTripper {
 	c.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // the point of it
 	return c
 }
+
+var installDefault sync.Once
+
+// UseAsDefault installs the policy during process initialization, before requests start.
+// Plain http.Client and http.DefaultClient then inherit the same policy without changing TLS configs in flight.
+func UseAsDefault() { installDefault.Do(func() { http.DefaultTransport = shared }) }
