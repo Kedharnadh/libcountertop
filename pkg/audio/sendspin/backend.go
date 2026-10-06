@@ -1,0 +1,89 @@
+// Package sendspin contains device-independent synchronized playback and protocol sessions.
+package sendspin
+
+import (
+	"github.com/Sendspin/sendspin-go/pkg/protocol"
+	"time"
+)
+
+const Rate = 48000
+const Channels = 2
+const Bits = 16
+const DefaultHardwareTail = 150 * time.Millisecond
+const StateOff = "off"
+const StateWaiting = "waiting"
+const StateJoined = "joined"
+const StatePlaying = "playing"
+const stateOff = StateOff
+const stateWaiting = StateWaiting
+const stateJoined = StateJoined
+const statePlaying = StatePlaying
+const Service = "_sendspin._tcp"
+const Domain = "local."
+const Path = "/sendspin"
+const path = Path
+
+type Renderer interface{ Render(at uint64, out []int16) }
+type Producer interface {
+	Stand(bool)
+	Duck(bool)
+	Requeue()
+}
+type Sink interface {
+	Attach(Renderer)
+	Written() uint64
+}
+type Arbitration interface {
+	Took(Producer)
+	Gave(Producer)
+}
+type Controls struct {
+	Volume       func() int
+	SetVolume    func(int)
+	SetMuted     func(bool)
+	DuckDB       func() float64
+	HardwareTail time.Duration
+}
+type Identity struct {
+	ID, Model, Manufacturer, Version string
+	ArtworkSize                      int
+}
+type Callbacks struct {
+	State      func(string)
+	Connection func(*Session)
+	Began      func()
+	Grouped    func(string)
+	Metadata   func(*protocol.MetadataState, func() int64)
+	Artwork    func(protocol.ArtworkChunk)
+}
+
+func (c Callbacks) state(s string) {
+	if c.State != nil {
+		c.State(s)
+	}
+}
+func (c Callbacks) connection(s *Session) {
+	if c.Connection != nil {
+		c.Connection(s)
+	}
+}
+func (c Callbacks) began() {
+	if c.Began != nil {
+		c.Began()
+	}
+}
+func (c Callbacks) grouped(s string) {
+	if c.Grouped != nil {
+		c.Grouped(s)
+	}
+}
+func (c Callbacks) metadata(m *protocol.MetadataState, now func() int64) {
+	if c.Metadata != nil {
+		c.Metadata(m, now)
+	}
+}
+func (c Callbacks) artwork(a protocol.ArtworkChunk) {
+	if c.Artwork != nil {
+		c.Artwork(a)
+	}
+}
