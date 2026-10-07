@@ -1,22 +1,19 @@
-package face
+package clockface
 
-// Kind is a stable clock-face identifier, independent of a product settings schema.
-type Kind string
+import "github.com/ygelfand/libcountertop/pkg/display/clockkind"
+
+type Kind = clockkind.Kind
 
 const (
- Plain Kind = "plain"
- Stack Kind = "stack"
- Cards Kind = "cards"
- Analog Kind = "analog"
- AnalogSeconds Kind = "analog-seconds"
- Segments Kind = "segments"
- Words Kind = "words"
- Overlap Kind = "overlap"
- Default = Plain
+	Plain         = clockkind.Plain
+	Stack         = clockkind.Stack
+	Cards         = clockkind.Cards
+	Analog        = clockkind.Analog
+	AnalogSeconds = clockkind.AnalogSeconds
+	Segments      = clockkind.Segments
+	Words         = clockkind.Words
+	Overlap       = clockkind.Overlap
+	Default       = clockkind.Default
 )
 
-// Kinds returns the available clock-face identifiers.
-func Kinds() []Kind {
- return []Kind{Plain,Stack,Cards,Analog,AnalogSeconds,Segments,Words,Overlap}
-}
-
+var Kinds = clockkind.Kinds

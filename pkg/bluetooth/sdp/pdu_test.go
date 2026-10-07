@@ -123,7 +123,7 @@ func TestASearchWantsEveryClassItNamed(t *testing.T) {
 }
 
 func TestOnlyTheAttributesAskedForComeBack(t *testing.T) {
-	r := AudioSink(1, "LANovo", UUIDAVDTP, FeatureSpeaker)
+	r := AudioSink(1, "Panel", UUIDAVDTP, FeatureSpeaker)
 
 	s := Search{Attributes: []AttrRange{{First: AttrProtocols, Last: AttrProtocols}}}
 	got := s.Selected(r)
@@ -144,7 +144,7 @@ func TestOnlyTheAttributesAskedForComeBack(t *testing.T) {
 // The answer wraps every matching record's attribute list in one more sequence. Leaving that outer
 // sequence off is what produces a phone that sees the device and finds no services on it.
 func TestTheAnswerWrapsEveryRecordInOneSequence(t *testing.T) {
-	r := AudioSink(1, "LANovo", UUIDAVDTP, FeatureSpeaker)
+	r := AudioSink(1, "Panel", UUIDAVDTP, FeatureSpeaker)
 
 	pdu, err := SearchAttributeResponse(0x1234, []Record{r})
 	if err != nil {

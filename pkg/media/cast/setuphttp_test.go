@@ -8,7 +8,7 @@ import (
 )
 
 func TestTheSetupEndpointServesTheDescription(t *testing.T) {
-	e := NewEureka(Device{ID: "266a1baa915744d5e2531b227c645271", Name: "dev", Model: "LANovo"}, "Lenovo", "1")
+	e := NewEureka(Device{ID: "266a1baa915744d5e2531b227c645271", Name: "dev", Model: "Panel"}, "Lenovo", "1")
 	var seen []int
 	h := SetupHandler(func() Eureka { return e }, func() []byte { return []byte("png") }, func(_ *http.Request, status int) { seen = append(seen, status) })
 

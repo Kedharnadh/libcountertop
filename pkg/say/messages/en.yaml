@@ -1,0 +1,505 @@
+# Shared English catalogue for all Countertop devices.
+# Missing translations fall back to English.
+
+about.built: Built
+about.commit: Commit
+about.name: Name
+about.title: About
+about.version: Version
+align.center: Center
+align.left: Left
+align.right: Right
+assistants.off: "Off"
+assistants.reply: Response playback
+assistants.slot: Assistant {{.N}}
+assistants.talk: Talk now
+assistants.talk.hint: Without the wake word
+assistants.threshold: Wake word sensitivity
+assistants.threshold.hint: Higher wakes more easily
+assistants.title: Voice assistants
+assistants.tone: Wake sound
+assistants.unset: Set the wake word in Home Assistant
+assistants.waiting: Waiting for the model
+boot.leaving: Restarting
+boot.skip: Skip
+boot.stranded: Lost contact with the screen
+call.address: Address
+call.auto: Auto-answer
+call.auto.hint: Answers at once
+call.autovideo: Auto-answer with camera on
+call.busy: Busy
+call.calling: Calling…
+call.camera.off: Camera off
+call.camera.on: Camera on
+call.declined: Declined
+call.dropped: Call dropped
+call.empty: No other devices found
+call.failed: Call failed
+call.gone: No longer on the network
+call.incoming: Incoming call
+call.incoming.allow: Incoming calls
+call.incoming.video: Incoming video call
+call.model: Model
+call.mute: Mute
+call.no: "No"
+call.pausewake: Pause wake word during calls
+call.seen: Last seen
+call.settings: Calls
+call.settings.hint: Incoming calls and auto-answer
+call.stream: Video stream
+call.stream.hint: Sub uses less bandwidth; falls back to main when the sub stream is off
+call.stream.main: Main
+call.stream.sub: Sub
+call.tab: Call
+call.unanswered: No answer
+call.unavailable: Not taking calls
+call.unmute: Unmute
+call.version: Version
+call.video: Video calls
+call.volume: Volume
+call.yes: "Yes"
+camera.group.exposure: Exposure
+camera.group.picture: Picture
+camera.group.streams: Streams
+camera.group.whitebalance: White Balance
+camera.option.banding.50hz: 50 Hz
+camera.option.banding.60hz: 60 Hz
+camera.option.banding.auto: Auto
+camera.option.banding.off: Off
+camera.option.brightness.high: High
+camera.option.brightness.low: Low
+camera.option.brightness.middle: Medium
+camera.option.contrast.high: High
+camera.option.contrast.low: Low
+camera.option.contrast.middle: Medium
+camera.option.effect.aqua: Aqua
+camera.option.effect.blackboard: Blackboard
+camera.option.effect.mono: Mono
+camera.option.effect.negative: Negative
+camera.option.effect.none: None
+camera.option.effect.posterize: Posterize
+camera.option.effect.sepia: Sepia
+camera.option.effect.solarize: Solarize
+camera.option.effect.whiteboard: Whiteboard
+camera.option.hue.high: High
+camera.option.hue.low: Low
+camera.option.hue.middle: Medium
+camera.option.noise.fast: Fast
+camera.option.noise.high_quality: High quality
+camera.option.noise.minimal: Minimal
+camera.option.noise.off: Off
+camera.option.quality.high: High
+camera.option.quality.low: Low
+camera.option.quality.standard: Standard
+camera.option.saturation.high: High
+camera.option.saturation.low: Low
+camera.option.saturation.middle: Medium
+camera.option.scene.action: Action
+camera.option.scene.auto: Auto
+camera.option.scene.beach: Beach
+camera.option.scene.candlelight: Candlelight
+camera.option.scene.fireworks: Fireworks
+camera.option.scene.hdr: HDR
+camera.option.scene.landscape: Landscape
+camera.option.scene.night: Night
+camera.option.scene.night-portrait: Night portrait
+camera.option.scene.party: Party
+camera.option.scene.portrait: Portrait
+camera.option.scene.snow: Snow
+camera.option.scene.sports: Sports
+camera.option.scene.steadyphoto: Steady photo
+camera.option.scene.sunset: Sunset
+camera.option.scene.theatre: Theatre
+camera.option.sharpness.high: High
+camera.option.sharpness.low: Low
+camera.option.sharpness.middle: Medium
+camera.option.whitebalance.auto: Auto
+camera.option.whitebalance.cloudy-daylight: Cloudy
+camera.option.whitebalance.daylight: Daylight
+camera.option.whitebalance.fluorescent: Fluorescent
+camera.option.whitebalance.incandescent: Incandescent
+camera.option.whitebalance.shade: Shade
+camera.option.whitebalance.twilight: Twilight
+camera.option.whitebalance.warm-fluorescent: Warm fluorescent
+camera.reset: Reset to defaults
+camera.reset.confirm: Tap again to reset
+camera.setting.banding: Anti-banding
+camera.setting.brightness: Brightness
+camera.setting.contrast: Contrast
+camera.setting.effect: Effect
+camera.setting.ev: Exposure compensation
+camera.setting.framerate: Frame rate
+camera.setting.framerate_auto: Auto frame rate
+camera.setting.hue: Hue
+camera.setting.iso: ISO
+camera.setting.keyframe: Keyframe interval
+camera.setting.main_on: Main stream
+camera.setting.main_size: Main resolution
+camera.setting.noise: Noise reduction
+camera.setting.quality: Quality
+camera.setting.saturation: Saturation
+camera.setting.scene: Scene
+camera.setting.sharpness: Sharpness
+camera.setting.sub_on: Sub stream
+camera.setting.sub_size: Sub resolution
+camera.setting.whitebalance: White balance
+camera.starting: Starting the camera
+camera.stream: Camera stream
+cast.apps: Apps
+cast.enable: Enable
+cast.prime: Prime Video
+cast.prime.persist: Persistent registration
+cast.prime.persist.hint: Every cast plays as the account that registered first
+cast.prime.registered: Registered
+cast.prime.reset: Reset registration
+cast.prime.skipintro: Skip intro
+cast.prime.skipintro.hint: Start after Amazon's opening bumper
+cast.prime.unregistered: Not registered
+chime.chirp: Chirp
+chime.ding: Ding
+chime.none: None
+chime.rise: Rise
+clock.color: Color
+clock.color.title: Clock color
+clock.date: Show date
+clock.face: Clock face
+clock.hours: Use 24-hour format
+clock.position: Position
+clock.position.title: Clock position
+clock.size: Size
+clock.size.title: Clock size
+clock.title: Clock
+clock.zone: Time zone
+controls.dock: Dock position
+controls.volume: Volume panel position
+datetime.title: Date & time
+debug.fps: Visual frame rate limit
+debug.fps.value: "{{.N}} fps"
+debug.seed: Visual seed
+debug.seed.random: Random
+debug.seed.value: "#{{.N}}"
+debug.title: Developer options
+debug.visuals: Visuals
+delay.10m: 10 minutes
+delay.15m: 15 minutes
+delay.1m: 1 minute
+delay.2m: 2 minutes
+delay.30s: 30 seconds
+delay.3m: 3 minutes
+delay.5m: 5 minutes
+delay.never: Never
+delivery.stream: Stream
+delivery.whole: Download first
+display.auto: Adaptive brightness
+display.brightness: Brightness
+display.clock: Clock
+display.idle: Screen saver
+display.marks: Privacy indicators
+display.poster: Wallpaper
+display.presence: Sensors
+display.size: Size
+display.style: Style
+display.theme: Theme
+display.title: Display
+dock.title: Dock position
+edge.bottom: Bottom
+edge.left: Left
+edge.right: Right
+edge.top: Top
+face.analog: Analog
+face.analog-seconds: Analog seconds
+face.cards: Cards
+face.none: None
+face.overlap: Overlap
+face.plain: Plain
+face.segments: Segments
+face.stack: Stack
+face.words: Words
+features.cast: Cast receiver
+features.cast.hint: Cast from a phone or an app
+features.proxy: Bluetooth proxy
+features.proxy.hint: Bluetooth LE proxy for Home Assistant
+features.rtsp.hint: RTSP on port 8554
+features.sendspin: Sendspin
+features.sendspin.hint: Whole-home audio
+features.speaker: Bluetooth speaker
+features.speaker.hint: Play from a phone over Bluetooth
+features.title: Connected services
+home.all: All
+home.area.count: "{{.N}} of {{.Of}}"
+home.check: Check again
+home.checking: Checking Home Assistant…
+home.combine: Include switches
+home.devices: Select devices
+home.empty: Nothing to show
+home.enable: Enable
+home.enabled: Enable home control
+home.everything.lights: All lights
+home.everything.switches: All switches
+home.failed: Couldn't load from Home Assistant
+home.group: Group by area
+home.group.all: Every area on one card
+home.group.from: "Areas with {{.N}} or more devices"
+home.group.none: Every device on its own card
+home.label.count: "{{.N}} device{{if ne .N 1}}s{{end}}"
+home.loading: Loading…
+home.noarea: No area
+home.none: None
+home.picked.areas: "{{.N}} area{{if ne .N 1}}s{{end}}"
+home.picked.entities: "{{.N}} device{{if ne .N 1}}s{{end}}"
+home.picked.labels: "{{.N}} label{{if ne .N 1}}s{{end}}"
+home.refresh: Refresh
+home.refused: Actions not allowed
+home.refused.hint: Open ESPHome, press the settings cog on {{.Name}}, and enable “Allow the device to perform Home Assistant actions.”
+home.retry: Try again
+home.search: Search
+home.selection.lights: Lights
+home.selection.switches: Switches
+home.tab.labels: Labels
+home.tab.manual: Manual
+home.tile.all.off: All off
+home.tile.all.on: All on
+home.tile.area: "{{.N}} of {{.Of}} on"
+home.tile.level: "{{.N}}%"
+home.tile.off: "Off"
+home.tile.on: "On"
+home.tile.unavailable: Unavailable
+home.title: Home control
+home.unconnected: Not connected
+home.unconnected.hint: Add {{.Name}} to Home Assistant
+hours.12: 12 hour
+hours.24: 24 hour
+idle.after: Start after
+idle.after.title: Start after
+idle.face: Clock face
+idle.horizontal: Clock horizontal position
+idle.label: Visual label
+idle.media: Close paused player after
+idle.media.hint: Audio and video players
+idle.none: None
+idle.size: Clock size
+idle.source1: Visual 1 audio
+idle.source2: Visual 2 audio
+idle.title: Screen saver
+idle.vertical: Clock vertical position
+idle.visual1: Visual 1
+idle.visual2: Visual 2
+ink.amber: Amber
+ink.blue: Blue
+ink.cyan: Cyan
+ink.green: Green
+ink.pink: Pink
+ink.red: Red
+ink.theme: Theme
+ink.violet: Violet
+keyboard.cancel: Cancel
+keyboard.compact: Compact
+keyboard.large: Large
+keyboard.save: Save
+keyboard.size: Keyboard size
+keyboard.standard: Standard
+language.name: English
+look.default: Default
+look.full: Full screen
+look.panel: In the panel
+look.place: Placement
+look.stage.listening: Listening
+look.stage.responding: Responding
+look.stage.waiting: Waiting
+look.title: Visuals
+mode.auto: Automatic
+mode.manual: Manual
+network.address: IP address
+network.address.none: None
+network.lease: Lease renews
+network.lease.hours: "{{.N}} h"
+network.lease.minutes: "{{.N}} min"
+network.lease.now: Now
+network.mac: MAC address
+network.router: Router
+network.ssid: Wi-Fi network
+network.title: Network & internet
+onboard.hint: Scan the code, then choose this address.
+onboard.title: Add me to Home Assistant
+player.live: LIVE
+player.next: Up next
+player.now: Now playing
+position.bottom: Bottom
+position.center: Center
+position.top: Top
+poster.daily: Daily
+poster.every: Change every
+poster.hourly: Hourly
+poster.never: Never
+poster.next: Change now
+poster.off: Off
+poster.show: Show wallpaper
+poster.wake: On each wake
+power.reboot: Restart device
+power.reboot.what: Everything comes back in about a minute.
+power.restart: Restart app
+power.restart.what: The screen goes dark for a few seconds.
+power.title: Restart
+presence.group.presence: Presence
+presence.setting.range: Detection range
+presence.setting.wake: Wake on motion
+rail.media: Media
+rail.sleep: Sleep
+reply.download: Starts later, never gaps
+reply.stream: Starts sooner, can gap
+reply.title: Response playback
+screen.setting.auto: Auto brightness
+screen.setting.backlight: Brightness
+screen.setting.drawer: Dock location
+screen.setting.size: Size
+screen.setting.style: Style
+screen.setting.theme: Theme
+settings.about: About
+settings.assistants: Voice assistants
+settings.camera: Camera
+settings.debug: Developer options
+settings.display: Display
+settings.features: Connected services
+settings.language: Language
+settings.network: Network & internet
+settings.power: Restart
+settings.system: System
+settings.title: Settings
+settings.volume: Sound
+size.large: Large
+size.medium: Medium
+size.micro: Micro
+size.mini: Mini
+size.nano: Nano
+size.small: Small
+sound.alerts: Alarm volume
+sound.feedback: System sounds
+sound.media: Media volume
+sound.voice: Assistant volume
+source.both: Microphone and speaker
+source.mic: Microphone
+source.speaker: Speaker
+stream.alerts: Alerts
+stream.feedback: Feedback
+stream.media: Media
+stream.voice: Voice
+style.eink: E-ink
+style.glass: Glass
+style.hifi: Hi-fi
+style.material: Material You
+style.metro: Metro
+style.neon: Neon
+style.skeuo: Skeuo
+style.standard: Standard
+style.terminal: Terminal
+style.title: Style
+system.adb: ADB over network
+system.adb.hint: Unauthenticated root shell on 5555
+system.certificates: Verify certificates
+system.certificates.hint: TLS certificate validation
+system.title: System
+theme.default: Default
+theme.title: Theme
+tone.alert: Alert
+tone.info: Info
+tone.success: Success
+tone.title: Wake sound
+tone.warning: Warning
+uisize.compact: Compact
+uisize.large: Large
+uisize.medium: Medium
+uisize.mini: Mini
+uisize.xlarge: Extra large
+upgrade.installing: Installing…
+upgrade.line: Updating to {{.Version}} · {{.Status}}
+upgrade.percent: "{{.N}}%"
+visual.aurora: Aurora
+visual.classic-vu: Classic VU
+visual.cymatics: Cymatics
+visual.digital-vu: Digital VU
+visual.fire: Fire
+visual.fireflies: Fireflies
+visual.fireworks: Fireworks
+visual.galaxy: Galaxy
+visual.hal-9000: HAL 9000
+visual.halo: Halo
+visual.ink-in-water: Ink in Water
+visual.koi-pond: Koi Pond
+visual.lava-lamp: Lava Lamp
+visual.lcars: LCARS
+visual.lens-flares: Lens Flares
+visual.light-cycles: Light Cycles
+visual.matrix: Matrix
+visual.mercury: Mercury
+visual.mother: Mother
+visual.neon-sign: Neon Sign
+visual.orb: Orb
+visual.paint-splash: Paint Splash
+visual.phosphor: Phosphor
+visual.pipboy-3: PB 3000
+visual.pipboy-4: PB Mark IV
+visual.pipboy-76: PB 2000
+visual.pipboy-nv: PB New Vegas
+visual.pulsar: Pulsar
+visual.rain-on-glass: Rain on Glass
+visual.ribbons: Ribbons
+visual.synthwave: Synthwave
+visual.tesla: Tesla
+visual.thunderstorm: Thunderstorm
+volume.chime: Notification sound
+volume.location.title: Volume panel position
+weather.animate: Animate
+weather.cond.clear-night: Clear
+weather.cond.cloudy: Cloudy
+weather.cond.exceptional: Warning
+weather.cond.fog: Fog
+weather.cond.hail: Hail
+weather.cond.lightning: Thunderstorm
+weather.cond.lightning-rainy: Thunderstorm
+weather.cond.partlycloudy: Partly cloudy
+weather.cond.pouring: Heavy rain
+weather.cond.rainy: Rain
+weather.cond.snowy: Snow
+weather.cond.snowy-rainy: Sleet
+weather.cond.sunny: Sunny
+weather.cond.windy: Windy
+weather.cond.windy-variant: Windy
+weather.dashboard: Show on dashboard
+weather.entity: Weather entity
+weather.feels: "Feels like {{.T}}"
+weather.humidity: "Humidity {{.N}}%"
+weather.idle: Show on screen saver
+weather.look: Look
+weather.look.card: Card
+weather.look.compact: Compact
+weather.look.detail: Detail
+weather.look.icon: Icon
+weather.look.stack: Stack
+weather.look.words: Words
+weather.none: No weather entities in Home Assistant
+weather.off: "Off"
+weather.size: Size
+weather.themed: Themed colors
+weather.themed.hint: "Off uses natural colors: a yellow sun, grey clouds, blue rain"
+weather.title: Weather
+weather.uv: "UV {{.N}}"
+weather.wind: "Wind {{.N}} {{.Unit}}"
+youtube.category.filler: Filler
+youtube.category.hook: Hook
+youtube.category.interaction: Interaction reminder
+youtube.category.intro: Intro
+youtube.category.music_offtopic: Non-music section
+youtube.category.outro: Outro
+youtube.category.preview: Preview
+youtube.category.selfpromo: Self-promotion
+youtube.category.sponsor: Sponsor
+youtube.delay: Live delay
+youtube.delay.hint: How far behind live a stream plays
+youtube.delay.value: "{{.N}} s"
+youtube.demand: Connect only when casting
+youtube.demand.hint: Otherwise stays connected to YouTube
+youtube.skip: Skip segments
+youtube.skip.none: None
+youtube.skip.some: "{{.N}} kinds"
+youtube.title: YouTube
+zone.title: Time zone

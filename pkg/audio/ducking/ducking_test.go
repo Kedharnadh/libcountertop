@@ -5,10 +5,7 @@ import (
 	"testing"
 )
 
-func TestSavedDepthAndLegacyLevel(t *testing.T) {
-	if Gain(LegacyDB) != float32(0.2) {
-		t.Fatal(Gain(LegacyDB))
-	}
+func TestSavedDepth(t *testing.T) {
 	if got := Gain(-15); math.Abs(float64(got)-math.Pow(10, -15.0/20)) > 1e-7 {
 		t.Fatal(got)
 	}

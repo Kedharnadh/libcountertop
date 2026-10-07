@@ -85,9 +85,9 @@ func soap(t *testing.T, url, op, inner string) (int, string) {
 }
 
 func TestServeForAClient(t *testing.T) {
-	hold, err := time.ParseDuration(os.Getenv("LANOVO_ONVIF_SERVE"))
+	hold, err := time.ParseDuration(os.Getenv("COUNTERTOP_ONVIF_SERVE"))
 	if err != nil {
-		t.Skip("set LANOVO_ONVIF_SERVE to a duration to serve on 127.0.0.1:8000")
+		t.Skip("set COUNTERTOP_ONVIF_SERVE to a duration to serve on 127.0.0.1:8000")
 	}
 	s := &Service{Device: Device{Manufacturer: "Lenovo", Model: "SD-X701B", Firmware: "1.0", Serial: "HUA03RW0", Name: "display", MAC: "aa:bb:cc:dd:ee:ff", RTSPPort: 8554,
 		Profiles: func() []Profile {

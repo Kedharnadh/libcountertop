@@ -1,6 +1,6 @@
-// Package service supervises the parts of lanovod that have a life of their own.
+// Package service supervises the parts of the daemon that have a life of their own.
 //
-// lanovod is a handful of long-running loops over hardware Android can take back: the panel, the
+// the daemon is a handful of long-running loops over hardware Android can take back: the panel, the
 // speaker, the microphones, the radio, the API server. Each can fail on its own, and a bare
 // goroutine that returns takes its subsystem with it for the rest of the process.
 //
@@ -112,7 +112,7 @@ type policy struct {
 type Option func(*policy)
 
 // Required marks a service the process cannot run without. If it cannot be acquired, Run gives up
-// and lanovod exits, which is the right answer when init will start it again in a moment.
+// and the daemon exits, which is the right answer when init will start it again in a moment.
 func Required() Option {
 	return func(p *policy) { p.required = true }
 }

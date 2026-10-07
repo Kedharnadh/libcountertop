@@ -1,4 +1,4 @@
-package face
+package clockface
 
 import (
 	"testing"
@@ -168,4 +168,3 @@ func TestClockReadsTheReading(t *testing.T) {
 		}
 	}
 }
-

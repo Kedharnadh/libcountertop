@@ -1,4 +1,4 @@
-// Package face is the ways the clock can be drawn.
+// Package clockface draws clock readings within a supplied rectangle and palette.
 //
 // A face is handed the box it may use rather than the panel. Position, and a dashboard with more on
 // it than the time, both give a face less than the whole screen, and a face that measured the screen
@@ -9,14 +9,13 @@
 // lives apart from it — the reading in reading.go, the sizing in fit.go, the geometry beside the
 // face that uses it — so a face file is the look of that face and nothing else.
 //
-// What a face does not decide is when it is drawn. The dashboard redraws when the reading changes,
-// which is every minute, and a face that wanted a second hand would need a reading that carried
-// seconds — worth doing when there is one, and dead weight until then.
-package face
+// The caller decides when to draw. Readings carry seconds for the optional second hand, and Ticks
+// reports which faces require a redraw within the minute.
+package clockface
 
 import (
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
+	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
 // Face draws a reading inside the box it is given, in the colors it is given.
@@ -55,4 +54,3 @@ func Of(name Kind) Face {
 	}
 	return registered[Default]
 }
-

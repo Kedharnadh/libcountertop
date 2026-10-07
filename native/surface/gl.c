@@ -621,7 +621,7 @@ static void *render(void *arg) {
 	gl_glow glow = {0};
 	int W = g->w, H = g->h;
 	char prop[PROP_VALUE_MAX] = "";
-	__system_property_get("debug.lanovo.gltime", prop);
+	__system_property_get("debug." COUNTERTOP_PREFIX ".gltime", prop);
 	timing tm = {.on = prop[0] == '1'};
 
 	for (;;) {

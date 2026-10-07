@@ -156,10 +156,10 @@ func (c *counter) Attend(*playback.Session)    {}
 func (c *counter) Position(src playback.Source) (time.Duration, bool) { return src.Start(), false }
 func (c *counter) Failed(error)                                       {}
 
-// Against YouTube itself, so only when asked: LANOVO_LIVE=1.
+// Against YouTube itself, so only when asked: COUNTERTOP_LIVE=1.
 func TestAVideoPlaysThroughToItsEnd(t *testing.T) {
-	if os.Getenv("LANOVO_LIVE") == "" {
-		t.Skip("set LANOVO_LIVE=1 to play a real video")
+	if os.Getenv("COUNTERTOP_LIVE") == "" {
+		t.Skip("set COUNTERTOP_LIVE=1 to play a real video")
 	}
 	out := &counter{done: make(chan struct{})}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)

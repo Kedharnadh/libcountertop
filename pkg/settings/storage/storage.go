@@ -23,7 +23,7 @@ type Store[T any] struct {
 
 // Load overlays a document on defaults. clone must detach its slices and maps.
 // Unreadable documents stay protected against replacement, and malformed documents yield complete defaults.
-func Load[T any](path string, defaults T, clone func(T) T) (*Store[T], error) {
+func Load[T any](path string, defaults T, clone func(T) T, migrations ...func([]byte, *T) error) (*Store[T], error) {
 	if clone == nil {
 		clone = func(v T) T { return v }
 	}
@@ -40,6 +40,13 @@ func Load[T any](path string, defaults T, clone func(T) T) (*Store[T], error) {
 		s.readable = false
 		s.cfg = clone(defaults)
 		return s, fmt.Errorf("config: %s: %w", path, err)
+	}
+	for _, migrate := range migrations {
+		if err := migrate(data, &s.cfg); err != nil {
+			s.readable = false
+			s.cfg = clone(defaults)
+			return s, fmt.Errorf("config: %s: %w", path, err)
+		}
 	}
 	return s, nil
 }

@@ -1,4 +1,4 @@
-package face
+package clockface
 
 import "github.com/ygelfand/libcountertop/pkg/display/ui"
 
@@ -27,4 +27,3 @@ func fit(weight ui.Weight, text string, maxW, maxH int) int {
 	}
 	return size
 }
-

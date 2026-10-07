@@ -1,4 +1,4 @@
-package face
+package clockface
 
 import (
 	"fmt"
@@ -91,4 +91,3 @@ func clock(r Reading) (hour, minute int, ok bool) {
 	}
 	return hour, minute, true
 }
-

@@ -9,7 +9,7 @@ import (
 
 // A service whose device is not there when the group starts.
 //
-// The sound card is why this exists: lanovod runs from post-fs-data and ueventd has not always made
+// The sound card is why this exists: the daemon runs from post-fs-data and ueventd has not always made
 // /dev/snd/controlC0 by the time the microphones are acquired. Giving up there left the device with
 // no audio until something restarted the whole process, however long the service's restart policy
 // said to keep trying.

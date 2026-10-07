@@ -24,10 +24,10 @@ func TestNeighboursComeOutOfAWatchNextAnswer(t *testing.T) {
 	}
 }
 
-// Against YouTube itself, so only when asked: LANOVO_LIVE=1.
+// Against YouTube itself, so only when asked: COUNTERTOP_LIVE=1.
 func TestTheQueueAroundAMixVideo(t *testing.T) {
-	if os.Getenv("LANOVO_LIVE") == "" {
-		t.Skip("set LANOVO_LIVE=1 to ask YouTube")
+	if os.Getenv("COUNTERTOP_LIVE") == "" {
+		t.Skip("set COUNTERTOP_LIVE=1 to ask YouTube")
 	}
 	c := &http.Client{Timeout: 30 * time.Second}
 	prev, next, err := neighbours(t.Context(), c, Position{Video: "Y7nDX15KJ5M", List: "RDAMVMY7nDX15KJ5M", Index: 0}, nil)

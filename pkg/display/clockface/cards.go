@@ -1,8 +1,8 @@
-package face
+package clockface
 
 import (
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
+	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
 func init() { register(Cards, cards{}) }
@@ -174,4 +174,3 @@ func cardsFit(in ui.Rect, across bool) (side, gap int) {
 	side = max(side, 1)
 	return side, int(float64(side) * cardGap)
 }
-

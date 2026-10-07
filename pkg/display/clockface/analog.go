@@ -1,8 +1,8 @@
-package face
+package clockface
 
 import (
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
+	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
 func init() {
@@ -149,4 +149,3 @@ func (a analog) Draw(s ui.Surface, in ui.Rect, r Reading, palette theme.Theme) {
 		ui.DrawText(s, date, l.Date.X, l.Date.Y, palette.Muted, palette.Background, r.Date)
 	}
 }
-

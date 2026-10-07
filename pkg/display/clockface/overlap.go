@@ -1,8 +1,8 @@
-package face
+package clockface
 
 import (
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
+	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
 func init() { register(Overlap, overlap{}) }
@@ -194,4 +194,3 @@ func measureOverlap(size int, hour, minute string, r Reading) overlapped {
 	}
 	return m
 }
-

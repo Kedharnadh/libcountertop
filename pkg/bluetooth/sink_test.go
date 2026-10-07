@@ -30,7 +30,7 @@ type phone struct {
 
 func newPhone(t *testing.T) *phone {
 	t.Helper()
-	return &phone{t: t, sink: NewSink("Lanovo", l2cap.MTUDefault), cid: 0x0041}
+	return &phone{t: t, sink: NewSink("Panel", l2cap.MTUDefault), cid: 0x0041}
 }
 
 func (p *phone) nextID() byte {
@@ -569,7 +569,7 @@ func recordsIn(t *testing.T, p sdp.PDU) []sdp.Element {
 // Both remote control records have to name the channel the stack actually serves, and it is not
 // the audio one.
 func TestTheRemoteControlRecordsNameTheControlChannel(t *testing.T) {
-	records := Records("Lanovo")
+	records := Records("Panel")
 	if len(records) != 3 {
 		t.Fatalf("%d records", len(records))
 	}
@@ -599,7 +599,7 @@ func TestTheRemoteControlRecordsNameTheControlChannel(t *testing.T) {
 //
 // Only the categories. The bits above them mean different things at each end.
 func TestTheRemoteControlRecordsAgreeOnTheirCategories(t *testing.T) {
-	for _, r := range Records("Lanovo")[1:] {
+	for _, r := range Records("Panel")[1:] {
 		classes, ok := r.Attribute(sdp.AttrServiceClasses)
 		if !ok {
 			t.Fatal("a remote control record has no service classes")
@@ -639,7 +639,7 @@ func TestTheRemoteControlRecordsAgreeOnTheirCategories(t *testing.T) {
 func TestEveryRecordHasItsOwnHandle(t *testing.T) {
 	seen := map[uint32]bool{}
 
-	for _, r := range Records("Lanovo") {
+	for _, r := range Records("Panel") {
 		handle, ok := r.Attribute(sdp.AttrRecordHandle)
 		if !ok {
 			t.Fatal("a record has no handle")
@@ -659,7 +659,7 @@ func TestEveryRecordHasItsOwnHandle(t *testing.T) {
 // A record that names a channel the stack does not serve is a device a phone finds and cannot use,
 // which looks like broken audio rather than a missing feature.
 func TestTheRecordAdvertisesTheChannelTheStackServes(t *testing.T) {
-	protocols, ok := Record("Lanovo").Attribute(sdp.AttrProtocols)
+	protocols, ok := Record("Panel").Attribute(sdp.AttrProtocols)
 	if !ok {
 		t.Fatal("the record has no protocol list")
 	}

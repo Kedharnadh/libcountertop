@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-var kitchen = Device{ID: "1b0cf94a40f35185c64b074179c1caa8", Name: "Kitchen", Model: "LANovo"}
+var kitchen = Device{ID: "1b0cf94a40f35185c64b074179c1caa8", Name: "Kitchen", Model: "Panel"}
 
 func answer(t *testing.T, r *Receiver, request string) (envelope map[string]any, data map[string]any) {
 	t.Helper()
@@ -25,7 +25,7 @@ func answer(t *testing.T, r *Receiver, request string) (envelope map[string]any,
 
 func eurekaReceiver() *Receiver {
 	r := NewReceiver("Kitchen")
-	r.Eureka = func() Eureka { return NewEureka(kitchen, "LANovo", "0.0.1") }
+	r.Eureka = func() Eureka { return NewEureka(kitchen, "Panel", "0.0.1") }
 	return r
 }
 
@@ -67,7 +67,7 @@ func TestEurekaInfoWithParamsIsOnlyThosePaths(t *testing.T) {
 	}
 
 	info := data["device_info"].(map[string]any)
-	if info["cloud_device_id"] != kitchen.CloudID() || info["product_name"] != "LANovo" ||
+	if info["cloud_device_id"] != kitchen.CloudID() || info["product_name"] != "Panel" ||
 		info["ssdp_udn"] != "1b0cf94a-40f3-5185-c64b-074179c1caa8" {
 		t.Errorf("device_info is %v", info)
 	}

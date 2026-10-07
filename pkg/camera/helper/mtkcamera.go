@@ -1,4 +1,4 @@
-// Package mtkcamera streams H.264 from lanovo-camera, the helper that runs the vendor camera stack into
+// Package mtkcamera streams H.264 from the camera helper, the helper that runs the vendor camera stack into
 // hardware encoders. One client at a time; closing the stream stops the camera.
 package helper
 

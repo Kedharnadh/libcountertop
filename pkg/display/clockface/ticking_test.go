@@ -1,11 +1,11 @@
-package face
+package clockface
 
 import (
 	"testing"
 	"time"
 
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
+	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
 // Only the face with a second hand asks to be redrawn every second. A face that ticked by accident
@@ -86,4 +86,3 @@ func TestTheSecondHandMoves(t *testing.T) {
 		t.Error("the face with no second hand changed with the second")
 	}
 }
-

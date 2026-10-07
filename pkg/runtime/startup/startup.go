@@ -21,6 +21,21 @@ type Moment struct {
 	Trace, Header, Ready float64
 }
 
+// NetworkAddress reports lease readiness only while its Wi-Fi link is associated.
+// A retained lease remains available to the DHCP lifecycle during a brief disconnect.
+func NetworkAddress(link Progress, address string) Progress {
+	if !link.Done {
+		if link.Failed {
+			return Progress{Failed: true, Doing: link.Doing}
+		}
+		return Progress{Doing: "waiting for Wi-Fi"}
+	}
+	if address == "" {
+		return Progress{Doing: "asking for an address"}
+	}
+	return Progress{Done: true, Doing: address}
+}
+
 func Settled(p []Progress) bool {
 	for _, r := range p {
 		if !r.Done && !r.Failed {

@@ -142,7 +142,7 @@ func Join(c Conn, ssid, passphrase string) error {
 		}
 	}
 
-	// The supplicant writes its own configuration, so the network survives a reboot and lanovod
+	// The supplicant writes its own configuration, so the network survives a reboot and the daemon
 	// comes up on it. Assigning an address is somebody else's job.
 	_, err = c.Cmd("save_config")
 	return err

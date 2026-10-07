@@ -1,10 +1,10 @@
-package face
+package clockface
 
 import (
 	"math"
 
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
+	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
 // The geometry of a dial, kept apart from the face that draws one: this is trigonometry and the
@@ -62,4 +62,3 @@ func heading(deg float64) (dx, dy float64) {
 	rad := deg * math.Pi / 180
 	return math.Sin(rad), -math.Cos(rad)
 }
-

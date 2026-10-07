@@ -1,8 +1,8 @@
-package face
+package clockface
 
 import (
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
+	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
 func init() { register(Segments, segments{}) }
@@ -183,4 +183,3 @@ func segmentsFit(in ui.Rect, rows []string) int {
 	}
 	return max(height, 1)
 }
-

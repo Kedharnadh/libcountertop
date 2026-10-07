@@ -1,8 +1,8 @@
-package face
+package clockface
 
 import (
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
+	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
 func init() { register(Stack, stack{}) }
@@ -227,4 +227,3 @@ func measureStack(size int, hour, minute string, r Reading) stacked {
 
 	return m
 }
-

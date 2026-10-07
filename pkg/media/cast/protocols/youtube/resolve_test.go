@@ -17,8 +17,8 @@ import (
 )
 
 func TestAVideoStreamIsVP9(t *testing.T) {
-	if os.Getenv("LANOVO_LIVE") == "" {
-		t.Skip("set LANOVO_LIVE=1 to ask YouTube")
+	if os.Getenv("COUNTERTOP_LIVE") == "" {
+		t.Skip("set COUNTERTOP_LIVE=1 to ask YouTube")
 	}
 	r := NewResolver(&http.Client{Timeout: time.Minute}, nil)
 	_, stream, err := r.Video(t.Context(), "Y7nDX15KJ5M")
@@ -43,7 +43,7 @@ func TestAVideoStreamIsVP9(t *testing.T) {
 	if tr.Codec != "V_VP9" || tr.Height == 0 {
 		t.Errorf("track %+v", tr)
 	}
-	if dump := os.Getenv("LANOVO_DUMP"); dump != "" {
+	if dump := os.Getenv("COUNTERTOP_DUMP"); dump != "" {
 		if err := os.WriteFile(dump, head, 0o644); err != nil {
 			t.Error(err)
 		}

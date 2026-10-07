@@ -10,7 +10,7 @@ import (
 )
 
 func TestProductIdentityIsPreservedInHeadersSDPAndSenderReports(t *testing.T) {
-	for _, id := range []Identity{{"LANovo", "lanovo-"}, {"EchoLocal", "echolocal-"}} {
+	for _, id := range []Identity{{"Panel", "panel-"}, {"Speaker", "speaker-"}} {
 		t.Run(id.Name, func(t *testing.T) {
 			srv := NewServerWithIdentity(id)
 			st := NewStream()

@@ -1,0 +1,80 @@
+package schema
+
+import "github.com/ygelfand/libcountertop/pkg/say"
+
+type Idle struct {
+	After    Delay      `json:"after"`
+	Media    Delay      `json:"media"`
+	Face     Face       `json:"face"`
+	Position Position   `json:"position"`
+	Align    Align      `json:"align"`
+	Size     Size       `json:"size"`
+	First    IdleVisual `json:"first"`
+	Second   IdleVisual `json:"second"`
+}
+
+type IdleVisual struct {
+	Kind   string `json:"kind"`
+	Source Source `json:"source"`
+}
+
+func (v IdleVisual) On() bool { return v.Kind != "" }
+
+func IdleFaces() []Face { return append([]Face{FaceNone}, Faces()...) }
+
+type Align string
+
+const (
+	AlignLeft   Align = "left"
+	AlignCenter Align = "center"
+	AlignRight  Align = "right"
+)
+
+func (a Align) Label() string {
+	switch a {
+	case AlignLeft:
+		return say.T("align.left")
+	case AlignCenter:
+		return say.T("align.center")
+	case AlignRight:
+		return say.T("align.right")
+	}
+	return string(a)
+}
+
+func Aligns() []Align { return []Align{AlignLeft, AlignCenter, AlignRight} }
+
+type Source string
+
+const (
+	SourceBoth    Source = "both"
+	SourceMic     Source = "mic"
+	SourceSpeaker Source = "speaker"
+)
+
+func (s Source) Label() string {
+	switch s {
+	case SourceBoth:
+		return say.T("source.both")
+	case SourceMic:
+		return say.T("source.mic")
+	case SourceSpeaker:
+		return say.T("source.speaker")
+	}
+	return string(s)
+}
+
+func Sources() []Source { return []Source{SourceBoth, SourceMic, SourceSpeaker} }
+
+func DefaultIdle() Idle {
+	return Idle{
+		After:    DefaultDelay,
+		Media:    Delay5m,
+		Face:     DefaultFace,
+		Position: DefaultPosition,
+		Align:    AlignCenter,
+		Size:     DefaultSize,
+		First:    IdleVisual{Source: SourceBoth},
+		Second:   IdleVisual{Source: SourceBoth},
+	}
+}

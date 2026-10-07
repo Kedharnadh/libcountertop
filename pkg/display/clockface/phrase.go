@@ -1,4 +1,4 @@
-package face
+package clockface
 
 // The time in English, kept apart from the face that draws it: this is language and that is
 // layout, and a second language would land here and nowhere else.
@@ -59,4 +59,3 @@ func Say(hour, minute int) []string {
 	}
 	return []string{count + " past", name}
 }
-

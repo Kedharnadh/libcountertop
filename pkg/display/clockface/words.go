@@ -1,8 +1,8 @@
-package face
+package clockface
 
 import (
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
+	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
 func init() { register(Words, words{}) }
@@ -102,4 +102,3 @@ func wordsFit(in ui.Rect, said []string) int {
 	}
 	return size
 }
-

@@ -1,8 +1,8 @@
-package face
+package clockface
 
 import (
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
+	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
 // A seven segment digit, kept apart from the face that arranges them: which bars a digit lights is
@@ -72,4 +72,3 @@ func drawColon(s ui.Surface, x, top, height int, on theme.Color) {
 		ui.FillRounded(s, ui.Rect{X: x + (span-dot)/2, Y: y, W: dot, H: dot}, dot/2, on)
 	}
 }
-

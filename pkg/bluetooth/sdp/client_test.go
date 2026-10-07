@@ -63,7 +63,7 @@ func TestAContinuationIsCarriedBack(t *testing.T) {
 // An answer this side writes has to be one this side can read, which also says the records survive
 // the trip with their attributes intact.
 func TestAnAnswerRoundTripsIntoRecords(t *testing.T) {
-	want := RemoteControl(2, "Lanovo", 0x0017, 0x001b, UUIDAVRemoteControlController, 0x03cf)
+	want := RemoteControl(2, "Panel", 0x0017, 0x001b, UUIDAVRemoteControlController, 0x03cf)
 
 	p, err := SearchAttributeResponse(3, []Record{want})
 	if err != nil {
@@ -98,7 +98,7 @@ func TestAnAnswerRoundTripsIntoRecords(t *testing.T) {
 // The whole point of asking: the channel a protocol is served on lives in the additional protocol
 // descriptor lists, not the main one.
 func TestFindingAChannelInTheExtraLists(t *testing.T) {
-	r := RemoteControl(2, "Lanovo", 0x0017, 0x001b, UUIDAVRemoteControlController, 0x03cf)
+	r := RemoteControl(2, "Panel", 0x0017, 0x001b, UUIDAVRemoteControlController, 0x03cf)
 
 	psm, ok := MorePSM(r, UUIDAVCTP)
 	if !ok {
@@ -117,7 +117,7 @@ func TestFindingAChannelInTheExtraLists(t *testing.T) {
 
 // A record with no extra lists at all is the common case and not an error.
 func TestARecordWithNoExtraLists(t *testing.T) {
-	r := AudioSink(1, "Lanovo", 0x0019, FeatureSpeaker)
+	r := AudioSink(1, "Panel", 0x0019, FeatureSpeaker)
 
 	if _, ok := MorePSM(r, UUIDOBEX); ok {
 		t.Error("a channel came back from a record that publishes none")
@@ -140,7 +140,7 @@ func TestAnAnswerTooShortToHaveAHeader(t *testing.T) {
 // An odd number of fields cannot be identifier and value pairs, so it is a truncated record rather
 // than one with something missing.
 func TestARecordThatCannotPairUp(t *testing.T) {
-	body, err := Sequence(Sequence(Uint16(AttrName), Text("Lanovo"), Uint16(AttrFeatures))).Marshal()
+	body, err := Sequence(Sequence(Uint16(AttrName), Text("Panel"), Uint16(AttrFeatures))).Marshal()
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}

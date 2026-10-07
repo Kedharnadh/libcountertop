@@ -1,10 +1,10 @@
-package face
+package clockface
 
 import (
 	"testing"
 
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
+	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
 // The screen this device has, and the two rotations it can be at.
@@ -119,4 +119,3 @@ func TestEveryFaceDrawsInACorner(t *testing.T) {
 		}
 	}
 }
-

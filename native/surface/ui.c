@@ -182,7 +182,7 @@ static void *render(void *arg) {
 	eglSwapInterval(dpy, 1);
 
 	char prop[PROP_VALUE_MAX] = "";
-	__system_property_get("debug.lanovo.uitime", prop);
+	__system_property_get("debug." COUNTERTOP_PREFIX ".uitime", prop);
 	int timed = prop[0] == '1';
 
 	GLuint progs[UI_PROGRAMS] = {0};

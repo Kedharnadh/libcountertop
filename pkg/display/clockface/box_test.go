@@ -1,11 +1,11 @@
-package face
+package clockface
 
 import (
 	"testing"
 	"time"
 
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
+	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
 // every face there is, so a new one is covered by being registered rather than by being remembered.
@@ -81,4 +81,3 @@ func TestEveryFaceStaysInsideAnAwkwardBox(t *testing.T) {
 		}
 	}
 }
-

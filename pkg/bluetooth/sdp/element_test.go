@@ -69,7 +69,7 @@ func TestAShortUUIDGoesOutAndComesBack(t *testing.T) {
 }
 
 func TestTextAndBoolAndNil(t *testing.T) {
-	if got := roundTrip(t, Text("LANovo")); string(got.Value) != "LANovo" {
+	if got := roundTrip(t, Text("Panel")); string(got.Value) != "Panel" {
 		t.Errorf("text came back %q", got.Value)
 	}
 	if got := roundTrip(t, Bool(true)); got.Type != TypeBool || got.Value[0] != 1 {

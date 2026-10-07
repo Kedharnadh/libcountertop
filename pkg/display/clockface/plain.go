@@ -1,8 +1,8 @@
-package face
+package clockface
 
 import (
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
+	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
 func init() { register(Plain, plain{}) }
@@ -106,4 +106,3 @@ func arrange(r Reading, in ui.Rect) (layout, fonts) {
 	}
 	return l, f
 }
-

@@ -6,7 +6,7 @@ import (
 )
 
 func sink() Record {
-	return AudioSink(0x00010000, "LANovo", UUIDAVDTP, FeatureSpeaker)
+	return AudioSink(0x00010000, "Panel", UUIDAVDTP, FeatureSpeaker)
 }
 
 // What a phone needs to find, in the order it needs it: there is an audio sink, it conforms to
@@ -88,7 +88,7 @@ func TestTheRecordGoesOutSortedByIdentifier(t *testing.T) {
 	r := Record{
 		{ID: AttrFeatures, Value: Uint(FeatureSpeaker)},
 		{ID: AttrRecordHandle, Value: Uint(1)},
-		{ID: AttrName, Value: Text("LANovo")},
+		{ID: AttrName, Value: Text("Panel")},
 	}
 
 	got := r.Element()

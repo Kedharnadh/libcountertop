@@ -1,4 +1,4 @@
-package face
+package clockface
 
 import (
 	"strings"
@@ -105,4 +105,3 @@ func abs(n int) int {
 	}
 	return n
 }
-

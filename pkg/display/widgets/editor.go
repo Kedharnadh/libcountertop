@@ -1,0 +1,90 @@
+package widgets
+
+import (
+	gui "github.com/go-gui-org/go-gui/gui"
+	"github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/style"
+)
+
+// Editor owns text drafts, focus, and keyboard state for one GUI session.
+// Its methods run on the window's UI loop.
+type Editor struct {
+	drafts  map[string]string
+	leaf    string
+	save    func()
+	Top     float32
+	Shift   bool
+	Symbols bool
+}
+
+func NewEditor() *Editor { return &Editor{drafts: make(map[string]string)} }
+
+func focused(w *gui.Window, leaf string) bool {
+	for _, id := range w.ResolveID(leaf) {
+		if w.IsFocus(id) {
+			return true
+		}
+	}
+	return false
+}
+
+func (e *Editor) Typing(w *gui.Window) bool { return e.leaf != "" && focused(w, e.leaf) }
+
+func (e *Editor) Save() {
+	if e.save != nil {
+		e.save()
+	}
+}
+
+func (e *Editor) Clear(w *gui.Window, bottom float32) {
+	if e.Top <= 0 || bottom <= e.Top-style.Reach()*0.3 {
+		return
+	}
+	by := bottom - e.Top + style.Reach()*0.5
+	w.QueueCommand(func(w *gui.Window) { w.ScrollVerticalTo("page", w.ScrollVerticalOffset("page")-by) })
+}
+
+// Field styles an input and registers its save action while focused.
+func (e *Editor) Field(kit style.Kit, cfg gui.InputCfg, save func()) gui.View {
+	kit.Field(&cfg)
+	leaf, blur := cfg.ID, cfg.OnBlur
+	cfg.OnBlur = func(ev gui.EventCtx) {
+		if e.leaf == leaf {
+			e.leaf, e.save = "", nil
+		}
+		if blur != nil {
+			blur(ev)
+		}
+	}
+	return gui.Column(gui.ContainerCfg{
+		Sizing: cfg.Sizing, Padding: gui.NoPadding,
+		AmendLayout: func(ev gui.EventCtx) {
+			if focused(ev.Window, leaf) {
+				e.leaf, e.save = leaf, save
+				e.Clear(ev.Window, ev.Layout.Shape.Y+ev.Layout.Shape.Height)
+			}
+		},
+		Content: []gui.View{gui.Input(cfg)},
+	})
+}
+
+// Row builds an editable row using a page-qualified identifier.
+func (e *Editor) Row(kit style.Kit, id string, r model.Row) gui.View {
+	fid := id + "-field"
+	text, ok := e.drafts[fid]
+	if !ok {
+		text = r.Value
+	}
+	return e.Field(kit, gui.InputCfg{
+		ID: fid, Text: text, Sizing: gui.FillFit,
+		OnTextChanged: func(s string, ev gui.EventCtx) { e.drafts[fid] = s; ev.Window.InvalidateLayout() },
+		OnTextCommit: func(_ string, _ gui.InputCommitReason, ev gui.EventCtx) {
+			delete(e.drafts, fid)
+			ev.Window.InvalidateLayout()
+		},
+	}, func() {
+		if s, ok := e.drafts[fid]; ok && r.Save != nil {
+			r.Save(s)
+		}
+	})
+}

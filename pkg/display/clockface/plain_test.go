@@ -1,4 +1,4 @@
-package face
+package clockface
 
 import (
 	"testing"
@@ -88,4 +88,3 @@ func TestArrangeFollowsTheBoxItIsGiven(t *testing.T) {
 		t.Errorf("the time is at %d, above the box starting at 960", half.Time.Y)
 	}
 }
-

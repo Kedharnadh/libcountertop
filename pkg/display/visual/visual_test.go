@@ -36,7 +36,7 @@ func loud() analysis.Analysis {
 func shades(t *testing.T, v Visual, box ui.Rect, n int) *fakeGL {
 	t.Helper()
 	g := &fakeGL{}
-	x := Input{Mic: loud(), Speaker: loud(), Dt: 40 * time.Millisecond, Label: "LANOVO"}
+	x := Input{Mic: loud(), Speaker: loud(), Dt: 40 * time.Millisecond, Label: "PANEL"}
 	for i := range n {
 		x.Now = time.Duration(i+1) * x.Dt
 		x.Replying = i >= n/2
