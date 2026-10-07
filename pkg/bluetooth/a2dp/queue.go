@@ -145,7 +145,7 @@ func (s *Sink) holds(items []avrcp.Item) {
 	s.queue, s.handles = items, nil
 	s.mu.Unlock()
 
-	s.options.Media().Changed()
+	s.options.Media.Changed()
 }
 
 // browsable reports whether the browsing channel is up.

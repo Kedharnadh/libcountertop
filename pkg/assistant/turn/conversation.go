@@ -2,8 +2,6 @@ package turn
 
 import (
 	"context"
-	"github.com/ygelfand/libcountertop/pkg/assistant/activity"
-	"github.com/ygelfand/libcountertop/pkg/inference/wake"
 	"log/slog"
 	"math"
 	"sync/atomic"
@@ -11,7 +9,8 @@ import (
 
 	esphome "github.com/ygelfand/go-esphome-device"
 	"github.com/ygelfand/go-esphome-device/api"
-
+	"github.com/ygelfand/libcountertop/pkg/assistant/activity"
+	"github.com/ygelfand/libcountertop/pkg/inference/wake"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
 
@@ -71,7 +70,7 @@ type event struct {
 // a guard flag.
 type Conversation struct {
 	replyID uint64
-	options Options
+	options Dependencies
 	Word    func(int) (string, bool)
 	vs      *esphome.VoiceSatellite
 	source  Microphone
@@ -151,21 +150,12 @@ type reply struct {
 	stream *Reply
 }
 
-func NewConversation(vs *esphome.VoiceSatellite, options Options) *Conversation {
+func NewConversation(vs *esphome.VoiceSatellite, options Dependencies) *Conversation {
 	if options.Models == nil {
 		options.Models = func() []wake.Model { return nil }
 	}
-	if options.Begin == nil {
-		options.Begin = func() {}
-	}
-	if options.End == nil {
-		options.End = func() {}
-	}
-	if options.Effect == nil {
-		options.Effect = func(int, Phase) {}
-	}
-	if options.Elsewhere == nil {
-		options.Elsewhere = func() {}
+	if options.Presentation == nil {
+		options.Presentation = &Presentation{}
 	}
 	c := &Conversation{
 		options: options, Word: options.Word, vs: vs, source: options.Source, speaker: options.Speaker,
@@ -248,8 +238,8 @@ func (c *Conversation) Phase() phase { return phase(c.visible.Load()) }
 // Run owns the Conversation until ctx is cancelled.
 func (c *Conversation) Run(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
-	c.options.Begin()
-	defer c.options.End()
+	c.options.Presentation.Begin()
+	defer c.options.Presentation.End()
 
 	senderDone := make(chan struct{})
 	safe.Go("voice sender", func() { defer close(senderDone); c.sends(ctx) })
@@ -426,7 +416,7 @@ func (c *Conversation) handle(e event) {
 			slog.Info("another device answered first", "slot", c.slot+1, "message", e.msg)
 			c.clearPending()
 			c.idle("answered elsewhere", activity.Cancelled)
-			c.options.Elsewhere()
+			c.options.Presentation.Elsewhere()
 			return
 		}
 
@@ -663,14 +653,14 @@ func (c *Conversation) idle(why string, how activity.Outcome) {
 func (c *Conversation) enter(p phase) {
 	c.phase = p
 	c.visible.Store(int32(p))
-	c.options.Adapting(p != phaseListening)
+	c.options.Source.SetAdapting(p != phaseListening)
 	c.show()
-	c.options.Effect(c.slot, c.phase)
+	c.options.Presentation.Phase(c.slot, c.phase)
 }
 
 // show hands the whole turn to whatever is drawing it.
 func (c *Conversation) show() {
-	c.options.Shown(Showing{
+	c.options.Presentation.Show(Showing{
 		Phase: c.phase,
 		Slot:  c.slot,
 		Said:  c.said,
@@ -712,7 +702,7 @@ func (c *Conversation) hold(on bool) {
 
 	// Every background, not just the track: a room playing along with the rest of the house is also
 	// something a reply has to be heard over, and it is not the media player's to quieten.
-	c.options.Duck(on)
+	c.options.Sound.Duck(on)
 }
 
 // arm gives the current phase a limit; disarm removes it. Each phase sets its own, so a slow model

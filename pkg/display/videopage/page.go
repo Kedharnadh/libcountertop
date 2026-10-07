@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ygelfand/libcountertop/pkg/audio/volume"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -21,7 +22,7 @@ const (
 // Page is a video on the shell: the picture shows through it, and its controls, spinner, logo
 // and errors are drawn like any other screen.
 type Page struct {
-	options Options
+	options Dependencies
 	c       Controls
 
 	mu      sync.Mutex
@@ -91,7 +92,7 @@ func (p *Page) Linger() {
 	p.mu.Unlock()
 }
 
-func New(c Controls, o Options) *Page {
+func New(c Controls, o Dependencies) *Page {
 	return &Page{c: c, options: o, loading: true, began: time.Now()}
 }
 
@@ -181,7 +182,7 @@ func (p *Page) redraw() {
 // Run puts the page up and keeps it current until ctx ends.
 func (p *Page) Run(ctx context.Context) {
 	p.Show()
-	quiet := p.options.VolumeChanged(func() {
+	quiet := p.options.Volume.Watch(func(int) {
 		if p.options.Shell.Top() == p {
 			p.reveal()
 		}
@@ -244,7 +245,7 @@ func (p *Page) tick() {
 	}
 	p.paused = now.Paused
 	spinning := p.loading && time.Since(p.began) > spinAfter
-	key := fmt.Sprintf("%v|%v|%d|%v|%v|%s|%s|%s|%d|%d|%d|%d", p.shown, p.picture, now.Elapsed/time.Second, now.Paused, now.Playing, now.Title, now.Artist, now.Album, now.ArtID, now.MarkID, now.Can, p.options.Level())
+	key := fmt.Sprintf("%v|%v|%d|%v|%v|%s|%s|%s|%d|%d|%d|%d", p.shown, p.picture, now.Elapsed/time.Second, now.Paused, now.Playing, now.Title, now.Artist, now.Album, now.ArtID, now.MarkID, now.Can, p.options.Volume.Level())
 	changed := key != p.drawn
 	p.drawn = key
 	p.mu.Unlock()
@@ -253,8 +254,7 @@ func (p *Page) tick() {
 	}
 }
 
-type Options struct {
-	Shell         *shell.Shell
-	Level         func() int
-	VolumeChanged func(func()) func()
+type Dependencies struct {
+	Shell  *shell.Shell
+	Volume volume.Channel
 }

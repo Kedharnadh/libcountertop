@@ -13,6 +13,7 @@ type Microphone interface {
 	Listen(string) (<-chan []int16, func())
 	Recent(time.Duration) []int16
 	Gain() float64
+	SetAdapting(bool)
 	Clipped() uint64
 }
 
@@ -34,6 +35,7 @@ type Sound interface {
 	Claim(string, func(context.Context, Speaker) error) Claim
 	Busy() bool
 	Silence()
+	Duck(bool)
 }
 
 type Recorder interface {
@@ -43,30 +45,21 @@ type Recorder interface {
 	Seconds(string) float64
 }
 
-type Words struct {
-	MaxListen, MaxThink, FollowUp, Buffer, ChimeLength func(int) time.Duration
-	Delivery                                           func(int) string
-	Tones                                              func(int) bool
-	Chime                                              func(int)
-}
-
-// Options binds the conversation to audio hardware, saved settings, and presentation.
-type Options struct {
-	Source                                    Microphone
-	Speaker                                   Speaker
-	Sound                                     Sound
-	Player                                    interface{ Sounding(bool) }
-	Log                                       *activity.Log
-	Recorder                                  Recorder
-	Words                                     Words
-	Word                                      func(int) (string, bool)
-	Models                                    func() []wake.Model
-	Muted                                     func() (bool, error)
-	Adapting, Duck                            func(bool)
-	HardwareTail                              time.Duration
-	Shown                                     func(Showing)
-	Begin, End, Cancelled, Failure, Elsewhere func()
-	Effect                                    func(int, Phase)
+// Dependencies binds the conversation to audio hardware, saved settings, and presentation.
+type Dependencies struct {
+	Source             Microphone
+	Speaker            Speaker
+	Sound              Sound
+	Player             interface{ Sounding(bool) }
+	Log                *activity.Log
+	Recorder           Recorder
+	Words              Words
+	Word               func(int) (string, bool)
+	Models             func() []wake.Model
+	Muted              func() (bool, error)
+	HardwareTail       time.Duration
+	Presentation       *Presentation
+	Cancelled, Failure func()
 }
 
 func dropped(source Microphone) uint64 {

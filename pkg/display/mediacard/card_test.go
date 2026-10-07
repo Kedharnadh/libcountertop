@@ -1,10 +1,11 @@
 package mediacard
 
 import (
+	"testing"
+
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	media "github.com/ygelfand/libcountertop/pkg/media/source"
-	"testing"
-	"time"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 type testSource struct {
@@ -22,11 +23,22 @@ func (*testSource) Kind() media.Kind { return media.FromCast }
 func (*testSource) Label() string    { return "" }
 func (s *testSource) Open() bool     { return s.own }
 
+type testPlayer struct{ source *testSource }
+
+func (p testPlayer) Now() media.Now       { return p.source.Now() }
+func (p testPlayer) Holder() media.Source { return p.source }
+func (testPlayer) ResetSession()          {}
+
+type testIdle struct{}
+
+func (testIdle) Read() schema.Idle               { return schema.Idle{} }
+func (testIdle) Update(func(*schema.Idle)) error { return nil }
+
 func TestSourcePageReleasesTheCardAndCloseReleasesTheHold(t *testing.T) {
 	stack := shell.New()
 	defer stack.Close()
 	src := &testSource{now: media.Now{Playing: true}}
-	c := New(Options{Now: src.Now, Source: func() Source { return src }, Idle: func() time.Duration { return 0 }, Reset: func() {}, Shell: stack})
+	c := New(Dependencies{Player: testPlayer{src}, Idle: testIdle{}, Shell: stack})
 	c.Began(src)
 	c.Follow()
 	if stack.Top() != c.Page() {

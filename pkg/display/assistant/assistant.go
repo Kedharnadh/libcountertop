@@ -28,7 +28,7 @@ const (
 )
 
 type Assistant struct {
-	options Options
+	options Dependencies
 	Frame   hook.Hook[Showing]
 
 	mu sync.Mutex
@@ -48,12 +48,14 @@ type Assistant struct {
 	took int
 }
 
-type Options struct {
-	Level func() float64
-	Stop  func() bool
+type Level interface{ Level() float64 }
+type Controller interface{ Stop() bool }
+type Dependencies struct {
+	Microphone Level
+	Controller Controller
 }
 
-func New(options Options) *Assistant {
+func New(options Dependencies) *Assistant {
 	return &Assistant{options: options, wake: make(chan struct{}, 1)}
 }
 
@@ -134,7 +136,7 @@ func (a *Assistant) Now() (Showing, bool) {
 	a.mu.Unlock()
 
 	if show.Phase == voice.Listening {
-		show.Level = a.options.Level()
+		show.Level = a.options.Microphone.Level()
 	}
 	return show, show.Down > 0
 }
@@ -197,7 +199,7 @@ func (a *Assistant) Cancel(id int) {
 	if !showing {
 		return
 	}
-	if a.options.Stop() {
+	if a.options.Controller.Stop() {
 		slog.Info("turn ended by touch")
 	}
 }

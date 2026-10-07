@@ -1,6 +1,8 @@
 package settings
 
 import (
+	"time"
+
 	face "github.com/ygelfand/libcountertop/pkg/display/clockface"
 	"github.com/ygelfand/libcountertop/pkg/display/dashboard"
 	widget "github.com/ygelfand/libcountertop/pkg/display/model"
@@ -9,31 +11,33 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
-	"time"
 )
 
 type ClockState struct {
 	Screen config.Screen
 	Clock  config.Clock
 }
-type ClockOptions struct {
-	Read     func() ClockState
-	Push     func(shell.View)
-	Face     func(config.Face)
-	Position func(config.Position)
-	Size     func(config.Size)
-	Ink      func(config.Ink)
-	Date     func(bool)
+type ClockController interface {
+	SetFace(config.Face)
+	SetPosition(config.Position)
+	SetSize(config.Size)
+	SetInk(config.Ink)
+	SetDate(bool)
 }
-type ClockPages struct{ options ClockOptions }
+type ClockDependencies struct {
+	Preferences Preferences
+	Shell       *shell.Shell
+	Controller  ClockController
+}
+type ClockPages struct{ options ClockDependencies }
 
-func NewClockPages(options ClockOptions) *ClockPages { return &ClockPages{options: options} }
-func (p *ClockPages) open(view shell.View) func(int) { return func(int) { p.options.Push(view) } }
+func NewClockPages(options ClockDependencies) *ClockPages { return &ClockPages{options: options} }
+func (p *ClockPages) open(view shell.View) func(int)      { return func(int) { p.options.Shell.Push(view) } }
 func (p *ClockPages) Page() *shell.Page {
 	return &shell.Page{
 		Title: say.T("clock.title"),
 		Build: func() ([]widget.Row, []func(int)) {
-			cfg := p.options.Read()
+			cfg := p.options.Preferences.ClockState()
 
 			return []widget.Row{
 					{Label: say.T("clock.face"), Kind: widget.Chevron, Value: cfg.Clock.Face.Label()},
@@ -44,12 +48,12 @@ func (p *ClockPages) Page() *shell.Page {
 					{Label: say.T("clock.date"), Kind: widget.Toggle, On: cfg.Clock.Date},
 				}, []func(int){
 					p.open(p.Faces(say.T("clock.face"),
-						func() config.Face { return p.options.Read().Clock.Face },
-						p.options.Face)),
+						func() config.Face { return p.options.Preferences.ClockState().Clock.Face },
+						p.options.Controller.SetFace)),
 					p.open(p.Positions()),
 					p.open(p.Sizes()),
 					p.open(p.Colors()),
-					func(int) { p.options.Date(!cfg.Clock.Date) },
+					func(int) { p.options.Controller.SetDate(!cfg.Clock.Date) },
 				}
 		},
 	}
@@ -84,7 +88,7 @@ func picks(use func(config.Face), f config.Face) func(int) {
 
 func (p *ClockPages) Preview(f config.Face) func(ui.Surface, ui.Rect, theme.Theme) {
 	return func(s ui.Surface, at ui.Rect, palette theme.Theme) {
-		cfg := p.options.Read()
+		cfg := p.options.Preferences.ClockState()
 		reading := face.Read(time.Now(), cfg.Screen.Hours == config.TwentyFourHour)
 
 		// In the clock's own color, not the theme's. The row is previewing this device's clock, and
@@ -97,7 +101,7 @@ func (p *ClockPages) Positions() *shell.Page {
 	return &shell.Page{
 		Title: say.T("clock.position.title"),
 		Build: func() ([]widget.Row, []func(int)) {
-			now := p.options.Read().Clock.Position
+			now := p.options.Preferences.ClockState().Clock.Position
 
 			rows := make([]widget.Row, 0, len(config.Positions()))
 			acts := make([]func(int), 0, len(config.Positions()))
@@ -116,14 +120,14 @@ func (p *ClockPages) Positions() *shell.Page {
 }
 
 func (p *ClockPages) usePosition(at config.Position) func(int) {
-	return func(int) { p.options.Position(at) }
+	return func(int) { p.options.Controller.SetPosition(at) }
 }
 
 func (p *ClockPages) Sizes() *shell.Page {
 	return &shell.Page{
 		Title: say.T("clock.size.title"),
 		Build: func() ([]widget.Row, []func(int)) {
-			now := p.options.Read().Clock.Size
+			now := p.options.Preferences.ClockState().Clock.Size
 
 			rows := make([]widget.Row, 0, len(config.Sizes()))
 			acts := make([]func(int), 0, len(config.Sizes()))
@@ -142,14 +146,14 @@ func (p *ClockPages) Sizes() *shell.Page {
 }
 
 func (p *ClockPages) useSize(size config.Size) func(int) {
-	return func(int) { p.options.Size(size) }
+	return func(int) { p.options.Controller.SetSize(size) }
 }
 
 func (p *ClockPages) Colors() *shell.Page {
 	return &shell.Page{
 		Title: say.T("clock.color.title"),
 		Build: func() ([]widget.Row, []func(int)) {
-			now := p.options.Read().Clock.Ink
+			now := p.options.Preferences.ClockState().Clock.Ink
 
 			rows := make([]widget.Row, 0, len(config.Inks()))
 			acts := make([]func(int), 0, len(config.Inks()))
@@ -168,23 +172,23 @@ func (p *ClockPages) Colors() *shell.Page {
 }
 
 func (p *ClockPages) useInk(ink config.Ink) func(int) {
-	return func(int) { p.options.Ink(ink) }
+	return func(int) { p.options.Controller.SetInk(ink) }
 }
 
 func (p *ClockPages) placing(at config.Position) func(ui.Surface, ui.Rect, theme.Theme) {
 	return func(s ui.Surface, box ui.Rect, palette theme.Theme) {
-		p.laid(s, box, palette, at, p.options.Read().Clock.Size)
+		p.laid(s, box, palette, at, p.options.Preferences.ClockState().Clock.Size)
 	}
 }
 
 func (p *ClockPages) sizing(size config.Size) func(ui.Surface, ui.Rect, theme.Theme) {
 	return func(s ui.Surface, box ui.Rect, palette theme.Theme) {
-		p.laid(s, box, palette, p.options.Read().Clock.Position, size)
+		p.laid(s, box, palette, p.options.Preferences.ClockState().Clock.Position, size)
 	}
 }
 
 func (p *ClockPages) laid(s ui.Surface, box ui.Rect, palette theme.Theme, at config.Position, size config.Size) {
-	cfg := p.options.Read()
+	cfg := p.options.Preferences.ClockState()
 	reading := face.Read(time.Now(), cfg.Screen.Hours == config.TwentyFourHour)
 
 	within := dashboard.Box(at, size, box.W, box.H)
@@ -196,7 +200,7 @@ func (p *ClockPages) laid(s ui.Surface, box ui.Rect, palette theme.Theme, at con
 
 func (p *ClockPages) inking(ink config.Ink) func(ui.Surface, ui.Rect, theme.Theme) {
 	return func(s ui.Surface, at ui.Rect, palette theme.Theme) {
-		cfg := p.options.Read()
+		cfg := p.options.Preferences.ClockState()
 		reading := face.Read(time.Now(), cfg.Screen.Hours == config.TwentyFourHour)
 
 		face.Of(cfg.Clock.Face).Draw(s, at, reading.Undated(), ink.Over(palette))

@@ -2,23 +2,21 @@
 package policy
 
 import (
+	"log/slog"
+
 	esphome "github.com/ygelfand/go-esphome-device"
 	"github.com/ygelfand/libcountertop/pkg/fetch"
-	"log/slog"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
+	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
 
-type Options struct {
-	Read func() bool
-	Save func(bool) error
-}
-
 type Policy struct {
-	options Options
-	verify  *esphome.Switch
+	settings storage.Section[schema.Network]
+	verify   *esphome.Switch
 }
 
-func New(options Options) *Policy {
-	p := &Policy{options: options, verify: &esphome.Switch{Base: esphome.Base{ObjectID: "verify_certificates", Name: "Verify certificates", Icon: "mdi:certificate", Category: esphome.CategoryConfig}}}
+func New(settings storage.Section[schema.Network]) *Policy {
+	p := &Policy{settings: settings, verify: &esphome.Switch{Base: esphome.Base{ObjectID: "verify_certificates", Name: "Verify certificates", Icon: "mdi:certificate", Category: esphome.CategoryConfig}}}
 	p.verify.OnCommand = p.SetVerify
 	return p
 }
@@ -28,8 +26,8 @@ func (p *Policy) Entities() []esphome.Entity { return []esphome.Entity{p.verify}
 func (p *Policy) Restore(verify bool)        { p.apply(verify) }
 func (p *Policy) Verifying() bool            { return !fetch.Skipping() }
 func (p *Policy) SetVerify(verify bool) {
-	err := p.options.Save(verify)
-	p.apply(p.options.Read())
+	err := p.settings.Update(func(c *schema.Network) { c.Verify = verify })
+	p.apply(p.settings.Read().Verify)
 	if err != nil {
 		slog.Error("saving certificate policy failed", "err", err)
 	}

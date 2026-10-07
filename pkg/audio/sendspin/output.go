@@ -6,7 +6,6 @@ package sendspin
 
 import (
 	"fmt"
-	"github.com/ygelfand/libcountertop/pkg/audio/ducking"
 	"log/slog"
 	"math"
 	"sync"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	ssync "github.com/Sendspin/sendspin-go/pkg/sync"
+	"github.com/ygelfand/libcountertop/pkg/audio/ducking"
 )
 
 // holdMax bounds what is held ahead. The server keeps within the buffer capacity we advertised, so
@@ -350,14 +350,14 @@ func (o *Output) queuedMs() int {
 //
 // The group speaks percentages and so do we, so nothing is converted.
 func (o *Output) setVolume(level int) {
-	if o.controls.SetVolume != nil {
-		o.controls.SetVolume(max(0, min(level, 100)))
+	if o.controls.Volume != nil {
+		o.controls.Volume.Set(max(0, min(level, 100)))
 	}
 }
 
 func (o *Output) setMuted(muted bool) {
-	if o.controls.SetMuted != nil {
-		o.controls.SetMuted(muted)
+	if o.controls.Media != nil {
+		o.controls.Media.Mute(muted)
 	}
 }
 
@@ -380,8 +380,8 @@ func (o *Output) Stand(down bool) {
 func (o *Output) Duck(on bool) {
 	gain := float32(1)
 	if on {
-		if o.controls.DuckDB != nil {
-			gain = ducking.Gain(o.controls.DuckDB())
+		if o.controls.Settings != nil {
+			gain = ducking.Gain(o.controls.Settings.Read().DuckDB)
 		}
 	}
 
@@ -409,7 +409,7 @@ func (o *Output) hardwareTail() time.Duration {
 }
 func (o *Output) volume() int {
 	if o.controls.Volume != nil {
-		return max(0, min(o.controls.Volume(), 100))
+		return max(0, min(o.controls.Volume.Level(), 100))
 	}
 	return 100
 }

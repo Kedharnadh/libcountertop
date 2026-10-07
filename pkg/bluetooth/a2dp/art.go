@@ -220,7 +220,7 @@ func (s *Sink) fetched(handle string, raw []byte) {
 	s.art.mu.Unlock()
 
 	if raw != nil {
-		s.options.Media().Changed()
+		s.options.Media.Changed()
 	}
 	s.pump()
 }

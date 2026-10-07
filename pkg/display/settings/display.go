@@ -15,7 +15,7 @@ func (p *BasicPages) Display() *shell.Page {
 	return &shell.Page{
 		Title: say.T("display.title"),
 		Build: func() ([]widget.Row, []func(int)) {
-			cfg := p.options.Read()
+			cfg := p.state()
 			auto := cfg.Screen.Mode == config.ModeAuto
 
 			rows := []widget.Row{
@@ -32,17 +32,17 @@ func (p *BasicPages) Display() *shell.Page {
 				{Glyph: gogui.IconEye, Label: say.T("display.marks"), Kind: widget.Toggle, On: cfg.Screen.Marks},
 			}
 			acts := []func(int){
-				p.options.Brightness,
-				func(int) { p.options.Auto(auto) },
+				p.options.Screen.SetBacklight,
+				func(int) { p.toggleAuto(auto) },
 				p.open(func() shell.View { return p.Theme() }),
 				p.open(func() shell.View { return p.Style() }),
-				func(level int) { p.options.Size(SizeOf(level)) },
-				p.open(p.options.ClockPage),
-				p.open(p.options.IdlePage),
-				p.open(p.options.PosterPage),
-				p.open(p.options.DockPage),
-				p.open(p.options.VolumePage),
-				func(int) { p.options.Marks(!cfg.Screen.Marks) },
+				func(level int) { p.setSize(SizeOf(level)) },
+				p.open(func() shell.View { return p.options.Clocks.Page() }),
+				p.open(func() shell.View { return p.options.Idle.Page() }),
+				p.open(func() shell.View { return p.Poster() }),
+				p.open(func() shell.View { return p.Dock() }),
+				p.open(func() shell.View { return p.VolumeEdge() }),
+				func(int) { p.options.Privacy.SetMarks(!cfg.Screen.Marks) },
 			}
 			if p.options.PresencePage != nil {
 				rows = append(rows, widget.Row{Glyph: gogui.IconEye, Label: say.T("display.presence"), Kind: widget.Chevron})

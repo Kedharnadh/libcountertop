@@ -2,7 +2,7 @@
 NATIVE := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 NDK ?= $(firstword $(ANDROID_NDK_HOME) $(ANDROID_NDK_LATEST_HOME) $(wildcard /opt/homebrew/Caskroom/android-ndk/*/AndroidNDK*.app/Contents/NDK))
 NDK_HOST := $(if $(filter Darwin,$(shell uname -s)),darwin-x86_64,linux-x86_64)
-API ?= 27
+# API is required: the consumer resolves it from board metadata.
 PREFIX ?= countertop
 OUT ?= $(CURDIR)/bin
 NDK_CC := $(NDK)/toolchains/llvm/prebuilt/$(NDK_HOST)/bin/armv7a-linux-androideabi$(API)-clang
@@ -20,8 +20,8 @@ CAMERA_SOURCES := $(CAMERA)/camera.c $(CAMERA)/turn.c $(CAMERA)/cam2.c $(if $(fi
 .PHONY: all surface camera camshim check-ndk test
 all: surface camera camshim
 check-ndk:
-	@test -x "$(NDK_CC)" || { echo "no NDK clang at $(NDK_CC); set NDK or ANDROID_NDK_HOME"; exit 1; }
 	@test "$(API)" = 25 -o "$(API)" = 27 || { echo "supported native API levels: 25, 27"; exit 1; }
+	@test -x "$(NDK_CC)" || { echo "no NDK clang at $(NDK_CC); set NDK or ANDROID_NDK_HOME"; exit 1; }
 
 surface: check-ndk
 	@mkdir -p $(dir $(SURFACE_BIN)) $(STUBS)/surface

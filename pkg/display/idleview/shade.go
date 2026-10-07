@@ -8,6 +8,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/gpu"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/visual"
+	"github.com/ygelfand/libcountertop/pkg/display/visualview"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
@@ -35,7 +36,7 @@ func (v *View) shaded(n int, vis visual.Visual, area ui.Rect, source config.Sour
 		g = nil
 	}
 	if g == nil {
-		l, err := v.options.Open(area.W, area.H)
+		l, err := v.options.GPU.Open(area.W, area.H)
 		if errors.Is(err, gpu.ErrNoHelper) {
 			return
 		}
@@ -48,7 +49,7 @@ func (v *View) shaded(n int, vis visual.Visual, area ui.Rect, source config.Sour
 		v.gl[n] = g
 	}
 	g.source = source
-	if rot := v.options.Orientation(); g.area != area || g.rot != rot {
+	if rot := int(v.options.Display.Orientation()); g.area != area || g.rot != rot {
 		if err := g.layer.Place(area); err != nil {
 			if g.layer.Alive() {
 				slog.Error("idle: placing the GPU layer", "err", err)
@@ -85,10 +86,10 @@ func (v *View) shade() {
 			continue
 		}
 		if x.Now == 0 {
-			x = v.options.Input()
+			x = v.options.Visuals.Input()
 		}
 		now := time.Now()
-		in := v.options.From(x, g.source)
+		in := visualview.From(x, g.source)
 		if !g.last.IsZero() {
 			in.Dt = now.Sub(g.last)
 		}

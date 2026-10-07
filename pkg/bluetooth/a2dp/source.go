@@ -220,7 +220,7 @@ func (s *Sink) put(send func(uint16, []byte) error, handle uint16, pdu []byte) e
 
 // attach gives the card to the phone.
 func (s *Sink) attach() {
-	s.options.Media().Began(source{sink: s})
+	s.options.Media.Began(source{sink: s})
 }
 
 // detach gives the card back, for a phone that has gone.
@@ -228,6 +228,6 @@ func (s *Sink) detach() {
 	if s.options.Media == nil {
 		return
 	}
-	s.options.Media().Ended(source{sink: s})
-	s.options.Media().Release(source{sink: s})
+	s.options.Media.Ended(source{sink: s})
+	s.options.Media.Release(source{sink: s})
 }

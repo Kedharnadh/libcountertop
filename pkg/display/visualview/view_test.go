@@ -1,9 +1,12 @@
 package visualview
 
 import (
-	"github.com/ygelfand/libcountertop/pkg/display/gpu"
-	"github.com/ygelfand/libcountertop/pkg/display/visual"
 	"testing"
+
+	"github.com/ygelfand/libcountertop/pkg/display/geometry"
+	"github.com/ygelfand/libcountertop/pkg/display/gpu"
+	"github.com/ygelfand/libcountertop/pkg/display/surface"
+	"github.com/ygelfand/libcountertop/pkg/display/visual"
 )
 
 type source struct{}
@@ -15,10 +18,17 @@ func (source) Loudest() float64    { return 0 }
 
 func TestMissingHelperRemainsRetryable(t *testing.T) {
 	attempts := 0
-	w := New(source{}, Options{Open: func(int, int) (*gpu.Layer, error) { attempts++; return nil, gpu.ErrNoHelper }})
+	d := missingDisplay{attempts: &attempts}
+	w := New(source{}, Dependencies{GPU: gpu.New(d), Display: d})
 	w.Keep(120, 80)
 	w.Keep(120, 80)
 	if attempts != 2 {
 		t.Fatalf("open attempts=%d", attempts)
 	}
 }
+
+type missingDisplay struct{ attempts *int }
+
+func (d missingDisplay) Helper() *surface.Client         { *d.attempts++; return nil }
+func (missingDisplay) Native() (int, int)                { return 120, 80 }
+func (missingDisplay) Orientation() geometry.Orientation { return 0 }

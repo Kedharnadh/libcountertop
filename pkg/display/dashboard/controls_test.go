@@ -10,7 +10,7 @@ import (
 func TestSaveFailurePublishesActualState(t *testing.T) {
 	state := State{Face: "Plain", Date: true}
 	draws := 0
-	c := NewControls(ControlOptions{Read: func() State { return state }, Redraw: func() { draws++ }})
+	c := newControls(controlOptions{Read: func() State { return state }, Redraw: func() { draws++ }})
 	c.Restore(state)
 	c.Commit("clock_face", func() error { return errors.New("write failed") })
 	if c.Face.Get() != "Plain" || draws != 0 {
@@ -28,7 +28,7 @@ func (f faceChoice) Label() string { return string(f) }
 
 func TestChoiceCommandSavesAndKeepsEntityIdentity(t *testing.T) {
 	state := State{Face: "Plain"}
-	c := NewControls(ControlOptions{DeviceID: 1, Read: func() State { return state }, Face: Choices([]faceChoice{"Plain", "Analog"}, func(v faceChoice) error { state.Face = v.Label(); return nil })})
+	c := newControls(controlOptions{DeviceID: 1, Read: func() State { return state }, Face: Choices([]faceChoice{"Plain", "Analog"}, func(v faceChoice) error { state.Face = v.Label(); return nil })})
 	c.Restore(state)
 	c.Face.OnCommand("Analog")
 	if state.Face != "Analog" || c.Face.Get() != "Analog" {

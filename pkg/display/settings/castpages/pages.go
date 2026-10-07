@@ -2,33 +2,37 @@
 package castpages
 
 import (
+	"slices"
+	"strings"
+
 	widget "github.com/ygelfand/libcountertop/pkg/display/model"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/media/cast/protocols/youtube"
 	"github.com/ygelfand/libcountertop/pkg/say"
-	"slices"
-	"strings"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
+	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
 
-type State struct {
-	Receiver, OnDemand, PrimePersist, PrimeSkipIntro bool
-	Skip                                             []string
-	LiveDelay                                        int
+type Receiver interface {
+	SetReceiver(bool)
+	SetPrimePersist(bool)
+	SetPrimeSkipIntro(bool)
+	SetLoungeOnDemand(bool)
+	SetSkip(string)
+	SetLiveDelay(int)
+	PrimeRegistered() bool
+	ResetPrime()
 }
-type Options struct {
-	Read                                                               func() State
-	Push                                                               func(shell.View)
-	SetReceiver, SetPrimePersist, SetPrimeSkipIntro, SetLoungeOnDemand func(bool)
-	SetSkip                                                            func(string)
-	SetLiveDelay                                                       func(int)
-	PrimeRegistered                                                    func() bool
-	ResetPrime                                                         func()
+type Dependencies struct {
+	Settings storage.Section[schema.Cast]
+	Shell    *shell.Shell
+	Receiver Receiver
 }
-type Pages struct{ options Options }
+type Pages struct{ options Dependencies }
 
-func New(o Options) *Pages { return &Pages{options: o} }
+func New(o Dependencies) *Pages { return &Pages{options: o} }
 func (p *Pages) open(makePage func() shell.View) func(int) {
-	return func(int) { p.options.Push(makePage()) }
+	return func(int) { p.options.Shell.Push(makePage()) }
 }
 
 const (
@@ -41,12 +45,12 @@ func (p *Pages) Cast() *shell.Page {
 	return &shell.Page{
 		Title: say.T("features.cast"),
 		Build: func() ([]widget.Row, []func(int)) {
-			on := p.options.Read().Receiver
+			on := p.options.Settings.Read().Receiver
 			return []widget.Row{
 					{Label: say.T("cast.enable"), Kind: widget.Toggle, On: on},
 					{Label: say.T("cast.apps"), Kind: widget.Chevron},
 				}, []func(int){
-					func(int) { p.options.SetReceiver(!on) },
+					func(int) { p.options.Receiver.SetReceiver(!on) },
 					p.open(func() shell.View { return p.CastApps() }),
 				}
 		},
@@ -72,7 +76,7 @@ func (p *Pages) Sponsor() *shell.Page {
 	return &shell.Page{
 		Title: say.T("youtube.skip"),
 		Build: func() ([]widget.Row, []func(int)) {
-			chosen := p.options.Read().Skip
+			chosen := p.options.Settings.Read().YouTube.Skip
 			rows := make([]widget.Row, 0, len(youtube.Categories))
 			acts := make([]func(int), 0, len(youtube.Categories))
 			for _, c := range youtube.Categories {
@@ -83,7 +87,7 @@ func (p *Pages) Sponsor() *shell.Page {
 					if !on {
 						next = append(next, c)
 					}
-					p.options.SetSkip(strings.Join(next, ","))
+					p.options.Receiver.SetSkip(strings.Join(next, ","))
 				})
 			}
 			return rows, acts
@@ -95,9 +99,9 @@ func (p *Pages) Prime() *shell.Page {
 	return &shell.Page{
 		Title: say.T("cast.prime"),
 		Build: func() ([]widget.Row, []func(int)) {
-			persist, skip := p.options.Read().PrimePersist, p.options.Read().PrimeSkipIntro
+			persist, skip := p.options.Settings.Read().Prime.Persist, p.options.Settings.Read().Prime.SkipIntro
 			state := say.T("cast.prime.unregistered")
-			if p.options.PrimeRegistered() {
+			if p.options.Receiver.PrimeRegistered() {
 				state = say.T("cast.prime.registered")
 			}
 			return []widget.Row{
@@ -105,9 +109,9 @@ func (p *Pages) Prime() *shell.Page {
 					{Label: say.T("cast.prime.reset"), Kind: widget.Plain, Value: state},
 					{Label: say.T("cast.prime.skipintro"), Hint: say.T("cast.prime.skipintro.hint"), Kind: widget.Toggle, On: skip},
 				}, []func(int){
-					func(int) { p.options.SetPrimePersist(!persist) },
-					func(int) { p.options.ResetPrime() },
-					func(int) { p.options.SetPrimeSkipIntro(!skip) },
+					func(int) { p.options.Receiver.SetPrimePersist(!persist) },
+					func(int) { p.options.Receiver.ResetPrime() },
+					func(int) { p.options.Receiver.SetPrimeSkipIntro(!skip) },
 				}
 		},
 	}
@@ -117,7 +121,7 @@ func (p *Pages) YouTube() *shell.Page {
 	return &shell.Page{
 		Title: say.T("youtube.title"),
 		Build: func() ([]widget.Row, []func(int)) {
-			c := p.options.Read()
+			c := p.options.Settings.Read().YouTube
 			return []widget.Row{
 					{
 						Label: say.T("youtube.demand"),
@@ -137,9 +141,9 @@ func (p *Pages) YouTube() *shell.Page {
 						Value: DelaySays(c.LiveDelay),
 					},
 				}, []func(int){
-					func(int) { p.options.SetLoungeOnDemand(!c.OnDemand) },
+					func(int) { p.options.Receiver.SetLoungeOnDemand(!c.OnDemand) },
 					p.open(func() shell.View { return p.Sponsor() }),
-					func(level int) { p.options.SetLiveDelay(DelayOf(level)) },
+					func(level int) { p.options.Receiver.SetLiveDelay(DelayOf(level)) },
 				}
 		},
 	}

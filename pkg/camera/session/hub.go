@@ -14,6 +14,12 @@ var ErrMuted = errors.New("livecam: the camera is off while the microphones are 
 var ErrNoStill = errors.New("livecam: the helper could not make a picture")
 var ErrRestarted = errors.New("livecam: the camera configuration changed")
 
+// Size is the encoded camera frame geometry.
+type Size struct {
+	Width  int `json:"width"`
+	Height int `json:"height"`
+}
+
 type Picture struct {
 	RGBA          []byte
 	Width, Height int
@@ -347,4 +353,17 @@ func (h *Hub) read(s *Session) {
 		}
 		h.mu.Unlock()
 	}
+}
+
+// Sizes is the encoded geometry of each enabled stream in the current snapshot.
+func (h *Hub) Sizes() []Size {
+	c := h.options.Snapshot().Config
+	if c.Width <= 0 || c.Height <= 0 {
+		return nil
+	}
+	out := []Size{{Width: c.Width, Height: c.Height}}
+	if c.SubWidth > 0 && c.SubHeight > 0 {
+		out = append(out, Size{Width: c.SubWidth, Height: c.SubHeight})
+	}
+	return out
 }

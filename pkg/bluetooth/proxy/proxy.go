@@ -14,6 +14,8 @@ import (
 	"github.com/ygelfand/go-esphome-device/api"
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/hci"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
+	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -29,16 +31,15 @@ type Scanner interface {
 	StopAdvertising() error
 }
 
-type Options struct {
+type Dependencies struct {
 	Radio     Scanner
-	Read      func() bool
-	Save      func(bool) error
+	Settings  storage.Section[schema.Bluetooth]
 	Reconnect func()
 	Beacon    func() []byte
 }
 
 type Proxy struct {
-	options        Options
+	options        Dependencies
 	proxy          *esphome.BluetoothProxy
 	enable         *esphome.Switch
 	wanted         chan struct{}
@@ -49,7 +50,7 @@ type Proxy struct {
 	done           chan struct{}
 }
 
-func New(options Options) *Proxy {
+func New(options Dependencies) *Proxy {
 	b := &Proxy{options: options, proxy: &esphome.BluetoothProxy{}, wanted: make(chan struct{}, 1), reports: make(chan hci.Advertisement, queued)}
 	b.enable = &esphome.Switch{Base: esphome.Base{ObjectID: "bluetooth_proxy", Name: "Bluetooth proxy", Icon: "mdi:bluetooth", Category: esphome.CategoryConfig}}
 	b.enable.OnCommand = b.SetProxy
@@ -63,10 +64,10 @@ func (b *Proxy) Entities() []esphome.Entity { return []esphome.Entity{b.enable} 
 func (b *Proxy) Handle(ctx context.Context, conn *esphome.Conn, msg proto.Message) error {
 	return b.proxy.Handle(ctx, conn, msg)
 }
-func (b *Proxy) Enabled() bool { return b.options.Read() }
+func (b *Proxy) Enabled() bool { return b.options.Settings.Read().Proxy }
 func (b *Proxy) Restore()      { b.enable.Set(b.Enabled()); b.apply() }
 func (b *Proxy) SetProxy(on bool) {
-	err := b.options.Save(on)
+	err := b.options.Settings.Update(func(c *schema.Bluetooth) { c.Proxy = on })
 	b.Restore()
 	if err != nil {
 		slog.Error("saving bluetooth proxy setting failed", "err", err)
@@ -108,11 +109,16 @@ func (b *Proxy) Run(ctx context.Context) error {
 	b.lifecycle.Lock()
 	done := b.done
 	b.lifecycle.Unlock()
-	if done == nil { return errors.New("bluetooth proxy not started") }
+	if done == nil {
+		return errors.New("bluetooth proxy not started")
+	}
 	select {
-	case <-ctx.Done(): return nil
+	case <-ctx.Done():
+		return nil
 	case <-done:
-		if ctx.Err() != nil { return nil }
+		if ctx.Err() != nil {
+			return nil
+		}
 		return errors.New("bluetooth proxy worker stopped")
 	}
 }

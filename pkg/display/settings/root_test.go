@@ -1,16 +1,17 @@
 package settings
 
 import (
-	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"testing"
+
+	"github.com/ygelfand/libcountertop/pkg/display/shell"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 func TestRootCreatesPagesOnlyWhenOpened(t *testing.T) {
 	created := 0
 	page := func() shell.View { created++; return &shell.Page{} }
-	o := RootOptions{Network: func() string { return "" }, Theme: func() string { return "" }, Assistants: func() string { return "" }, MediaLevel: func() int { return 0 }, Push: func(shell.View) {},
-		NetworkPage: page, FeaturesPage: page, DisplayPage: page, HomePage: page, VolumePage: page, AssistantsPage: page, SystemPage: page, DebugPage: page, AboutPage: page,
-	}
+	o := RootDependencies{Network: rootNetwork{}, Screen: rootScreen{}, Volume: rootVolume{}, Shell: shell.New(), Assistants: &AssistantPages{options: AssistantDependencies{Slots: 0}}, NetworkPage: page, FeaturesPage: page, VolumePage: page, AboutPage: page}
+
 	rows, actions := RootPage(o).Build()
 	if created != 0 || len(rows) != len(actions) {
 		t.Fatalf("created=%d rows=%d actions=%d", created, len(rows), len(actions))
@@ -20,3 +21,18 @@ func TestRootCreatesPagesOnlyWhenOpened(t *testing.T) {
 		t.Fatalf("created=%d after opening one page", created)
 	}
 }
+
+type rootNetwork struct{}
+
+func (rootNetwork) Network() string { return "" }
+
+type rootScreen struct{}
+
+func (rootScreen) Read() schema.Screen               { return schema.Screen{} }
+func (rootScreen) Update(func(*schema.Screen)) error { return nil }
+
+type rootVolume struct{}
+
+func (rootVolume) Level() int             { return 0 }
+func (rootVolume) Set(int)                {}
+func (rootVolume) Watch(func(int)) func() { return func() {} }

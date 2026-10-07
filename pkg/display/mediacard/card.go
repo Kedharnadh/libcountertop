@@ -11,19 +11,23 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	media "github.com/ygelfand/libcountertop/pkg/media/source"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
+	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
 
 type Source = media.Source
 type Opener = media.Opener
-type Options struct {
-	Now    func() media.Now
-	Source func() Source
-	Idle   func() time.Duration
-	Reset  func()
+type Player interface {
+	Now() media.Now
+	Holder() media.Source
+	ResetSession()
+}
+type Dependencies struct {
+	Player Player
+	Idle   storage.Section[config.Idle]
 	Shell  *shell.Shell
 }
 
-func New(o Options) *Card      { return &Card{options: o, page: &Screen{}} }
+func New(o Dependencies) *Card { return &Card{options: o, page: &Screen{}} }
 func (c *Card) Page() *Screen  { return c.page }
 func (c *Card) Began(s Source) { c.mu.Lock(); c.begun = s; c.mu.Unlock() }
 func (c *Card) Close()         { c.mu.Lock(); h := c.held; c.held = nil; c.mu.Unlock(); h.Release() }
@@ -55,7 +59,7 @@ const (
 // Card is what is playing on the screen: it opens when something starts and goes once things have
 // been quiet a while.
 type Card struct {
-	options Options
+	options Dependencies
 	page    *Screen
 	mu      sync.Mutex
 	held    *shell.Hold
@@ -85,7 +89,7 @@ func (c *Card) Tick() {
 	if c.options.Shell.Top() != c.page {
 		return
 	}
-	now := c.options.Now()
+	now := c.options.Player.Now()
 	if !now.Playing || now.Length <= 0 {
 		return
 	}
@@ -95,9 +99,9 @@ func (c *Card) Tick() {
 }
 
 func (c *Card) Follow() {
-	now := c.options.Now()
+	now := c.options.Player.Now()
 	playing := now.Playing || now.Hold
-	src := c.options.Source()
+	src := c.options.Player.Holder()
 
 	idle := !now.Playing && (now.Paused || now.Hold)
 	c.mu.Lock()
@@ -115,7 +119,7 @@ func (c *Card) Follow() {
 	stalled := time.Since(c.stalled)
 	held, quiet := c.held, time.Since(c.sounded)
 	if !playing && quiet > gap && begun == nil {
-		c.options.Reset()
+		c.options.Player.ResetSession()
 	}
 	c.mu.Unlock()
 
@@ -129,7 +133,7 @@ func (c *Card) Follow() {
 		held.Keep(false)
 	}
 
-	if limit := c.options.Idle(); idle && src != nil && limit > 0 &&
+	if limit := c.options.Idle.Read().Media.After(); idle && src != nil && limit > 0 &&
 		stalled > limit {
 		slog.Info(
 			"the player was left idle",
@@ -149,7 +153,7 @@ func (c *Card) Follow() {
 func (c *Card) Open() { c.open() }
 
 func (c *Card) open() {
-	if o, ok := c.options.Source().(Opener); ok && o.Open() {
+	if o, ok := c.options.Player.Holder().(Opener); ok && o.Open() {
 		c.mu.Lock()
 		held := c.held
 		c.held = nil

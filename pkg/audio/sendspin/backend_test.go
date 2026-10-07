@@ -1,8 +1,10 @@
 package sendspin
 
 import (
-	"github.com/ygelfand/libcountertop/pkg/audio/ducking"
 	"testing"
+
+	"github.com/ygelfand/libcountertop/pkg/audio/ducking"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 type fakeSink struct {
@@ -16,7 +18,7 @@ func TestBackendControlsRemainLiveAndVolumeIsClamped(t *testing.T) {
 	depth := -20.0
 	volume := 35
 	muted := false
-	o := NewOutput(&fakeSink{}, Controls{DuckDB: func() float64 { return depth }, Volume: func() int { return volume }, SetVolume: func(v int) { volume = v }, SetMuted: func(on bool) { muted = on }})
+	o := NewOutput(&fakeSink{}, Controls{Settings: controlSettings{&depth}, Volume: controlVolume{&volume}, Media: controlMedia{&muted}})
 	o.Duck(true)
 	if o.gain != ducking.Gain(depth) {
 		t.Fatal(o.gain)
@@ -39,6 +41,21 @@ func TestBackendControlsRemainLiveAndVolumeIsClamped(t *testing.T) {
 		t.Fatal(o.gain)
 	}
 }
+
+type controlSettings struct{ depth *float64 }
+
+func (s controlSettings) Read() schema.Media             { return schema.Media{DuckDB: *s.depth} }
+func (controlSettings) Update(func(*schema.Media)) error { return nil }
+
+type controlVolume struct{ level *int }
+
+func (v controlVolume) Level() int           { return *v.level }
+func (v controlVolume) Set(level int)        { *v.level = level }
+func (controlVolume) Watch(func(int)) func() { return func() {} }
+
+type controlMedia struct{ muted *bool }
+
+func (m controlMedia) Mute(on bool) { *m.muted = on }
 func TestNegotiatedOutputAttachesAndDetachesTheDeviceRenderer(t *testing.T) {
 	sink := &fakeSink{}
 	o := NewOutput(sink)

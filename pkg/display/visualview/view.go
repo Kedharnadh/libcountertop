@@ -8,10 +8,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ygelfand/libcountertop/pkg/display/geometry"
 	"github.com/ygelfand/libcountertop/pkg/display/gpu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/visual"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
+	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
 
 const shadeEvery = time.Second / 60
@@ -19,7 +22,7 @@ const shadeEvery = time.Second / 60
 // View is the chosen visual across the whole screen. A tap puts it away.
 type View struct {
 	v       Source
-	options Options
+	options Dependencies
 
 	mu      sync.Mutex
 	vis     visual.Visual
@@ -39,7 +42,7 @@ type View struct {
 	slowest time.Duration
 }
 
-func New(source Source, options Options) *View { return &View{v: source, options: options} }
+func New(source Source, options Dependencies) *View { return &View{v: source, options: options} }
 
 func (w *View) Covers() bool { return true }
 
@@ -61,7 +64,7 @@ func (w *View) Keep(width, height int) {
 		w.close()
 	}
 	if w.layer == nil {
-		l, err := w.options.Open(area.W, area.H)
+		l, err := w.options.GPU.Open(area.W, area.H)
 		if errors.Is(err, gpu.ErrNoHelper) {
 			return
 		}
@@ -72,7 +75,7 @@ func (w *View) Keep(width, height int) {
 		}
 		w.layer, w.fresh, w.area = l, true, ui.Rect{}
 	}
-	if rot := w.options.Orientation(); w.area != area || w.rot != rot {
+	if rot := int(w.options.Display.Orientation()); w.area != area || w.rot != rot {
 		if err := w.layer.Place(area); err != nil {
 			if w.layer.Alive() {
 				slog.Error("visuals: placing the GPU layer", "err", err)
@@ -123,10 +126,10 @@ func (w *View) run(ctx context.Context) {
 			return
 		case now = <-t.C:
 		}
-		if !w.options.Visible(w) {
+		if !w.options.Shell.Visible(w) {
 			return
 		}
-		if fps := w.options.MaxFPS(); fps > 0 && now.Sub(shaded) < time.Second/time.Duration(fps)-2*time.Millisecond {
+		if fps := w.options.Settings.Read().MaxFPS; fps > 0 && now.Sub(shaded) < time.Second/time.Duration(fps)-2*time.Millisecond {
 			continue
 		}
 		shaded = now
@@ -182,11 +185,12 @@ type Source interface {
 	Hold() func()
 	Loudest() float64
 }
-type Options struct {
-	Open        func(int, int) (*gpu.Layer, error)
-	Orientation func() int
-	Visible     func(shell.View) bool
-	MaxFPS      func() int
+type Display interface{ Orientation() geometry.Orientation }
+type Dependencies struct {
+	GPU      *gpu.Renderer
+	Display  Display
+	Shell    *shell.Shell
+	Settings storage.Section[schema.Visual]
 }
 
 // Close stops drawing and waits for the view's input and GPU resources to be released.

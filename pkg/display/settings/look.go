@@ -15,7 +15,7 @@ func (p *LookPages) Page(slot int) *shell.Page {
 	return &shell.Page{
 		Title: say.T("look.title"),
 		Build: func() ([]widget.Row, []func(int)) {
-			look := p.options.Read(slot)
+			look := p.options.Preferences.Wake.Read().Slot(slot).Look
 			rows := []widget.Row{{Label: say.T("look.place"), Kind: widget.Chevron, Value: look.Place.Label()}}
 			taps := []func(int){p.open(func() shell.View { return p.Place(slot) })}
 			for _, st := range config.Stages() {
@@ -38,13 +38,13 @@ func (p *LookPages) Place(slot int) *shell.Page {
 	return &shell.Page{
 		Title: say.T("look.place"),
 		Build: func() ([]widget.Row, []func(int)) {
-			now := p.options.Read(slot).Place
+			now := p.options.Preferences.Wake.Read().Slot(slot).Look.Place
 			var rows []widget.Row
 			var taps []func(int)
 			for _, value := range config.LookPlaces() {
 				rows = append(rows, widget.Row{Label: value.Label(), Chosen: value == now})
 				taps = append(taps, func(int) {
-					if err := p.options.Place(slot, value); err != nil {
+					if err := p.options.Preferences.Word(slot, func(w *config.WakeWord) { w.Look.Place = value }); err != nil {
 						slog.Error("saving the assistant visual placement failed", "slot", slot+1, "err", err)
 					}
 				})
@@ -56,28 +56,34 @@ func (p *LookPages) Place(slot int) *shell.Page {
 
 func (p *LookPages) Stage(slot int, st config.Stage) *shell.Page {
 	use := func(kind string) {
-		if err := p.options.Visual(slot, st, kind); err != nil {
+		if err := p.options.Preferences.Word(slot, func(w *config.WakeWord) {
+			switch st {
+			case config.StageListening:
+				w.Look.Listening = kind
+			case config.StageWaiting:
+				w.Look.Waiting = kind
+			case config.StageResponding:
+				w.Look.Responding = kind
+			}
+		}); err != nil {
 			slog.Error("saving the assistant visual failed", "slot", slot+1, "stage", st, "err", err)
 		}
-		p.options.Pop()
+		p.options.Shell.Pop()
 	}
 	return VisualPicker(st.Label(), say.T("look.default"),
 		func() { use("") },
-		func() string { return p.options.Read(slot).Kind(st) },
+		func() string { return p.options.Preferences.Wake.Read().Slot(slot).Look.Kind(st) },
 		func(k visual.Kind) { use(string(k)) }, p.options.Thumbnail)
 }
 
-type LookOptions struct {
-	Read      func(int) config.Look
-	Place     func(int, config.LookPlace) error
-	Visual    func(int, config.Stage, string) error
-	Push      func(shell.View)
-	Pop       func()
-	Thumbnail func(visual.Kind, int, int) *image.RGBA
+type LookDependencies struct {
+	Preferences Preferences
+	Shell       *shell.Shell
+	Thumbnail   func(visual.Kind, int, int) *image.RGBA
 }
-type LookPages struct{ options LookOptions }
+type LookPages struct{ options LookDependencies }
 
-func NewLookPages(o LookOptions) *LookPages { return &LookPages{options: o} }
+func NewLookPages(o LookDependencies) *LookPages { return &LookPages{options: o} }
 func (p *LookPages) open(makePage func() shell.View) func(int) {
-	return func(int) { p.options.Push(makePage()) }
+	return func(int) { p.options.Shell.Push(makePage()) }
 }

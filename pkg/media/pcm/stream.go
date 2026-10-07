@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/ygelfand/libcountertop/pkg/audio/ducking"
 	"io"
 	"log/slog"
 	"math"
@@ -16,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ygelfand/libcountertop/pkg/audio/background"
+	"github.com/ygelfand/libcountertop/pkg/audio/ducking"
 	"github.com/ygelfand/libcountertop/pkg/audio/noise"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
@@ -700,17 +701,13 @@ type Sink interface {
 	Queued() int
 }
 
-type Producer interface {
-	Stand(bool)
-	Duck(bool)
-	Requeue()
-}
+type Producer = background.Producer
 
 // Arbitration binds the platform's existing background speaker arbiter.
-type Arbitration struct {
-	Took func(Producer)
-	Gave func(Producer)
-	Owns func(Producer) bool
+type Arbitration interface {
+	Took(Producer)
+	Gave(Producer)
+	Owns(Producer) bool
 }
 type Options struct {
 	Sink           Sink

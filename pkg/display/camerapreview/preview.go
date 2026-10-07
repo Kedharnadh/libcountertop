@@ -3,13 +3,13 @@ package camerapreview
 import (
 	"context"
 	"errors"
-	"github.com/ygelfand/libcountertop/pkg/camera/helper"
-	"github.com/ygelfand/libcountertop/pkg/camera/session"
 	"io"
 	"log/slog"
 	"sync"
 	"time"
 
+	"github.com/ygelfand/libcountertop/pkg/camera/session"
+	"github.com/ygelfand/libcountertop/pkg/display/geometry"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/surface"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
@@ -23,7 +23,7 @@ const (
 )
 
 type Preview struct {
-	options Options
+	options Dependencies
 	left    chan shell.Change
 	listen  sync.Once
 	cancel  context.CancelFunc
@@ -37,17 +37,32 @@ type Preview struct {
 	box     ui.Rect
 }
 
-type Options struct {
-	Shell       *shell.Shell
-	Helper      func() *surface.Client
-	Select      func() (index, width, height int)
-	Join        func(int) (*session.Session, <-chan helper.Frame, error)
-	Leave       func(*session.Session, <-chan helper.Frame)
-	Orientation func() int
-	Place       func(ui.Rect, int, int) (float32, float32, surface.Matrix)
+type Display interface {
+	Helper() *surface.Client
+	Native() (int, int)
+	Orientation() geometry.Orientation
+}
+type Dependencies struct {
+	Shell   *shell.Shell
+	Camera  *session.Hub
+	Display Display
 }
 
-func New(options Options) *Preview {
+func (p *Preview) selectStream() (int, int, int) {
+	sizes := p.options.Camera.Sizes()
+	if len(sizes) == 0 {
+		return -1, 0, 0
+	}
+	at := len(sizes) - 1
+	return at, sizes[at].Width, sizes[at].Height
+}
+func (p *Preview) placement(box ui.Rect, w, h int) (float32, float32, surface.Matrix) {
+	fw, fh := p.options.Display.Native()
+	x, y, m, _ := p.options.Display.Orientation().Place(fw, fh, geometry.Rect{X: box.X, Y: box.Y, W: box.W, H: box.H}, w, h)
+	return x, y, m
+}
+
+func New(options Dependencies) *Preview {
 	return &Preview{options: options, left: make(chan shell.Change, 1)}
 }
 
@@ -125,24 +140,24 @@ func (p *Preview) run(ctx context.Context) {
 
 func (p *Preview) place(c *surface.Client, box ui.Rect, w, h int, visible bool) error {
 	fit := Fit(w, h, box)
-	x, y, m := p.options.Place(fit, w, h)
+	x, y, m := p.placement(fit, w, h)
 	return c.VideoPlace(camLayer, x, y, m, camZ, visible)
 }
 
 func (p *Preview) play(ctx context.Context) error {
-	c := p.options.Helper()
+	c := p.options.Display.Helper()
 	if c == nil {
 		return nil
 	}
-	at, width, height := p.options.Select()
+	at, width, height := p.selectStream()
 	if at < 0 || width <= 0 || height <= 0 {
 		return errors.New("camera preview has no stream")
 	}
-	s, frames, err := p.options.Join(at)
+	s, frames, err := p.options.Camera.Join(at)
 	if err != nil {
 		return err
 	}
-	defer p.options.Leave(s, frames)
+	defer p.options.Camera.Leave(s, frames)
 
 	if err := c.VideoOpen(camLayer, surface.AVC, width, height, camZ, 0, ""); err != nil {
 		return err
@@ -152,7 +167,7 @@ func (p *Preview) play(ctx context.Context) error {
 	var config []byte
 	keyed := false
 	placed := ui.Rect{}
-	orient := p.options.Orientation()
+	orient := int(p.options.Display.Orientation())
 	check := time.NewTicker(250 * time.Millisecond)
 	defer check.Stop()
 	select {
@@ -174,7 +189,7 @@ func (p *Preview) play(ctx context.Context) error {
 				return nil
 			}
 			p.options.Shell.Redraw()
-			if o := p.options.Orientation(); keyed && (box != placed || o != orient) {
+			if o := int(p.options.Display.Orientation()); keyed && (box != placed || o != orient) {
 				placed, orient = box, o
 				if err := p.place(c, box, width, height, true); err != nil {
 					return err

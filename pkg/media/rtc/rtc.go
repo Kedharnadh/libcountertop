@@ -93,7 +93,9 @@ type counters struct {
 }
 
 type Link struct {
-	count counters
+	life    sync.Mutex
+	workers sync.WaitGroup
+	count   counters
 
 	pc    *webrtc.PeerConnection
 	track *webrtc.TrackLocalStaticSample
@@ -158,14 +160,14 @@ func NewWithStreamID(m Media, ended func(webrtc.PeerConnectionState), streamID s
 	}
 	ctx, stop := context.WithCancel(context.Background())
 	l := &Link{pc: pc, track: track, media: m, ended: ended, ctx: ctx, stop: stop}
-	go l.drain(sender)
+	l.worker(func() { l.drain(sender) })
 	switch {
 	case m.Camera != nil:
 		l.video, err = webrtc.NewTrackLocalStaticSample(h264, "video", streamID)
 		if err == nil {
 			var vs *webrtc.RTPSender
 			if vs, err = pc.AddTrack(l.video); err == nil {
-				go l.listen(vs)
+				l.worker(func() { l.listen(vs) })
 			}
 		}
 	case m.Screen != nil:
@@ -176,8 +178,7 @@ func NewWithStreamID(m Media, ended func(webrtc.PeerConnectionState), streamID s
 		l.talk, err = pc.CreateDataChannel("status", &webrtc.DataChannelInit{Negotiated: &negotiated, ID: &id})
 	}
 	if err != nil {
-		pc.Close()
-		stop()
+		l.Close()
 		return nil, err
 	}
 	l.talk.OnOpen(func() {
@@ -186,7 +187,7 @@ func NewWithStreamID(m Media, ended func(webrtc.PeerConnectionState), streamID s
 		}
 	})
 	l.talk.OnMessage(l.heard)
-	pc.OnTrack(l.receive)
+	pc.OnTrack(func(t *webrtc.TrackRemote, r *webrtc.RTPReceiver) { l.worker(func() { l.receive(t, r) }) })
 	pc.OnConnectionStateChange(l.state)
 	return l, nil
 }
@@ -263,8 +264,11 @@ func (l *Link) heard(msg webrtc.DataChannelMessage) {
 func (l *Link) Close() error {
 	var err error
 	l.closed.Do(func() {
+		l.life.Lock()
 		l.stop()
+		l.life.Unlock()
 		err = l.pc.Close()
+		l.workers.Wait()
 	})
 	return err
 }
@@ -274,9 +278,9 @@ func (l *Link) state(s webrtc.PeerConnectionState) {
 	switch s {
 	case webrtc.PeerConnectionStateConnected:
 		l.sending.Do(func() {
-			go l.send()
+			l.worker(l.send)
 			if l.video != nil {
-				go l.film()
+				l.worker(l.film)
 			}
 		})
 	case webrtc.PeerConnectionStateFailed, webrtc.PeerConnectionStateClosed:
@@ -511,3 +515,14 @@ func (l *Link) Stats() Stats {
 }
 
 func (l *Link) String() string { return fmt.Sprintf("link(%s)", l.pc.ConnectionState()) }
+
+func (l *Link) worker(run func()) {
+	l.life.Lock()
+	if l.ctx.Err() != nil {
+		l.life.Unlock()
+		return
+	}
+	l.workers.Add(1)
+	l.life.Unlock()
+	go func() { defer l.workers.Done(); run() }()
+}

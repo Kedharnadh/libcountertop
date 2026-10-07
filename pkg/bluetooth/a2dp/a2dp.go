@@ -14,6 +14,7 @@ import (
 	esphome "github.com/ygelfand/go-esphome-device"
 	"github.com/ygelfand/libcountertop/pkg/audio/analysis"
 	speaker "github.com/ygelfand/libcountertop/pkg/audio/resample"
+	"github.com/ygelfand/libcountertop/pkg/audio/volume"
 	"github.com/ygelfand/libcountertop/pkg/bluetooth"
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/avdtp"
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/avrcp"
@@ -25,11 +26,13 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/sdp"
 	"github.com/ygelfand/libcountertop/pkg/media/pcm"
 	media "github.com/ygelfand/libcountertop/pkg/media/source"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
+	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
 
 // Sink is the device answering as a speaker.
 type Sink struct {
-	options Options
+	options Dependencies
 	art     session
 	dumping *capture.Dump
 	mu      sync.Mutex
@@ -115,7 +118,7 @@ type Sink struct {
 	said    time.Time
 }
 
-func New(options Options) *Sink {
+func New(options Dependencies) *Sink {
 	s := &Sink{options: options, dumping: capture.New(options.CaptureDirectory),
 		wake: make(chan struct{}, 1),
 		enable: &esphome.Switch{
@@ -128,7 +131,7 @@ func New(options Options) *Sink {
 		},
 	}
 
-	s.enable.Set(s.options.Enabled())
+	s.enable.Set(s.options.Settings.Read().Speaker)
 	s.enable.OnCommand = s.SetEnabled
 
 	return s
@@ -139,7 +142,7 @@ func (s *Sink) Name() string { return "bluetooth speaker" }
 func (s *Sink) Entities() []esphome.Entity { return []esphome.Entity{s.enable} }
 
 // Enabled reports whether the device should be answering as a speaker.
-func (s *Sink) Enabled() bool { return s.options.Enabled() }
+func (s *Sink) Enabled() bool { return s.options.Settings.Read().Speaker }
 
 // SetEnabled turns the speaker on or off.
 //
@@ -147,12 +150,12 @@ func (s *Sink) Enabled() bool { return s.options.Enabled() }
 // the setting as it now is. Turning it on while off ends a run that is only waiting; turning it off
 // while serving ends one that is holding the line.
 func (s *Sink) SetEnabled(on bool) {
-	if err := s.options.SaveEnabled(on); err != nil {
+	if err := s.options.Settings.Update(func(c *schema.Bluetooth) { c.Speaker = on }); err != nil {
 		slog.Error("saving the bluetooth speaker setting failed", "err", err)
-		s.enable.Set(s.options.Enabled())
+		s.enable.Set(s.options.Settings.Read().Speaker)
 		return
 	}
-	s.enable.Set(s.options.Enabled())
+	s.enable.Set(s.options.Settings.Read().Speaker)
 	select {
 	case s.wake <- struct{}{}:
 	default:
@@ -171,7 +174,7 @@ const retry = 10 * time.Second
 // as finished — and the two things that stop this running, the setting being off and the radio
 // being busy, both go away later without anything failing.
 func (s *Sink) Run(ctx context.Context) error {
-	quiet := s.options.VolumeChanged(s.volumed)
+	quiet := s.options.Volume.Watch(s.volumed)
 	defer quiet()
 	ctx, stop := context.WithCancel(ctx)
 	defer stop()
@@ -308,14 +311,14 @@ func (s *Sink) start(name string) {
 	// accepts the command and answers it — but nothing was listening, so moving the slider changed
 	// the number on the phone and nothing on this device.
 	s.sink.Remote().Volume = func(percent int) {
-		s.options.VolumeSet(percent)
+		s.options.Volume.Set(percent)
 	}
 
 	// The track moved, or the position, or the phone said what it is playing. The player pulls the
 	// state when it redraws, so this only has to say that there is something new to pull.
 	s.sink.Remote().Changed = func(state avrcp.State) {
 		s.announce(state.Track)
-		s.options.Media().Changed()
+		s.options.Media.Changed()
 	}
 
 	// The remote control channel is up: ask what is playing, for the channel the list comes over,
@@ -377,7 +380,7 @@ func (s *Sink) start(name string) {
 
 		// Taking the background stands the others down, and is what stops a group and a phone both
 		// playing into the room at once.
-		s.options.Took(s)
+		s.options.Arbitration.Took(s)
 
 		s.mu.Lock()
 		s.streaming = true
@@ -429,7 +432,7 @@ func (s *Sink) start(name string) {
 		s.streaming = false
 		s.mu.Unlock()
 
-		s.options.Gave(s)
+		s.options.Arbitration.Gave(s)
 
 		// The next stream may be at another rate, and in any case does not continue this one.
 		s.mu.Lock()
@@ -607,7 +610,7 @@ func (s *Sink) named(e pair.Event) []pair.Command {
 		s.mu.Unlock()
 
 		slog.Info("bluetooth connected", "name", name)
-		s.options.Media().Changed()
+		s.options.Media.Changed()
 	}
 	return nil
 }
@@ -731,18 +734,19 @@ type Media interface {
 	Release(media.Source)
 	Changed()
 }
-type Options struct {
+type Dependencies struct {
 	Queue                   Queue
 	Radio                   func() *hci.Radio
 	Bonds, CaptureDirectory string
 	Name                    func() string
-	Enabled                 func() bool
-	SaveEnabled             func(bool) error
-	VolumeSet               func(int)
-	VolumeChanged           func(func(int)) func()
-	Media                   func() Media
-	Took, Gave              func(pcm.Producer)
-	DuckDB                  func() float64
+	Settings                storage.Section[schema.Bluetooth]
+	Volume                  volume.Channel
+	Media                   Media
+	Arbitration             interface {
+		Took(pcm.Producer)
+		Gave(pcm.Producer)
+	}
+	Ducking storage.Section[schema.Media]
 }
 
 func (s *Sink) Dump(within time.Duration) (string, error) { return s.dumping.Start(within) }

@@ -13,14 +13,14 @@ func (p *BasicPages) Poster() *shell.Page {
 	return &shell.Page{
 		Title: say.T("display.poster"),
 		Build: func() ([]widget.Row, []func(int)) {
-			cfg := p.options.Poster()
+			cfg := p.options.Preferences.Poster.Read()
 			return []widget.Row{
 					{Label: say.T("poster.show"), Kind: widget.Toggle, On: cfg.Enabled},
 					{Label: say.T("poster.next"), Dim: !cfg.Enabled},
 					{Label: say.T("poster.every"), Kind: widget.Chevron, Value: cfg.Every.Label(), Dim: !cfg.Enabled},
 				}, []func(int){
-					func(int) { p.options.PosterEnabled(!cfg.Enabled) },
-					func(int) { p.options.PosterNext() },
+					func(int) { p.options.Poster.SetEnabled(!cfg.Enabled) },
+					func(int) { p.options.Poster.Next() },
 					p.open(func() shell.View { return p.PosterEvery() }),
 				}
 		},
@@ -30,12 +30,12 @@ func (p *BasicPages) PosterEvery() *shell.Page {
 	return &shell.Page{
 		Title: say.T("poster.every"),
 		Build: func() ([]widget.Row, []func(int)) {
-			now := p.options.Poster().Every
+			now := p.options.Preferences.Poster.Read().Every
 			var rows []widget.Row
 			var acts []func(int)
 			for _, e := range config.PosterEveries() {
 				rows = append(rows, widget.Row{Label: e.Label(), Chosen: e == now})
-				acts = append(acts, func(int) { p.options.SetPosterEvery(e) })
+				acts = append(acts, func(int) { p.options.Poster.SetEvery(e) })
 			}
 			return rows, acts
 		},
@@ -51,7 +51,7 @@ func (p *BasicPages) Dock() *shell.Page {
 	return &shell.Page{
 		Title: say.T("dock.title"),
 		Build: func() ([]widget.Row, []func(int)) {
-			now := p.options.Read().Screen.Drawer
+			now := p.state().Screen.Drawer
 
 			var (
 				rows []widget.Row
@@ -59,7 +59,7 @@ func (p *BasicPages) Dock() *shell.Page {
 			)
 			for _, e := range config.Edges() {
 				rows = append(rows, widget.Row{Label: e.Label(), Chosen: e == now})
-				acts = append(acts, func(int) { p.options.SetDock(e) })
+				acts = append(acts, func(int) { p.options.Screen.SetDrawer(e) })
 			}
 			return rows, acts
 		},
@@ -69,7 +69,7 @@ func (p *BasicPages) VolumeEdge() *shell.Page {
 	return &shell.Page{
 		Title: say.T("volume.location.title"),
 		Build: func() ([]widget.Row, []func(int)) {
-			now := p.options.Read().Screen.Volume
+			now := p.state().Screen.Volume
 
 			var (
 				rows []widget.Row
@@ -77,7 +77,7 @@ func (p *BasicPages) VolumeEdge() *shell.Page {
 			)
 			for _, e := range config.Sides() {
 				rows = append(rows, widget.Row{Label: e.Label(), Chosen: e == now})
-				acts = append(acts, func(int) { p.options.SetVolumeEdge(e) })
+				acts = append(acts, func(int) { p.setVolumeEdge(e) })
 			}
 			return rows, acts
 		},
@@ -85,24 +85,24 @@ func (p *BasicPages) VolumeEdge() *shell.Page {
 }
 func (p *BasicPages) System() *shell.Page {
 	return &shell.Page{Title: say.T("system.title"), Build: func() ([]widget.Row, []func(int)) {
-		c := p.options.Read()
-		return []widget.Row{{Glyph: gogui.IconTextSize, Label: say.T("settings.language"), Kind: widget.Chevron, Value: say.Name(say.Chosen())}, {Glyph: gogui.IconClock, Label: say.T("datetime.title"), Kind: widget.Chevron, Value: zonepolicy.Label(p.options.Zone())}, {Glyph: gogui.IconKeyboard, Label: say.T("keyboard.size"), Kind: widget.Chevron, Value: c.Screen.Keyboard.Label()}, {Glyph: gogui.IconSync, Label: say.T("settings.power"), Kind: widget.Chevron}}, []func(int){p.open(func() shell.View { return p.Language() }), p.open(func() shell.View { return p.DateTime() }), p.open(func() shell.View { return p.Keyboard() }), p.open(p.options.PowerPage)}
+		c := p.state()
+		return []widget.Row{{Glyph: gogui.IconTextSize, Label: say.T("settings.language"), Kind: widget.Chevron, Value: say.Name(say.Chosen())}, {Glyph: gogui.IconClock, Label: say.T("datetime.title"), Kind: widget.Chevron, Value: zonepolicy.Label(p.options.Zone.ChosenZone())}, {Glyph: gogui.IconKeyboard, Label: say.T("keyboard.size"), Kind: widget.Chevron, Value: c.Screen.Keyboard.Label()}, {Glyph: gogui.IconSync, Label: say.T("settings.power"), Kind: widget.Chevron}}, []func(int){p.open(func() shell.View { return p.Language() }), p.open(func() shell.View { return p.DateTime() }), p.open(func() shell.View { return p.Keyboard() }), p.open(p.options.PowerPage)}
 	}}
 }
 func (p *BasicPages) DateTime() *shell.Page {
 	return &shell.Page{Title: say.T("datetime.title"), Build: func() ([]widget.Row, []func(int)) {
-		c := p.options.Read()
-		return []widget.Row{{Label: say.T("clock.zone"), Kind: widget.Chevron, Value: zonepolicy.Label(p.options.Zone())}, {Label: say.T("clock.hours"), Kind: widget.Toggle, On: c.Screen.Hours == config.TwentyFourHour}}, []func(int){p.open(func() shell.View { return p.Zone() }), func(int) { p.options.ToggleHours(c.Screen.Hours) }}
+		c := p.state()
+		return []widget.Row{{Label: say.T("clock.zone"), Kind: widget.Chevron, Value: zonepolicy.Label(p.options.Zone.ChosenZone())}, {Label: say.T("clock.hours"), Kind: widget.Toggle, On: c.Screen.Hours == config.TwentyFourHour}}, []func(int){p.open(func() shell.View { return p.Zone() }), func(int) { p.toggleHours(c.Screen.Hours) }}
 	}}
 }
 func (p *BasicPages) Keyboard() *shell.Page {
 	return &shell.Page{Title: say.T("keyboard.size"), Build: func() ([]widget.Row, []func(int)) {
-		now := p.options.Read().Screen.Keyboard
+		now := p.state().Screen.Keyboard
 		rows := []widget.Row{}
 		acts := []func(int){}
 		for _, k := range config.KeyboardSizes() {
 			rows = append(rows, widget.Row{Label: k.Label(), Chosen: k == now})
-			acts = append(acts, func(int) { p.options.SetKeyboard(k) })
+			acts = append(acts, func(int) { p.setKeyboard(k) })
 		}
 		return rows, acts
 	}}

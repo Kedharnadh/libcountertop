@@ -9,10 +9,10 @@ import (
 	"time"
 
 	esphome "github.com/ygelfand/go-esphome-device"
-
 	"github.com/ygelfand/libcountertop/pkg/audio/analysis"
 	"github.com/ygelfand/libcountertop/pkg/display/visual"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
+	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
 
 const (
@@ -68,17 +68,17 @@ func (v *Visuals) SetMaxFPS(fps int) {
 	if !slices.Contains(config.MaxFPSSteps, fps) {
 		fps = config.DefaultMaxFPS
 	}
-	if err := v.options.MaxFPS(fps); err != nil {
+	if err := v.options.Settings.Update(func(c *config.Visual) { c.MaxFPS = fps }); err != nil {
 		slog.Error("saving the visual frame cap failed", "err", err)
 	}
 }
 
 func (v *Visuals) SetSeed(n int) {
 	n = max(0, min(n, visual.SeedMost))
-	if err := v.options.Seed(n); err != nil {
+	if err := v.options.Settings.Update(func(c *config.Visual) { c.Seed = n }); err != nil {
 		slog.Error("saving the visual seed failed", "err", err)
 	}
-	v.Restore(v.options.Read())
+	v.Restore(v.options.Settings.Read())
 }
 
 func (v *Visuals) SetLabel(s string) {
@@ -86,10 +86,10 @@ func (v *Visuals) SetLabel(s string) {
 	if len(r) > LabelMost {
 		r = r[:LabelMost]
 	}
-	if err := v.options.Label(string(r)); err != nil {
+	if err := v.options.Settings.Update(func(c *config.Visual) { c.Label = string(r) }); err != nil {
 		slog.Error("saving a setting failed", "setting", v.label.ObjectID, "err", err)
 	}
-	v.Restore(v.options.Read())
+	v.Restore(v.options.Settings.Read())
 }
 
 // Kind is the visual the device is set to draw.
@@ -101,10 +101,10 @@ func (v *Visuals) Kind() visual.Kind {
 
 // SetKind changes the visual and remembers it.
 func (v *Visuals) SetKind(k visual.Kind) {
-	if err := v.options.Kind(string(k)); err != nil {
+	if err := v.options.Settings.Update(func(c *config.Visual) { c.Kind = string(k) }); err != nil {
 		slog.Error("saving a setting failed", "setting", v.kind.ObjectID, "err", err)
 	}
-	v.Restore(v.options.Read())
+	v.Restore(v.options.Settings.Read())
 }
 
 func (v *Visuals) build() {
@@ -247,13 +247,11 @@ func (v *Visuals) hear(ctx context.Context) {
 type Tap interface{ Offer([]int16) }
 type Options struct {
 	MicRate, SpeakerRate, SpeakerChannels, Lift int
-	Read                                        func() config.Visual
+	Settings                                    storage.Section[config.Visual]
 	DeviceID                                    uint32
 	Listen                                      func() (<-chan []int16, func())
 	Muted                                       func() bool
 	Tap                                         func(Tap)
-	Kind, Label                                 func(string) error
-	MaxFPS, Seed                                func(int) error
 }
 
 func labels(values []visual.Kind) []string {

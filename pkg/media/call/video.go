@@ -1,0 +1,360 @@
+package call
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"sync"
+	"time"
+
+	display "github.com/ygelfand/libcountertop/pkg/display/geometry"
+	"github.com/ygelfand/libcountertop/pkg/display/surface"
+	"github.com/ygelfand/libcountertop/pkg/media/rtc"
+	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
+)
+
+const (
+	remoteLayer = 920
+	selfLayer   = 921
+	remoteZ     = -2
+	selfZ       = -1
+	videoLag    = 200 * time.Millisecond
+	feedRetry   = 20 * time.Millisecond
+	feedGiveUp  = 200 * time.Millisecond
+	rejoinWait  = 500 * time.Millisecond
+	selfShare   = 0.28
+	selfMargin  = 0.03
+	sideShare   = 0.25
+	belowShare  = 0.3
+	turnCheck   = 250 * time.Millisecond
+)
+
+type Layout struct {
+	Remote  display.Rect
+	Picture display.Rect
+	Self    display.Rect
+	Panel   display.Rect
+	Side    bool
+}
+
+func arrange(vw, vh int, remote, own Size) Layout {
+	full := fullScreen(vw, vh)
+	m := int(float64(min(vw, vh)) * selfMargin)
+	if remote.Width > 0 && remote.Height > 0 {
+		r := fit(full, remote.Width, remote.Height)
+		switch {
+		case vh > vw && vh-r.H >= int(float64(vh)*belowShare):
+			pic := display.Rect{W: vw, H: r.H}
+			panel := display.Rect{Y: r.H, W: vw, H: vh - r.H}
+			self := display.Rect{X: panel.W / 2, Y: panel.Y + m, W: panel.W/2 - m, H: panel.H / 2}
+			return Layout{Remote: pic, Picture: pic, Panel: panel, Side: true, Self: fitOwn(self, own, true)}
+		case vw > vh && vw-r.W >= int(float64(vw)*sideShare):
+			pic := display.Rect{W: r.W, H: vh}
+			panel := display.Rect{X: r.W, W: vw - r.W, H: vh}
+			self := display.Rect{X: panel.X + m, Y: panel.H / 5, W: panel.W - 2*m, H: panel.H * 2 / 5}
+			return Layout{Remote: pic, Picture: pic, Panel: panel, Side: true, Self: fitOwn(self, own, false)}
+		}
+		return Layout{Remote: full, Picture: r, Panel: full, Self: corner(vw, vh)}
+	}
+	return Layout{Remote: full, Picture: full, Panel: full, Self: corner(vw, vh)}
+}
+
+func fitOwn(box display.Rect, own Size, right bool) display.Rect {
+	if own.Width == 0 || own.Height == 0 {
+		return box
+	}
+	r := fit(box, own.Width, own.Height)
+	if right {
+		r.X = box.X + box.W - r.W
+	}
+	r.Y = box.Y
+	return r
+}
+
+func (c *Calls) layout(vw, vh int) Layout {
+	c.mu.Lock()
+	var remote, own Size
+	if c.now != nil {
+		remote, own = c.now.remote, c.now.own
+	}
+	c.mu.Unlock()
+	return arrange(vw, vh, remote, own)
+}
+
+func (c *Calls) Arrange(vw, vh int) Layout { return c.layout(vw, vh) }
+
+type layer struct {
+	options Dependencies
+	id      uint32
+	z       int
+	size    Size
+	box     func(vw, vh int) display.Rect
+	broken  func()
+
+	mu     sync.Mutex
+	open   bool
+	shown  bool
+	hidden bool
+	closed bool
+	frames uint64
+	failed error
+}
+
+type LayerStats struct {
+	Open   bool
+	Width  int
+	Height int
+	Frames uint64
+	Failed error
+}
+
+func (l *layer) stats() LayerStats {
+	if l == nil {
+		return LayerStats{}
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return LayerStats{Open: l.open, Width: l.size.Width, Height: l.size.Height, Frames: l.frames, Failed: l.failed}
+}
+
+func (l *layer) Show(f rtc.Frame) {
+	c := l.options.Display.Helper()
+	if c == nil {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.closed {
+		return
+	}
+	if !l.open {
+		if !f.Key || l.size.Width == 0 {
+			return
+		}
+		c.VideoClose(l.id)
+		if err := c.VideoOpen(l.id, surface.AVC, l.size.Width, l.size.Height, l.z, 0, ""); err != nil {
+			slog.Warn("call video open", "layer", l.id, "width", l.size.Width, "height", l.size.Height, "err", err)
+			l.failed = err
+			return
+		}
+		slog.Info("call video opened", "layer", l.id, "width", l.size.Width, "height", l.size.Height)
+		l.open, l.failed = true, nil
+	}
+	if err := feed(c, l.id, f); err != nil {
+		l.failed = err
+		if errors.Is(err, surface.Broken) {
+			slog.Warn("call video decoder broke, reopening", "layer", l.id)
+			c.VideoClose(l.id)
+			l.open, l.shown = false, false
+			if l.broken != nil {
+				go l.broken()
+			}
+			return
+		}
+		slog.Debug("call video feed", "layer", l.id, "err", err)
+		return
+	}
+	l.frames++
+	c.VideoClock(l.id, f.PTS-videoLag, true)
+	if !l.shown {
+		l.shown = true
+		l.place(c)
+	}
+}
+
+func (l *layer) resize(sz Size) {
+	if l == nil {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if sz == l.size {
+		return
+	}
+	l.size = sz
+	if l.open {
+		if c := l.options.Display.Helper(); c != nil {
+			c.VideoClose(l.id)
+		}
+		l.open, l.shown = false, false
+	}
+}
+
+func (l *layer) place(c *surface.Client) {
+	o := l.options.Display.Orientation()
+	fw, fh := l.options.Display.Native()
+	vw, vh := o.Size(fw, fh)
+	at := fit(l.box(vw, vh), l.size.Width, l.size.Height)
+	x, y, m, _ := o.Place(fw, fh, at, l.size.Width, l.size.Height)
+	if err := c.VideoPlace(l.id, x, y, m, l.z, !l.hidden); err != nil {
+		slog.Debug("call video place", "layer", l.id, "err", err)
+	}
+}
+
+func (l *layer) hide(on bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.hidden = on
+	if c := l.options.Display.Helper(); c != nil && l.shown {
+		l.place(c)
+	}
+}
+
+func (l *layer) reorient() {
+	if l == nil {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if c := l.options.Display.Helper(); c != nil && l.shown {
+		l.place(c)
+	}
+}
+
+func (l *layer) close() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.closed = true
+	if !l.open {
+		return
+	}
+	if c := l.options.Display.Helper(); c != nil {
+		c.VideoClose(l.id)
+	}
+	l.open, l.shown = false, false
+}
+
+func feed(c *surface.Client, id uint32, f rtc.Frame) error {
+	var flags uint32
+	if f.Key {
+		flags = surface.SampleKey
+	}
+	give := time.Now().Add(feedGiveUp)
+	for {
+		_, err := c.VideoSample(id, f.PTS, flags, f.Data)
+		if !errors.Is(err, surface.Full) || time.Now().After(give) {
+			return err
+		}
+		time.Sleep(feedRetry)
+	}
+}
+
+func fit(box display.Rect, w, h int) display.Rect {
+	dw, dh := box.W, box.W*h/max(1, w)
+	if dh > box.H {
+		dw, dh = box.H*w/max(1, h), box.H
+	}
+	return display.Rect{X: box.X + (box.W-dw)/2, Y: box.Y + (box.H-dh)/2, W: dw, H: dh}
+}
+
+func fullScreen(vw, vh int) display.Rect { return display.Rect{W: vw, H: vh} }
+
+func corner(vw, vh int) display.Rect {
+	w := int(float64(vw) * selfShare)
+	h := int(float64(vh) * selfShare)
+	m := int(float64(min(vw, vh)) * selfMargin)
+	return display.Rect{X: vw - w - m, Y: vh - h - m, W: w, H: h}
+}
+
+type pictures struct {
+	options Dependencies
+	workers sync.WaitGroup
+	remote  *layer
+	self    *layer
+	stop    func()
+}
+
+func (c *Calls) newPictures(s *session, remote Size) *pictures {
+	return &pictures{options: c.options, remote: &layer{options: c.options, id: remoteLayer, z: remoteZ, size: remote,
+		box:    func(vw, vh int) display.Rect { return c.layout(vw, vh).Remote },
+		broken: func() { c.requestKey(s) },
+	}}
+}
+
+func (c *Calls) requestKey(s *session) {
+	c.mu.Lock()
+	link := s.link
+	c.mu.Unlock()
+	if link != nil {
+		link.RequestKey()
+	}
+}
+
+func (p *pictures) start(ctx context.Context, c *Calls, s *session, at int, own Size, visible bool) {
+	p.self = &layer{options: c.options, id: selfLayer, z: selfZ, size: own, hidden: !visible, box: func(vw, vh int) display.Rect { return c.layout(vw, vh).Self }}
+	self := p.self
+	ctx, cancel := context.WithCancel(ctx)
+	frames, stop := camera{source: c.options.Camera, at: at, sized: func(sz Size) { c.ownSized(s, sz) }}.Frames()
+	p.stop = func() { cancel(); stop() }
+	p.workers.Add(2)
+	safe.Go("call self view", func() {
+		defer p.workers.Done()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case f, ok := <-frames:
+				if !ok {
+					return
+				}
+				self.Show(f)
+			}
+		}
+	})
+	safe.Go("call video turn", func() { defer p.workers.Done(); p.follow(ctx) })
+}
+
+func (p *pictures) follow(ctx context.Context) {
+	tick := time.NewTicker(turnCheck)
+	defer tick.Stop()
+	was := p.options.Display.Orientation()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+			if now := p.options.Display.Orientation(); now != was {
+				was = now
+				p.replace()
+			}
+		}
+	}
+}
+
+func (p *pictures) replace() {
+	if p == nil {
+		return
+	}
+	p.remote.reorient()
+	p.self.reorient()
+}
+
+func (p *pictures) showRemote(on bool) {
+	if p == nil || p.remote == nil {
+		return
+	}
+	p.remote.hide(!on)
+}
+
+func (p *pictures) showSelf(on bool) {
+	if p == nil || p.self == nil {
+		return
+	}
+	p.self.hide(!on)
+}
+
+func (p *pictures) close() {
+	if p == nil {
+		return
+	}
+	if p.stop != nil {
+		p.stop()
+	}
+	p.workers.Wait()
+	if p.self != nil {
+		p.self.close()
+	}
+	if p.remote != nil {
+		p.remote.close()
+	}
+}

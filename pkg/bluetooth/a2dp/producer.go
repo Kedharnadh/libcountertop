@@ -31,7 +31,7 @@ func (s *Sink) Stand(down bool) {
 func (s *Sink) Duck(on bool) {
 	gain := float32(1)
 	if on {
-		gain = ducking.Gain(s.options.DuckDB())
+		gain = ducking.Gain(s.options.Ducking.Read().DuckDB)
 	}
 
 	s.mu.Lock()

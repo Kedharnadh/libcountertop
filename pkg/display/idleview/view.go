@@ -7,6 +7,7 @@ import (
 	"time"
 
 	face "github.com/ygelfand/libcountertop/pkg/display/clockface"
+	"github.com/ygelfand/libcountertop/pkg/display/geometry"
 	"github.com/ygelfand/libcountertop/pkg/display/gpu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
@@ -21,7 +22,7 @@ const (
 )
 
 type View struct {
-	options Options
+	options Dependencies
 	mu      sync.Mutex
 	vis     [2]visual.Visual
 	kinds   [2]string
@@ -35,7 +36,7 @@ type View struct {
 	broken [2]visual.Visual
 }
 
-func New(options Options) *View { return &View{options: options} }
+func New(options Dependencies) *View { return &View{options: options} }
 
 func (v *View) Covers() bool           { return true }
 func (v *View) Asleep() bool           { return true }
@@ -162,7 +163,7 @@ func (v *View) run(ctx context.Context) {
 			return
 		case now = <-t.C:
 		}
-		if !v.options.Visible(v) {
+		if !v.options.Shell.Visible(v) {
 			return
 		}
 		if fps := v.options.Read().Visual.MaxFPS; fps <= 0 || now.Sub(shaded) >= time.Second/time.Duration(fps)-2*time.Millisecond {
@@ -177,10 +178,10 @@ func (v *View) run(ctx context.Context) {
 		cfg := v.options.Read()
 		if slots := Chosen(cfg.Idle); len(slots) > 0 {
 			if release == nil {
-				release = v.options.Hold()
+				release = v.options.Visuals.Hold()
 			}
 			if v.painting(len(slots)) {
-				v.options.Redraw()
+				v.options.Shell.Redraw()
 				continue
 			}
 		} else {
@@ -195,7 +196,7 @@ func (v *View) run(ctx context.Context) {
 		stale := v.shown != key(cfg, time.Now())
 		v.mu.Unlock()
 		if stale {
-			v.options.Redraw()
+			v.options.Shell.Redraw()
 		}
 	}
 }
@@ -206,15 +207,17 @@ type Settings struct {
 	Idle   config.Idle
 	Visual config.Visual
 }
-type Options struct {
-	Read        func() Settings
-	Hold        func() func()
-	Input       func() visual.Input
-	From        func(visual.Input, config.Source) visual.Input
-	Open        func(int, int) (*gpu.Layer, error)
-	Orientation func() int
-	Visible     func(shell.View) bool
-	Redraw      func()
+type Visuals interface {
+	Hold() func()
+	Input() visual.Input
+}
+type Display interface{ Orientation() geometry.Orientation }
+type Dependencies struct {
+	Read    func() Settings
+	Visuals Visuals
+	GPU     *gpu.Renderer
+	Display Display
+	Shell   *shell.Shell
 }
 
 // Close stops drawing and waits for the view's input and GPU resources to be released.

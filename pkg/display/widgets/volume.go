@@ -25,6 +25,14 @@ func (kit *Toolkit) VolumeCard(w *gogui.Window, options VolumeOptions) gogui.Vie
 	vw, vh := w.WindowSize()
 	stream, open := options.Current, options.Open
 	level := options.Current.Level
+	outerPadding := t.PaddingLarge.Top + t.PaddingLarge.Bottom
+	cardPadding := t.PaddingMedium.Top + t.PaddingMedium.Bottom
+	inside := max(0, float32(vh)-outerPadding-cardPadding)
+	rowHeight := style.Reach()
+	titleHeight := t.TextStyleTitle.Size * 1.5
+	fixed := titleHeight + rowHeight + 2*t.SpacingMedium
+	meterHeight := max(0, min(float32(vh)*0.45, inside-fixed))
+	bodyHeight := min(inside, fixed+meterHeight)
 
 	meter := gogui.SliderCfg{
 		ID:        "volume-card",
@@ -36,7 +44,7 @@ func (kit *Toolkit) VolumeCard(w *gogui.Window, options VolumeOptions) gogui.Vie
 		Width:     style.Reach(),
 		Size:      style.Reach() * 0.3,
 		ThumbSize: style.Reach() * 0.65,
-		Height:    float32(vh) * 0.45,
+		Height:    meterHeight,
 		OnChange: func(v float32, e gogui.EventCtx) {
 			options.Set(100 - int(v+0.5))
 			options.Linger()
@@ -48,36 +56,52 @@ func (kit *Toolkit) VolumeCard(w *gogui.Window, options VolumeOptions) gogui.Vie
 		options.Grip(kit.Slider(meter)),
 		kit.Pressable(gogui.Row, gogui.ContainerCfg{
 			ID:      "volume-stream",
+			Height:  rowHeight,
+			Sizing:  gogui.FitFixed,
 			Padding: gogui.PaddingSmall,
 			Radius:  gogui.RadiusMedium,
 			Content: []gogui.View{gogui.Label(stream.Label, secondary())},
 		}, func(gogui.EventCtx) { options.Expand() }),
 	}
+	content := capsule
 	if open {
+		var choices []gogui.View
 		for _, s := range options.Choices {
 			if s.Key == stream.Key {
 				continue
 			}
 			pick := s
-			capsule = append(capsule, kit.Pressable(gogui.Row, gogui.ContainerCfg{
+			choices = append(choices, kit.Pressable(gogui.Row, gogui.ContainerCfg{
 				ID:      "volume-pick-" + s.Key,
+				Height:  rowHeight,
+				Sizing:  gogui.FitFixed,
 				Padding: gogui.PaddingSmall,
 				Radius:  gogui.RadiusMedium,
 				Content: []gogui.View{gogui.Label(s.Label, gogui.TextStyle{})},
 			}, func(gogui.EventCtx) { options.Pick(pick.Key) }))
 		}
+		content = []gogui.View{gogui.Row(gogui.ContainerCfg{
+			Padding: gogui.NoPadding, Spacing: gogui.SpacingMedium, VAlign: gogui.VAlignMiddle,
+			Content: []gogui.View{
+				gogui.Column(gogui.ContainerCfg{Padding: gogui.NoPadding, Spacing: gogui.SpacingMedium, HAlign: gogui.HAlignCenter, Content: capsule}),
+				gogui.Column(gogui.ContainerCfg{ID: "volume-choices", Height: bodyHeight, Sizing: gogui.FitFixed, Scrollable: true, Padding: gogui.NoPadding, Spacing: gogui.SpacingSmall, Content: choices}),
+			},
+		})}
 	}
 
 	card := gogui.Column(kit.Panel(gogui.ContainerCfg{
-		ID:      "volume",
-		Padding: gogui.PaddingMedium,
-		Spacing: gogui.SpacingMedium,
-		HAlign:  gogui.HAlignCenter,
+		ID:         "volume",
+		Height:     bodyHeight + cardPadding,
+		Sizing:     gogui.FitFixed,
+		Scrollable: true,
+		Padding:    gogui.PaddingMedium,
+		Spacing:    gogui.SpacingMedium,
+		HAlign:     gogui.HAlignCenter,
 		OnClick: func(e gogui.EventCtx) {
 			options.Linger()
 			e.Consume()
 		},
-		Content: capsule,
+		Content: content,
 	}))
 
 	side := gogui.HAlignRight

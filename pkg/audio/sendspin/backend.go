@@ -2,8 +2,13 @@
 package sendspin
 
 import (
-	"github.com/Sendspin/sendspin-go/pkg/protocol"
 	"time"
+
+	"github.com/Sendspin/sendspin-go/pkg/protocol"
+	"github.com/ygelfand/libcountertop/pkg/audio/background"
+	"github.com/ygelfand/libcountertop/pkg/audio/volume"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
+	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
 
 const Rate = 48000
@@ -24,11 +29,7 @@ const Path = "/sendspin"
 const path = Path
 
 type Renderer interface{ Render(at uint64, out []int16) }
-type Producer interface {
-	Stand(bool)
-	Duck(bool)
-	Requeue()
-}
+type Producer = background.Producer
 type Sink interface {
 	Attach(Renderer)
 	Written() uint64
@@ -38,10 +39,9 @@ type Arbitration interface {
 	Gave(Producer)
 }
 type Controls struct {
-	Volume       func() int
-	SetVolume    func(int)
-	SetMuted     func(bool)
-	DuckDB       func() float64
+	Volume       volume.Channel
+	Media        interface{ Mute(bool) }
+	Settings     storage.Section[schema.Media]
 	HardwareTail time.Duration
 }
 type Identity struct {

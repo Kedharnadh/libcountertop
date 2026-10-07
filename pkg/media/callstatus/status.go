@@ -4,14 +4,13 @@ package callstatus
 import (
 	"encoding/json"
 	"errors"
-	"github.com/ygelfand/libcountertop/pkg/media/rtc"
 	"log/slog"
+
+	"github.com/ygelfand/libcountertop/pkg/camera/session"
+	"github.com/ygelfand/libcountertop/pkg/media/rtc"
 )
 
-type Size struct {
-	Width  int `json:"width"`
-	Height int `json:"height"`
-}
+type Size = session.Size
 type Status struct {
 	Muted     bool `json:"muted"`
 	CameraOff bool `json:"camera_off"`

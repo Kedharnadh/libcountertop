@@ -5,6 +5,7 @@ import (
 	"image"
 	"sync/atomic"
 
+	"github.com/ygelfand/libcountertop/pkg/display/geometry"
 	"github.com/ygelfand/libcountertop/pkg/display/surface"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/visual"
@@ -13,15 +14,21 @@ import (
 const z = -1
 
 type Renderer struct {
-	options Options
+	display Display
 	ids     atomic.Uint32
 }
-type Options struct {
-	Helper func() *surface.Client
-	Place  func(ui.Rect, int, int) (float32, float32, surface.Matrix)
+type Display interface {
+	Helper() *surface.Client
+	Native() (int, int)
+	Orientation() geometry.Orientation
 }
 
-func New(options Options) *Renderer { return &Renderer{options: options} }
+func New(display Display) *Renderer { return &Renderer{display: display} }
+func (r *Renderer) place(at ui.Rect, w, h int) (float32, float32, surface.Matrix) {
+	fw, fh := r.display.Native()
+	x, y, m, _ := r.display.Orientation().Place(fw, fh, geometry.Rect{X: at.X, Y: at.Y, W: at.W, H: at.H}, w, h)
+	return x, y, m
+}
 
 var ErrNoHelper = errors.New("gpu: the display helper is not connected")
 
@@ -37,7 +44,7 @@ type Layer struct {
 func (r *Renderer) Open(w, h int) (*Layer, error) { return r.OpenAt(w, h, z) }
 
 func (r *Renderer) OpenAt(w, h, depth int) (*Layer, error) {
-	c := r.options.Helper()
+	c := r.display.Helper()
 	if c == nil || c.Err() != nil {
 		return nil, ErrNoHelper
 	}
@@ -52,7 +59,7 @@ func (r *Renderer) OpenAt(w, h, depth int) (*Layer, error) {
 }
 
 func (r *Renderer) OpenOffscreen(w, h int) (*Layer, error) {
-	c := r.options.Helper()
+	c := r.display.Helper()
 	if c == nil || c.Err() != nil {
 		return nil, ErrNoHelper
 	}
@@ -79,7 +86,7 @@ func (l *Layer) Read() (*image.RGBA, error) {
 }
 
 func (l *Layer) Alive() bool {
-	return !l.closed.Load() && l.owner.options.Helper() == l.c && l.c.Err() == nil
+	return !l.closed.Load() && l.owner.display.Helper() == l.c && l.c.Err() == nil
 }
 
 func (l *Layer) Texture(unit int, img *image.RGBA) error {
@@ -148,7 +155,7 @@ func (l *Layer) Quads(q []visual.Quad) error {
 }
 
 func (l *Layer) Place(at ui.Rect) error {
-	x, y, m := l.owner.options.Place(at, l.W, l.H)
+	x, y, m := l.owner.place(at, l.W, l.H)
 	return l.c.VideoPlace(l.id, x, y, m, l.z, true)
 }
 

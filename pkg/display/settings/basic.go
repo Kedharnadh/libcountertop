@@ -23,39 +23,57 @@ type BasicState struct {
 	Visual              config.Visual
 	PosterLabel, UISize string
 }
-type BasicOptions struct {
-	Poster                 func() config.Poster
-	PosterEnabled          func(bool)
-	PosterNext             func()
-	SetPosterEvery         func(config.PosterEvery)
-	SetDock, SetVolumeEdge func(config.Edge)
-	SetKeyboard            func(config.KeyboardSize)
-	ToggleHours            func(config.HourFormat)
-	PowerPage              func() shell.View
-
-	Read                                                                            func() BasicState
-	Push                                                                            func(shell.View)
-	ADB                                                                             func() bool
-	SetADB                                                                          func(bool)
-	SetFPS, SetSeed                                                                 func(int)
-	SetStyle                                                                        func(string) error
-	SetTheme, SetLanguage                                                           func(string)
-	Zone                                                                            func() string
-	SetZone                                                                         func(string)
-	VisualPage, ClockPage, IdlePage, PosterPage, DockPage, VolumePage, PresencePage func() shell.View
-	Brightness                                                                      func(int)
-	Auto                                                                            func(bool)
-	Size                                                                            func(string)
-	Marks                                                                           func(bool)
+type ScreenControl interface {
+	Set(string, string) error
+	SetDrawer(config.Edge)
+	SetBacklight(int)
+	SetMode(config.ScreenMode)
+	Use(string)
 }
-type BasicPages struct{ options BasicOptions }
+type PosterControl interface {
+	SetEnabled(bool)
+	Next()
+	SetEvery(config.PosterEvery)
+}
+type VisualControl interface {
+	SetMaxFPS(int)
+	SetSeed(int)
+}
+type PrivacyControl interface{ SetMarks(bool) }
+type ADBControl interface {
+	ADB() bool
+	SetADB(bool)
+}
+type ZoneControl interface {
+	ChosenZone() string
+	SetZone(string)
+}
+type HoursControl interface{ SetHours(config.HourFormat) }
+type BasicDependencies struct {
+	Preferences                         Preferences
+	Shell                               *shell.Shell
+	Screen                              ScreenControl
+	Poster                              PosterControl
+	Visuals                             VisualControl
+	Privacy                             PrivacyControl
+	Access                              ADBControl
+	Zone                                ZoneControl
+	Dashboard                           HoursControl
+	Clocks                              *ClockPages
+	Idle                                *IdlePages
+	UISize                              func() string
+	PowerPage, VisualPage, PresencePage func() shell.View
+}
+type BasicPages struct{ options BasicDependencies }
 
-func NewBasicPages(o BasicOptions) *BasicPages { return &BasicPages{options: o} }
+func NewBasicPages(o BasicDependencies) *BasicPages { return &BasicPages{options: o} }
 func (p *BasicPages) open(makePage func() shell.View) func(int) {
-	return func(int) { p.options.Push(makePage()) }
+	return func(int) { p.options.Shell.Push(makePage()) }
 }
-func (p *BasicPages) useTheme(name string) func(int) { return func(int) { p.options.SetTheme(name) } }
-func (p *BasicPages) useZone(name string) func(int)  { return func(int) { p.options.SetZone(name) } }
+func (p *BasicPages) useTheme(name string) func(int) { return func(int) { p.setTheme(name) } }
+func (p *BasicPages) useZone(name string) func(int) {
+	return func(int) { p.options.Zone.SetZone(name) }
+}
 
 const (
 	swatchPad = 0.12
@@ -66,18 +84,18 @@ func (p *BasicPages) Debug() *shell.Page {
 	return &shell.Page{
 		Title: say.T("debug.title"),
 		Build: func() ([]widget.Row, []func(int)) {
-			fps, seed := p.options.Read().Visual.MaxFPS, p.options.Read().Visual.Seed
-			adb := p.options.ADB()
+			fps, seed := p.state().Visual.MaxFPS, p.state().Visual.Seed
+			adb := p.options.Access.ADB()
 			return []widget.Row{
 					{Glyph: gogui.IconTerminal, Label: say.T("system.adb"), Hint: say.T("system.adb.hint"), Kind: widget.Toggle, On: adb},
 					{Label: say.T("debug.visuals"), Kind: widget.Chevron},
 					{Label: say.T("debug.fps"), Kind: widget.Slider, Level: FpsLevel(fps), Snap: FpsSnap, Value: FpsSays(fps)},
 					{Label: say.T("debug.seed"), Kind: widget.Slider, Level: SeedLevel(seed), Value: SeedSays(seed)},
 				}, []func(int){
-					func(int) { p.options.SetADB(!adb) },
+					func(int) { p.options.Access.SetADB(!adb) },
 					p.open(p.options.VisualPage),
-					func(level int) { p.options.SetFPS(config.MaxFPSSteps[FpsIndex(level)]) },
-					func(level int) { p.options.SetSeed(SeedOf(level)) },
+					func(level int) { p.options.Visuals.SetMaxFPS(config.MaxFPSSteps[FpsIndex(level)]) },
+					func(level int) { p.options.Visuals.SetSeed(SeedOf(level)) },
 				}
 		},
 	}
@@ -124,13 +142,13 @@ func (p *BasicPages) Style() *shell.Page {
 	return &shell.Page{
 		Title: say.T("style.title"),
 		Tiles: func() ([]widget.Cell, []func(int)) {
-			now := style.ByName(p.options.Read().Screen.Style).Name
+			now := style.ByName(p.state().Screen.Style).Name
 			var cells []widget.Cell
 			var taps []func(int)
 			for _, name := range style.Names() {
 				cells = append(cells, widget.Cell{Label: say.T("style." + name), Chosen: name == now, Style: name})
 				taps = append(taps, func(int) {
-					if err := p.options.SetStyle(name); err != nil {
+					if err := p.setStyle(name); err != nil {
 						slog.Error("the style could not be saved", "style", name, "err", err)
 					}
 				})
@@ -147,8 +165,8 @@ func (p *BasicPages) Theme() *shell.Page {
 		// A grid rather than a row each: a row spends its width on a label and a small Swatch, and
 		// twelve of them do not fit on a screen. A tile is the Swatch, with the name on it.
 		Tiles: func() ([]widget.Cell, []func(int)) {
-			now := p.options.Read().Screen.Theme
-			follow, _ := theme.ByName(style.Theme(p.options.Read().Screen.Style, style.ThemeDefault))
+			now := p.state().Screen.Theme
+			follow, _ := theme.ByName(style.Theme(p.state().Screen.Style, style.ThemeDefault))
 
 			cells := []widget.Cell{{Label: say.T("theme.default"), Chosen: now == style.ThemeDefault, Palette: &follow}}
 			acts := []func(int){p.useTheme(style.ThemeDefault)}
@@ -215,7 +233,7 @@ func (p *BasicPages) Language() *shell.Page {
 			)
 			for _, tag := range say.Languages() {
 				rows = append(rows, widget.Row{Label: say.Name(tag), Chosen: tag == now})
-				acts = append(acts, func(int) { p.options.SetLanguage(tag) })
+				acts = append(acts, func(int) { p.setLanguage(tag) })
 			}
 			return rows, acts
 		},
@@ -226,7 +244,7 @@ func (p *BasicPages) Zone() *shell.Page {
 	return &shell.Page{
 		Title: say.T("zone.title"),
 		Build: func() ([]widget.Row, []func(int)) {
-			now := p.options.Zone()
+			now := p.options.Zone.ChosenZone()
 
 			rows := []widget.Row{{Label: "Home Assistant", Chosen: now == ""}}
 			acts := []func(int){p.useZone("")}
@@ -259,7 +277,7 @@ func (p *BasicPages) Region(region string) *shell.Page {
 	return &shell.Page{
 		Title: region,
 		Build: func() ([]widget.Row, []func(int)) {
-			now := p.options.Zone()
+			now := p.options.Zone.ChosenZone()
 
 			var (
 				rows []widget.Row
@@ -274,4 +292,41 @@ func (p *BasicPages) Region(region string) *shell.Page {
 			return rows, acts
 		},
 	}
+}
+
+func (p *BasicPages) state() BasicState { return p.options.Preferences.Basic(p.options.UISize()) }
+func (p *BasicPages) setTheme(name string) {
+	if err := p.options.Preferences.Screen.Update(func(c *config.Screen) { c.Theme = name }); err == nil {
+		p.options.Screen.Use(name)
+	}
+}
+func (p *BasicPages) setLanguage(tag string) {
+	say.Use(tag)
+	saveScreen(p.options.Preferences.Screen, p.options.Shell, "screen.language", func(c *config.Screen) { c.Language = tag })
+}
+func (p *BasicPages) setKeyboard(v config.KeyboardSize) {
+	saveScreen(p.options.Preferences.Screen, p.options.Shell, "screen.keyboard", func(c *config.Screen) { c.Keyboard = v })
+}
+func (p *BasicPages) setVolumeEdge(v config.Edge) {
+	saveScreen(p.options.Preferences.Screen, p.options.Shell, "screen.volume", func(c *config.Screen) { c.Volume = v })
+}
+func (p *BasicPages) setStyle(v string) error { return p.options.Screen.Set("style", v) }
+func (p *BasicPages) setSize(v string) {
+	if err := p.options.Screen.Set("size", v); err != nil {
+		slog.Error("saving the display size failed", "err", err)
+	}
+}
+func (p *BasicPages) toggleAuto(was bool) {
+	mode := config.ModeAuto
+	if was {
+		mode = config.ModeManual
+	}
+	p.options.Screen.SetMode(mode)
+}
+func (p *BasicPages) toggleHours(was config.HourFormat) {
+	hours := config.TwentyFourHour
+	if was == hours {
+		hours = config.TwelveHour
+	}
+	p.options.Dashboard.SetHours(hours)
 }
