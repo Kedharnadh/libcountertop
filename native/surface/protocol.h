@@ -3,11 +3,7 @@
 #define SOCKET_PATH "/dev/socket/" SOCKET_NAME
 
 #define MAGIC 0x53564e4c
-#if COUNTERTOP_SHOW
 #define VERSION 5
-#else
-#define VERSION 4
-#endif
 
 #define OP_HELLO 1
 #define OP_CREATE 2

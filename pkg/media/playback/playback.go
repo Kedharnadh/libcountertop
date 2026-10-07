@@ -45,9 +45,9 @@ type Pictures interface {
 type Picture struct {
 	H264          bool
 	Width, Height int
-	Next          func() (data []byte, at time.Duration, err error)
+	Next          func(context.Context) (data []byte, at time.Duration, err error)
 	Session       uint32
-	Sealed        func() (data []byte, at time.Duration, crypt *surface.Crypt, err error)
+	Sealed        func(context.Context) (data []byte, at time.Duration, crypt *surface.Crypt, err error)
 }
 
 type Live interface {
@@ -87,7 +87,7 @@ type Session struct {
 type Source interface {
 	// Read fills pcm with interleaved 48 kHz stereo and says how many samples it wrote. It returns
 	// 0 while there is nothing yet, and io.EOF at the end.
-	Read(pcm []int16) (int, error)
+	Read(ctx context.Context, pcm []int16) (int, error)
 
 	// Start is where in the media the first sample Read hands over sits.
 	Start() time.Duration

@@ -4,14 +4,13 @@ NDK ?= $(firstword $(ANDROID_NDK_HOME) $(ANDROID_NDK_LATEST_HOME) $(wildcard /op
 NDK_HOST := $(if $(filter Darwin,$(shell uname -s)),darwin-x86_64,linux-x86_64)
 API ?= 27
 PREFIX ?= countertop
-SHOW ?= 0
 OUT ?= $(CURDIR)/bin
 NDK_CC := $(NDK)/toolchains/llvm/prebuilt/$(NDK_HOST)/bin/armv7a-linux-androideabi$(API)-clang
 SURFACE_BIN ?= $(OUT)/$(PREFIX)-surface
 CAMERA_BIN ?= $(OUT)/$(PREFIX)-camera
 CAMSHIM_BIN ?= $(OUT)/lib$(PREFIX)-camshim.so
 STUBS := $(OUT)/countertop-stubs/$(PREFIX)-api$(API)
-FLAGS := -O2 -Wall -Werror -I$(NATIVE) -DCOUNTERTOP_PREFIX='"$(PREFIX)"' -DCOUNTERTOP_SHOW=$(SHOW)
+FLAGS := -O2 -Wall -Werror -I$(NATIVE) -DCOUNTERTOP_PREFIX='"$(PREFIX)"'
 SURFACE := $(NATIVE)/surface
 CAMERA := $(NATIVE)/camera
 CAMERA_LIBS := camera_client gui utils binder $(if $(filter 25,$(API)),stagefright)

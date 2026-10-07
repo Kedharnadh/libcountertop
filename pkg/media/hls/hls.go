@@ -184,13 +184,17 @@ func (s *Stream) Read(out []int16) (int, error) {
 	}
 }
 
-func (s *Stream) Next() (Frame, error) {
+func (s *Stream) Next(ctx context.Context) (Frame, error) {
 	select {
+	case <-ctx.Done():
+		return Frame{}, ctx.Err()
 	case <-s.anchored:
 	case <-s.done:
 		return Frame{}, s.failure()
 	}
 	select {
+	case <-ctx.Done():
+		return Frame{}, ctx.Err()
 	case f := <-s.frames:
 		f.At = max(f.At-s.origin, 0)
 		return f, nil

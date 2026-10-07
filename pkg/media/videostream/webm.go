@@ -1,0 +1,81 @@
+package videostream
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"log/slog"
+	"time"
+
+	"github.com/ygelfand/libcountertop/pkg/media/webm"
+)
+
+type webmFrames struct {
+	r      *webm.Reader
+	closer io.Closer
+	from   time.Duration
+	keyed  bool
+}
+
+func (w *webmFrames) Next(ctx context.Context) (Frame, error) {
+	if err := ctx.Err(); err != nil {
+		return Frame{}, err
+	}
+	if w.closer != nil {
+		done := make(chan struct{})
+		stop := context.AfterFunc(ctx, func() { w.closer.Close(); close(done) })
+		defer func() {
+			if !stop() {
+				<-done
+			}
+		}()
+	}
+
+	for {
+		f, err := w.r.Next()
+		if err != nil {
+			return Frame{}, err
+		}
+		at := time.Duration(f.Time)
+		if !w.keyed {
+			if !f.Key || at+time.Second < w.from {
+				continue
+			}
+			w.keyed = true
+		}
+		return Frame{Data: f.Data, At: at}, nil
+	}
+}
+
+func WebM(r io.Reader, from time.Duration) (Stream, error) {
+	demux := webm.NewVideoReader(r)
+	tr, err := demux.Track()
+	if err != nil {
+		return Stream{}, err
+	}
+	var codec uint32
+	switch tr.Codec {
+	case "V_VP9":
+		codec = VP9
+	default:
+		return Stream{}, fmt.Errorf("video: %s is not decoded here", tr.Codec)
+	}
+	frames := &webmFrames{r: demux, from: from}
+	frames.closer, _ = r.(io.Closer)
+	if s, ok := r.(interface{ From(int64) }); ok && from > 0 {
+		if err := demux.Index(); err != nil {
+			return Stream{}, err
+		}
+		off, at, ok := demux.Cue(int64(from))
+		slog.Debug("video cue", "want", from, "cue", time.Duration(at), "at", off, "found", ok)
+		if ok {
+			s.From(off)
+			demux.Restart(r, off)
+			frames.from = time.Duration(at)
+		}
+	}
+	return Stream{
+		Codec: codec, Width: uint32(tr.Width), Height: uint32(tr.Height),
+		Source: frames,
+	}, nil
+}

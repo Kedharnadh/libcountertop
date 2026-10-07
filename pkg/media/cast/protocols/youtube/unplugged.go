@@ -642,7 +642,12 @@ func (u *unplugged) licensed(ctx context.Context, challenge []byte) ([]byte, err
 	return unpluggedLicense(ctx, u.hc, ctt, u.id, u.cpn, u.session, u.params, challenge)
 }
 
-func (u *unplugged) Read(out []int16) (int, error) { return u.p.Read(out) }
+func (u *unplugged) Read(ctx context.Context, out []int16) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	return u.p.Read(out)
+}
 
 func (u *unplugged) Picture() playback.Picture { return u.p.Video(u.Width, u.Height) }
 

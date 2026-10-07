@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/pion/opus"
-
 	"github.com/ygelfand/libcountertop/pkg/media/cast/preferences"
 	"github.com/ygelfand/libcountertop/pkg/media/hls"
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
@@ -167,7 +166,7 @@ func (r *Resolver) Probe(ctx context.Context, id string, hold, back time.Duratio
 	go func() {
 		var s seen
 		for {
-			f, err := t.live.Next()
+			f, err := t.live.Next(ctx)
 			if err != nil {
 				s.err = err
 				break
@@ -256,7 +255,20 @@ func newTrack(info Track, stream io.ReadCloser, st *station, at time.Duration) (
 }
 
 // Read decodes packets until pcm is full or there are none left.
-func (t *track) Read(pcm []int16) (int, error) {
+func (t *track) Read(ctx context.Context, pcm []int16) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	if t.stream != nil {
+		done := make(chan struct{})
+		stop := context.AfterFunc(ctx, func() { t.stream.Close(); close(done) })
+		defer func() {
+			if !stop() {
+				<-done
+			}
+		}()
+	}
+
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -267,7 +279,7 @@ func (t *track) Read(pcm []int16) (int, error) {
 		return t.readLive(t.live.Read, pcm)
 	}
 	if t.tv != nil {
-		return t.readLive(t.tv.Read, pcm)
+		return t.readLive(func(out []int16) (int, error) { return t.tv.Read(ctx, out) }, pcm)
 	}
 
 	n := 0
@@ -396,8 +408,8 @@ func (t *track) Live(context.Context) (playback.Picture, error) {
 	if t.live == nil {
 		return playback.Picture{}, nil
 	}
-	next := func() ([]byte, time.Duration, error) {
-		f, err := t.live.Next()
+	next := func(ctx context.Context) ([]byte, time.Duration, error) {
+		f, err := t.live.Next(ctx)
 		return f.Data, f.At + t.Start(), err
 	}
 	return playback.Picture{H264: true, Width: t.live.Width, Height: t.live.Height, Next: next}, nil

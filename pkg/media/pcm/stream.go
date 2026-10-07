@@ -44,11 +44,13 @@ const (
 // It is the speaker driver's background: a reply or an announcement takes the speaker and this
 // yields, carrying on from where it was rather than starting again.
 type Stream struct {
-	out     Sink
-	options Options
-	workers sync.WaitGroup
-	parent  context.Context
-	changed func()
+	lifecycle sync.Mutex
+	running   bool
+	out       Sink
+	options   Options
+	workers   sync.WaitGroup
+	parent    context.Context
+	changed   func()
 
 	// bg is the queue of things that play for minutes. A track joins it while it has something to
 	// play and leaves when it stops, so whatever it interrupted carries on afterwards.
@@ -108,10 +110,26 @@ func New(options Options) *Stream {
 	if options.DuckDB == nil {
 		options.DuckDB = func() float64 { return ducking.DefaultDB }
 	}
-	return &Stream{options: options, out: options.Sink, bg: options.Arbitration, changed: options.Changed, gain: 1, target: 1, parent: context.Background()}
+	return &Stream{options: options, out: options.Sink, bg: options.Arbitration, changed: options.Changed, gain: 1, target: 1, parent: context.Background(), running: true}
 }
-func (m *Stream) Start(ctx context.Context) { m.mu.Lock(); m.parent = ctx; m.mu.Unlock() }
-func (m *Stream) Close() error              { m.Stop(); m.workers.Wait(); return nil }
+func (m *Stream) Start(ctx context.Context) {
+	m.lifecycle.Lock()
+	defer m.lifecycle.Unlock()
+	m.mu.Lock()
+	m.parent = ctx
+	m.running = true
+	m.mu.Unlock()
+}
+func (m *Stream) Close() error {
+	m.lifecycle.Lock()
+	defer m.lifecycle.Unlock()
+	m.mu.Lock()
+	m.running = false
+	m.mu.Unlock()
+	m.Stop()
+	m.workers.Wait()
+	return nil
+}
 
 // Duck lowers background music during a voice turn without pausing playback.
 func (m *Stream) Duck(on bool) {
@@ -138,9 +156,11 @@ func (m *Stream) Play(url string) {
 	}
 
 	t, ctx := m.start(&track{item: url})
+	if t == nil {
+		return
+	}
 	slog.Info("playing media", "url", url)
 
-	m.workers.Add(1)
 	safe.Go("media", func() {
 		defer m.workers.Done()
 		err := m.run(ctx, t, url)
@@ -167,9 +187,11 @@ func (m *Stream) PlayNoise(sounds ...string) {
 	}
 
 	t, ctx := m.start(&track{item: strings.Join(sounds, " and "), sounds: sounds})
+	if t == nil {
+		return
+	}
 	slog.Info("playing noise", "sounds", sounds)
 
-	m.workers.Add(1)
 	safe.Go("noise", func() {
 		defer m.workers.Done()
 		err := m.generate(ctx, t, fill)
@@ -197,25 +219,24 @@ func (m *Stream) Noise() []string {
 
 // start makes a track the one being played, dropping whatever was.
 func (m *Stream) start(t *track) (*track, context.Context) {
+	m.lifecycle.Lock()
 	m.mu.Lock()
-	parent := m.parent
-	m.mu.Unlock()
-	ctx, cancel := context.WithCancel(parent)
+	if !m.running {
+		m.mu.Unlock()
+		m.lifecycle.Unlock()
+		return nil, nil
+	}
+	ctx, cancel := context.WithCancel(m.parent)
 	t.cancel = cancel
-
-	m.mu.Lock()
 	previous := m.track
 	m.track, m.paused, m.rewind = t, false, nil
+	m.workers.Add(1)
 	m.regate()
 	m.mu.Unlock()
-
 	previous.stop()
 	m.flush()
-
-	// After the previous track is stopped, so taking over from ourselves is not mistaken for a second
-	// background wanting the speaker.
 	m.bg.Took(m)
-
+	m.lifecycle.Unlock()
 	m.changed()
 	return t, ctx
 }
@@ -528,7 +549,7 @@ func (m *Stream) settle(ctx context.Context) error {
 //
 // The buffer is filled again each time round, so queue is free to scale it in place on its way out.
 func (m *Stream) generate(ctx context.Context, t *track, fill noise.Fill) error {
-	mono := make([]float32, chunk/frame)
+	mono := make([]float32, chunk/(m.options.Channels*2))
 	samples := make([]int16, len(mono)*m.options.Channels)
 
 	for {

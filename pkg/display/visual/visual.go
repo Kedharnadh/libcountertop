@@ -3,14 +3,23 @@ package visual
 import (
 	"image"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/audio/analysis"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
+	"github.com/ygelfand/libcountertop/pkg/say"
 )
 
 type Kind string
+
+func (k Kind) Label() string {
+	if !slices.Contains(order, k) {
+		k = Default
+	}
+	return say.T("visual." + string(k))
+}
 
 const (
 	LensFlares   Kind = "lens-flares"
@@ -250,7 +259,7 @@ func Built() []Kind {
 			out = append(out, k)
 		}
 	}
-	slices.Sort(out)
+	slices.SortFunc(out, func(a, b Kind) int { return strings.Compare(strings.ToLower(a.Label()), strings.ToLower(b.Label())) })
 	return out
 }
 

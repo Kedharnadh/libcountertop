@@ -31,6 +31,7 @@ type Waker interface{ Wakes() bool }
 type Shell struct {
 	mu         sync.Mutex
 	stack      []View
+	visible    []View
 	holds      map[View]bool
 	timer      *time.Timer
 	closed     time.Time
@@ -108,6 +109,18 @@ func (s *Shell) Views() []View {
 }
 
 func (s *Shell) changed(from, to View) {
+	s.mu.Lock()
+	previous := s.visible
+	s.visible = slices.Clone(Showing(s.stack))
+	current := slices.Clone(s.visible)
+	s.mu.Unlock()
+	for _, view := range previous {
+		if !slices.Contains(current, view) {
+			if closer, ok := view.(interface{ Close() }); ok {
+				closer.Close()
+			}
+		}
+	}
 	if from != to {
 		s.Changed.Emit(Change{From: from, To: to})
 	}

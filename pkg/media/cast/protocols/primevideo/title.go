@@ -223,7 +223,12 @@ func (t *title) close() {
 	t.p.Close()
 }
 
-func (t *title) Read(pcm []int16) (int, error) { return t.p.Read(pcm) }
+func (t *title) Read(ctx context.Context, pcm []int16) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	return t.p.Read(pcm)
+}
 
 func (t *title) Start() time.Duration {
 	if at, ok := t.p.Origin(); ok {

@@ -383,7 +383,7 @@ func TestAHelperHangingUpIsReportedOnce(t *testing.T) {
 			return
 		}
 		read(c)
-		answer(c, opHello, nil, version)
+		answer(c, opHello, nil, version, 960, 480)
 		c.Close()
 	}()
 
@@ -437,7 +437,7 @@ func TestClosingTwiceIsQuiet(t *testing.T) {
 func TestVersion5ReturnsPanelDimensions(t *testing.T) {
 	f, path := newFake(t)
 	f.ver = 5
-	c, err := DialVersion(path, 5)
+	c, err := Dial(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -448,8 +448,9 @@ func TestVersion5ReturnsPanelDimensions(t *testing.T) {
 }
 
 func TestVersion5RefusesVersion4Helper(t *testing.T) {
-	_, path := newFake(t)
-	c, err := DialVersion(path, 5)
+	f, path := newFake(t)
+	f.ver = 4
+	c, err := Dial(path)
 	if c != nil {
 		c.Close()
 	}

@@ -44,7 +44,7 @@ func TestTheTallestH264UnderTheCapAndTheDefaultAACArePicked(t *testing.T) {
 	}
 }
 
-func fakeServer(t *testing.T, target *string, answer func(body map[string]any) (int, any)) *[]map[string]any {
+func fakeServer(t *testing.T, target *string, answer func(body map[string]any) (int, any)) func() []map[string]any {
 	t.Helper()
 	var mu sync.Mutex
 	var seen []map[string]any
@@ -63,7 +63,7 @@ func fakeServer(t *testing.T, target *string, answer func(body map[string]any) (
 	old := *target
 	*target = srv.URL
 	t.Cleanup(func() { *target = old })
-	return &seen
+	return func() []map[string]any { mu.Lock(); defer mu.Unlock(); return append([]map[string]any(nil), seen...) }
 }
 
 func tokenOf(body map[string]any) string {
@@ -89,7 +89,7 @@ func TestTheLicenseRequestCarriesTheNonceAndTheCredential(t *testing.T) {
 	if !bytes.Equal(got, license) {
 		t.Errorf("license %x", got)
 	}
-	b := (*seen)[0]
+	b := seen()[0]
 	if b["cpn"] != "nonce-16-chars-x" || b["sessionId"] != "sess" || b["drmParams"] != "Cg0=" || b["videoId"] != "chan" || tokenOf(b) != "ctt-1" {
 		t.Errorf("request %v", b)
 	}
@@ -156,7 +156,7 @@ func TestARefusedHeartbeatEndsTheStreamWithTheReason(t *testing.T) {
 	if err := u.p.Failure(); err == nil || !strings.Contains(err.Error(), "too many streams") {
 		t.Errorf("failure %v", err)
 	}
-	b := (*seen)[0]
+	b := seen()[0]
 	if b["heartbeatToken"] != "token" || b["heartbeatServerData"] != "data" || b["cpn"] != "nonce" || tokenOf(b) != "ctt-1" {
 		t.Errorf("beat %v", b)
 	}
@@ -197,7 +197,7 @@ func TestHeartbeatsCarryTheServersDataForwardAndSurviveErrors(t *testing.T) {
 		t.Fatal("a failed beat ended the stream")
 	default:
 	}
-	beats := *seen
+	beats := seen()
 	if len(beats) < 3 {
 		t.Fatalf("%d beats", len(beats))
 	}

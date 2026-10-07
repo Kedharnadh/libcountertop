@@ -133,7 +133,7 @@ func (c *counter) Play(src playback.Source) {
 		defer close(c.done)
 		buf := make([]int16, 1920)
 		for {
-			n, err := src.Read(buf)
+			n, err := src.Read(context.Background(), buf)
 			c.mu.Lock()
 			c.samples += n
 			c.err = err

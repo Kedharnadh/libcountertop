@@ -115,22 +115,7 @@ typedef struct {
 } audio_slot;
 
 static void *client;
-#if COUNTERTOP_SHOW
-static int panel_w, panel_h;
 
-static int panel(void) {
-	int fd = open("/dev/graphics/fb0", O_RDONLY | O_CLOEXEC);
-	if (fd < 0) return -errno;
-	struct fb_var_screeninfo v;
-	int err = ioctl(fd, FBIOGET_VSCREENINFO, &v) < 0 ? -errno : 0;
-	close(fd);
-	if (err) return err;
-	panel_w = (int)v.xres;
-	panel_h = (int)v.yres;
-	return 0;
-}
-
-#endif
 
 static layer layers[MAX_LAYERS];
 static audio_slot audios[MAX_AUDIO];
@@ -798,6 +783,8 @@ static void gl_fills(const uint32_t *a, uint32_t len) {
 	if (l && l->is_gl) gl_quads(&l->gl, (const float *)(a + 2), (int)n);
 }
 
+static void panel_size(void);
+
 static void serve(int conn) {
 	uint32_t hdr[2];
 	if (read_full(conn, hdr, sizeof hdr) < 0 || hdr[0] != OP_HELLO || hdr[1] != 8) return;
@@ -808,11 +795,8 @@ static void serve(int conn) {
 		logw("client speaks version %u, this is %u", hello[1], VERSION);
 		return;
 	}
-	#if COUNTERTOP_SHOW
- if (reply(conn, OP_HELLO, (uint32_t[]){VERSION, (uint32_t)panel_w, (uint32_t)panel_h}, 3, -1) < 0) return;
-#else
- if (reply(conn, OP_HELLO, (uint32_t[]){VERSION}, 1, -1) < 0) return;
-#endif
+ panel_size();
+ if (reply(conn, OP_HELLO, (uint32_t[]){VERSION, (uint32_t)last_w, (uint32_t)last_h}, 3, -1) < 0) return;
 
 	int fresh = 1;
 	uint32_t *buf = NULL;
@@ -980,61 +964,7 @@ static layer *wait_layer;
 static pthread_t wait_th;
 static volatile int waiting;
 
-#if COUNTERTOP_SHOW
-static const char wait_fs[] =
-	"void main() {\n"
-	"	highp vec2 p = gl_FragCoord.xy - res * 0.5;\n"
-	"	float s = min(res.x, res.y);\n"
-	"	float r = s * 0.028, gap = r * 3.5;\n"
-	"	vec2 along = res.x >= res.y ? vec2(1.0, 0.0) : vec2(0.0, 1.0);\n"
-	"	vec4 o = vec4(0.0);\n"
-	"	for (int i = 0; i < 3; i++) {\n"
-	"		float d = length(p - along * float(i - 1) * gap) / r;\n"
-	"		float lit = 0.35 + 0.65 * max(sin(6.283185 * (u[0] / 1.2 - float(i) / 6.0)), 0.0);\n"
-	"		float inner = 1.0 - smoothstep(0.6, 0.7, d);\n"
-	"		float alpha = (1.0 - smoothstep(0.88, 1.0, d)) * mix(0.85, lit, inner);\n"
-	"		vec3 c = mix(vec3(0.05), vec3(1.0), inner);\n"
-	"		if (alpha > o.a) o = vec4(c * alpha, alpha);\n"
-	"	}\n"
-	"	gl_FragColor = o;\n"
-	"}\n";
 
-static void *wait_loop(void *arg) {
-	layer *l = arg;
-	struct timespec t0, now;
-	clock_gettime(CLOCK_MONOTONIC, &t0);
-	while (waiting) {
-		clock_gettime(CLOCK_MONOTONIC, &now);
-		float t = (float)((now.tv_sec - t0.tv_sec) + (now.tv_nsec - t0.tv_nsec) / 1e9);
-		gl_values(&l->gl, &t, 1, (gl_glow){0});
-		struct timespec tick = {0, 33 * 1000 * 1000};
-		nanosleep(&tick, NULL);
-	}
-	return NULL;
-}
-
-static void wait_start(void) {
-	layer *l = free_slot();
-	if (!l || surface_for(l, WAIT_ID, (uint32_t)panel_w, (uint32_t)panel_h, 0, 0, WAIT_Z, 0) != OK) return;
-	if (gl_open(&l->gl, l->win, panel_w, panel_h) != OK) {
-		drop(l);
-		return;
-	}
-	l->is_gl = 1;
-	if (gl_program(&l->gl, wait_fs, (int)sizeof wait_fs - 1, 0) != OK) {
-		drop(l);
-		return;
-	}
-	wait_layer = l;
-	waiting = 1;
-	if (pthread_create(&wait_th, NULL, wait_loop, l) != 0) {
-		waiting = 0;
-		drop(l);
-		wait_layer = NULL;
-	}
-}
-
-#else
 static const char wait_vs[] =
 	"layout(location=0) in vec3 p;\n"
 	"layout(location=1) in vec2 uv;\n"
@@ -1087,6 +1017,17 @@ static void *wait_loop(void *arg) {
 
 static void panel_size(void) {
 	if (last_w && last_h) return;
+	int fd = open("/dev/graphics/fb0", O_RDONLY | O_CLOEXEC);
+	if (fd >= 0) {
+		struct fb_var_screeninfo info;
+		int got = ioctl(fd, FBIOGET_VSCREENINFO, &info);
+		close(fd);
+		if (got == 0 && info.xres && info.yres) {
+			last_w = (int)info.xres;
+			last_h = (int)info.yres;
+			return;
+		}
+	}
 	void *display = NULL;
 	sf_display(&display, 0);
 	if (!display) return;
@@ -1118,7 +1059,7 @@ static void wait_start(void) {
 	}
 }
 
-#endif
+
 
 static void wait_stop(void) {
 	if (!wait_layer) return;
@@ -1135,13 +1076,7 @@ int main(void) {
 		logw("socket %s: %s", SOCKET_PATH, strerror(errno));
 		return 1;
 	}
-	#if COUNTERTOP_SHOW
- int err = panel();
- if (err) { logw("panel size from /dev/graphics/fb0: %s", strerror(-err)); return 1; }
- err = composer();
-#else
  int err = composer();
-#endif
 	if (err) {
 		logw("composer client: %d", err);
 		return 1;

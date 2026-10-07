@@ -1,0 +1,65 @@
+package settings
+
+import (
+	"slices"
+
+	gogui "github.com/go-gui-org/go-gui/gui"
+	widget "github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/shell"
+	"github.com/ygelfand/libcountertop/pkg/display/style"
+	"github.com/ygelfand/libcountertop/pkg/say"
+	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
+)
+
+func (p *BasicPages) Display() *shell.Page {
+	return &shell.Page{
+		Title: say.T("display.title"),
+		Build: func() ([]widget.Row, []func(int)) {
+			cfg := p.options.Read()
+			auto := cfg.Screen.Mode == config.ModeAuto
+
+			rows := []widget.Row{
+				{Label: say.T("display.brightness"), Kind: widget.Slider, Level: cfg.Screen.Backlight},
+				{Label: say.T("display.auto"), Kind: widget.Toggle, On: auto},
+				{Glyph: gogui.IconPalette, Label: say.T("display.theme"), Kind: widget.Chevron, Value: ThemeSays(cfg.Screen.Theme)},
+				{Label: say.T("display.style"), Kind: widget.Chevron, Value: say.T("style." + style.ByName(cfg.Screen.Style).Name)},
+				{Label: say.T("display.size"), Kind: widget.Slider, Level: SizeLevel(cfg.UISize), Snap: SizeSnap, Value: say.T("uisize." + cfg.UISize)},
+				{Glyph: gogui.IconClock, Label: say.T("display.clock"), Kind: widget.Chevron, Value: cfg.Clock.Face.Label()},
+				{Glyph: gogui.IconMoon, Label: say.T("display.idle"), Kind: widget.Chevron, Value: cfg.Idle.After.Label()},
+				{Glyph: gogui.IconPicture, Label: say.T("display.poster"), Kind: widget.Chevron, Value: cfg.PosterLabel},
+				{Label: say.T("controls.dock"), Kind: widget.Chevron, Value: cfg.Screen.Drawer.Label()},
+				{Label: say.T("controls.volume"), Kind: widget.Chevron, Value: cfg.Screen.Volume.Label()},
+				{Glyph: gogui.IconEye, Label: say.T("display.marks"), Kind: widget.Toggle, On: cfg.Screen.Marks},
+			}
+			acts := []func(int){
+				p.options.Brightness,
+				func(int) { p.options.Auto(auto) },
+				p.open(func() shell.View { return p.Theme() }),
+				p.open(func() shell.View { return p.Style() }),
+				func(level int) { p.options.Size(SizeOf(level)) },
+				p.open(p.options.ClockPage),
+				p.open(p.options.IdlePage),
+				p.open(p.options.PosterPage),
+				p.open(p.options.DockPage),
+				p.open(p.options.VolumePage),
+				func(int) { p.options.Marks(!cfg.Screen.Marks) },
+			}
+			if p.options.PresencePage != nil {
+				rows = append(rows, widget.Row{Glyph: gogui.IconEye, Label: say.T("display.presence"), Kind: widget.Chevron})
+				acts = append(acts, p.open(p.options.PresencePage))
+			}
+			return rows, acts
+
+		},
+	}
+}
+func SizeOf(level int) string {
+	all := config.ScreenSizes()
+	last := len(all) - 1
+	return all[min(max((level*last+50)/100, 0), last)]
+}
+func SizeLevel(name string) int {
+	all := config.ScreenSizes()
+	return max(slices.Index(all, name), 0) * 100 / (len(all) - 1)
+}
+func SizeSnap(level int) int { return SizeLevel(SizeOf(level)) }

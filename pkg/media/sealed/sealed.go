@@ -288,8 +288,10 @@ func (p *Player) Read(out []int16) (int, error) {
 	}
 }
 
-func (p *Player) next() ([]byte, time.Duration, *surface.Crypt, error) {
+func (p *Player) next(ctx context.Context) ([]byte, time.Duration, *surface.Crypt, error) {
 	select {
+	case <-ctx.Done():
+		return nil, 0, nil, ctx.Err()
 	case f := <-p.frames:
 		return f.data, f.at, f.crypt, nil
 	case <-p.done:

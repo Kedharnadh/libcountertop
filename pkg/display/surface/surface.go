@@ -16,7 +16,7 @@ import (
 const (
 	Socket  = "/dev/socket/countertop-surface"
 	magic   = 0x53564e4c
-	version = 4
+	version = 5
 )
 
 const (
@@ -178,16 +178,13 @@ type Client struct {
 	Dropped hook.Hook[error]
 }
 
-func Dial(path string) (*Client, error) { return DialVersion(path, version) }
-
-// DialVersion selects an existing helper protocol. Version 5 includes panel dimensions.
-func DialVersion(path string, protocol uint32) (*Client, error) {
+func Dial(path string) (*Client, error) {
 	c, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: path, Net: "unix"})
 	if err != nil {
 		return nil, err
 	}
 	cl := &Client{c: c, layers: map[uint32]*Layer{}}
-	if err := cl.send(opHello, magic, protocol); err != nil {
+	if err := cl.send(opHello, magic, version); err != nil {
 		c.Close()
 		return nil, err
 	}
@@ -196,25 +193,20 @@ func DialVersion(path string, protocol uint32) (*Client, error) {
 		c.Close()
 		return nil, err
 	}
-	if (protocol != 4 && protocol != 5) || len(words) != map[uint32]int{4: 1, 5: 3}[protocol] || words[0] != protocol {
+	if len(words) != 3 || words[0] != version {
 		c.Close()
 		return nil, ErrVersion
 	}
-	if protocol == 5 {
-		cl.Width, cl.Height = int(words[1]), int(words[2])
-		go cl.watch()
-	}
+	cl.Width, cl.Height = int(words[1]), int(words[2])
+	go cl.watch()
 	return cl, nil
 }
 
 func DialWait(path string, wait time.Duration) (*Client, error) {
-	return DialWaitVersion(path, wait, version)
-}
 
-func DialWaitVersion(path string, wait time.Duration, protocol uint32) (*Client, error) {
 	deadline := time.Now().Add(wait)
 	for {
-		c, err := DialVersion(path, protocol)
+		c, err := Dial(path)
 		if err == nil || errors.Is(err, ErrVersion) || time.Now().After(deadline) {
 			return c, err
 		}
@@ -979,7 +971,7 @@ func (c *Client) ScreenRead() ([]byte, int, int, error) {
 	return pix, w, h, nil
 }
 
-// watch detects an idle helper disconnect on devices using protocol 5.
+// watch detects an idle helper disconnect .
 func (c *Client) watch() {
 	for c.Err() == nil {
 		time.Sleep(500 * time.Millisecond)
