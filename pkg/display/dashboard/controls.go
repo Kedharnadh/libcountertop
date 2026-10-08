@@ -150,8 +150,9 @@ type Dependencies struct {
 	DeviceID    uint32
 }
 
-func (p Preferences) State() State {
-	s, c := p.Screen.Read(), p.Clock.Read()
+func (p Preferences) State() State { return StateOf(p.Screen.Read(), p.Clock.Read()) }
+
+func StateOf(s schema.Screen, c schema.Clock) State {
 	return State{
 		Hours:    s.Hours.Label(),
 		Face:     c.Face.Label(),

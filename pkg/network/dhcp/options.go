@@ -9,8 +9,12 @@ import (
 type Options struct {
 	Interface string
 	Hostname  func() string
-	Previous  func() net.IP
-	Remember  func(net.IP)
+	Store     Store
+}
+
+type Store interface {
+	Address() string
+	SetAddress(address string) error
 }
 
 func New(options Options) *Client { return &Client{options: options} }
@@ -29,14 +33,14 @@ func (c *Client) hostname() string {
 	return "countertop"
 }
 func (c *Client) previous() net.IP {
-	if c.options.Previous != nil {
-		return c.options.Previous()
+	if c.options.Store == nil {
+		return nil
 	}
-	return nil
+	return remembered(c.options.Store.Address())
 }
 func (c *Client) remember(ip net.IP) {
-	if c.options.Remember != nil {
-		c.options.Remember(ip)
+	if c.options.Store != nil {
+		keep(ip, c.options.Store)
 	}
 }
 

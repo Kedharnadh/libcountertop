@@ -33,6 +33,7 @@ func (p *AssistantPages) open(makePage func() shell.View) func(int) {
 	return func(int) { p.options.Shell.Push(makePage()) }
 }
 
+// Below 0.5 a model fires on anything; at 1 nothing reaches it.
 const (
 	LeastSure = 50
 	MostSure  = 99

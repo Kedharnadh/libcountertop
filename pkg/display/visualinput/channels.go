@@ -11,12 +11,18 @@ const LiftMax = 40
 func liftGain(db int) float32 { return float32(math.Pow(10, float64(db)/20)) }
 
 type stereo struct {
+	channels         int
 	left, right, mix *analysis.Analyzer
 	l, r, m          []int16
 }
 
-func newStereo(rate int, gain float32) *stereo {
-	s := &stereo{left: analysis.New(rate), right: analysis.New(rate), mix: analysis.New(rate)}
+func newStereo(rate, channels int, gain float32) *stereo {
+	s := &stereo{
+		channels: channels,
+		left:     analysis.New(rate),
+		right:    analysis.New(rate),
+		mix:      analysis.New(rate),
+	}
 	s.setGain(gain)
 	return s
 }
@@ -28,6 +34,12 @@ func (s *stereo) setGain(g float32) {
 }
 
 func (s *stereo) write(interleaved []int16) {
+	if s.channels == 1 {
+		s.left.Write(interleaved)
+		s.right.Write(interleaved)
+		s.mix.Write(interleaved)
+		return
+	}
 	n := len(interleaved) / 2
 	s.l, s.r, s.m = s.l[:0], s.r[:0], s.m[:0]
 	for i := range n {

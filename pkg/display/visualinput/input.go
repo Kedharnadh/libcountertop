@@ -132,8 +132,8 @@ func (v *Visuals) build() {
 func New(options Options) *Visuals {
 	v := &Visuals{
 		options: options,
-		mic:     newStereo(options.MicRate, liftGain(options.Lift)),
-		spk:     newStereo(options.SpeakerRate, 1),
+		mic:     newStereo(options.MicRate, options.MicChannels, liftGain(options.Lift)),
+		spk:     newStereo(options.SpeakerRate, options.SpeakerChannels, 1),
 		ring:    analysis.NewRing(options.SpeakerRate * options.SpeakerChannels / 5),
 		listen:  options.Listen, muted: options.Muted, tap: options.Tap,
 	}
@@ -246,12 +246,12 @@ func (v *Visuals) hear(ctx context.Context) {
 
 type Tap interface{ Offer([]int16) }
 type Options struct {
-	MicRate, SpeakerRate, SpeakerChannels, Lift int
-	Settings                                    storage.Section[config.Visual]
-	DeviceID                                    uint32
-	Listen                                      func() (<-chan []int16, func())
-	Muted                                       func() bool
-	Tap                                         func(Tap)
+	MicRate, MicChannels, SpeakerRate, SpeakerChannels, Lift int
+	Settings                                                 storage.Section[config.Visual]
+	DeviceID                                                 uint32
+	Listen                                                   func() (<-chan []int16, func())
+	Muted                                                    func() bool
+	Tap                                                      func(Tap)
 }
 
 func labels(values []visual.Kind) []string {

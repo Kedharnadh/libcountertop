@@ -152,3 +152,12 @@ func TestEmptyRegistry(t *testing.T) {
 	}
 	r.Restore(testConfig{})
 }
+
+func TestRegisterTakesATypedMaker(t *testing.T) {
+	r := New[testConfig](nil)
+	Register(r, Device, func() bare { return bare{name: "typed"} }, Order(1))
+	all := r.All()
+	if len(all) != 1 || all[0].Name() != "typed" {
+		t.Fatalf("registered %v, want the typed component", all)
+	}
+}

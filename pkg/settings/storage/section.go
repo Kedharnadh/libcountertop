@@ -22,3 +22,7 @@ func (s Binding[Root, Part]) Read() Part {
 func (s Binding[Root, Part]) Update(change func(*Part)) error {
 	return s.source().Update(func(root *Root) { change(s.field(root)) })
 }
+
+func Field[Root, Part any](s *Store[Root], field func(*Root) *Part) Binding[Root, Part] {
+	return Bind(func() *Store[Root] { return s }, field)
+}

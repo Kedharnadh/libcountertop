@@ -52,6 +52,10 @@ func (r *Registry[T]) Add(p Phase, make func() Component, opts ...Option) {
 	r.entries = append(r.entries, e)
 }
 
+func Register[T any, C Component](r *Registry[T], p Phase, make func() C, opts ...Option) {
+	r.Add(p, func() Component { return make() }, opts...)
+}
+
 func (r *Registry[T]) All() []Component {
 	sorted := r.sorted()
 	out := make([]Component, 0, len(sorted))

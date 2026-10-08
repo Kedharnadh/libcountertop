@@ -116,6 +116,12 @@ func (t *Tree) Root() *cobra.Command {
 	return t.root
 }
 
+func Executes(makeTree func() *cobra.Command) Dispatch {
+	return func(ctx context.Context, args []string) (string, error) {
+		return Execute(ctx, makeTree, args)
+	}
+}
+
 func Execute(ctx context.Context, makeTree func() *cobra.Command, args []string) (string, error) {
 	root := makeTree()
 	var out strings.Builder

@@ -11,11 +11,6 @@ import (
 
 const StopSlot = 100
 
-type StopEngine interface {
-	Use(int, wake.Model) error
-	Clear(int)
-}
-
 type StopOptions struct {
 	Directory string
 	DeviceID  uint32
@@ -25,11 +20,11 @@ type StopOptions struct {
 
 type StopWord struct {
 	Entity  *esphome.Number
-	engine  StopEngine
+	engine  Slots
 	options StopOptions
 }
 
-func NewStopWord(engine StopEngine, options StopOptions) *StopWord {
+func NewStopWord(engine Slots, options StopOptions) *StopWord {
 	s := &StopWord{engine: engine, options: options}
 	s.Entity = &esphome.Number{
 		Base: esphome.Base{

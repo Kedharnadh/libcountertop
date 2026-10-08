@@ -1,0 +1,355 @@
+package mediaplayer
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"sync/atomic"
+
+	esphome "github.com/ygelfand/go-esphome-device"
+
+	"github.com/ygelfand/libcountertop/pkg/audio/sound"
+	"github.com/ygelfand/libcountertop/pkg/audio/upsample"
+	"github.com/ygelfand/libcountertop/pkg/hook"
+	"github.com/ygelfand/libcountertop/pkg/media/ownership"
+	"github.com/ygelfand/libcountertop/pkg/media/pcm"
+	"github.com/ygelfand/libcountertop/pkg/media/source"
+	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
+)
+
+type Speaker interface {
+	sound.Player
+	pcm.Sink
+	PlayVoice(mono []int16)
+}
+
+type Volume interface {
+	SetVolume(fraction float32)
+	StepVolume(delta int)
+	Mute(on bool)
+}
+
+type Options[P Speaker] struct {
+	Speaker        P
+	Sound          *sound.Driver[P]
+	Rate, Channels int
+	DuckDB         func() float64
+	Volume         Volume
+	Changed        func()
+}
+
+type Player[P Speaker] struct {
+	Begun hook.Hook[source.Source]
+
+	mp     *esphome.MediaPlayer
+	stream *pcm.Stream
+	sound  *sound.Driver[P]
+	volume Volume
+	notify func()
+
+	speaking atomic.Bool
+
+	owner *ownership.Owner[source.Source]
+	queue *queue[P]
+}
+
+func Formats(rate, channels int) []esphome.MediaFormat {
+	return []esphome.MediaFormat{
+		{Format: "wav", SampleRate: uint32(rate), Channels: uint32(channels), SampleBytes: 2},
+		{
+			Format:       "wav",
+			SampleRate:   upsample.VoiceRate,
+			Channels:     1,
+			SampleBytes:  2,
+			Announcement: true,
+		},
+	}
+}
+
+func New[P Speaker](o Options[P]) *Player[P] {
+	p := &Player[P]{
+		mp: &esphome.MediaPlayer{
+			Base: esphome.Base{ObjectID: "speaker", Name: "Speaker", Icon: "mdi:speaker"},
+			Features: esphome.MediaPlayerFeatureVolumeSet |
+				esphome.MediaPlayerFeatureVolumeStep |
+				esphome.MediaPlayerFeatureVolumeMute |
+				esphome.MediaPlayerFeaturePlayMedia |
+				esphome.MediaPlayerFeatureBrowseMedia |
+				esphome.MediaPlayerFeaturePlay |
+				esphome.MediaPlayerFeaturePause |
+				esphome.MediaPlayerFeatureStop |
+				esphome.MediaPlayerFeatureAnnounce,
+			SupportedFormats: Formats(o.Rate, o.Channels),
+			SupportsPause:    true,
+		},
+		sound:  o.Sound,
+		volume: o.Volume,
+		notify: o.Changed,
+		owner: ownership.New(func(s source.Source) uint8 {
+			if s == nil {
+				return uint8(source.FromQueue)
+			}
+			return uint8(s.Kind())
+		}),
+	}
+	p.queue = &queue[P]{p: p}
+	p.mp.OnCommand = p.command
+	p.stream = pcm.New(pcm.Options{
+		Sink:        o.Speaker,
+		Rate:        o.Rate,
+		Channels:    o.Channels,
+		Changed:     p.Changed,
+		DuckDB:      o.DuckDB,
+		Arbitration: o.Sound.Backgrounds(),
+	})
+	p.mp.SetState(esphome.MediaPlayerIdle)
+	return p
+}
+
+func (p *Player[P]) Entity() *esphome.MediaPlayer { return p.mp }
+
+func (p *Player[P]) Stream() *pcm.Stream { return p.stream }
+
+func (p *Player[P]) Start(ctx context.Context) { p.stream.Start(ctx) }
+
+func (p *Player[P]) Close() error { return p.stream.Close() }
+
+func (p *Player[P]) command(c esphome.MediaCommand) {
+	if c.HasVolume {
+		p.volume.SetVolume(c.Volume)
+		p.Changed()
+	}
+
+	if c.HasMediaURL && c.MediaURL != "" {
+		p.play(c.MediaURL, c.Announcement)
+	}
+	if !c.HasCommand {
+		return
+	}
+
+	switch c.Command {
+	case esphome.MediaPlayerVolumeUp:
+		p.volume.StepVolume(1)
+		p.Changed()
+	case esphome.MediaPlayerVolumeDown:
+		p.volume.StepVolume(-1)
+		p.Changed()
+	case esphome.MediaPlayerMute:
+		p.Mute(true)
+	case esphome.MediaPlayerUnmute:
+		p.Mute(false)
+	case esphome.MediaPlayerStop:
+		p.Ended(p.queue)
+		p.Stop()
+	case esphome.MediaPlayerPause:
+		p.Pause()
+	case esphome.MediaPlayerPlay:
+		p.Unpause()
+	case esphome.MediaPlayerToggle:
+		if playing, _ := p.Playing(); playing {
+			p.Pause()
+		} else {
+			p.Unpause()
+		}
+	}
+}
+
+// Home Assistant serves the url as WAV, at the card's rate for music and the pipeline's for an announcement.
+func (p *Player[P]) play(url string, announcement bool) {
+	if announcement {
+		p.announce(url)
+		return
+	}
+	p.Began(p.queue)
+	p.stream.Play(url)
+}
+
+func (p *Player[P]) announce(url string) {
+	p.Sounding(true)
+	claim := p.sound.Claim("announce", func(ctx context.Context, spk P) error {
+		samples, err := pcm.Fetch(ctx, url)
+		if err != nil {
+			return err
+		}
+		spk.PlayVoice(samples)
+		spk.PlayVoice(make([]int16, upsample.VoiceRate*pcm.Tail/1000))
+		return nil
+	})
+
+	safe.Go("announce", func() {
+		<-claim.Done()
+		p.Sounding(false)
+
+		if err := claim.Err(); err != nil {
+			slog.Error("playing the announcement failed", "url", url, "err", err)
+		}
+	})
+}
+
+func (p *Player[P]) Sounding(on bool) {
+	p.speaking.Store(on)
+	p.Changed()
+}
+
+func (p *Player[P]) Mute(on bool) {
+	p.mp.SetMuted(on)
+	p.volume.Mute(on)
+	p.Changed()
+}
+
+func (p *Player[P]) Changed() {
+	p.mp.SetState(p.state())
+	if p.notify != nil {
+		p.notify()
+	}
+}
+
+func (p *Player[P]) state() esphome.MediaPlayerState {
+	playing, paused := p.Playing()
+
+	switch {
+	case playing || p.speaking.Load():
+		return esphome.MediaPlayerPlaying
+	case paused:
+		return esphome.MediaPlayerPaused
+	default:
+		return esphome.MediaPlayerIdle
+	}
+}
+
+func (p *Player[P]) Began(s source.Source) {
+	replaced, fresh, displaced := p.owner.Begin(s)
+	p.Changed()
+	if fresh {
+		p.Begun.Emit(s)
+	}
+	if displaced {
+		replaced.Stop()
+	}
+}
+
+func (p *Player[P]) Ended(s source.Source) { p.owner.End(s) }
+
+func (p *Player[P]) External(s source.Source) {
+	if s == nil {
+		p.owner.Clear()
+	} else {
+		p.owner.Set(s)
+	}
+	p.Changed()
+}
+
+func (p *Player[P]) Release(s source.Source) {
+	if p.owner.Release(s) {
+		p.Changed()
+	}
+}
+
+func (p *Player[P]) ResetSession() { p.owner.ResetSession() }
+
+func (p *Player[P]) Holder() source.Source { return p.source() }
+
+func (p *Player[P]) Sourced() (string, bool) {
+	s, held := p.owner.Get()
+	if held {
+		return fmt.Sprintf("%T", s), true
+	}
+	return "the local queue", false
+}
+
+func (p *Player[P]) Transport() source.Controller {
+	if s := p.source(); s != nil {
+		return s
+	}
+	return p.queue
+}
+
+func (p *Player[P]) Now() source.Now {
+	if s := p.source(); s != nil {
+		return s.Now()
+	}
+	return p.queued()
+}
+
+func (p *Player[P]) From() source.Kind {
+	if s := p.source(); s != nil {
+		return s.Kind()
+	}
+	return source.FromQueue
+}
+
+func (p *Player[P]) Named() string {
+	if s := p.source(); s != nil {
+		return s.Label()
+	}
+	return ""
+}
+
+func (p *Player[P]) Next() {
+	if s := p.external(); s != nil {
+		s.Next()
+	}
+}
+
+func (p *Player[P]) Previous() {
+	if s := p.external(); s != nil {
+		s.Previous()
+	}
+}
+
+func (p *Player[P]) Playing() (playing, paused bool) {
+	playing, paused = p.stream.Playing()
+	if s := p.external(); s != nil {
+		now := s.Now()
+		playing = playing || now.Playing && !now.Paused
+		paused = paused || now.Paused
+	}
+	return playing, paused
+}
+
+func (p *Player[P]) Pause() {
+	p.stream.Pause()
+	if s := p.external(); s != nil {
+		s.Pause()
+	}
+}
+
+func (p *Player[P]) Unpause() {
+	p.stream.Unpause()
+	if s := p.external(); s != nil {
+		s.Play()
+	}
+}
+
+func (p *Player[P]) Stop() {
+	p.stream.Stop()
+	if s := p.external(); s != nil {
+		s.Stop()
+	}
+	p.Changed()
+}
+
+func (p *Player[P]) source() source.Source { s, _ := p.owner.Get(); return s }
+
+func (p *Player[P]) external() source.Source {
+	if s := p.source(); s != source.Source(p.queue) {
+		return s
+	}
+	return nil
+}
+
+func (p *Player[P]) queued() source.Now {
+	playing, paused := p.stream.Playing()
+	return source.Now{Playing: playing, Paused: paused, Can: source.CanPause | source.CanStop}
+}
+
+type queue[P Speaker] struct{ p *Player[P] }
+
+func (q *queue[P]) Play()             { q.p.stream.Unpause() }
+func (q *queue[P]) Pause()            { q.p.stream.Pause() }
+func (q *queue[P]) Stop()             { q.p.stream.Stop(); q.p.Changed() }
+func (q *queue[P]) Next()             {}
+func (q *queue[P]) Previous()         {}
+func (q *queue[P]) Now() source.Now   { return q.p.queued() }
+func (q *queue[P]) Kind() source.Kind { return source.FromQueue }
+func (q *queue[P]) Label() string     { return "" }

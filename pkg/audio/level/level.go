@@ -1,0 +1,298 @@
+package level
+
+import (
+	"log/slog"
+	"math"
+	"sync/atomic"
+	"time"
+)
+
+const (
+	targetDBFS = -23.0
+	maxGainDB  = 27.0
+
+	speechOverFloorDB = 12.0
+
+	floorFall = 200 * time.Millisecond
+	floorRise = 60 * time.Second
+
+	// Speech peaks 12 to 18 dB above its own average.
+	peakDBFS = -3.0
+
+	// The vendor's own leveller carries a fixed 20 dB.
+	startGainDB = 20.0
+
+	fallTime = 500 * time.Millisecond
+	riseTime = 5 * time.Second
+)
+
+const (
+	levelLowHz  = 200
+	levelHighHz = 900
+	levelPoles  = 3
+
+	levelTopDB = 30.0
+
+	levelAttack  = 40 * time.Millisecond
+	levelRelease = 180 * time.Millisecond
+)
+
+const (
+	quietestAtGain = 16.0
+	quietestLimit  = 2.0
+)
+
+const fullScale = 32768
+
+type Config struct {
+	Rate  int
+	Frame int
+
+	ReferenceGain int
+
+	Gain        int
+	Sensitivity int
+	Leveling    bool
+}
+
+type Leveler struct {
+	gain float32
+
+	referenceGain int
+
+	least atomic.Uint32
+	quiet atomic.Int32
+
+	sounding bool
+
+	leveling    atomic.Bool
+	wasLeveling bool
+
+	peak atomic.Uint32
+
+	floor float32
+
+	fall, rise          float32
+	floorDown, floorUp  float32
+	target, ceiling     float32
+	headroom, overFloor float32
+
+	levelUp, levelDown float32
+
+	lp                 [levelPoles]float32
+	hp                 float32
+	lpA, hpA           float32
+	bandRMS, bandFloor float32
+
+	published  atomic.Uint32
+	shownFloor atomic.Uint32
+	level      atomic.Uint32
+	clipped    atomic.Uint64
+}
+
+func New(c Config) *Leveler {
+	frame := float64(c.Frame) / float64(c.Rate)
+	rate := float64(c.Rate)
+
+	l := &Leveler{
+		gain:          float32(math.Pow(10, startGainDB/20)),
+		referenceGain: c.ReferenceGain,
+		floor:         fullScale,
+		fall:          float32(1 - math.Exp(-frame/fallTime.Seconds())),
+		rise:          float32(1 - math.Exp(-frame/riseTime.Seconds())),
+		floorDown:     float32(1 - math.Exp(-frame/floorFall.Seconds())),
+		floorUp:       float32(1 - math.Exp(-frame/floorRise.Seconds())),
+		target:        float32(math.Pow(10, targetDBFS/20) * fullScale),
+		ceiling:       float32(math.Pow(10, maxGainDB/20)),
+		headroom:      float32(math.Pow(10, peakDBFS/20) * fullScale),
+		overFloor:     float32(math.Pow(10, speechOverFloorDB/20)),
+
+		levelUp:   float32(1 - math.Exp(-frame/levelAttack.Seconds())),
+		levelDown: float32(1 - math.Exp(-frame/levelRelease.Seconds())),
+
+		bandFloor: fullScale,
+		lpA:       float32(1 - math.Exp(-2*math.Pi*levelHighHz/rate)),
+		hpA:       float32(1 - math.Exp(-2*math.Pi*levelLowHz/rate)),
+	}
+
+	l.SetInputGain(c.Gain)
+	l.quiet.Store(int32(c.Sensitivity))
+	l.leveling.Store(c.Leveling)
+	l.wasLeveling = c.Leveling
+	l.publish()
+	return l
+}
+
+func (l *Leveler) SetInputGain(db int) {
+	l.least.Store(math.Float32bits(quietest(db - l.referenceGain)))
+}
+
+func (l *Leveler) SetSensitivity(db int) {
+	l.quiet.Store(int32(db))
+	slog.Info("room sensitivity", "over_floor_db", db)
+}
+
+func (l *Leveler) SetLeveling(on bool) {
+	l.leveling.Store(on)
+	slog.Info("microphone leveling", "on", on)
+}
+
+func (l *Leveler) SetPlayback(on bool) { l.sounding = on }
+
+func (l *Leveler) Process(frame []int16) {
+	on := l.leveling.Load()
+	switch {
+	case on:
+		l.apply(frame)
+	default:
+		if l.wasLeveling {
+			l.forget()
+		}
+		if len(frame) > 0 {
+			l.observe(frame)
+		}
+	}
+	l.wasLeveling = on
+}
+
+func (l *Leveler) Floor() float64 {
+	return 20 * math.Log10(float64(math.Float32frombits(l.shownFloor.Load()))/fullScale)
+}
+
+func (l *Leveler) Peak() float64 {
+	return float64(math.Float32frombits(l.peak.Swap(0)))
+}
+
+func (l *Leveler) Gain() float64 {
+	return 20 * math.Log10(float64(math.Float32frombits(l.published.Load())))
+}
+
+func (l *Leveler) Clipped() uint64 { return l.clipped.Load() }
+
+func (l *Leveler) Level() float64 {
+	return float64(math.Float32frombits(l.level.Load()))
+}
+
+func (l *Leveler) forget() {
+	l.gain = float32(math.Pow(10, startGainDB/20))
+	l.floor, l.bandFloor = fullScale, fullScale
+	l.publish()
+}
+
+func (l *Leveler) publish() {
+	l.published.Store(math.Float32bits(l.gain))
+	l.shownFloor.Store(math.Float32bits(l.bandFloor))
+}
+
+func abs(s int16) int32 {
+	if s < 0 {
+		return -int32(s)
+	}
+	return int32(s)
+}
+
+func (l *Leveler) observe(frame []int16) (rms, peak float32) {
+	var sum, band float64
+	for _, s := range frame {
+		sum += float64(s) * float64(s)
+		peak = max(peak, float32(abs(s)))
+
+		v := float32(s)
+		for i := range l.lp {
+			l.lp[i] += (v - l.lp[i]) * l.lpA
+			v = l.lp[i]
+		}
+		l.hp += (v - l.hp) * l.hpA
+		v -= l.hp
+
+		band += float64(v) * float64(v)
+	}
+	rms = float32(math.Sqrt(sum / float64(len(frame))))
+	l.bandRMS = float32(math.Sqrt(band / float64(len(frame))))
+
+	if !l.sounding {
+		least := math.Float32frombits(l.least.Load())
+		l.floor = follow(l.floor, rms, l.floorDown, l.floorUp, least)
+		l.bandFloor = follow(l.bandFloor, l.bandRMS, l.floorDown, l.floorUp, least)
+		l.shownFloor.Store(math.Float32bits(l.bandFloor))
+	}
+
+	l.publishLevel(l.bandRMS)
+	return rms, peak
+}
+
+func quietest(overReference int) float32 {
+	return float32(max(quietestAtGain*math.Pow(10, float64(overReference)/20), quietestLimit))
+}
+
+func follow(floor, rms, down, up, least float32) float32 {
+	step := up
+	if rms < floor {
+		step = down
+	}
+	return max(floor+(rms-floor)*step, least)
+}
+
+func levelFrom(overDB, quiet, span float64) float64 {
+	x := min(max((overDB-quiet)/span, 0), 1)
+
+	return x * x * x * (x*(6*x-15) + 10)
+}
+
+func (l *Leveler) publishLevel(rms float32) {
+	over := 0.0
+	if rms > l.bandFloor {
+		over = 20 * math.Log10(float64(rms/l.bandFloor))
+	}
+	quiet := float64(l.quiet.Load())
+	want := float32(levelFrom(over, quiet, levelTopDB-quiet))
+
+	was := math.Float32frombits(l.level.Load())
+	step := l.levelUp
+	if want < was {
+		step = l.levelDown
+	}
+	now := was + (want-was)*step
+	l.level.Store(math.Float32bits(now))
+
+	if now > math.Float32frombits(l.peak.Load()) {
+		l.peak.Store(math.Float32bits(now))
+	}
+}
+
+func (l *Leveler) apply(frame []int16) {
+	if len(frame) == 0 {
+		return
+	}
+	rms, peak := l.observe(frame)
+
+	if !l.sounding && rms > l.floor*l.overFloor {
+		want := min(max(l.target/rms, 1), l.ceiling)
+
+		step := l.rise
+		if want < l.gain {
+			step = l.fall
+		}
+		l.gain += (want - l.gain) * step
+	}
+
+	gain := l.gain
+	if peak > 0 {
+		gain = min(gain, l.headroom/peak)
+	}
+
+	l.publish()
+
+	for i, s := range frame {
+		switch v := float32(s) * gain; {
+		case v > fullScale-1:
+			frame[i] = fullScale - 1
+			l.clipped.Add(1)
+		case v < -fullScale:
+			frame[i] = -fullScale
+			l.clipped.Add(1)
+		default:
+			frame[i] = int16(v)
+		}
+	}
+}

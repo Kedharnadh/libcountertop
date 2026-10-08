@@ -52,6 +52,17 @@ func (s *Server) Start() error {
 
 func (s *Server) Wait() { s.workers.Wait() }
 
+func (s *Server) Address() string { return s.address }
+
+func (s *Server) Run(ctx context.Context) error {
+	if err := s.Start(); err != nil {
+		return err
+	}
+	<-ctx.Done()
+	s.Close()
+	return nil
+}
+
 func (s *Server) Close() {
 	s.mu.Lock()
 	defer s.mu.Unlock()

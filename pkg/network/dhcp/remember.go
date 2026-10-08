@@ -5,7 +5,7 @@ import (
 	"net"
 )
 
-func Previous(said string) net.IP {
+func remembered(said string) net.IP {
 	if said == "" {
 		return nil
 	}
@@ -16,15 +16,16 @@ func Previous(said string) net.IP {
 	}
 	return addr.To4()
 }
-func Remember(addr net.IP, read func() string, save func(string) error) {
+
+func keep(addr net.IP, store Store) {
 	said := ""
 	if addr.To4() != nil {
 		said = addr.To4().String()
 	}
-	if read() == said {
+	if store.Address() == said {
 		return
 	}
-	if err := save(said); err != nil {
+	if err := store.SetAddress(said); err != nil {
 		slog.Warn("could not remember the address", "address", said, "err", err)
 	}
 }

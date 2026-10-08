@@ -1,0 +1,164 @@
+package satellite
+
+import (
+	"context"
+	"log/slog"
+
+	esphome "github.com/ygelfand/go-esphome-device"
+	"google.golang.org/protobuf/proto"
+
+	"github.com/ygelfand/libcountertop/pkg/assistant/turn"
+	"github.com/ygelfand/libcountertop/pkg/inference/wakeslots"
+)
+
+// Announce and StartConversation both require a media player.
+const Features = esphome.DefaultVoiceFeatures |
+	esphome.FeatureSpeaker |
+	esphome.FeatureAnnounce |
+	esphome.FeatureStartConversation |
+	esphome.FeatureTimers
+
+type Timers interface {
+	Event(esphome.TimerEvent)
+	Forget()
+	Ringing() bool
+	Stop() bool
+}
+
+type Sound interface {
+	Busy() bool
+	Silence()
+}
+
+type Player interface {
+	Playing() (playing, paused bool)
+	Pause()
+}
+
+type Options struct {
+	Slots   int
+	Initial []string
+	Timers  Timers
+	Sound   Sound
+	Player  Player
+	Save    func(slot int, id string) error
+}
+
+type Satellite struct {
+	vs        *esphome.VoiceSatellite
+	turn      *turn.Conversation
+	selection wakeslots.Selection
+	options   Options
+}
+
+func New(vs *esphome.VoiceSatellite, deps turn.Dependencies, options Options) *Satellite {
+	s := &Satellite{vs: vs, options: options}
+	s.selection.Set(options.Initial)
+	vs.ActiveWakeWords = wakeslots.Advertised(options.Initial)
+	vs.MaxActiveWakeWords = uint32(options.Slots)
+
+	deps.Word = s.selection.ID
+	s.turn = turn.NewConversation(vs, deps)
+
+	vs.OnTimer = options.Timers.Event
+	vs.OnSubscribed = func(subscribed bool) {
+		if !subscribed {
+			options.Timers.Forget()
+		}
+	}
+	return s
+}
+
+func (s *Satellite) Name() string { return "conversation" }
+
+func (s *Satellite) Handle(ctx context.Context, c *esphome.Conn, msg proto.Message) error {
+	return s.vs.Handle(ctx, c, msg)
+}
+
+func (s *Satellite) Run(ctx context.Context) error {
+	s.turn.Run(ctx)
+	return nil
+}
+
+func (s *Satellite) Ready() bool { return s.vs.Subscribed() }
+
+func (s *Satellite) Turn() *turn.Conversation { return s.turn }
+
+func (s *Satellite) Start(slot int) { s.turn.Start(slot) }
+
+func (s *Satellite) Action() {
+	if s.Stop() {
+		return
+	}
+
+	// Home Assistant runs the first pipeline for a wake that reports no phrase.
+	s.turn.Start(0)
+}
+
+func (s *Satellite) Interrupt() {
+	if s.turn.Phase() == turn.Listening {
+		slog.Debug("stop word ignored, the turn is listening")
+		return
+	}
+	if !s.options.Sound.Busy() && !s.options.Timers.Ringing() {
+		if playing, _ := s.options.Player.Playing(); !playing {
+			slog.Debug("stop word ignored, nothing to stop")
+			return
+		}
+	}
+	s.Stop()
+}
+
+func (s *Satellite) Stop() bool {
+	if s.options.Timers.Stop() {
+		return true
+	}
+
+	if s.turn.Busy() {
+		s.turn.Cancel()
+		return true
+	}
+
+	if s.options.Sound.Busy() {
+		s.options.Sound.Silence()
+		return true
+	}
+
+	if playing, _ := s.options.Player.Playing(); playing {
+		s.options.Player.Pause()
+		return true
+	}
+	return false
+}
+
+// Home Assistant takes the echoed list as authoritative and reverts a slot missing from it.
+func (s *Satellite) OnWakeWord(load func(ids []string) []string, selected func()) {
+	s.vs.OnSetActiveWakeWords = func(ids []string) {
+		accepted := load(ids)
+		s.SetSlots(accepted)
+
+		for slot := range s.options.Slots {
+			id := ""
+			if slot < len(accepted) {
+				id = accepted[slot]
+			}
+			if err := s.options.Save(slot, id); err != nil {
+				slog.Error("saving the wake word failed", "slot", slot+1, "err", err)
+			}
+		}
+		if len(wakeslots.Advertised(accepted)) != len(wakeslots.Advertised(ids)) {
+			slog.Warn("some wake words were refused", "asked", ids, "running", accepted)
+		}
+		if selected != nil {
+			selected()
+		}
+	}
+}
+
+func (s *Satellite) Slots() []string { return s.selection.Get() }
+
+func (s *Satellite) SetSlots(slots []string) {
+	s.selection.Set(slots)
+	s.vs.ActiveWakeWords = wakeslots.Advertised(slots)
+	slog.Info("wake words listening", "slots", slots)
+}

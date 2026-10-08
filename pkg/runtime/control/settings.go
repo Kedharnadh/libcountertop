@@ -8,8 +8,22 @@ import (
 
 type Setting[T any] struct {
 	Name  string
+	Field string
 	Read  func(T) string
 	Write func(string) error
+}
+
+func Map[T, U any](rows []Setting[U], view func(T) U) []Setting[T] {
+	out := make([]Setting[T], len(rows))
+	for i, row := range rows {
+		out[i] = Setting[T]{
+			Name:  row.Name,
+			Field: row.Field,
+			Read:  func(t T) string { return row.Read(view(t)) },
+			Write: row.Write,
+		}
+	}
+	return out
 }
 
 func Settings[T any](read func() T, rows []Setting[T], args []string) (string, error) {

@@ -91,6 +91,16 @@ func (l *Library) Advertise() ([]esphome.WakeWord, int) {
 	return words, shadowed
 }
 
+// Home Assistant asks on connect and after every selection change, with the models in its custom_wake_words directory.
+func (l *Library) Answer(offered []esphome.ExternalWakeWord) []esphome.WakeWord {
+	l.Offered(offered)
+	words, shadowed := l.Advertise()
+
+	slog.Debug("wake words offered", "count", len(offered),
+		"ours", len(l.Ours()), "advertised", len(words), "shadowed", shadowed)
+	return words
+}
+
 func (l *Library) sorted() []esphome.ExternalWakeWord {
 	l.muOffers.Lock()
 	defer l.muOffers.Unlock()

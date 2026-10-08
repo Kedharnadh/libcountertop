@@ -14,6 +14,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/visual"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
+	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 	tz "github.com/ygelfand/libcountertop/pkg/timezone"
 )
 
@@ -321,21 +322,23 @@ func (p *BasicPages) setTheme(name string) {
 	}
 }
 func (p *BasicPages) setLanguage(tag string) {
-	say.Use(tag)
-	saveScreen(
-		p.options.Preferences.Screen,
-		p.options.Shell,
-		"screen.language",
-		func(c *config.Screen) { c.Language = tag },
-	)
+	SetLanguage(p.options.Preferences.Screen, p.options.Shell, tag)
 }
 func (p *BasicPages) setKeyboard(v config.KeyboardSize) {
-	saveScreen(
-		p.options.Preferences.Screen,
-		p.options.Shell,
-		"screen.keyboard",
-		func(c *config.Screen) { c.Keyboard = v },
-	)
+	SetKeyboard(p.options.Preferences.Screen, p.options.Shell, v)
+}
+
+func SetLanguage(section storage.Section[config.Screen], stack *shell.Shell, tag string) {
+	say.Use(tag)
+	saveScreen(section, stack, "screen.language", func(c *config.Screen) { c.Language = tag })
+}
+
+func SetKeyboard(
+	section storage.Section[config.Screen],
+	stack *shell.Shell,
+	v config.KeyboardSize,
+) {
+	saveScreen(section, stack, "screen.keyboard", func(c *config.Screen) { c.Keyboard = v })
 }
 func (p *BasicPages) setVolumeEdge(v config.Edge) {
 	saveScreen(
