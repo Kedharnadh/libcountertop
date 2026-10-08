@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	setting "github.com/ygelfand/libcountertop/pkg/settings"
 )
 
 type Setting[T any] struct {
@@ -52,4 +54,24 @@ func Settings[T any](read func() T, rows []Setting[T], args []string) (string, e
 		"no such setting %q; run settings without arguments to list names",
 		args[0],
 	)
+}
+
+func Registered[T any](r *setting.Registry) []Setting[T] {
+	var out []Setting[T]
+	for _, b := range r.All() {
+		for _, name := range b.Names() {
+			out = append(out, Setting[T]{
+				Name: b.Domain() + "." + name,
+				Read: func(T) string {
+					v, err := b.Value(name)
+					if err != nil {
+						return err.Error()
+					}
+					return OrNone(v)
+				},
+				Write: func(v string) error { return b.Change(name, v) },
+			})
+		}
+	}
+	return out
 }

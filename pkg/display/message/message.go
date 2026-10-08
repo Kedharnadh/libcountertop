@@ -24,13 +24,13 @@ type Messages struct {
 	timer      *time.Timer
 	current    Message
 	generation uint64
-	took       int
+	took       *int
 }
 
 func (m *Messages) Took(id int) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.took == id+1
+	return m.took != nil && *m.took == id
 }
 
 func (m *Messages) Current() (Message, bool) {
@@ -46,9 +46,9 @@ func (m *Messages) Close()                        { m.Hide() }
 func (m *Messages) Dismiss(id int) {
 	m.mu.Lock()
 	showing := m.timer != nil
-	m.took = 0
+	m.took = nil
 	if showing {
-		m.took = id + 1
+		m.took = &id
 	}
 	m.mu.Unlock()
 

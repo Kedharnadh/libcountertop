@@ -108,6 +108,10 @@ type Profile struct{ ID string }
 
 func (*Profile) Covers() bool { return true }
 
+type Directory struct{}
+
+func (*Directory) Covers() bool { return true }
+
 func New(o Dependencies) *Calls {
 	ctx, stop := context.WithCancel(context.Background())
 	c := &Calls{options: o, ctx: ctx, stop: stop}
@@ -161,6 +165,8 @@ func (c *Calls) Talking() bool {
 func (c *Calls) PausesWake() bool { return c.Talking() && c.options.Settings.Read().PauseWake }
 
 func (c *Calls) Open(p discovery.Peer) { c.options.Shell.Push(&Profile{ID: p.ID}) }
+
+func (c *Calls) Browse() { c.options.Shell.Push(&Directory{}) }
 
 func (c *Calls) Start(p discovery.Peer, video bool) error {
 	addr, err := route(p)

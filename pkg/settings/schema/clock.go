@@ -89,6 +89,7 @@ const (
 	PositionTop    Position = "top"
 	PositionCenter Position = "center"
 	PositionBottom Position = "bottom"
+	PositionRandom Position = "random"
 )
 
 const DefaultPosition = PositionCenter
@@ -101,6 +102,8 @@ func (p Position) Label() string {
 		return say.T("position.center")
 	case PositionBottom:
 		return say.T("position.bottom")
+	case PositionRandom:
+		return say.T("position.random")
 	}
 	return string(p)
 }

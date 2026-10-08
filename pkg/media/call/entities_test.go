@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	esphome "github.com/ygelfand/go-esphome-device"
+
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
@@ -28,12 +30,16 @@ func TestFailedCallSettingPublishesSavedValue(t *testing.T) {
 	t.Cleanup(c.Close)
 	c.Restore(settings.Read())
 	c.SetIncoming(false)
-	if !c.ha.incoming.Get() || !settings.Read().Incoming {
+	if !advertised(c, "incoming") || !settings.Read().Incoming {
 		t.Fatal("failed save changed the advertised or persisted incoming setting")
 	}
 	settings.err = nil
 	c.SetAutoVideo(true)
-	if !settings.Read().Incoming || !c.ha.video.Get() {
+	if !settings.Read().Incoming || !advertised(c, "auto_video") {
 		t.Fatal("changing auto video lost another setting or was not published")
 	}
+}
+
+func advertised(c *Calls, name string) bool {
+	return c.Controls().Entity(name).(*esphome.Switch).Get()
 }

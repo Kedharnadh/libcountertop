@@ -13,6 +13,7 @@ import (
 	core "github.com/ygelfand/libcountertop/pkg/audio/sendspin"
 	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
+	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
@@ -20,7 +21,7 @@ import (
 type Player struct {
 	options Dependencies
 	workers sync.WaitGroup
-	enabled *esphome.Switch
+	knobs   *Controls
 	state   *esphome.TextSensor
 	title   *esphome.TextSensor
 	artist  *esphome.TextSensor
@@ -51,15 +52,11 @@ func New(options Dependencies) *Player {
 		wake: make(chan struct{}, 1),
 	}
 
-	p.enabled = &esphome.Switch{
-		Base: esphome.Base{
-			ObjectID: "sendspin",
-			Name:     "Sendspin",
-			Icon:     "mdi:speaker-multiple",
-			Category: esphome.CategoryConfig,
-			DeviceID: options.DeviceID,
-		},
-		OnCommand: func(on bool) { p.SetEnabled(on) },
+	p.knobs = &Controls{
+		Table:  NewTable(),
+		Device: options.DeviceID,
+		Read:   options.Settings.Read,
+		Save:   p.save,
 	}
 
 	p.state = &esphome.TextSensor{
@@ -118,8 +115,10 @@ const (
 func (p *Player) Name() string { return "sendspin" }
 
 func (p *Player) Entities() []esphome.Entity {
-	return []esphome.Entity{p.enabled, p.state, p.title, p.artist}
+	return append(p.knobs.Entities(), p.state, p.title, p.artist)
 }
+
+func (p *Player) Settings() *Controls { return p.knobs }
 
 func (p *Player) Play()  { p.tell("play") }
 func (p *Player) Pause() { p.tell("pause") }
@@ -274,7 +273,7 @@ func artID(art []byte) uint64 {
 	return maphash.Bytes(artSeed, art)
 }
 
-func (p *Player) Restore(enabled bool) { p.enabled.Set(enabled) }
+func (p *Player) Restore(c schema.Sendspin) { p.knobs.PublishFrom(c) }
 
 func (p *Player) Run(ctx context.Context) error {
 	unwatch := p.options.Clock.WatchSteps(p.stepped)
@@ -293,13 +292,17 @@ func (p *Player) Run(ctx context.Context) error {
 }
 
 func (p *Player) SetEnabled(on bool) {
-	if err := p.options.Settings.Update(func(c *schema.Sendspin) { c.Enabled = on }); err != nil {
-		slog.Error("saving a setting failed", "setting", p.enabled.ObjectID, "err", err)
-		p.enabled.Set(p.options.Settings.Read().Enabled)
-		return
+	if err := p.knobs.Change("on", setting.OnOff(on)); err != nil {
+		slog.Error("saving a setting failed", "setting", "sendspin on", "err", err)
 	}
-	p.enabled.Set(p.options.Settings.Read().Enabled)
+}
+
+func (p *Player) save(s Setting, v string) error {
+	if err := setting.Store(p.options.Settings, s, v); err != nil {
+		return err
+	}
 	p.rethink()
+	return nil
 }
 
 func (p *Player) rethink() {

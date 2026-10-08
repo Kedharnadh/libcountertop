@@ -10,6 +10,7 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/homeassistant"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant/states"
+	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
@@ -63,7 +64,7 @@ type Weather struct {
 	entity string
 	values map[string]*states.Value
 
-	ha entities
+	knobs *setting.Controls[schema.Weather]
 
 	offered  []homeassistant.Entity
 	failed   error
@@ -75,7 +76,12 @@ const fetchWait = 10 * time.Second
 
 func New(opts Options) *Weather {
 	w := &Weather{opts: opts}
-	w.build()
+	w.knobs = &setting.Controls[schema.Weather]{
+		Table:  NewTable(),
+		Device: opts.DeviceID,
+		Read:   opts.Settings.Read,
+		Save:   w.store,
+	}
 	return w
 }
 
@@ -185,7 +191,7 @@ func (w *Weather) save(what string, err error) {
 	if err != nil {
 		slog.Error("saving a weather setting failed", "setting", what, "err", err)
 	}
-	w.Publish(w.opts.Settings.Read())
+	w.knobs.Publish()
 	w.opts.Redraw()
 }
 

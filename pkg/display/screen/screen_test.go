@@ -115,9 +115,9 @@ func TestThemedIsQuietWhenNothingChanged(t *testing.T) {
 func TestEntities(t *testing.T) {
 	s, _ := panel(t)
 
-	if got := len(s.Entities()); got != 7 {
+	if got := len(s.Entities()); got != 10 {
 		t.Errorf(
-			"%d entities, want backlight, mode, theme, style, size, the drawer edge and the level",
+			"%d entities, want backlight, mode, theme, style, size, the drawer edge, keyboard, language, marks and the level",
 			got,
 		)
 	}

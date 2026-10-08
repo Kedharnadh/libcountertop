@@ -40,6 +40,7 @@ func newRig(t *testing.T) (*rig, *Visuals) {
 			func() *storage.Store[schema.Visual] { return st },
 			func(c *schema.Visual) *schema.Visual { return c },
 		),
+		Lift:            new(lift),
 		MicRate:         16000,
 		MicChannels:     2,
 		SpeakerRate:     48000,

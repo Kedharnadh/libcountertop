@@ -43,6 +43,10 @@ const (
 	Triple
 
 	List
+
+	Text
+
+	Secret
 )
 
 func (k Kind) String() string {
@@ -59,6 +63,10 @@ func (k Kind) String() string {
 		return "triple"
 	case List:
 		return "list"
+	case Text:
+		return "text"
+	case Secret:
+		return "secret"
 	}
 	return "unknown"
 }
@@ -297,6 +305,12 @@ func (s Setting[T]) Labels() []string {
 func (s Setting[T]) Shows(c *T) string {
 	if s.IdleAs != "" && s.Idle != nil && s.Idle(c) {
 		return s.IdleAs
+	}
+	if s.Kind == Secret {
+		if s.Read(c) == "" {
+			return ""
+		}
+		return "set"
 	}
 	return s.LabelOf(s.Read(c))
 }

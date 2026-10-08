@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	esphome "github.com/ygelfand/go-esphome-device"
+
 	"github.com/ygelfand/libcountertop/pkg/fetch"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
@@ -15,15 +17,17 @@ func TestSaveFailureAppliesActiveConfiguration(t *testing.T) {
 	p := New(policySettings{active: &active, committed: &committed})
 	p.Restore(true)
 	p.SetVerify(false)
-	if !p.Verifying() || !p.verify.Get() {
+	if !p.Verifying() || !p.shown() {
 		t.Fatal("failed write disabled verification")
 	}
 	committed = true
 	p.SetVerify(false)
-	if p.Verifying() || p.verify.Get() {
+	if p.Verifying() || p.shown() {
 		t.Fatal("post-rename error hid active configuration")
 	}
 }
+
+func (p *Policy) shown() bool { return p.knobs.Entity("verify").(*esphome.Switch).Get() }
 
 type policySettings struct{ active, committed *bool }
 

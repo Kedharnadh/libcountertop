@@ -322,18 +322,18 @@ func (p *BasicPages) setTheme(name string) {
 	}
 }
 func (p *BasicPages) setLanguage(tag string) {
-	SetLanguage(p.options.Preferences.Screen, p.options.Shell, tag)
+	saveLanguage(p.options.Preferences.Screen, p.options.Shell, tag)
 }
 func (p *BasicPages) setKeyboard(v config.KeyboardSize) {
-	SetKeyboard(p.options.Preferences.Screen, p.options.Shell, v)
+	saveKeyboard(p.options.Preferences.Screen, p.options.Shell, v)
 }
 
-func SetLanguage(section storage.Section[config.Screen], stack *shell.Shell, tag string) {
+func saveLanguage(section storage.Section[config.Screen], stack *shell.Shell, tag string) {
 	say.Use(tag)
 	saveScreen(section, stack, "screen.language", func(c *config.Screen) { c.Language = tag })
 }
 
-func SetKeyboard(
+func saveKeyboard(
 	section storage.Section[config.Screen],
 	stack *shell.Shell,
 	v config.KeyboardSize,

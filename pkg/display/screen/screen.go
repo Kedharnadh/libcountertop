@@ -9,6 +9,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/hook"
+	"github.com/ygelfand/libcountertop/pkg/say"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
@@ -63,6 +64,8 @@ func New(options Options) *Screen {
 func (s *Screen) Name() string { return "screen" }
 
 func (s *Screen) Table() *Table { return s.table }
+
+func (s *Screen) Settings() *setting.Controls[schema.Screen] { return s.knobs }
 
 func (s *Screen) Entities() []esphome.Entity {
 	return append(s.knobs.Entities(), s.level)
@@ -150,6 +153,9 @@ func (s *Screen) save(row Setting, value string) error {
 	}
 	if err := s.options.Settings.Update(func(c *schema.Screen) { *c = now }); err != nil {
 		return err
+	}
+	if now.Language != "" && now.Language != say.Chosen() {
+		say.Use(now.Language)
 	}
 
 	if now.Mode == schema.ModeManual {

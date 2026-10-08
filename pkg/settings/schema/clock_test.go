@@ -7,12 +7,12 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
 
-func TestAFreshDeviceIdlesIntoTheClockItAlreadyShows(t *testing.T) {
+func TestAFreshDeviceIdlesIntoAWanderingClock(t *testing.T) {
 	c, idle := DefaultClock(), DefaultIdle()
 
-	if idle.Face != c.Face || idle.Position != c.Position || idle.Size != c.Size ||
-		idle.Align != AlignCenter {
-		t.Errorf("idle %+v differs from the clock %+v", idle, c)
+	if idle.Face != c.Face || idle.Size != c.Size ||
+		idle.Position != PositionRandom || idle.Align != AlignRandom {
+		t.Errorf("idle %+v, clock %+v", idle, c)
 	}
 	if idle.First.On() || idle.Second.On() {
 		t.Error("a fresh device idles with a visual")

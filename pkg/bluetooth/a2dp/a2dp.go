@@ -23,6 +23,8 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/sdp"
 	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 	"github.com/ygelfand/libcountertop/pkg/media/pcm"
+	"github.com/ygelfand/libcountertop/pkg/say"
+	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
@@ -41,7 +43,7 @@ type Sink struct {
 	resample *speaker.Rational
 	drift    speaker.Drift
 
-	enable *esphome.Switch
+	knobs *setting.Controls[schema.Bluetooth]
 
 	wake chan struct{}
 
@@ -87,39 +89,59 @@ type Sink struct {
 func New(options Dependencies) *Sink {
 	s := &Sink{options: options, dumping: capture.New(options.CaptureDirectory),
 		wake: make(chan struct{}, 1),
-		enable: &esphome.Switch{
-			Base: esphome.Base{
-				ObjectID: "bluetooth_speaker",
-				Name:     "Bluetooth speaker",
-				Icon:     "mdi:speaker-bluetooth",
-				Category: esphome.CategoryConfig,
-			},
-		},
 	}
-
-	s.enable.Set(s.options.Settings.Read().Speaker)
-	s.enable.OnCommand = s.SetEnabled
-
+	s.knobs = &setting.Controls[schema.Bluetooth]{
+		Table: NewTable(),
+		Read:  options.Settings.Read,
+		Save:  s.store,
+	}
 	return s
+}
+
+const Group setting.Group = "Bluetooth"
+
+func NewTable() *setting.Table[schema.Bluetooth] {
+	return setting.NewTable(
+		"bluetooth",
+		[]setting.Group{Group},
+		[]setting.Setting[schema.Bluetooth]{
+			setting.Flag(
+				setting.Setting[schema.Bluetooth]{
+					Name:  "speaker",
+					Group: Group,
+					Icon:  "mdi:speaker-bluetooth",
+				},
+				func(c *schema.Bluetooth) *bool { return &c.Speaker },
+			),
+		},
+		setting.Messages{Text: say.T, Missing: say.Missing},
+	)
 }
 
 func (s *Sink) Name() string { return "bluetooth speaker" }
 
-func (s *Sink) Entities() []esphome.Entity { return []esphome.Entity{s.enable} }
+func (s *Sink) Entities() []esphome.Entity { return s.knobs.Entities() }
+
+func (s *Sink) Controls() *setting.Controls[schema.Bluetooth] { return s.knobs }
 
 func (s *Sink) Enabled() bool { return s.options.Settings.Read().Speaker }
 
 func (s *Sink) SetEnabled(on bool) {
-	if err := s.options.Settings.Update(func(c *schema.Bluetooth) { c.Speaker = on }); err != nil {
+	if err := s.knobs.Change("speaker", setting.OnOff(on)); err != nil {
 		slog.Error("saving the bluetooth speaker setting failed", "err", err)
-		s.enable.Set(s.options.Settings.Read().Speaker)
-		return
+		s.knobs.Publish()
 	}
-	s.enable.Set(s.options.Settings.Read().Speaker)
+}
+
+func (s *Sink) store(row setting.Setting[schema.Bluetooth], v string) error {
+	if err := setting.Store(s.options.Settings, row, v); err != nil {
+		return err
+	}
 	select {
 	case s.wake <- struct{}{}:
 	default:
 	}
+	return nil
 }
 
 const retry = 10 * time.Second

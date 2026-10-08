@@ -11,11 +11,11 @@ import (
 	"time"
 
 	esphome "github.com/ygelfand/go-esphome-device"
-	"github.com/ygelfand/go-esphome-device/api"
 
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/hook"
 	"github.com/ygelfand/libcountertop/pkg/media/immich"
+	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
@@ -32,12 +32,7 @@ const (
 type Poster struct {
 	options Dependencies
 	dark    atomic.Bool
-	on      *esphome.Switch
-	every   *esphome.Select
-	server  *esphome.Text
-	key     *esphome.Text
-	albums  *esphome.Text
-	tags    *esphome.Text
+	knobs   *Controls
 	next    *esphome.Button
 	showing *esphome.TextSensor
 
@@ -66,16 +61,13 @@ func New(o Dependencies) *Poster {
 func (p *Poster) Name() string { return "poster" }
 
 func (p *Poster) Entities() []esphome.Entity {
-	return []esphome.Entity{p.on, p.every, p.server, p.key, p.albums, p.tags, p.next, p.showing}
+	return append(p.knobs.Entities(), p.next, p.showing)
 }
 
+func (p *Poster) Settings() *Controls { return p.knobs }
+
 func (p *Poster) Restore(c config.Poster) {
-	p.on.Set(c.Enabled)
-	p.every.Set(c.Every.Label())
-	p.server.Set(c.Server)
-	p.key.Set(c.Key)
-	p.albums.Set(c.Albums)
-	p.tags.Set(c.Tags)
+	p.knobs.PublishFrom(c)
 	p.showing.Set(c.Last)
 }
 
@@ -239,51 +231,17 @@ func pick(found []immich.Asset, last string) string {
 }
 
 func (p *Poster) build() {
-	base := func(id, name, icon string) esphome.Base {
-		return esphome.Base{
-			ObjectID: id,
-			Name:     name,
-			Icon:     icon,
-			Category: esphome.CategoryConfig,
-			DeviceID: p.options.DeviceID,
-		}
-	}
-	p.on = &esphome.Switch{Base: base("poster", "Poster", "mdi:image-frame")}
-	p.on.OnCommand = p.SetEnabled
-
-	p.every = &esphome.Select{
-		Base:    base("poster_every", "Poster changes", "mdi:image-sync"),
-		Options: labels(config.PosterEveries()),
-	}
-	p.every.OnCommand = func(label string) {
-		if v, ok := byLabel(config.PosterEveries(), label); ok {
-			p.SetEvery(v)
-		}
+	p.knobs = &Controls{
+		Table:  NewTable(),
+		Device: p.options.DeviceID,
+		Read:   p.options.Settings.Read,
+		Save:   p.save,
 	}
 
-	p.server = &esphome.Text{
-		Base:      base("poster_server", "Immich server", "mdi:server"),
-		MaxLength: 255,
-	}
-	p.server.OnCommand = p.SetServer
-	p.key = &esphome.Text{
-		Base:      base("poster_key", "Immich API key", "mdi:key"),
-		MaxLength: 255,
-		Mode:      api.TextMode_TEXT_MODE_PASSWORD,
-	}
-	p.key.OnCommand = p.SetKey
-	p.albums = &esphome.Text{
-		Base:      base("poster_albums", "Poster albums", "mdi:image-album"),
-		MaxLength: 255,
-	}
-	p.albums.OnCommand = p.SetAlbums
-	p.tags = &esphome.Text{
-		Base:      base("poster_tags", "Poster tags", "mdi:tag-multiple"),
-		MaxLength: 255,
-	}
-	p.tags.OnCommand = p.SetTags
-
-	p.next = &esphome.Button{Base: base("poster_next", "Next poster", "mdi:skip-next")}
+	p.next = &esphome.Button{Base: esphome.Base{
+		ObjectID: "poster_next", Name: "Next poster", Icon: "mdi:skip-next",
+		Category: esphome.CategoryConfig, DeviceID: p.options.DeviceID,
+	}}
 	p.next.OnPress = p.Next
 
 	p.showing = &esphome.TextSensor{
@@ -292,41 +250,25 @@ func (p *Poster) build() {
 	}
 }
 
-func (p *Poster) saved(what string, err error) {
-	p.Restore(p.options.Settings.Read())
-	if err != nil {
-		slog.Error("saving a setting failed", "setting", what, "err", err)
-		return
+func (p *Poster) save(s Setting, v string) error {
+	if err := setting.Store(p.options.Settings, s, v); err != nil {
+		return err
 	}
-	p.Next()
+	if s.Name != "every" {
+		p.Next()
+	}
+	return nil
 }
 
-func (p *Poster) SetEnabled(on bool) {
-	p.saved("poster", p.options.Settings.Update(func(c *config.Poster) { c.Enabled = on }))
-}
-
-func (p *Poster) SetEvery(v config.PosterEvery) {
-	defer func() { p.Restore(p.options.Settings.Read()) }()
-	if err := p.options.Settings.Update(func(c *config.Poster) { c.Every = v }); err != nil {
-		slog.Error("saving a setting failed", "setting", "poster every", "err", err)
+func (p *Poster) change(name, v string) {
+	if err := p.knobs.Change(name, v); err != nil {
+		slog.Error("saving a setting failed", "setting", "poster "+name, "err", err)
 	}
 }
 
-func (p *Poster) SetServer(v string) {
-	p.saved("poster server", p.options.Settings.Update(func(c *config.Poster) { c.Server = v }))
-}
+func (p *Poster) SetEnabled(on bool) { p.change("on", setting.OnOff(on)) }
 
-func (p *Poster) SetKey(v string) {
-	p.saved("poster key", p.options.Settings.Update(func(c *config.Poster) { c.Key = v }))
-}
-
-func (p *Poster) SetAlbums(v string) {
-	p.saved("poster albums", p.options.Settings.Update(func(c *config.Poster) { c.Albums = v }))
-}
-
-func (p *Poster) SetTags(v string) {
-	p.saved("poster tags", p.options.Settings.Update(func(c *config.Poster) { c.Tags = v }))
-}
+func (p *Poster) SetEvery(v config.PosterEvery) { p.change("every", string(v)) }
 
 type Touch interface{ Since() time.Duration }
 
@@ -335,20 +277,4 @@ type Dependencies struct {
 	Touch    Touch
 	Ambient  func() (float64, bool)
 	DeviceID uint32
-}
-
-func labels(v []config.PosterEvery) []string {
-	out := make([]string, len(v))
-	for i, x := range v {
-		out[i] = x.Label()
-	}
-	return out
-}
-func byLabel(v []config.PosterEvery, label string) (config.PosterEvery, bool) {
-	for _, x := range v {
-		if x.Label() == label {
-			return x, true
-		}
-	}
-	return "", false
 }

@@ -5,15 +5,16 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"strconv"
 	"strings"
 	"sync/atomic"
 
 	esphome "github.com/ygelfand/go-esphome-device"
 
 	"github.com/ygelfand/libcountertop/pkg/media/cast"
-	"github.com/ygelfand/libcountertop/pkg/media/cast/protocols/youtube"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 	"github.com/ygelfand/libcountertop/pkg/runtime/startup"
+	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
@@ -29,10 +30,7 @@ type Receiver struct {
 	settings storage.Section[schema.Cast]
 	network  func(ctx context.Context) bool
 
-	enable *esphome.Switch
-	demand *esphome.Switch
-	skip   *esphome.Text
-	delay  *esphome.Number
+	knobs *Controls
 
 	server *Server
 
@@ -47,13 +45,11 @@ func NewReceiver(opts ReceiverOptions) *Receiver {
 	r := &Receiver{settings: opts.Settings, network: opts.Network}
 	c := opts.Settings.Read()
 
-	r.enable = &esphome.Switch{
-		Base: esphome.Base{
-			ObjectID: "cast_receiver",
-			Name:     "Cast receiver",
-			Icon:     "mdi:cast",
-			Category: esphome.CategoryConfig,
-		},
+	r.knobs = &Controls{
+		Table:  NewTable(),
+		Device: opts.DeviceID,
+		Read:   opts.Settings.Read,
+		Save:   r.save,
 	}
 	r.oracle = &esphome.Text{
 		Base: esphome.Base{
@@ -81,49 +77,12 @@ func NewReceiver(opts ReceiverOptions) *Receiver {
 		},
 		DeviceClass: "timestamp",
 	}
-	r.demand = &esphome.Switch{
-		Base: esphome.Base{
-			ObjectID: "youtube_lounge_on_demand",
-			Name:     "YouTube lounge on demand",
-			Icon:     "mdi:youtube",
-			Category: esphome.CategoryConfig,
-		},
-	}
-	r.skip = &esphome.Text{
-		Base: esphome.Base{
-			ObjectID: "youtube_sponsorblock",
-			Name:     "YouTube SponsorBlock categories",
-			Icon:     "mdi:debug-step-over",
-			Category: esphome.CategoryConfig,
-		},
-		MaxLength: 255,
-	}
-	r.delay = &esphome.Number{
-		Base: esphome.Base{
-			ObjectID: "youtube_live_delay",
-			Name:     "YouTube live delay",
-			Icon:     "mdi:timer-sand",
-			Category: esphome.CategoryConfig,
-		},
-		Min: schema.LiveDelayLeast, Max: schema.LiveDelayMost, Step: 1, Unit: "s",
-		Mode: esphome.NumberSlider,
-	}
-
 	for _, b := range []*esphome.Base{
-		&r.enable.Base, &r.oracle.Base, &r.source.Base, &r.expires.Base,
-		&r.demand.Base, &r.skip.Base, &r.delay.Base,
+		&r.oracle.Base, &r.source.Base, &r.expires.Base,
 	} {
 		b.DeviceID = opts.DeviceID
 	}
 
-	r.demand.Set(c.YouTube.OnDemand)
-	r.demand.OnCommand = r.SetLoungeOnDemand
-	r.skip.Set(strings.Join(c.YouTube.Skip, ","))
-	r.skip.OnCommand = r.SetSkip
-	r.delay.Set(float32(c.YouTube.LiveDelay))
-	r.delay.OnCommand = func(v float32) { r.SetLiveDelay(int(v)) }
-	r.enable.Set(c.Receiver)
-	r.enable.OnCommand = r.SetReceiver
 	r.oracle.Set(c.Oracle)
 	r.oracle.OnCommand = r.SetOracle
 
@@ -139,39 +98,54 @@ func (r *Receiver) write() schema.CastWriter { return schema.NewCastWriter(r.set
 func (r *Receiver) Name() string { return "cast receiver" }
 
 func (r *Receiver) Entities() []esphome.Entity {
-	return []esphome.Entity{r.enable, r.oracle, r.source, r.expires, r.demand, r.skip, r.delay}
+	return append(r.knobs.Entities(), r.oracle, r.source, r.expires)
 }
 
-func (r *Receiver) SetSkip(text string) {
-	categories := youtube.ParseCategories(text)
-	if err := r.write().Skip(categories); err != nil {
-		slog.Error("saving the sponsorblock categories failed", "err", err)
-		return
+func (r *Receiver) Settings() *Controls { return r.knobs }
+
+func (r *Receiver) save(s Setting, v string) error {
+	was := r.settings.Read()
+	if err := setting.Store(r.settings, s, v); err != nil {
+		return err
 	}
-	r.skip.Set(strings.Join(categories, ","))
+	r.apply(was, r.settings.Read())
+	return nil
 }
+
+func (r *Receiver) apply(was, now schema.Cast) {
+	switch {
+	case was.Receiver != now.Receiver:
+		r.turn(now.Receiver)
+	case was.YouTube.OnDemand != now.YouTube.OnDemand && now.Receiver:
+		r.server.Down()
+		if err := r.server.Up(); err != nil {
+			slog.Error("the cast receiver would not start", "err", err)
+		}
+	}
+	if was.Prime.Persist && !now.Prime.Persist {
+		r.server.UnsaveRegistrations()
+	}
+}
+
+func (r *Receiver) change(name, v string) {
+	if err := r.knobs.Change(name, v); err != nil {
+		slog.Error("saving a setting failed", "setting", "cast "+name, "err", err)
+	}
+}
+
+func (r *Receiver) SetSkip(text string) { r.change("youtube.skip", text) }
 
 func (r *Receiver) SetLiveDelay(seconds int) {
-	if err := r.write().LiveDelay(seconds); err != nil {
-		slog.Error("saving the live delay failed", "err", err)
-		return
-	}
-	r.delay.Set(float32(r.settings.Read().YouTube.LiveDelay))
+	seconds = min(max(seconds, schema.LiveDelayLeast), schema.LiveDelayMost)
+	r.change("youtube.livedelay", strconv.Itoa(seconds))
 }
 
 func (r *Receiver) SetLoungeOnDemand(on bool) {
-	r.demand.Set(on)
-	if err := r.write().LoungeOnDemand(on); err != nil {
-		slog.Error("saving the lounge setting failed", "err", err)
+	if on {
+		r.change("youtube.lounge", loungeDemand)
 		return
 	}
-	if !r.Enabled() {
-		return
-	}
-	r.server.Down()
-	if err := r.server.Up(); err != nil {
-		slog.Error("the cast receiver would not start", "err", err)
-	}
+	r.change("youtube.lounge", loungeAlways)
 }
 
 func (r *Receiver) SetOracle(url string) {
@@ -257,30 +231,13 @@ func (r *Receiver) ResetPrime() {
 	slog.Info("prime video registration reset")
 }
 
-func (r *Receiver) SetPrimeSkipIntro(on bool) {
-	if err := r.write().PrimeSkipIntro(on); err != nil {
-		slog.Error("saving the prime video skip intro setting failed", "err", err)
-	}
-}
+func (r *Receiver) SetPrimeSkipIntro(on bool) { r.change("prime.skipintro", setting.OnOff(on)) }
 
-func (r *Receiver) SetPrimePersist(on bool) {
-	if err := r.write().PrimePersist(on); err != nil {
-		slog.Error("saving the prime video registration setting failed", "err", err)
-		return
-	}
-	if !on {
-		r.server.UnsaveRegistrations()
-	}
-}
+func (r *Receiver) SetPrimePersist(on bool) { r.change("prime.persist", setting.OnOff(on)) }
 
-func (r *Receiver) SetReceiver(on bool) {
-	r.enable.Set(on)
+func (r *Receiver) SetReceiver(on bool) { r.change("receiver", setting.OnOff(on)) }
 
-	if err := r.write().Receiver(on); err != nil {
-		slog.Error("saving the cast setting failed", "err", err)
-		return
-	}
-
+func (r *Receiver) turn(on bool) {
 	if !on {
 		r.server.Down()
 		r.booted(startup.Progress{Done: true, Doing: "off"})

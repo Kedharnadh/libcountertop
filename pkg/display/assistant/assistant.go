@@ -32,7 +32,7 @@ type Assistant struct {
 	closing time.Time
 
 	wake chan struct{}
-	took int
+	took *int
 }
 
 type Level interface{ Level() float64 }
@@ -156,15 +156,15 @@ func (a *Assistant) Hide() { a.Frame.Emit(Showing{}) }
 func (a *Assistant) Took(id int) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return a.took == id+1
+	return a.took != nil && *a.took == id
 }
 
 func (a *Assistant) Cancel(id int) {
 	a.mu.Lock()
 	showing := a.turn.Phase != voice.Idle
-	a.took = 0
+	a.took = nil
 	if showing {
-		a.took = id + 1
+		a.took = &id
 	}
 	a.mu.Unlock()
 

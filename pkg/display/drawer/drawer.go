@@ -12,6 +12,7 @@ import (
 
 const (
 	OrderSettings = 30
+	OrderCalls    = 35
 	OrderPlayer   = 40
 	OrderIdle     = 50
 )

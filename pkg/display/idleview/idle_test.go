@@ -101,13 +101,18 @@ func TestOnlyChosenVisualsAreDrawn(t *testing.T) {
 }
 
 func TestNoneIsOfferedFirst(t *testing.T) {
-	labels := KindLabels()
+	row := NewTable().MustRow("visual1")
+	labels := row.Labels()
 	if labels[0] != KindLabel("") || len(labels) != len(visual.Built())+1 {
 		t.Errorf("labels %v", labels)
 	}
-	if k, ok := kindByLabel(KindLabel("orb")); !ok || k != "orb" {
-		t.Errorf("orb by label: %q %v", k, ok)
+	if k := row.ValueOf(KindLabel("orb")); k != "orb" {
+		t.Errorf("orb by label: %q", k)
 	}
+}
+
+func (r *rig) sel(name string) *esphome.Select {
+	return r.knobs.Entity(name).(*esphome.Select)
 }
 
 type rig struct {
@@ -211,7 +216,8 @@ func TestEverySettingReachesBothSides(t *testing.T) {
 	if got.First != schema.DefaultIdle().First {
 		t.Errorf("an unbuilt visual changed the first slot to %+v", got.First)
 	}
-	if r.kinds[1].Get() != KindLabel("orb") || r.sources[1].Get() != schema.SourceMic.Label() {
+	if r.sel("visual2").Get() != KindLabel("orb") ||
+		r.sel("visual2.source").Get() != schema.SourceMic.Label() {
 		t.Error("the second visual's entities did not follow")
 	}
 }
@@ -220,16 +226,16 @@ func TestEveryCommandFromHomeAssistantIsSaved(t *testing.T) {
 	r := newRig(t)
 
 	for _, want := range schema.IdleFaces() {
-		r.face.OnCommand(want.Label())
+		r.sel("face").OnCommand(want.Label())
 		if got := r.store.Get().Face; got != want {
 			t.Errorf("%q from Home Assistant saved as %q", want, got)
 		}
 	}
-	r.kinds[0].OnCommand(KindLabel(""))
+	r.sel("visual1").OnCommand(KindLabel(""))
 	if got := r.store.Get().First.Kind; got != "" {
 		t.Errorf("none from Home Assistant saved as %q", got)
 	}
-	r.face.OnCommand("Sundial")
+	r.sel("face").OnCommand("Sundial")
 	if got := r.store.Get().Face; got != schema.IdleFaces()[len(schema.IdleFaces())-1] {
 		t.Errorf("an unknown face moved the setting to %q", got)
 	}
@@ -242,8 +248,8 @@ func TestRestorePutsEveryEntityBack(t *testing.T) {
 	c.Second = schema.IdleVisual{Kind: "orb", Source: schema.SourceSpeaker}
 	r.Restore(c)
 
-	if r.face.Get() != c.Face.Label() || r.kinds[1].Get() != KindLabel("orb") ||
-		r.sources[1].Get() != schema.SourceSpeaker.Label() {
+	if r.sel("face").Get() != c.Face.Label() || r.sel("visual2").Get() != KindLabel("orb") ||
+		r.sel("visual2.source").Get() != schema.SourceSpeaker.Label() {
 		t.Error("restore left an entity behind")
 	}
 	for _, e := range r.Entities() {

@@ -13,6 +13,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/visual"
 	"github.com/ygelfand/libcountertop/pkg/say"
+	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
@@ -34,8 +35,7 @@ type Options struct {
 type Idle struct {
 	options Options
 
-	after, face, place, align, size *esphome.Select
-	kinds, sources                  [2]*esphome.Select
+	knobs *setting.Controls[schema.Idle]
 
 	mu   sync.Mutex
 	hold *shell.Hold
@@ -43,7 +43,12 @@ type Idle struct {
 
 func NewIdle(options Options) *Idle {
 	i := &Idle{options: options}
-	i.build()
+	i.knobs = &setting.Controls[schema.Idle]{
+		Table:  NewTable(),
+		Device: options.DeviceID,
+		Read:   options.Settings.Read,
+		Save:   i.save,
+	}
 	return i
 }
 
@@ -51,24 +56,11 @@ func (i *Idle) Name() string { return "idle" }
 
 func (i *Idle) View() *View { return i.options.View }
 
-func (i *Idle) Entities() []esphome.Entity {
-	return []esphome.Entity{
-		i.after, i.face, i.place, i.align, i.size,
-		i.kinds[0], i.sources[0], i.kinds[1], i.sources[1],
-	}
-}
+func (i *Idle) Entities() []esphome.Entity { return i.knobs.Entities() }
 
-func (i *Idle) Restore(c schema.Idle) {
-	i.after.Set(c.After.Label())
-	i.face.Set(c.Face.Label())
-	i.place.Set(c.Position.Label())
-	i.align.Set(c.Align.Label())
-	i.size.Set(c.Size.Label())
-	for n, v := range []schema.IdleVisual{c.First, c.Second} {
-		i.kinds[n].Set(KindLabel(v.Kind))
-		i.sources[n].Set(v.Source.Label())
-	}
-}
+func (i *Idle) Settings() *setting.Controls[schema.Idle] { return i.knobs }
+
+func (i *Idle) Restore(c schema.Idle) { i.knobs.PublishFrom(c) }
 
 func (i *Idle) Run(ctx context.Context) error {
 	t := time.NewTicker(check)
@@ -146,26 +138,6 @@ func KindLabel(kind string) string {
 	return visual.Kind(kind).Label()
 }
 
-func KindLabels() []string {
-	out := []string{say.T("idle.none")}
-	for _, k := range visual.Built() {
-		out = append(out, k.Label())
-	}
-	return out
-}
-
-func kindByLabel(label string) (string, bool) {
-	if label == say.T("idle.none") {
-		return "", true
-	}
-	for _, k := range visual.Built() {
-		if k.Label() == label {
-			return string(k), true
-		}
-	}
-	return "", false
-}
-
 func (i *Idle) redraw() {
 	i.mu.Lock()
 	held := i.hold.Held()
@@ -175,39 +147,40 @@ func (i *Idle) redraw() {
 	}
 }
 
-func (i *Idle) save(what string, change func(*schema.Idle)) {
+func (i *Idle) save(s Setting, v string) error {
+	if err := setting.Store(i.options.Settings, s, v); err != nil {
+		return err
+	}
+	i.redraw()
+	return nil
+}
+
+func (i *Idle) set(what string, change func(*schema.Idle)) {
 	if err := i.options.Settings.Update(change); err != nil {
 		slog.Error("saving a setting failed", "setting", what, "err", err)
 	}
+	i.knobs.Publish()
+	i.redraw()
 }
 
 func (i *Idle) SetAfter(v schema.Delay) {
-	i.after.Set(v.Label())
-	i.save("idle_after", func(c *schema.Idle) { c.After = v })
+	i.set("after", func(c *schema.Idle) { c.After = v })
 }
 
 func (i *Idle) SetFace(v schema.Face) {
-	i.face.Set(v.Label())
-	i.save("idle_face", func(c *schema.Idle) { c.Face = v })
-	i.redraw()
+	i.set("face", func(c *schema.Idle) { c.Face = v })
 }
 
 func (i *Idle) SetPosition(v schema.Position) {
-	i.place.Set(v.Label())
-	i.save("idle_position", func(c *schema.Idle) { c.Position = v })
-	i.redraw()
+	i.set("position", func(c *schema.Idle) { c.Position = v })
 }
 
 func (i *Idle) SetAlign(v schema.Align) {
-	i.align.Set(v.Label())
-	i.save("idle_align", func(c *schema.Idle) { c.Align = v })
-	i.redraw()
+	i.set("align", func(c *schema.Idle) { c.Align = v })
 }
 
 func (i *Idle) SetSize(v schema.Size) {
-	i.size.Set(v.Label())
-	i.save("idle_size", func(c *schema.Idle) { c.Size = v })
-	i.redraw()
+	i.set("size", func(c *schema.Idle) { c.Size = v })
 }
 
 func slot(c *schema.Idle, n int) *schema.IdleVisual {
@@ -221,82 +194,9 @@ func (i *Idle) SetKind(n int, kind string) {
 	if kind != "" && !slices.Contains(visual.Built(), visual.Kind(kind)) {
 		return
 	}
-	i.kinds[n].Set(KindLabel(kind))
-	i.save("idle_visual", func(c *schema.Idle) { slot(c, n).Kind = kind })
-	i.redraw()
+	i.set("visual", func(c *schema.Idle) { slot(c, n).Kind = kind })
 }
 
 func (i *Idle) SetSource(n int, s schema.Source) {
-	i.sources[n].Set(s.Label())
-	i.save("idle_visual_source", func(c *schema.Idle) { slot(c, n).Source = s })
-	i.redraw()
-}
-
-type labeled interface{ Label() string }
-
-func labels[T labeled](values []T) []string {
-	out := make([]string, len(values))
-	for n, v := range values {
-		out[n] = v.Label()
-	}
-	return out
-}
-
-func choose[T labeled](values []T, set func(T)) func(string) {
-	return func(label string) {
-		for _, v := range values {
-			if v.Label() == label {
-				set(v)
-				return
-			}
-		}
-	}
-}
-
-func (i *Idle) build() {
-	sel := func(id, name, icon string, options []string) *esphome.Select {
-		return &esphome.Select{
-			Base: esphome.Base{ObjectID: id, Name: name, Icon: icon,
-				Category: esphome.CategoryConfig, DeviceID: i.options.DeviceID},
-			Options: options,
-		}
-	}
-
-	i.after = sel("idle_after", "Idle screen after", "mdi:timer-outline",
-		labels(schema.Delays()))
-	i.after.OnCommand = choose(schema.Delays(), i.SetAfter)
-
-	i.face = sel("idle_face", "Idle clock face", "mdi:clock-digital",
-		labels(schema.IdleFaces()))
-	i.face.OnCommand = choose(schema.IdleFaces(), i.SetFace)
-
-	i.place = sel("idle_position", "Idle clock vertical position", "mdi:align-vertical-center",
-		labels(schema.Positions()))
-	i.place.OnCommand = choose(schema.Positions(), i.SetPosition)
-
-	i.align = sel("idle_align", "Idle clock horizontal position", "mdi:align-horizontal-center",
-		labels(schema.Aligns()))
-	i.align.OnCommand = choose(schema.Aligns(), i.SetAlign)
-
-	i.size = sel("idle_size", "Idle clock size", "mdi:resize", labels(schema.Sizes()))
-	i.size.OnCommand = choose(schema.Sizes(), i.SetSize)
-
-	for n, id := range []string{"1", "2"} {
-		i.kinds[n] = sel("idle_visual_"+id, "Idle visual "+id, "mdi:waveform", KindLabels())
-		i.kinds[n].OnCommand = func(l string) {
-			if k, ok := kindByLabel(l); ok {
-				i.SetKind(n, k)
-			}
-		}
-		i.sources[n] = sel(
-			"idle_visual_"+id+"_source",
-			"Idle visual "+id+" listens to",
-			"mdi:microphone-settings",
-			labels(schema.Sources()),
-		)
-		i.sources[n].OnCommand = choose(
-			schema.Sources(),
-			func(s schema.Source) { i.SetSource(n, s) },
-		)
-	}
+	i.set("visual.source", func(c *schema.Idle) { slot(c, n).Source = s })
 }

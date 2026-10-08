@@ -6,9 +6,14 @@ about.commit: Commit
 about.name: Name
 about.title: About
 about.version: Version
+access.group.access: Access
+access.setting.adb: ADB over network
 align.center: Center
 align.left: Left
+align.random: Random
 align.right: Right
+api.group.api: Home Assistant
+api.setting.adopted: Adopted by Home Assistant
 assistants.off: "Off"
 assistants.reply: Response playback
 assistants.slot: Assistant {{.N}}
@@ -20,6 +25,9 @@ assistants.title: Voice assistants
 assistants.tone: Wake sound
 assistants.unset: Set the wake word in Home Assistant
 assistants.waiting: Waiting for the model
+bluetooth.group.bluetooth: Bluetooth
+bluetooth.setting.proxy: Bluetooth proxy
+bluetooth.setting.speaker: Bluetooth speaker
 boot.leaving: Restarting
 boot.skip: Skip
 boot.stranded: Lost contact with the screen
@@ -35,6 +43,7 @@ call.declined: Declined
 call.dropped: Call dropped
 call.empty: No other devices found
 call.failed: Call failed
+call.group.calls: Calls
 call.gone: No longer on the network
 call.incoming: Incoming call
 call.incoming.allow: Incoming calls
@@ -44,6 +53,11 @@ call.mute: Mute
 call.no: "No"
 call.pausewake: Pause wake word during calls
 call.seen: Last seen
+call.setting.auto_answer: Auto-answer calls
+call.setting.auto_video: Auto-answer with camera on
+call.setting.incoming: Incoming calls
+call.setting.pause_wake: Pause wake word during calls
+call.setting.stream: Call video stream
 call.settings: Calls
 call.settings.hint: Incoming calls and auto-answer
 call.stream: Video stream
@@ -147,6 +161,13 @@ camera.starting: Starting the camera
 camera.stream: Camera stream
 cast.apps: Apps
 cast.enable: Enable
+cast.entity.receiver: Cast receiver
+cast.entity.youtube.livedelay: YouTube live delay
+cast.entity.youtube.lounge: YouTube lounge
+cast.entity.youtube.skip: YouTube SponsorBlock categories
+cast.group.cast: Cast
+cast.option.youtube.lounge.always: Always
+cast.option.youtube.lounge.demand: On demand
 cast.prime: Prime Video
 cast.prime.persist: Persistent registration
 cast.prime.persist.hint: Every cast plays as the account that registered first
@@ -155,6 +176,12 @@ cast.prime.reset: Reset registration
 cast.prime.skipintro: Skip intro
 cast.prime.skipintro.hint: Start after Amazon's opening bumper
 cast.prime.unregistered: Not registered
+cast.setting.prime.persist: Prime Video persistent registration
+cast.setting.prime.skipintro: Prime Video skip intro
+cast.setting.receiver: Receiver
+cast.setting.youtube.livedelay: YouTube live delay
+cast.setting.youtube.lounge: YouTube lounge
+cast.setting.youtube.skip: SponsorBlock categories
 chime.chirp: Chirp
 chime.ding: Ding
 chime.none: None
@@ -166,6 +193,12 @@ clock.face: Clock face
 clock.hours: Use 24-hour format
 clock.position: Position
 clock.position.title: Clock position
+clock.setting.color: Clock color
+clock.setting.date: Clock date
+clock.setting.face: Clock face
+clock.setting.hours: Clock format
+clock.setting.position: Clock position
+clock.setting.size: Clock size
 clock.size: Size
 clock.size.title: Clock size
 clock.title: Clock
@@ -240,6 +273,7 @@ home.failed: Couldn't load from Home Assistant
 home.group: Group by area
 home.group.all: Every area on one card
 home.group.from: "Areas with {{.N}} or more devices"
+home.group.home: Home control
 home.group.none: Every device on its own card
 home.label.count: "{{.N}} device{{if ne .N 1}}s{{end}}"
 home.loading: Loading…
@@ -255,6 +289,12 @@ home.retry: Try again
 home.search: Search
 home.selection.lights: Lights
 home.selection.switches: Switches
+home.setting.combine: Include switches
+home.setting.control.lights: Control lights
+home.setting.control.switches: Control switches
+home.setting.enabled: Enable home control
+home.setting.group.lights: Group lights from
+home.setting.group.switches: Group switches from
 home.tab.labels: Labels
 home.tab.manual: Manual
 home.tile.all.off: All off
@@ -277,6 +317,16 @@ idle.label: Visual label
 idle.media: Close paused player after
 idle.media.hint: Audio and video players
 idle.none: None
+idle.setting.after: Idle screen after
+idle.setting.align: Idle clock horizontal position
+idle.setting.face: Idle clock face
+idle.setting.media: Close paused player after
+idle.setting.position: Idle clock vertical position
+idle.setting.size: Idle clock size
+idle.setting.visual1: Idle visual 1
+idle.setting.visual1.source: Idle visual 1 listens to
+idle.setting.visual2: Idle visual 2
+idle.setting.visual2.source: Idle visual 2 listens to
 idle.size: Clock size
 idle.source1: Visual 1 audio
 idle.source2: Visual 2 audio
@@ -307,6 +357,16 @@ look.stage.listening: Listening
 look.stage.responding: Responding
 look.stage.waiting: Waiting
 look.title: Visuals
+media.entity.duck: Music ducking
+media.group.media: Media
+media.setting.duck: Ducking depth
+microphone.group.microphone: Microphone
+microphone.setting.cancel: Microphone echo cancellation
+microphone.setting.denoise: Noise suppression
+microphone.setting.gain: Microphone gain
+microphone.setting.leveling: Microphone leveling
+microphone.setting.mixing: Microphone mixing
+microphone.setting.sensitivity: Room sensitivity
 mode.auto: Automatic
 mode.manual: Manual
 network.address: IP address
@@ -317,6 +377,7 @@ network.lease.minutes: "{{.N}} min"
 network.lease.now: Now
 network.mac: MAC address
 network.router: Router
+network.setting.verify: Verify certificates
 network.ssid: Wi-Fi network
 network.title: Network & internet
 onboard.hint: Scan the code, then choose this address.
@@ -326,13 +387,29 @@ player.next: Up next
 player.now: Now playing
 position.bottom: Bottom
 position.center: Center
+position.random: Random
 position.top: Top
 poster.daily: Daily
+poster.entity.albums: Poster albums
+poster.entity.every: Poster changes
+poster.entity.on: Poster
+poster.entity.tags: Poster tags
 poster.every: Change every
+poster.group.poster: Poster
 poster.hourly: Hourly
 poster.never: Never
 poster.next: Change now
 poster.off: Off
+poster.option.every.daily: Daily
+poster.option.every.hourly: Hourly
+poster.option.every.never: Never
+poster.option.every.wake: On each wake
+poster.setting.albums: Albums
+poster.setting.every: Change every
+poster.setting.key: Immich API key
+poster.setting.on: Show wallpaper
+poster.setting.server: Immich server
+poster.setting.tags: Tags
 poster.show: Show wallpaper
 poster.wake: On each wake
 power.reboot: Restart device
@@ -348,12 +425,19 @@ rail.sleep: Sleep
 reply.download: Starts later, never gaps
 reply.stream: Starts sooner, can gap
 reply.title: Response playback
+rtsp.group.rtsp: RTSP
+rtsp.setting.enabled: RTSP server
 screen.setting.auto: Auto brightness
 screen.setting.backlight: Brightness
 screen.setting.drawer: Dock location
+screen.setting.keyboard: Keyboard size
+screen.setting.language: Language
+screen.setting.marks: Privacy marks
 screen.setting.size: Size
 screen.setting.style: Style
 screen.setting.theme: Theme
+sendspin.group.sendspin: Sendspin
+sendspin.setting.on: Sendspin
 settings.about: About
 settings.assistants: Voice assistants
 settings.camera: Camera
@@ -443,6 +527,11 @@ visual.pipboy-nv: PB New Vegas
 visual.pulsar: Pulsar
 visual.rain-on-glass: Rain on Glass
 visual.ribbons: Ribbons
+visual.setting.fps: Visual frame cap
+visual.setting.kind: Visual
+visual.setting.label: Visual label
+visual.setting.lift: Visualizer lift
+visual.setting.seed: Visual seed
 visual.synthwave: Synthwave
 visual.tesla: Tesla
 visual.thunderstorm: Thunderstorm
@@ -478,6 +567,15 @@ weather.look.stack: Stack
 weather.look.words: Words
 weather.none: No weather entities in Home Assistant
 weather.off: "Off"
+weather.setting.align: Weather horizontal position
+weather.setting.animate: Animate weather
+weather.setting.dashboard: Weather on dashboard
+weather.setting.entity: Weather entity
+weather.setting.idle: Weather on screen saver
+weather.setting.look: Weather look
+weather.setting.position: Weather vertical position
+weather.setting.size: Weather size
+weather.setting.themed: Themed weather colors
 weather.size: Size
 weather.themed: Themed colors
 weather.themed.hint: "Off uses natural colors: a yellow sun, grey clouds, blue rain"

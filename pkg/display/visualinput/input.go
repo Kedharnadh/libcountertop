@@ -12,6 +12,7 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/audio/analysis"
 	"github.com/ygelfand/libcountertop/pkg/display/visual"
+	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
@@ -41,15 +42,43 @@ type Visuals struct {
 	muted  func() bool
 	tap    func(Tap)
 
-	kind   *esphome.Select
+	knobs  *setting.Controls[Setup]
 	chosen visual.Kind
-	label  *esphome.Text
 	named  string
 }
 
 func (v *Visuals) Name() string { return "visuals" }
 
-func (v *Visuals) Entities() []esphome.Entity { return []esphome.Entity{v.kind, v.label} }
+func (v *Visuals) Entities() []esphome.Entity { return v.knobs.Entities() }
+
+func (v *Visuals) Settings() *setting.Controls[Setup] { return v.knobs }
+
+func (v *Visuals) read() Setup {
+	return Setup{Visual: v.options.Settings.Read(), Lift: v.options.Lift.Read()}
+}
+
+func (v *Visuals) save(s Setting, value string) error {
+	was := v.read()
+	now := was
+	if err := s.Write(&now, value); err != nil {
+		return err
+	}
+	if now.Lift != was.Lift {
+		if err := v.options.Lift.Update(func(db *int) { *db = now.Lift }); err != nil {
+			return err
+		}
+		v.SetLift(now.Lift)
+	}
+	if now.Visual != was.Visual {
+		if err := v.options.Settings.Update(
+			func(c *config.Visual) { *c = now.Visual },
+		); err != nil {
+			return err
+		}
+	}
+	v.Restore(v.options.Settings.Read())
+	return nil
+}
 
 func (v *Visuals) Restore(cfg config.Visual) {
 	k := visual.Kind(cfg.Kind)
@@ -60,8 +89,8 @@ func (v *Visuals) Restore(cfg config.Visual) {
 	v.chosen = k
 	v.named = cfg.Label
 	v.mu.Unlock()
-	v.kind.Set(k.Label())
-	v.label.Set(cfg.Label)
+	cfg.Kind = string(k)
+	v.knobs.PublishFrom(Setup{Visual: cfg, Lift: v.options.Lift.Read()})
 	visual.SetSeed(cfg.Seed)
 }
 
@@ -72,6 +101,7 @@ func (v *Visuals) SetMaxFPS(fps int) {
 	if err := v.options.Settings.Update(func(c *config.Visual) { c.MaxFPS = fps }); err != nil {
 		slog.Error("saving the visual frame cap failed", "err", err)
 	}
+	v.knobs.Publish()
 }
 
 func (v *Visuals) SetSeed(n int) {
@@ -90,7 +120,7 @@ func (v *Visuals) SetLabel(s string) {
 	if err := v.options.Settings.Update(
 		func(c *config.Visual) { c.Label = string(r) },
 	); err != nil {
-		slog.Error("saving a setting failed", "setting", v.label.ObjectID, "err", err)
+		slog.Error("saving a setting failed", "setting", "label", "err", err)
 	}
 	v.Restore(v.options.Settings.Read())
 }
@@ -103,41 +133,26 @@ func (v *Visuals) Kind() visual.Kind {
 
 func (v *Visuals) SetKind(k visual.Kind) {
 	if err := v.options.Settings.Update(func(c *config.Visual) { c.Kind = string(k) }); err != nil {
-		slog.Error("saving a setting failed", "setting", v.kind.ObjectID, "err", err)
+		slog.Error("saving a setting failed", "setting", "kind", "err", err)
 	}
 	v.Restore(v.options.Settings.Read())
-}
-
-func (v *Visuals) build() {
-	v.chosen = visual.Kind(config.DefaultVisual)
-	v.kind = &esphome.Select{
-		Base: esphome.Base{ObjectID: "visual", Name: "Visual", Icon: "mdi:waveform",
-			Category: esphome.CategoryConfig, DeviceID: v.options.DeviceID},
-		Options: labels(visual.Built()),
-	}
-	v.kind.OnCommand = func(label string) {
-		if k, ok := byLabel(visual.Built(), label); ok {
-			v.SetKind(k)
-		}
-	}
-	v.named = config.DefaultLabel
-	v.label = &esphome.Text{
-		Base: esphome.Base{ObjectID: "visual_label", Name: "Visual label", Icon: "mdi:format-text",
-			Category: esphome.CategoryConfig, DeviceID: v.options.DeviceID},
-		MaxLength: LabelMost,
-	}
-	v.label.OnCommand = v.SetLabel
 }
 
 func New(options Options) *Visuals {
 	v := &Visuals{
 		options: options,
-		mic:     newStereo(options.MicRate, options.MicChannels, liftGain(options.Lift)),
+		mic:     newStereo(options.MicRate, options.MicChannels, liftGain(options.Lift.Read())),
 		spk:     newStereo(options.SpeakerRate, options.SpeakerChannels, 1),
 		ring:    analysis.NewRing(options.SpeakerRate * options.SpeakerChannels / 5),
 		listen:  options.Listen, muted: options.Muted, tap: options.Tap,
 	}
-	v.build()
+	v.chosen, v.named = visual.Kind(config.DefaultVisual), config.DefaultLabel
+	v.knobs = &setting.Controls[Setup]{
+		Table:  NewTable(),
+		Device: options.DeviceID,
+		Read:   v.read,
+		Save:   v.save,
+	}
 	return v
 }
 
@@ -246,26 +261,11 @@ func (v *Visuals) hear(ctx context.Context) {
 
 type Tap interface{ Offer([]int16) }
 type Options struct {
-	MicRate, MicChannels, SpeakerRate, SpeakerChannels, Lift int
-	Settings                                                 storage.Section[config.Visual]
-	DeviceID                                                 uint32
-	Listen                                                   func() (<-chan []int16, func())
-	Muted                                                    func() bool
-	Tap                                                      func(Tap)
-}
-
-func labels(values []visual.Kind) []string {
-	out := make([]string, len(values))
-	for i, v := range values {
-		out[i] = v.Label()
-	}
-	return out
-}
-func byLabel(values []visual.Kind, label string) (visual.Kind, bool) {
-	for _, v := range values {
-		if v.Label() == label {
-			return v, true
-		}
-	}
-	return "", false
+	MicRate, MicChannels, SpeakerRate, SpeakerChannels int
+	Settings                                           storage.Section[config.Visual]
+	Lift                                               storage.Section[int]
+	DeviceID                                           uint32
+	Listen                                             func() (<-chan []int16, func())
+	Muted                                              func() bool
+	Tap                                                func(Tap)
 }

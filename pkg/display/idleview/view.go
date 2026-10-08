@@ -3,6 +3,7 @@ package idleview
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
 	"sync"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 
 const (
 	frameEvery = time.Second / 20
+	moveEvery  = 30 * time.Second
 	forever    = 100 * 365 * 24 * time.Hour
 )
 
@@ -30,6 +32,8 @@ type View struct {
 	stop    context.CancelFunc
 	done    chan struct{}
 	shown   string
+	spot    Spot
+	moved   time.Time
 
 	gmu    sync.Mutex
 	gl     [2]*shading
@@ -194,12 +198,51 @@ func (v *View) run(ctx context.Context) {
 		}
 
 		v.mu.Lock()
-		stale := v.shown != key(cfg, time.Now())
+		stale := v.shown != key(cfg, time.Now()) ||
+			moving(cfg.Idle) && now.Sub(v.moved) >= moveEvery
 		v.mu.Unlock()
 		if stale {
 			v.options.Shell.Redraw()
 		}
 	}
+}
+
+type Spot struct {
+	At    config.Position
+	Align config.Align
+}
+
+func moving(c config.Idle) bool {
+	return c.Position == config.PositionRandom || c.Align == config.AlignRandom
+}
+
+func (v *View) Spot(c config.Idle, now time.Time) Spot {
+	if !moving(c) {
+		return Spot{c.Position, c.Align}
+	}
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if v.moved.IsZero() || now.Sub(v.moved) >= moveEvery || !fits(v.spot, c) {
+		v.spot, v.moved = next(v.spot, c), now
+	}
+	return v.spot
+}
+
+func fits(s Spot, c config.Idle) bool {
+	return (c.Position == config.PositionRandom || s.At == c.Position) &&
+		(c.Align == config.AlignRandom || s.Align == c.Align)
+}
+
+func next(from Spot, c config.Idle) Spot {
+	var spots []Spot
+	for _, at := range config.Positions() {
+		for _, align := range config.Aligns() {
+			if s := (Spot{at, align}); fits(s, c) && s != from {
+				spots = append(spots, s)
+			}
+		}
+	}
+	return spots[rand.IntN(len(spots))]
 }
 
 type Settings struct {

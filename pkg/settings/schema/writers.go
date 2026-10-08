@@ -89,10 +89,6 @@ type CastWriter struct{ s storage.Section[Cast] }
 
 func NewCastWriter(s storage.Section[Cast]) CastWriter { return CastWriter{s: s} }
 
-func (w CastWriter) Receiver(v bool) error {
-	return w.s.Update(func(c *Cast) { c.Receiver = v })
-}
-
 func (w CastWriter) Oracle(url string) error {
 	return w.s.Update(func(c *Cast) { c.Oracle = url })
 }
@@ -101,30 +97,6 @@ func (w CastWriter) Screens(device, music, video string) error {
 	return w.s.Update(func(c *Cast) {
 		c.YouTube.Device, c.YouTube.Music, c.YouTube.Video = device, music, video
 	})
-}
-
-func (w CastWriter) PrimeSkipIntro(v bool) error {
-	return w.s.Update(func(c *Cast) { c.Prime.SkipIntro = v })
-}
-
-func (w CastWriter) PrimePersist(v bool) error {
-	return w.s.Update(func(c *Cast) { c.Prime.Persist = v })
-}
-
-func (w CastWriter) Skip(categories []string) error {
-	if categories == nil {
-		categories = []string{}
-	}
-	return w.s.Update(func(c *Cast) { c.YouTube.Skip = categories })
-}
-
-func (w CastWriter) LiveDelay(seconds int) error {
-	seconds = min(max(seconds, LiveDelayLeast), LiveDelayMost)
-	return w.s.Update(func(c *Cast) { c.YouTube.LiveDelay = seconds })
-}
-
-func (w CastWriter) LoungeOnDemand(v bool) error {
-	return w.s.Update(func(c *Cast) { c.YouTube.OnDemand = v })
 }
 
 type ClockWriter struct{ s storage.Section[Clock] }

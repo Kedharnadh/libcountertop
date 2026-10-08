@@ -6,7 +6,10 @@ import (
 	"sync"
 
 	esphome "github.com/ygelfand/go-esphome-device"
+	"github.com/ygelfand/go-esphome-device/api"
 )
+
+const textMost = 255
 
 type Controls[T any] struct {
 	Table  *Table[T]
@@ -50,6 +53,8 @@ func (c *Controls[T]) PublishFrom(at T) {
 			e.Set(float32(s.Level(&at)))
 		case *esphome.Select:
 			e.Set(s.LabelOf(s.Read(&at)))
+		case *esphome.Text:
+			e.Set(s.Read(&at))
 		}
 	}
 }
@@ -104,6 +109,21 @@ func (c *Controls[T]) entity(s Setting[T], at *T) esphome.Entity {
 		e.OnCommand = func(v float32) { c.put(s, strconv.Itoa(int(v))) }
 		return e
 
+	case Text, Secret:
+		e := &esphome.Text{
+			Base: esphome.Base{
+				ObjectID: id, DeviceID: device, Name: name, Icon: icon,
+				Category: esphome.CategoryConfig,
+			},
+			MaxLength: textMost,
+		}
+		if s.Kind == Secret {
+			e.Mode = api.TextMode_TEXT_MODE_PASSWORD
+		}
+		e.Set(s.Read(at))
+		e.OnCommand = func(v string) { c.change(s, v) }
+		return e
+
 	case Choice:
 		e := &esphome.Select{
 			Base: esphome.Base{
@@ -120,12 +140,56 @@ func (c *Controls[T]) entity(s Setting[T], at *T) esphome.Entity {
 }
 
 func (c *Controls[T]) put(s Setting[T], v string) {
-	if v == "" {
-		return
+	if v != "" {
+		c.change(s, v)
 	}
+}
+
+func (c *Controls[T]) change(s Setting[T], v string) {
 	if err := c.Save(s, v); err != nil {
 		slog.Error("the setting could not be saved", "setting", s.Name, "err", err)
 		return
 	}
 	c.Publish()
+}
+
+func (c *Controls[T]) Domain() string { return c.Table.Domain }
+
+func (c *Controls[T]) Names() []string {
+	rows := c.Table.Rows()
+	out := make([]string, len(rows))
+	for i, s := range rows {
+		out[i] = s.Name
+	}
+	return out
+}
+
+func (c *Controls[T]) Value(name string) (string, error) {
+	s, err := c.Table.Row(name)
+	if err != nil {
+		return "", err
+	}
+	at := c.Read()
+	return s.Shows(&at), nil
+}
+
+func (c *Controls[T]) Change(name, value string) error {
+	s, err := c.Table.Row(name)
+	if err != nil {
+		return err
+	}
+	if s.Kind == Choice {
+		if v := s.ValueOf(value); v != "" {
+			value = v
+		}
+	}
+	probe := c.Read()
+	if err := s.Write(&probe, value); err != nil {
+		return err
+	}
+	if err := c.Save(s, value); err != nil {
+		return err
+	}
+	c.Publish()
+	return nil
 }

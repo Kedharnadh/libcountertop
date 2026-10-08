@@ -176,7 +176,7 @@ func (p *IdlePages) Page() *shell.Page {
 					)),
 					p.open(Choose(
 						say.T("idle.vertical"),
-						config.Positions(),
+						config.IdlePositions(),
 						func() config.Position { return p.options.Preferences.IdleState().Idle.Position },
 						i.SetPosition,
 						func(position config.Position) func(ui.Surface, ui.Rect, theme.Theme) {
@@ -185,7 +185,7 @@ func (p *IdlePages) Page() *shell.Page {
 					)),
 					p.open(Choose(
 						say.T("idle.horizontal"),
-						config.Aligns(),
+						config.IdleAligns(),
 						func() config.Align { return p.options.Preferences.IdleState().Idle.Align },
 						i.SetAlign,
 						func(a config.Align) func(ui.Surface, ui.Rect, theme.Theme) {

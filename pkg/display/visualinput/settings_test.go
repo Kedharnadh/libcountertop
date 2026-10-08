@@ -12,7 +12,7 @@ func TestFailedSaveRestoresActiveSettings(t *testing.T) {
 	active := config.Visual{Kind: string(visual.Orb), Label: "saved", Seed: 3}
 	fail := errors.New("write failed")
 	v := New(Options{MicRate: 16000, SpeakerRate: 48000, SpeakerChannels: 2,
-		Settings: failedSettings{active: active, err: fail},
+		Settings: failedSettings{active: active, err: fail}, Lift: new(lift),
 	})
 	v.Restore(active)
 	v.SetLabel("unsaved")
@@ -30,3 +30,14 @@ type failedSettings struct {
 
 func (s failedSettings) Read() config.Visual               { return s.active }
 func (s failedSettings) Update(func(*config.Visual)) error { return s.err }
+
+type lift int
+
+func (l *lift) Read() int { return int(*l) }
+
+func (l *lift) Update(change func(*int)) error {
+	n := int(*l)
+	change(&n)
+	*l = lift(n)
+	return nil
+}

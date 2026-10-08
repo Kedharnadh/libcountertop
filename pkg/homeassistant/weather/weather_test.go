@@ -3,8 +3,14 @@ package weather
 import (
 	"testing"
 
+	esphome "github.com/ygelfand/go-esphome-device"
+
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
+
+func (w *Weather) sel(name string) *esphome.Select {
+	return w.knobs.Entity(name).(*esphome.Select)
+}
 
 type section struct{ v schema.Weather }
 
@@ -20,7 +26,7 @@ func TestASettingIsSavedAndShownToHomeAssistant(t *testing.T) {
 	redrawn := 0
 	w := New(Options{Settings: saved, Redraw: func() { redrawn++ }})
 
-	w.ha.look.OnCommand(schema.WeatherDetail.Label())
+	w.sel("look").OnCommand(schema.WeatherDetail.Label())
 	w.SetEntity("  weather.home ")
 
 	if saved.v.Look != schema.WeatherDetail {
@@ -29,7 +35,7 @@ func TestASettingIsSavedAndShownToHomeAssistant(t *testing.T) {
 	if saved.v.Entity != "weather.home" {
 		t.Errorf("entity saved as %q, want it trimmed", saved.v.Entity)
 	}
-	if got := w.ha.look.Get(); got != schema.WeatherDetail.Label() {
+	if got := w.sel("look").Get(); got != schema.WeatherDetail.Label() {
 		t.Errorf("Home Assistant shows %q, want %q", got, schema.WeatherDetail.Label())
 	}
 	if redrawn != 2 {
@@ -41,7 +47,7 @@ func TestAnUnknownChoiceFromHomeAssistantChangesNothing(t *testing.T) {
 	saved := &section{v: schema.DefaultWeather()}
 	w := New(Options{Settings: saved, Redraw: func() {}})
 
-	w.ha.size.OnCommand("enormous")
+	w.sel("size").OnCommand("enormous")
 
 	if saved.v != schema.DefaultWeather() {
 		t.Errorf("settings became %+v", saved.v)

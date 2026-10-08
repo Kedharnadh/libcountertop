@@ -110,28 +110,6 @@ func TestHomeGroupIsClampedAndEmptyPicksAreDropped(t *testing.T) {
 	}
 }
 
-func TestCastSkipNilIsSavedEmpty(t *testing.T) {
-	s, path := load(t)
-	w := NewCastWriter(storage.Field(s, func(r *root) *Cast { return &r.Cast }))
-	if err := w.Skip(nil); err != nil {
-		t.Fatal(err)
-	}
-	if err := w.LiveDelay(LiveDelayMost + 1); err != nil {
-		t.Fatal(err)
-	}
-	again, err := storage.Load(path, root{Cast: DefaultCast()}, cloneRoot)
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := again.Get().Cast.YouTube
-	if got.Skip == nil || len(got.Skip) != 0 {
-		t.Fatalf("skip came back %#v", got.Skip)
-	}
-	if got.LiveDelay != LiveDelayMost {
-		t.Fatalf("live delay %d", got.LiveDelay)
-	}
-}
-
 func TestIdleVisualSlotsAreSeparate(t *testing.T) {
 	s, _ := load(t)
 	w := NewIdleWriter(storage.Field(s, func(r *root) *Idle { return &r.Idle }))

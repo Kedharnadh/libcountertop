@@ -17,6 +17,9 @@ func TestTheEntityIdentifiersDoNotMove(t *testing.T) {
 		"style":     "screen_style",
 		"size":      "screen_size",
 		"drawer":    "drawer_edge",
+		"keyboard":  "screen_keyboard",
+		"language":  "screen_language",
+		"marks":     "privacy_marks",
 	}
 
 	tb := table()

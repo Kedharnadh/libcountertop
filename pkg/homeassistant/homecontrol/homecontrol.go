@@ -1,7 +1,6 @@
 package homecontrol
 
 import (
-	"log/slog"
 	"slices"
 	"strconv"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant"
 	"github.com/ygelfand/libcountertop/pkg/say"
+	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
@@ -62,54 +62,23 @@ func (s Selection) Controlled() bool {
 
 func (e *Engine) Enabled() bool { return e.options.Settings.Read().Enabled }
 
-func (e *Engine) SetEnabled(on bool) {
-	if err := e.options.Settings.Update(func(c *config.Home) { c.Enabled = on }); err != nil {
-		slog.Error("the home control setting could not be saved", "err", err)
-	}
-	e.options.Client.Enable(e.Enabled())
-	e.cache.clear()
-}
+func (e *Engine) SetEnabled(on bool) { e.set(enabled, setting.OnOff(on)) }
 
 func (s Selection) GroupFrom() int { return s.engine.options.Settings.Read().Grouped(s.Key) }
 
 func (s Selection) SetGroupFrom(n int) {
-	if err := s.engine.options.Settings.Update(func(c *config.Home) {
-		if c.Group == nil {
-			c.Group = map[string]int{}
-		}
-		c.Group[s.Key] = min(max(n, 0), config.HomeGroupMost)
-	}); err != nil {
-		slog.Error("the grouping setting could not be saved", "selection", s.Key, "err", err)
-	}
-	s.engine.options.Shell.Redraw()
+	s.engine.set("group."+s.Key, strconv.Itoa(min(max(n, 0), config.HomeGroupMost)))
 }
 
 func (s Selection) SetControlled(on bool) {
-	if err := s.engine.options.Settings.Update(func(c *config.Home) {
-		if c.Control == nil {
-			c.Control = map[string]bool{}
-		}
-		if on {
-			c.Control[s.Key] = true
-		} else {
-			delete(c.Control, s.Key)
-		}
-	}); err != nil {
-		slog.Error("the control setting could not be saved", "selection", s.Key, "err", err)
-	}
-	s.engine.options.Shell.Redraw()
+	s.engine.set("control."+s.Key, setting.OnOff(on))
 }
 
 func (e *Engine) Combined() bool {
 	return e.options.Settings.Read().Combine && e.selections[0].Controlled()
 }
 
-func (e *Engine) SetCombined(on bool) {
-	if err := e.options.Settings.Update(func(c *config.Home) { c.Combine = on }); err != nil {
-		slog.Error("the combine setting could not be saved", "err", err)
-	}
-	e.options.Shell.Redraw()
-}
+func (e *Engine) SetCombined(on bool) { e.set(combine, setting.OnOff(on)) }
 
 func (e *Engine) SelectionPage(s Selection) *shell.Page {
 	return &shell.Page{

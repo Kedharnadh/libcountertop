@@ -44,6 +44,10 @@ func dash(t *testing.T) rig {
 func (r rig) clock() schema.Clock   { return r.prefs.Clock.Read() }
 func (r rig) screen() schema.Screen { return r.prefs.Screen.Read() }
 
+func (r rig) sel(name string) *esphome.Select { return r.Entity(name).(*esphome.Select) }
+
+func (r rig) toggle(name string) *esphome.Switch { return r.Entity(name).(*esphome.Switch) }
+
 func TestEverySelectReachesBothSides(t *testing.T) {
 	d := dash(t)
 
@@ -54,7 +58,7 @@ func TestEverySelectReachesBothSides(t *testing.T) {
 			if got := d.clock().Face; got != want {
 				t.Errorf("the file says %q, want %q", got, want)
 			}
-			if got := d.Face.Get(); got != want.Label() {
+			if got := d.sel("face").Get(); got != want.Label() {
 				t.Errorf("the entity says %q, want %q", got, want.Label())
 			}
 		}
@@ -67,7 +71,7 @@ func TestEverySelectReachesBothSides(t *testing.T) {
 			if got := d.clock().Position; got != want {
 				t.Errorf("the file says %q, want %q", got, want)
 			}
-			if got := d.Position.Get(); got != want.Label() {
+			if got := d.sel("position").Get(); got != want.Label() {
 				t.Errorf("the entity says %q, want %q", got, want.Label())
 			}
 		}
@@ -80,7 +84,7 @@ func TestEverySelectReachesBothSides(t *testing.T) {
 			if got := d.clock().Size; got != want {
 				t.Errorf("the file says %q, want %q", got, want)
 			}
-			if got := d.Size.Get(); got != want.Label() {
+			if got := d.sel("size").Get(); got != want.Label() {
 				t.Errorf("the entity says %q, want %q", got, want.Label())
 			}
 		}
@@ -93,7 +97,7 @@ func TestEverySelectReachesBothSides(t *testing.T) {
 			if got := d.clock().Ink; got != want {
 				t.Errorf("the file says %q, want %q", got, want)
 			}
-			if got := d.Ink.Get(); got != want.Label() {
+			if got := d.sel("color").Get(); got != want.Label() {
 				t.Errorf("the entity says %q, want %q", got, want.Label())
 			}
 		}
@@ -106,7 +110,7 @@ func TestEverySelectReachesBothSides(t *testing.T) {
 			if got := d.screen().Hours; got != want {
 				t.Errorf("the file says %q, want %q", got, want)
 			}
-			if got := d.Format.Get(); got != want.Label() {
+			if got := d.sel("hours").Get(); got != want.Label() {
 				t.Errorf("the entity says %q, want %q", got, want.Label())
 			}
 		}
@@ -122,7 +126,7 @@ func TestEverySwitchReachesBothSides(t *testing.T) {
 		if got := d.clock().Date; got != want {
 			t.Errorf("the date in the file is %v, want %v", got, want)
 		}
-		if got := d.Date.Get(); got != want {
+		if got := d.toggle("date").Get(); got != want {
 			t.Errorf("the date entity is %v, want %v", got, want)
 		}
 	}
@@ -132,7 +136,7 @@ func TestEveryCommandFromHomeAssistantIsSaved(t *testing.T) {
 	d := dash(t)
 
 	for _, want := range schema.Faces() {
-		d.Face.OnCommand(want.Label())
+		d.sel("face").OnCommand(want.Label())
 
 		if got := d.clock().Face; got != want {
 			t.Errorf("%q from Home Assistant saved as %q", want, got)
@@ -140,14 +144,14 @@ func TestEveryCommandFromHomeAssistantIsSaved(t *testing.T) {
 	}
 
 	for _, want := range schema.Inks() {
-		d.Ink.OnCommand(want.Label())
+		d.sel("color").OnCommand(want.Label())
 
 		if got := d.clock().Ink; got != want {
 			t.Errorf("%q from Home Assistant saved as %q", want, got)
 		}
 	}
 
-	d.Date.OnCommand(false)
+	d.toggle("date").OnCommand(false)
 	if d.clock().Date {
 		t.Error("turning the date off from Home Assistant did not save")
 	}
@@ -160,7 +164,7 @@ func TestAnUnknownLabelChangesNothing(t *testing.T) {
 	d := dash(t)
 
 	d.SetFace(schema.FaceAnalog)
-	d.Face.OnCommand("Sundial")
+	d.sel("face").OnCommand("Sundial")
 
 	if got := d.clock().Face; got != schema.FaceAnalog {
 		t.Errorf("an unknown face left the setting on %q", got)
@@ -178,26 +182,26 @@ func TestRestorePutsEveryEntityBack(t *testing.T) {
 	c.Date = false
 	s.Hours = schema.TwelveHour
 
-	d.Restore(StateOf(s, c))
+	d.Restore(s, c)
 
 	for _, at := range []struct {
 		name string
 		got  string
 		want string
 	}{
-		{"face", d.Face.Get(), c.Face.Label()},
-		{"position", d.Position.Get(), c.Position.Label()},
-		{"size", d.Size.Get(), c.Size.Label()},
-		{"color", d.Ink.Get(), c.Ink.Label()},
-		{"hours", d.Format.Get(), s.Hours.Label()},
+		{"face", d.sel("face").Get(), c.Face.Label()},
+		{"position", d.sel("position").Get(), c.Position.Label()},
+		{"size", d.sel("size").Get(), c.Size.Label()},
+		{"color", d.sel("color").Get(), c.Ink.Label()},
+		{"hours", d.sel("hours").Get(), s.Hours.Label()},
 	} {
 		if at.got != at.want {
 			t.Errorf("after restoring, %s says %q, want %q", at.name, at.got, at.want)
 		}
 	}
 
-	if d.Date.Get() != c.Date {
-		t.Errorf("after restoring, the date is %v, want %v", d.Date.Get(), c.Date)
+	if d.toggle("date").Get() != c.Date {
+		t.Errorf("after restoring, the date is %v, want %v", d.toggle("date").Get(), c.Date)
 	}
 }
 

@@ -29,7 +29,8 @@ func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
 	pal := a.ui.Palette()
 	slots := v.Keep(vw, vh)
 	areas := idleview.Areas(vw, vh, len(slots))
-	box := dashboard.Place(cfg.Idle.Position, cfg.Idle.Align, cfg.Idle.Size, vw, vh)
+	spot := v.Spot(cfg.Idle, time.Now())
+	box := dashboard.Place(spot.At, spot.Align, cfg.Idle.Size, vw, vh)
 
 	var layers []gogui.View
 	if len(slots) == 0 {

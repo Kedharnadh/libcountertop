@@ -13,6 +13,8 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/runtime/component"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
+	setting "github.com/ygelfand/libcountertop/pkg/settings"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 // Home Assistant drops the connection after 4.5 keepalive intervals.
@@ -55,10 +57,14 @@ type Server struct {
 	reconnect chan struct{}
 	announced sync.Once
 	port      atomic.Int32
+
+	knobs *setting.Controls[schema.API]
 }
 
 func New(deps Dependencies) *Server {
-	return &Server{deps: deps, reconnect: make(chan struct{}, 1)}
+	a := &Server{deps: deps, reconnect: make(chan struct{}, 1)}
+	a.knobs = a.controls()
+	return a
 }
 
 func (a *Server) Name() string { return "api" }
@@ -171,12 +177,6 @@ func (a *Server) Reconnect() {
 }
 
 func (a *Server) Adopted() bool { return a.deps.Adoption.Adopted() }
-
-func (a *Server) SetAdopted(on bool) {
-	if err := a.deps.Adoption.SetAdopted(on); err != nil {
-		slog.Error("saving a setting failed", "setting", "api.adopted", "err", err)
-	}
-}
 
 func (a *Server) subscribed() {
 	if !a.deps.Adoption.Adopted() {

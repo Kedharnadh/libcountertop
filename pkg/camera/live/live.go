@@ -166,7 +166,7 @@ func (c *Camera) Reset() error {
 		return err
 	}
 	c.Apply()
-	c.controls().Publish()
+	c.Controls().Publish()
 	c.StreamsChanged.Emit(c.Served())
 	return nil
 }
@@ -177,7 +177,7 @@ func (c *Camera) Apply() {
 	}
 }
 
-func (c *Camera) controls() *setting.Controls[Knobs] {
+func (c *Camera) Controls() *setting.Controls[Knobs] {
 	c.knobsOnce.Do(func() {
 		c.knobs = &setting.Controls[Knobs]{
 			Table:  c.Table(),
@@ -207,7 +207,7 @@ func (c *Camera) Entities() []esphome.Entity {
 			}
 		},
 	}
-	return append(c.controls().Entities(), reset)
+	return append(c.Controls().Entities(), reset)
 }
 
-func (c *Camera) Publish() { c.controls().Publish() }
+func (c *Camera) Publish() { c.Controls().Publish() }

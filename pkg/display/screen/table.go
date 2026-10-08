@@ -1,8 +1,10 @@
 package screen
 
 import (
+	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
@@ -135,6 +137,15 @@ func rows(table func() *Table, uiSize func() string) []Setting {
 				return table().MustRow("drawer").Bad(v, "")
 			},
 		},
+		setting.Pick(
+			Setting{Name: "keyboard", Group: Panel, Icon: "mdi:keyboard-outline"},
+			schema.KeyboardSizes(),
+			func(s *schema.Screen) *schema.KeyboardSize { return &s.Keyboard },
+		),
+		languageRow(Setting{Name: "language", Group: Panel, Icon: "mdi:translate"}),
+		setting.Flag(Setting{
+			Name: "marks", Group: Panel, ID: "privacy_marks", Icon: "mdi:shield-account-outline",
+		}, func(s *schema.Screen) *bool { return &s.Marks }),
 	}
 }
 
@@ -160,4 +171,27 @@ func edges() []setting.Option {
 		out = append(out, setting.Option{Value: string(e), Label: e.Label()})
 	}
 	return out
+}
+
+func languageRow(s Setting) Setting {
+	s.Kind = setting.Choice
+	for _, tag := range say.Languages() {
+		s.Options = append(s.Options, setting.Option{Value: tag, Label: say.Name(tag)})
+	}
+	s.Read = func(c *schema.Screen) string {
+		if c.Language == "" {
+			return say.Chosen()
+		}
+		return c.Language
+	}
+	s.Write = func(c *schema.Screen, v string) error {
+		for _, o := range s.Options {
+			if strings.EqualFold(o.Value, v) || strings.EqualFold(o.Label, v) {
+				c.Language = o.Value
+				return nil
+			}
+		}
+		return fmt.Errorf("%s takes %s, not %q", s.Name, strings.Join(s.Values(), " or "), v)
+	}
+	return s
 }

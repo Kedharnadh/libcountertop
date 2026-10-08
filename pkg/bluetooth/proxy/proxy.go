@@ -15,6 +15,8 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/hci"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
+	"github.com/ygelfand/libcountertop/pkg/say"
+	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
@@ -23,6 +25,8 @@ const Features = esphome.BluetoothPassiveScan | esphome.BluetoothRawAdvertisemen
 const queued = 512
 const batch = 16
 const hold = 250 * time.Millisecond
+
+const Group setting.Group = "Bluetooth"
 
 type Scanner interface {
 	Up() bool
@@ -41,7 +45,7 @@ type Dependencies struct {
 type Proxy struct {
 	options        Dependencies
 	proxy          *esphome.BluetoothProxy
-	enable         *esphome.Switch
+	knobs          *setting.Controls[schema.Bluetooth]
 	wanted         chan struct{}
 	reports        chan hci.Advertisement
 	heard, dropped atomic.Uint64
@@ -57,37 +61,58 @@ func New(options Dependencies) *Proxy {
 		wanted:  make(chan struct{}, 1),
 		reports: make(chan hci.Advertisement, queued),
 	}
-	b.enable = &esphome.Switch{
-		Base: esphome.Base{
-			ObjectID: "bluetooth_proxy",
-			Name:     "Bluetooth proxy",
-			Icon:     "mdi:bluetooth",
-			Category: esphome.CategoryConfig,
-		},
+	b.knobs = &setting.Controls[schema.Bluetooth]{
+		Table: NewTable(),
+		Read:  options.Settings.Read,
+		Save:  b.store,
 	}
-	b.enable.OnCommand = b.SetProxy
 	b.proxy.OnSubscribed = func(bool) { b.apply() }
 	b.proxy.OnMode = func(bool) { b.apply() }
 	return b
 }
 
-func (b *Proxy) Name() string               { return "bluetooth proxy" }
-func (b *Proxy) Entities() []esphome.Entity { return []esphome.Entity{b.enable} }
+func NewTable() *setting.Table[schema.Bluetooth] {
+	return setting.NewTable(
+		"bluetooth",
+		[]setting.Group{Group},
+		[]setting.Setting[schema.Bluetooth]{
+			setting.Flag(
+				setting.Setting[schema.Bluetooth]{
+					Name:  "proxy",
+					Group: Group,
+					Icon:  "mdi:bluetooth",
+				},
+				func(c *schema.Bluetooth) *bool { return &c.Proxy },
+			),
+		},
+		setting.Messages{Text: say.T, Missing: say.Missing},
+	)
+}
+
+func (b *Proxy) Name() string                                  { return "bluetooth proxy" }
+func (b *Proxy) Entities() []esphome.Entity                    { return b.knobs.Entities() }
+func (b *Proxy) Controls() *setting.Controls[schema.Bluetooth] { return b.knobs }
 func (b *Proxy) Handle(ctx context.Context, conn *esphome.Conn, msg proto.Message) error {
 	return b.proxy.Handle(ctx, conn, msg)
 }
 func (b *Proxy) Enabled() bool { return b.options.Settings.Read().Proxy }
-func (b *Proxy) Restore()      { b.enable.Set(b.Enabled()); b.apply() }
+func (b *Proxy) Restore()      { b.knobs.Publish(); b.apply() }
 func (b *Proxy) SetProxy(on bool) {
-	err := b.options.Settings.Update(func(c *schema.Bluetooth) { c.Proxy = on })
-	b.Restore()
-	if err != nil {
+	if err := b.knobs.Change("proxy", setting.OnOff(on)); err != nil {
 		slog.Error("saving bluetooth proxy setting failed", "err", err)
-		return
+		b.Restore()
+	}
+}
+func (b *Proxy) store(s setting.Setting[schema.Bluetooth], v string) error {
+	err := setting.Store(b.options.Settings, s, v)
+	b.apply()
+	if err != nil {
+		return err
 	}
 	if b.options.Reconnect != nil {
 		b.options.Reconnect()
 	}
+	return nil
 }
 func (b *Proxy) Reports() uint64 { return b.heard.Load() }
 func (b *Proxy) Dropped() uint64 { return b.dropped.Load() }

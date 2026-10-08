@@ -110,3 +110,17 @@ func TestDismissWithNothingShowing(t *testing.T) {
 
 	m.Dismiss(0)
 }
+
+func TestNegativeContactsAreTakenOnlyWhenDismissing(t *testing.T) {
+	m := New()
+	defer m.Close()
+	m.Dismiss(-1)
+	if m.Took(-1) {
+		t.Fatal("a touch with nothing showing was consumed")
+	}
+	m.Show(Message{Body: "up"}, time.Hour)
+	m.Dismiss(-2)
+	if !m.Took(-2) || m.Took(-1) {
+		t.Fatal("the dismissing touch was not the one consumed")
+	}
+}

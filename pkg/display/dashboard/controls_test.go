@@ -5,53 +5,47 @@ import (
 	"testing"
 
 	esphome "github.com/ygelfand/go-esphome-device"
+
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
-func TestSaveFailurePublishesActualState(t *testing.T) {
-	state := State{Face: "Plain", Date: true}
-	draws := 0
-	c := newControls(
-		controlOptions{Read: func() State { return state }, Redraw: func() { draws++ }},
-	)
-	c.Restore(state)
-	c.Commit("clock_face", func() error { return errors.New("write failed") })
-	if c.Face.Get() != "Plain" || draws != 0 {
-		t.Fatalf("failed write changed entity=%q redraws=%d", c.Face.Get(), draws)
+type failing struct {
+	schema.Clock
+	err error
+}
+
+func (f *failing) Read() schema.Clock { return f.Clock }
+
+func (f *failing) Update(change func(*schema.Clock)) error {
+	change(&f.Clock)
+	return f.err
+}
+
+func TestASaveThatFailsAfterWritingStillRedraws(t *testing.T) {
+	clock := &failing{Clock: schema.DefaultClock(), err: errors.New("directory sync failed")}
+	drawn := new(redraws)
+	c := NewControls(Dependencies{
+		Preferences: Preferences{Screen: section(t, schema.DefaultScreen()), Clock: clock},
+		Display:     drawn,
+	})
+
+	if err := c.Change("face", string(schema.FaceAnalog)); err == nil {
+		t.Fatal("the failed write was not reported")
 	}
-	c.Commit(
-		"clock_face",
-		func() error { state.Face = "Analog"; return errors.New("directory sync failed after rename") },
-	)
-	if c.Face.Get() != "Analog" || draws != 1 {
-		t.Fatalf("visible saved state lost: entity=%q redraws=%d", c.Face.Get(), draws)
+	if clock.Face != schema.FaceAnalog || *drawn != 1 {
+		t.Fatalf("face %q, %d redraws", clock.Face, *drawn)
 	}
 }
 
-type faceChoice string
-
-func (f faceChoice) Label() string { return string(f) }
-
-func TestChoiceCommandSavesAndKeepsEntityIdentity(t *testing.T) {
-	state := State{Face: "Plain"}
-	c := newControls(
-		controlOptions{
-			DeviceID: 1,
-			Read:     func() State { return state },
-			Face: Choices(
-				[]faceChoice{"Plain", "Analog"},
-				func(v faceChoice) error { state.Face = v.Label(); return nil },
-			),
+func TestEntitiesKeepTheirIdentity(t *testing.T) {
+	c := NewControls(Dependencies{
+		Preferences: Preferences{
+			Screen: section(t, schema.DefaultScreen()),
+			Clock:  section(t, schema.DefaultClock()),
 		},
-	)
-	c.Restore(state)
-	c.Face.OnCommand("Analog")
-	if state.Face != "Analog" || c.Face.Get() != "Analog" {
-		t.Fatal("select command did not save and publish")
-	}
-	c.Face.OnCommand("Sundial")
-	if state.Face != "Analog" {
-		t.Fatal("unknown label reached writer")
-	}
+		Display:  new(redraws),
+		DeviceID: 1,
+	})
 	ids := []string{
 		"clock_format",
 		"clock_face",

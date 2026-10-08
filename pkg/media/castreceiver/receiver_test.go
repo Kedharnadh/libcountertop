@@ -6,6 +6,8 @@ import (
 	"sync"
 	"testing"
 
+	esphome "github.com/ygelfand/go-esphome-device"
+
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
@@ -85,7 +87,7 @@ func TestClosingWithoutStartingIsSafe(t *testing.T) {
 func TestTheSwitchFollowsTheSetting(t *testing.T) {
 	r, m := fresh(t)
 
-	if r.enable.Get() {
+	if r.knobs.Entity("receiver").(*esphome.Switch).Get() {
 		t.Error("the switch reads on for a receiver that is off")
 	}
 
@@ -94,7 +96,7 @@ func TestTheSwitchFollowsTheSetting(t *testing.T) {
 	if m.Read().Receiver {
 		t.Error("the setting says on")
 	}
-	if r.enable.Get() {
+	if r.knobs.Entity("receiver").(*esphome.Switch).Get() {
 		t.Error("the switch says on")
 	}
 	if r.Listening() {
@@ -111,12 +113,14 @@ func TestTheSwitchIsPublished(t *testing.T) {
 	}
 	want := []string{
 		"cast_receiver",
+		"youtube_sponsorblock",
+		"youtube_live_delay",
+		"cast_youtube_lounge",
+		"cast_prime_persist",
+		"cast_prime_skipintro",
 		"cast_oracle",
 		"cast_credentials",
 		"cast_credentials_expire",
-		"youtube_lounge_on_demand",
-		"youtube_sponsorblock",
-		"youtube_live_delay",
 	}
 	if !slices.Equal(ids, want) {
 		t.Errorf("the entities are %v, want %v", ids, want)
@@ -129,7 +133,7 @@ func TestTheEntitiesBelongToTheGivenDevice(t *testing.T) {
 		DeviceID: 7,
 		Server:   Config{Volume: silent{}},
 	})
-	if got := r.enable.DeviceID; got != 7 {
+	if got := r.knobs.Entity("receiver").(*esphome.Switch).DeviceID; got != 7 {
 		t.Errorf("device %d, want 7", got)
 	}
 }

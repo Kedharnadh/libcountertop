@@ -6,7 +6,7 @@ import (
 	gogui "github.com/go-gui-org/go-gui/gui"
 
 	"github.com/ygelfand/libcountertop/pkg/audio/volume"
-	"github.com/ygelfand/libcountertop/pkg/display/dashboard"
+	"github.com/ygelfand/libcountertop/pkg/display/drawer"
 	"github.com/ygelfand/libcountertop/pkg/display/navigation"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
@@ -15,6 +15,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/media/call"
 	"github.com/ygelfand/libcountertop/pkg/network/peer"
+	"github.com/ygelfand/libcountertop/pkg/say"
 )
 
 type Peers interface {
@@ -40,15 +41,32 @@ func (cv *View) Screen(v shell.View) *navigation.Screen {
 		return cv.callScreen(t)
 	case *call.Profile:
 		return cv.profileScreen(t)
+	case *call.Directory:
+		return cv.directoryScreen(t)
 	}
 	return nil
 }
 
-func (cv *View) Board(at ui.Rect, t dashboard.Tab, pal theme.Theme) gogui.View {
-	return cv.callsBoard(at, t, pal)
+func (cv *View) Rail() drawer.Entry {
+	return drawer.Entry{
+		Name:  func() string { return say.T("call.tab") },
+		Order: drawer.OrderCalls,
+		Glyph: func() string { return gogui.IconPhone },
+		Open:  cv.o.Calls.Browse,
+	}
 }
 
-func Glyph(dashboard.Tab) string { return gogui.IconPhone }
+func (cv *View) directoryScreen(d *call.Directory) *navigation.Screen {
+	return &navigation.Screen{
+		Title: say.T("call.tab"),
+		View:  d,
+		Build: func(w *gogui.Window) gogui.View {
+			vw, vh := w.WindowSize()
+			at := ui.Rect{W: vw - 2*gogui.PadLarge, H: vh}
+			return cv.callsBoard(at, cv.o.UI.Palette())
+		},
+	}
+}
 
 func iconStyle(c gogui.Color) gogui.TextStyle {
 	st := gogui.CurrentTheme().TextStyleIconMedium

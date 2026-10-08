@@ -7,7 +7,6 @@ import (
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
-	"github.com/ygelfand/libcountertop/pkg/display/dashboard"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
@@ -29,7 +28,7 @@ func devicePicture(codename string) (string, string) {
 	return "device-default", string(b)
 }
 
-func (cv *View) callsBoard(at ui.Rect, _ dashboard.Tab, pal theme.Theme) gogui.View {
+func (cv *View) callsBoard(at ui.Rect, pal theme.Theme) gogui.View {
 	peers := cv.o.Peers.Peers()
 	gap := reach() * 0.25
 	cols := max(3, int(float32(at.W)/(reach()*4)))

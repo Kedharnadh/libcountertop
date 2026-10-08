@@ -3,125 +3,58 @@ package weather
 import (
 	esphome "github.com/ygelfand/go-esphome-device"
 
+	"github.com/ygelfand/libcountertop/pkg/say"
+	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 const entityMost = 128
 
-type entities struct {
-	entity    *esphome.Text
-	look      *esphome.Select
-	dashboard *esphome.Switch
-	idle      *esphome.Switch
-	animate   *esphome.Switch
-	themed    *esphome.Switch
-	position  *esphome.Select
-	align     *esphome.Select
-	size      *esphome.Select
-}
+type (
+	Setting = setting.Setting[schema.Weather]
+	Table   = setting.Table[schema.Weather]
+)
 
-type labeled interface{ Label() string }
+const Group setting.Group = "Weather"
 
-func labels[T labeled](values []T) []string {
-	out := make([]string, 0, len(values))
-	for _, v := range values {
-		out = append(out, v.Label())
+func NewTable() *Table {
+	flag := func(name, id, icon string, field func(*schema.Weather) *bool) Setting {
+		return setting.Flag(Setting{Name: name, Group: Group, ID: id, Icon: icon}, field)
 	}
-	return out
-}
-
-func byLabel[T labeled](values []T, label string, use func(T)) {
-	for _, v := range values {
-		if v.Label() == label {
-			use(v)
-			return
-		}
-	}
+	return setting.NewTable("weather", []setting.Group{Group}, []Setting{
+		setting.Words(Setting{Name: "entity", Group: Group, Icon: "mdi:weather-partly-cloudy"},
+			entityMost, func(c *schema.Weather) *string { return &c.Entity }),
+		setting.Pick(Setting{Name: "look", Group: Group, Icon: "mdi:palette-outline"},
+			schema.WeatherLooks(), func(c *schema.Weather) *schema.WeatherLook { return &c.Look }),
+		flag("dashboard", "", "mdi:view-dashboard-outline",
+			func(c *schema.Weather) *bool { return &c.Dashboard }),
+		flag("idle", "weather_screensaver", "mdi:monitor-star",
+			func(c *schema.Weather) *bool { return &c.Idle }),
+		flag("animate", "", "mdi:animation-play-outline",
+			func(c *schema.Weather) *bool { return &c.Animate }),
+		flag("themed", "", "mdi:palette",
+			func(c *schema.Weather) *bool { return &c.Themed }),
+		setting.Pick(Setting{Name: "position", Group: Group, Icon: "mdi:arrow-up-down"},
+			schema.Positions(), func(c *schema.Weather) *schema.Position { return &c.Position }),
+		setting.Pick(Setting{Name: "align", Group: Group, Icon: "mdi:arrow-left-right"},
+			schema.Aligns(), func(c *schema.Weather) *schema.Align { return &c.Align }),
+		setting.Pick(Setting{Name: "size", Group: Group, Icon: "mdi:resize"},
+			schema.Sizes(), func(c *schema.Weather) *schema.Size { return &c.Size }),
+	}, setting.Messages{Text: say.T, Missing: say.Missing})
 }
 
 func (w *Weather) Name() string { return "weather" }
 
-func (w *Weather) base(id, name, icon string) esphome.Base {
-	return esphome.Base{
-		ObjectID: id,
-		Name:     name,
-		Icon:     icon,
-		Category: esphome.CategoryConfig,
-		DeviceID: w.opts.DeviceID,
-	}
-}
+func (w *Weather) Entities() []esphome.Entity { return w.knobs.Entities() }
 
-func (w *Weather) build() {
-	w.ha = entities{
-		entity: &esphome.Text{
-			Base:      w.base("weather_entity", "Weather entity", "mdi:weather-partly-cloudy"),
-			MaxLength: entityMost,
-		},
-		look: &esphome.Select{
-			Base:    w.base("weather_look", "Weather look", "mdi:palette-outline"),
-			Options: labels(schema.WeatherLooks()),
-		},
-		dashboard: &esphome.Switch{
-			Base: w.base("weather_dashboard", "Weather on dashboard", "mdi:view-dashboard-outline"),
-		},
-		idle: &esphome.Switch{
-			Base: w.base("weather_screensaver", "Weather on screen saver", "mdi:monitor-star"),
-		},
-		animate: &esphome.Switch{
-			Base: w.base("weather_animate", "Animate weather", "mdi:animation-play-outline"),
-		},
-		themed: &esphome.Switch{
-			Base: w.base("weather_themed", "Themed weather colors", "mdi:palette"),
-		},
-		position: &esphome.Select{
-			Base:    w.base("weather_position", "Weather vertical position", "mdi:arrow-up-down"),
-			Options: labels(schema.Positions()),
-		},
-		align: &esphome.Select{
-			Base:    w.base("weather_align", "Weather horizontal position", "mdi:arrow-left-right"),
-			Options: labels(schema.Aligns()),
-		},
-		size: &esphome.Select{
-			Base:    w.base("weather_size", "Weather size", "mdi:resize"),
-			Options: labels(schema.Sizes()),
-		},
-	}
-	h := w.ha
-	h.entity.OnCommand = w.SetEntity
-	h.look.OnCommand = func(l string) { byLabel(schema.WeatherLooks(), l, w.SetLook) }
-	h.dashboard.OnCommand = w.SetDashboard
-	h.idle.OnCommand = w.SetIdle
-	h.animate.OnCommand = w.SetAnimate
-	h.themed.OnCommand = w.SetThemed
-	h.position.OnCommand = func(l string) { byLabel(schema.Positions(), l, w.SetPosition) }
-	h.align.OnCommand = func(l string) { byLabel(schema.Aligns(), l, w.SetAlign) }
-	h.size.OnCommand = func(l string) { byLabel(schema.Sizes(), l, w.SetSize) }
-}
+func (w *Weather) Settings() *setting.Controls[schema.Weather] { return w.knobs }
 
-func (w *Weather) Entities() []esphome.Entity {
-	h := w.ha
-	return []esphome.Entity{
-		h.entity,
-		h.look,
-		h.dashboard,
-		h.idle,
-		h.animate,
-		h.themed,
-		h.position,
-		h.align,
-		h.size,
-	}
-}
+func (w *Weather) Publish(c schema.Weather) { w.knobs.PublishFrom(c) }
 
-func (w *Weather) Publish(c schema.Weather) {
-	h := w.ha
-	h.entity.Set(c.Entity)
-	h.look.Set(c.Look.Label())
-	h.dashboard.Set(c.Dashboard)
-	h.idle.Set(c.Idle)
-	h.animate.Set(c.Animate)
-	h.themed.Set(c.Themed)
-	h.position.Set(c.Position.Label())
-	h.align.Set(c.Align.Label())
-	h.size.Set(c.Size.Label())
+func (w *Weather) store(s Setting, v string) error {
+	if err := setting.Store(w.opts.Settings, s, v); err != nil {
+		return err
+	}
+	w.opts.Redraw()
+	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	ha "github.com/ygelfand/libcountertop/pkg/homeassistant"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant/states"
+	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
@@ -38,6 +39,7 @@ type Engine struct {
 	board      *Board
 	home       *Home
 	selections []Selection
+	knobs      *setting.Controls[config.Home]
 	mu         sync.Mutex
 	unwatch    func()
 }
@@ -49,6 +51,7 @@ func New(o Dependencies) *Engine {
 		{Key: "lights", Filter: ha.Filter{Domains: []string{"light"}}, engine: e},
 		{Key: "switches", Filter: ha.Filter{Domains: []string{"switch"}}, engine: e},
 	}
+	e.knobs = e.controls()
 	e.cache = &cache{
 		ctx:   ctx,
 		got:   map[string]*result{},

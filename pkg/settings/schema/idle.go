@@ -22,12 +22,17 @@ func (v IdleVisual) On() bool { return v.Kind != "" }
 
 func IdleFaces() []Face { return append([]Face{FaceNone}, Faces()...) }
 
+func IdlePositions() []Position { return append(Positions(), PositionRandom) }
+
+func IdleAligns() []Align { return append(Aligns(), AlignRandom) }
+
 type Align string
 
 const (
 	AlignLeft   Align = "left"
 	AlignCenter Align = "center"
 	AlignRight  Align = "right"
+	AlignRandom Align = "random"
 )
 
 func (a Align) Label() string {
@@ -38,6 +43,8 @@ func (a Align) Label() string {
 		return say.T("align.center")
 	case AlignRight:
 		return say.T("align.right")
+	case AlignRandom:
+		return say.T("align.random")
 	}
 	return string(a)
 }
@@ -71,8 +78,8 @@ func DefaultIdle() Idle {
 		After:    DefaultDelay,
 		Media:    Delay5m,
 		Face:     DefaultFace,
-		Position: DefaultPosition,
-		Align:    AlignCenter,
+		Position: PositionRandom,
+		Align:    AlignRandom,
 		Size:     DefaultSize,
 		First:    IdleVisual{Source: SourceBoth},
 		Second:   IdleVisual{Source: SourceBoth},
