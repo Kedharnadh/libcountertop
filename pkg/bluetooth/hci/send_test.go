@@ -82,7 +82,7 @@ func TestASilentDownloadWaitsForNothing(t *testing.T) {
 
 func TestAnAcknowledgedDownloadStillWaits(t *testing.T) {
 	p, chip := paired(t)
-	go io.Copy(io.Discard, chip)
+	go func() { _, _ = io.Copy(io.Discard, chip) }()
 
 	b, err := ReadBlob(silent(3000, sayEverything))
 	if err != nil {

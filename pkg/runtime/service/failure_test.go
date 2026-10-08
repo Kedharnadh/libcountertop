@@ -96,3 +96,31 @@ func TestFailedReacquisitionNeverRunsWithoutHardware(t *testing.T) {
 	cancel()
 	<-done
 }
+
+type slowStart struct {
+	fake
+	entered chan struct{}
+}
+
+func (s *slowStart) Start(ctx context.Context) error {
+	close(s.entered)
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func TestShutdownDuringARequiredStartIsNotAFailure(t *testing.T) {
+	svc := &slowStart{fake: fake{name: "slow"}, entered: make(chan struct{})}
+	g := New()
+	g.Add(svc, Required())
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- g.Run(ctx) }()
+	<-svc.entered
+	cancel()
+	if err := <-done; err != nil {
+		t.Errorf("Run = %v, want nil on shutdown", err)
+	}
+	if _, _, closes := svc.counts(); closes != 1 {
+		t.Errorf("closed %d times, want 1", closes)
+	}
+}

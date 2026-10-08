@@ -84,7 +84,7 @@ func serving(t *testing.T, d *deciding, size, total int) (chip *os.File, stop fu
 
 	go func() {
 		defer close(done)
-		Serve(ctx, Reader(ctx, p), d)
+		_ = Serve(ctx, Reader(ctx, p), d)
 	}()
 
 	asked(t, chip, hciReadBufferSize)
@@ -130,8 +130,8 @@ func TestALinkCarriesAWholePDUFromItsFragments(t *testing.T) {
 		body[4+i] = byte(i)
 	}
 
-	chip.Write(aclOf(1, boundaryFlushable, body[:20]))
-	chip.Write(aclOf(1, boundaryContinue, body[20:]))
+	_, _ = chip.Write(aclOf(1, boundaryFlushable, body[:20]))
+	_, _ = chip.Write(aclOf(1, boundaryContinue, body[20:]))
 
 	settles(t, func() bool { _, pdus, _ := d.saw(); return pdus == 1 })
 
@@ -153,7 +153,7 @@ func TestAnEventReachesWhoeverDecides(t *testing.T) {
 	chip, stop := serving(t, d, 64, 4)
 	defer stop()
 
-	chip.Write([]byte{typeEvent, pair.EventConnectionRequest, 0x03, 0xaa, 0xbb, 0xcc})
+	_, _ = chip.Write([]byte{typeEvent, pair.EventConnectionRequest, 0x03, 0xaa, 0xbb, 0xcc})
 
 	settles(t, func() bool { events, _, _ := d.saw(); return events >= 1 })
 
@@ -171,10 +171,12 @@ func TestALinkEndingIsPassedOnAndForgotten(t *testing.T) {
 	defer stop()
 
 	half := append([]byte{0x24, 0x00, 0x40, 0x00}, make([]byte, 16)...)
-	chip.Write(aclOf(7, boundaryFlushable, half))
+	_, _ = chip.Write(aclOf(7, boundaryFlushable, half))
 
 	// Disconnection complete: status, handle, reason.
-	chip.Write([]byte{typeEvent, pair.EventDisconnectionComplete, 0x04, 0x00, 0x07, 0x00, 0x13})
+	_, _ = chip.Write(
+		[]byte{typeEvent, pair.EventDisconnectionComplete, 0x04, 0x00, 0x07, 0x00, 0x13},
+	)
 
 	settles(t, func() bool { _, _, gone := d.saw(); return gone == 1 })
 
@@ -194,9 +196,9 @@ func TestSendingWaitsForTheControllerToCatchUp(t *testing.T) {
 	defer stop()
 
 	var sent counter
-	go io.Copy(&sent, chip)
+	go func() { _, _ = io.Copy(&sent, chip) }()
 
-	chip.Write(aclOf(1, boundaryFlushable, []byte{0x00, 0x00, 0x40, 0x00}))
+	_, _ = chip.Write(aclOf(1, boundaryFlushable, []byte{0x00, 0x00, 0x40, 0x00}))
 	settles(t, func() bool { _, pdus, _ := d.saw(); return pdus == 1 })
 
 	settles(t, func() bool { return sent.n() >= 2 })
@@ -209,7 +211,9 @@ func TestSendingWaitsForTheControllerToCatchUp(t *testing.T) {
 	}
 
 	for range 5 {
-		chip.Write([]byte{typeEvent, eventCompletedPackets, 0x05, 0x01, 0x01, 0x00, 0x01, 0x00})
+		_, _ = chip.Write(
+			[]byte{typeEvent, eventCompletedPackets, 0x05, 0x01, 0x01, 0x00, 0x01, 0x00},
+		)
 		time.Sleep(5 * time.Millisecond)
 	}
 

@@ -91,6 +91,11 @@ func (g *Group) Run(ctx context.Context) error {
 		acquired := false
 
 		if err := e.start(ctx); err != nil {
+			if ctx.Err() != nil {
+				started = append(started, e)
+				g.stop(started, &wg)
+				return nil
+			}
 			e.set(StateFailed, err)
 			if e.policy.required {
 				slog.Error(

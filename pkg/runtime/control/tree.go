@@ -72,108 +72,48 @@ func Literal(cmd *cobra.Command) {
 	}
 }
 
-var categories = map[string]string{
-	"version": "device",
-	"state":   "device",
-	"log":     "device",
-	"peers":   "device",
-	"wait":    "device",
-	"ready":   "device",
-	"tap":     "input",
-	"hold":    "input",
-	"swipe":   "input",
-	"button":  "input",
-	"turn":    "input",
-	"shot":    "display",
-	"size":    "display",
-	"stats":   "display",
-	"fps":     "display",
-	"open":    "display",
-	"stack":   "display",
-	"message": "display",
-	"clear":   "display",
-	"gltime":  "display",
-	"render":  "display",
-	"clip":    "display",
-	"thumbs":  "display",
-	"boot":    "display",
-	"timer":   "display",
-	"record":  "audio",
-	"echo":    "audio",
-	"volume":  "audio",
-	"mixer":   "audio",
-	"player":  "audio",
-	"cancel":  "audio",
-	"youtube": "media",
+type Task string
+
+const (
+	DeviceTask  Task = "device"
+	InputTask   Task = "input"
+	DisplayTask Task = "display"
+	AudioTask   Task = "audio"
+	MediaTask   Task = "media"
+)
+
+type Tree struct {
+	root  *cobra.Command
+	tasks map[Task]*cobra.Command
 }
 
-func Organize(root *cobra.Command) {
-	commands := root.Commands()
-	root.RemoveCommand(commands...)
-	groups := make(map[string]*cobra.Command)
-	var echo, record *cobra.Command
-	put := func(cmd *cobra.Command) {
-		name := cmd.Name()
-		if name == "echo" {
-			echo = cmd
-			return
-		}
-		if name == "record" {
-			record = cmd
-		}
-		if name == "wait" {
-			cmd.RunE = wait
-		}
-		category := categories[name]
-		if category == "" {
-			root.AddCommand(cmd)
-			return
-		}
-		parent := groups[category]
-		if parent == nil {
-			parent = Group(category, "", "")
-			groups[category] = parent
-			root.AddCommand(parent)
-		}
-		parent.AddCommand(cmd)
+func NewTree() *Tree { return &Tree{root: NewRoot(), tasks: make(map[Task]*cobra.Command)} }
+
+func (t *Tree) Add(task Task, cmds ...*cobra.Command) {
+	if len(cmds) == 0 {
+		return
 	}
-	for _, cmd := range commands {
-		put(cmd)
+	group := t.tasks[task]
+	if group == nil {
+		group = Group(string(task), "", "")
+		t.tasks[task] = group
+		t.root.AddCommand(group)
 	}
-	if record != nil {
-		if echo != nil {
-			echo.Use = "echo SECONDS [PATH]"
-			echo.Args = cobra.RangeArgs(1, 2)
-			run := echo.RunE
-			echo.RunE = func(cmd *cobra.Command, args []string) error {
-				if len(args) == 1 {
-					args = append(args, "/data/local/tmp/echo.wav")
-				}
-				return run(cmd, args)
-			}
-			record.AddCommand(echo)
-		} else if strings.Contains(record.Use, "raw|echo") {
-			for _, mode := range []string{"raw", "echo"} {
-				record.AddCommand(
-					&cobra.Command{
-						Use:  mode + " SECONDS [PATH]",
-						Args: cobra.RangeArgs(1, 2),
-						RunE: func(cmd *cobra.Command, args []string) error {
-							return record.RunE(cmd, append([]string{mode}, args...))
-						},
-					},
-				)
-			}
-		}
-	}
-	for name, group := range groups {
+	group.AddCommand(cmds...)
+}
+
+func (t *Tree) Top(cmds ...*cobra.Command) { t.root.AddCommand(cmds...) }
+
+func (t *Tree) Root() *cobra.Command {
+	for task, group := range t.tasks {
 		var names []string
 		for _, cmd := range group.Commands() {
 			names = append(names, cmd.Name())
 		}
-		group.Short = name + ": " + strings.Join(names, ", ")
+		group.Short = string(task) + ": " + strings.Join(names, ", ")
 	}
-	Literal(root)
+	Literal(t.root)
+	return t.root
 }
 
 func Execute(ctx context.Context, makeTree func() *cobra.Command, args []string) (string, error) {

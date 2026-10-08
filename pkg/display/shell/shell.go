@@ -35,12 +35,20 @@ type Shell struct {
 	timer      *time.Timer
 	closed     time.Time
 	generation uint64
+	reported   View
+	pending    []notice
+	notifying  bool
 
 	Changed hook.Hook[Change]
 	Redrawn hook.Hook[struct{}]
 }
 
 type Change struct{ From, To View }
+
+type notice struct {
+	closing []View
+	change  *Change
+}
 
 type Stacked struct {
 	View View
@@ -107,23 +115,59 @@ func (s *Shell) Views() []View {
 	return slices.Clone(s.stack)
 }
 
-func (s *Shell) changed(from, to View) {
+func (s *Shell) changed() {
 	s.mu.Lock()
 	previous := s.visible
 	s.visible = slices.Clone(Showing(s.stack))
-	current := slices.Clone(s.visible)
-	s.mu.Unlock()
+	n := notice{}
 	for _, view := range previous {
-		if !slices.Contains(current, view) {
+		if !slices.Contains(s.visible, view) {
+			n.closing = append(n.closing, view)
+		}
+	}
+	if to := s.top(); to != s.reported {
+		n.change = &Change{From: s.reported, To: to}
+		s.reported = to
+	}
+	s.pending = append(s.pending, n)
+	if s.notifying {
+		s.mu.Unlock()
+		return
+	}
+	s.notifying = true
+	s.mu.Unlock()
+	s.drain()
+}
+
+func (s *Shell) drain() {
+	defer func() {
+		if r := recover(); r != nil {
+			s.mu.Lock()
+			s.notifying, s.pending = false, nil
+			s.mu.Unlock()
+			panic(r)
+		}
+	}()
+	for {
+		s.mu.Lock()
+		if len(s.pending) == 0 {
+			s.notifying = false
+			s.mu.Unlock()
+			return
+		}
+		n := s.pending[0]
+		s.pending = s.pending[1:]
+		s.mu.Unlock()
+		for _, view := range n.closing {
 			if closer, ok := view.(interface{ Close() }); ok {
 				closer.Close()
 			}
 		}
+		if n.change != nil {
+			s.Changed.Emit(*n.change)
+		}
+		s.Redraw()
 	}
-	if from != to {
-		s.Changed.Emit(Change{From: from, To: to})
-	}
-	s.Redraw()
 }
 
 func (s *Shell) refuses(v View) bool {
@@ -142,34 +186,37 @@ func (s *Shell) refuses(v View) bool {
 }
 
 func (s *Shell) Push(v View) {
-	s.mu.Lock()
-	if s.refuses(v) {
-		s.mu.Unlock()
-		return
+	if s.add(v, false) {
+		s.changed()
+		s.wake()
 	}
-	from := s.top()
-	if !slices.Contains(s.stack, v) {
-		s.stack = append(s.stack, v)
-	}
-	to := s.top()
-	s.mu.Unlock()
-	s.changed(from, to)
-	s.wake()
 }
 
 func (s *Shell) Hold(v View) *Hold {
-	s.mu.Lock()
-	if s.refuses(v) {
-		s.mu.Unlock()
+	if !s.add(v, true) {
 		return nil
 	}
-	if s.holds == nil {
-		s.holds = map[View]bool{}
-	}
-	s.holds[v] = true
-	s.mu.Unlock()
-	s.Push(v)
+	s.changed()
+	s.wake()
 	return &Hold{shell: s, view: v}
+}
+
+func (s *Shell) add(v View, hold bool) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.refuses(v) {
+		return false
+	}
+	if hold {
+		if s.holds == nil {
+			s.holds = map[View]bool{}
+		}
+		s.holds[v] = true
+	}
+	if !slices.Contains(s.stack, v) {
+		s.stack = append(s.stack, v)
+	}
+	return true
 }
 
 type Hold struct {
@@ -218,7 +265,6 @@ func (s *Shell) Holding(v View) bool {
 
 func (s *Shell) Remove(v View) {
 	s.mu.Lock()
-	from := s.top()
 	s.stack = slices.DeleteFunc(s.stack, func(have View) bool { return have == v })
 	delete(s.holds, v)
 	if len(s.stack) == 0 {
@@ -229,9 +275,8 @@ func (s *Shell) Remove(v View) {
 			s.timer = nil
 		}
 	}
-	to := s.top()
 	s.mu.Unlock()
-	s.changed(from, to)
+	s.changed()
 }
 
 func (s *Shell) Pop() {
@@ -245,7 +290,6 @@ func (s *Shell) Pop() {
 
 func (s *Shell) Close() {
 	s.mu.Lock()
-	from := s.top()
 	timer := s.timer
 	s.closed = time.Now()
 	s.stack, s.timer = nil, nil
@@ -255,7 +299,7 @@ func (s *Shell) Close() {
 	if timer != nil {
 		timer.Stop()
 	}
-	s.changed(from, nil)
+	s.changed()
 }
 
 func (s *Shell) Redraw() { s.Redrawn.Emit(struct{}{}) }
@@ -273,7 +317,6 @@ func (s *Shell) idled(generation uint64) {
 		return
 	}
 	s.timer = nil
-	from := s.top()
 	s.stack = slices.DeleteFunc(s.stack, func(v View) bool { return !s.holds[v] })
 	if len(s.stack) == 0 {
 		s.closed = time.Now()
@@ -283,9 +326,8 @@ func (s *Shell) idled(generation uint64) {
 			s.timer = nil
 		}
 	}
-	to := s.top()
 	s.mu.Unlock()
-	s.changed(from, to)
+	s.changed()
 }
 
 func (s *Shell) wake() {

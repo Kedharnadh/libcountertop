@@ -162,7 +162,7 @@ func (p *Port) ibs() bool {
 	case ibsWake:
 		// The chip waits for the acknowledgement before sending anything else.
 		p.asleep.Store(false)
-		p.send([]byte{ibsWakeAck})
+		_, _ = p.send([]byte{ibsWakeAck})
 	default:
 		return false
 	}

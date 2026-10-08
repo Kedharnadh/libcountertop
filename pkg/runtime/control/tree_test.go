@@ -14,15 +14,15 @@ func TestGroupedPathsPassLiteralArguments(t *testing.T) {
 	for _, args := range [][]string{{"input", "tap", "-1", "20"}} {
 		var got []string
 		factory := func() *cobra.Command {
-			root := NewRoot()
-			root.AddCommand(
+			t := NewTree()
+			t.Add(
+				InputTask,
 				Does(
 					&cobra.Command{Use: "tap X Y", Args: cobra.ExactArgs(2)},
 					func(in []string) error { got = in; return nil },
 				),
 			)
-			Organize(root)
-			return root
+			return t.Root()
 		}
 		if _, err := Execute(t.Context(), factory, args); err != nil {
 			t.Fatal(err)
@@ -41,10 +41,9 @@ func TestWaitIsCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	factory := func() *cobra.Command {
-		root := NewRoot()
-		root.AddCommand(WaitCommand())
-		Organize(root)
-		return root
+		t := NewTree()
+		t.Add(DeviceTask, WaitCommand())
+		return t.Root()
 	}
 	if _, err := Execute(
 		ctx,
@@ -60,25 +59,21 @@ func TestWaitIsCanceled(t *testing.T) {
 
 func TestOldCommandPathsAreRejected(t *testing.T) {
 	factory := func() *cobra.Command {
-		root := NewRoot()
+		t := NewTree()
 		noop := func([]string) error { return nil }
-		root.AddCommand(
-			Does(&cobra.Command{Use: "tap X Y", Args: cobra.ExactArgs(2)}, noop),
-			Does(&cobra.Command{Use: "shot PATH", Args: cobra.ExactArgs(1)}, noop),
+		t.Add(InputTask, Does(&cobra.Command{Use: "tap X Y", Args: cobra.ExactArgs(2)}, noop))
+		t.Add(DisplayTask, Does(&cobra.Command{Use: "shot PATH", Args: cobra.ExactArgs(1)}, noop))
+		t.Add(
+			AudioTask,
+			Does(&cobra.Command{Use: "record SECONDS [PATH]", Args: cobra.RangeArgs(1, 2)}, noop),
+		)
+		t.Add(DeviceTask, WaitCommand())
+		t.Add(DeviceTask, DeviceCommands(func() DeviceInfo { return DeviceInfo{} })...)
+		t.Top(
 			Does(&cobra.Command{Use: "settings [NAME [VALUE]]", Args: cobra.MaximumNArgs(2)}, noop),
-			Does(
-				&cobra.Command{
-					Use:  "record [raw|echo] SECONDS [PATH]",
-					Args: cobra.RangeArgs(1, 3),
-				},
-				noop,
-			),
-			WaitCommand(),
 			BluetoothCommand(func([]string) (string, error) { return "", nil }),
 		)
-		root.AddCommand(DeviceCommands(func() DeviceInfo { return DeviceInfo{} })...)
-		Organize(root)
-		return root
+		return t.Root()
 	}
 	for _, args := range [][]string{
 		{"tap", "1", "2"}, {"screen", "tap", "1", "2"}, {"input", "drag", "1", "2", "3", "4"},
@@ -95,10 +90,9 @@ func TestOldCommandPathsAreRejected(t *testing.T) {
 func TestCallToggleRejectsUnknownValueBeforeAdapter(t *testing.T) {
 	called := false
 	factory := func() *cobra.Command {
-		root := NewRoot()
-		root.AddCommand(CallCommand(CallActions{Mute: func(bool) { called = true }}))
-		Organize(root)
-		return root
+		t := NewTree()
+		t.Top(CallCommand(CallActions{Mute: func(bool) { called = true }}))
+		return t.Root()
 	}
 	if _, err := Execute(
 		t.Context(),
@@ -126,41 +120,19 @@ func TestArgumentFramesPreserveSpacesAndSemicolons(t *testing.T) {
 	}
 }
 
-func TestRecordingModesUseOnePathAcrossAdapters(t *testing.T) {
-	for _, separateEcho := range []bool{false, true} {
-		var got []string
-		factory := func() *cobra.Command {
-			root := NewRoot()
-			record := &cobra.Command{
-				Use:  "record [raw|echo] SECONDS [PATH]",
-				RunE: func(_ *cobra.Command, args []string) error { got = args; return nil },
-			}
-			root.AddCommand(record)
-			if separateEcho {
-				record.Use = "record SECONDS [PATH]"
-				root.AddCommand(
-					&cobra.Command{
-						Use:  "echo SECONDS PATH",
-						RunE: func(_ *cobra.Command, args []string) error { got = args; return nil },
-					},
-				)
-			}
-			Organize(root)
-			return root
-		}
-		if _, err := Execute(
-			t.Context(),
-			factory,
-			[]string{"audio", "record", "echo", "2"},
-		); err != nil {
-			t.Fatal(err)
-		}
-		want := []string{"echo", "2"}
-		if separateEcho {
-			want = []string{"2", "/data/local/tmp/echo.wav"}
-		}
-		if !slices.Equal(got, want) {
-			t.Errorf("separateEcho=%t: arguments=%q, want %q", separateEcho, got, want)
-		}
+func TestGroupHelpListsItsCommands(t *testing.T) {
+	tree := NewTree()
+	tree.Add(DeviceTask, WaitCommand())
+	tree.Add(DeviceTask, DeviceCommands(func() DeviceInfo { return DeviceInfo{} })...)
+	root := tree.Root()
+	device, _, err := root.Find([]string{"device"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if device.Short != "device: state, version, wait" {
+		t.Errorf("device group summary = %q", device.Short)
+	}
+	if _, _, err := root.Find([]string{"input"}); err == nil {
+		t.Error("a task with no commands was added")
 	}
 }

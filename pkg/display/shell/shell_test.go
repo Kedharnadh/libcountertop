@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"sync"
 	"testing"
 	"time"
 )
@@ -113,5 +114,74 @@ func TestTheLongestTimeoutInTheStackWins(t *testing.T) {
 	s.Push(&view{covers: true})
 	if got := s.timeout(); got != SettingsTimeout {
 		t.Errorf("timeout %v, want %v", got, SettingsTimeout)
+	}
+}
+
+func TestChangesArriveInOrderUnderRacingPushAndRemove(t *testing.T) {
+	s := New()
+	defer s.Close()
+	base := &view{covers: true}
+	s.Push(base)
+	var mu sync.Mutex
+	var heard []Change
+	s.Changed.Listen(func(c Change) { mu.Lock(); heard = append(heard, c); mu.Unlock() })
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range 200 {
+				v := &view{covers: true}
+				s.Push(v)
+				s.Remove(v)
+			}
+		}()
+	}
+	wg.Wait()
+	mu.Lock()
+	defer mu.Unlock()
+	for i := 1; i < len(heard); i++ {
+		if heard[i].From != heard[i-1].To {
+			t.Fatalf(
+				"change %d starts at %v, the one before ended at %v",
+				i,
+				heard[i].From,
+				heard[i-1].To,
+			)
+		}
+	}
+	if n := len(heard); n > 0 && heard[n-1].To != s.Top() {
+		t.Errorf("last change ended at %v, top is %v", heard[n-1].To, s.Top())
+	}
+}
+
+func TestAListenerThatChangesTheStackIsHeardAfterwards(t *testing.T) {
+	s := New()
+	defer s.Close()
+	first, second := &view{covers: true}, &view{covers: true}
+	var heard []Change
+	s.Changed.Listen(func(c Change) {
+		heard = append(heard, c)
+		if c.To == first {
+			s.Push(second)
+		}
+	})
+	s.Push(first)
+	want := []Change{{From: nil, To: first}, {From: first, To: second}}
+	if len(heard) != len(want) || heard[0] != want[0] || heard[1] != want[1] {
+		t.Errorf("heard %v, want %v", heard, want)
+	}
+}
+
+func TestAHoldRefusedByASleepingTopIsNotRecorded(t *testing.T) {
+	s := New()
+	defer s.Close()
+	s.Push(&view{covers: true, asleep: true})
+	page := &view{covers: true}
+	if h := s.Hold(page); h != nil {
+		t.Fatal("a sleeping top let a covering view be held")
+	}
+	if s.Holding(page) {
+		t.Error("a refused hold is still recorded")
 	}
 }

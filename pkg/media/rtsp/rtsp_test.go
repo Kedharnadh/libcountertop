@@ -110,6 +110,23 @@ func dial(t *testing.T, addr, path string) *client {
 	return &client{t: t, c: c, r: bufio.NewReader(c), url: "rtsp://" + addr + "/" + path}
 }
 
+func (cl *client) skipInterleaved() {
+	cl.t.Helper()
+	for {
+		b, err := cl.r.Peek(1)
+		if err != nil || b[0] != '$' {
+			return
+		}
+		hdr := make([]byte, 4)
+		if _, err := io.ReadFull(cl.r, hdr); err != nil {
+			cl.t.Fatal(err)
+		}
+		if _, err := cl.r.Discard(int(binary.BigEndian.Uint16(hdr[2:]))); err != nil {
+			cl.t.Fatal(err)
+		}
+	}
+}
+
 func (cl *client) do(method, url string, headers ...string) (int, map[string]string, string) {
 	cl.t.Helper()
 	cl.cseq++
@@ -121,6 +138,7 @@ func (cl *client) do(method, url string, headers ...string) (int, map[string]str
 		cl.cseq,
 		joinHeaders(headers),
 	)
+	cl.skipInterleaved()
 	line, err := cl.r.ReadString('\n')
 	if err != nil {
 		cl.t.Fatal(err)

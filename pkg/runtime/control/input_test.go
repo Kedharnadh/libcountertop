@@ -20,10 +20,9 @@ func TestCanceledGestureReleasesItsContact(t *testing.T) {
 		}
 	}})
 	factory := func() *cobra.Command {
-		root := NewRoot()
-		root.AddCommand(input.Commands()...)
-		Organize(root)
-		return root
+		t := NewTree()
+		t.Add(InputTask, input.Commands()...)
+		return t.Root()
 	}
 	_, err := Execute(ctx, factory, []string{"input", "hold", "10", "20", "60000"})
 	if !errors.Is(err, context.Canceled) {
@@ -46,10 +45,9 @@ func TestSwipeUsesBoardCadenceAndViewedCoordinates(t *testing.T) {
 		},
 	)
 	factory := func() *cobra.Command {
-		root := NewRoot()
-		root.AddCommand(input.Commands()...)
-		Organize(root)
-		return root
+		t := NewTree()
+		t.Add(InputTask, input.Commands()...)
+		return t.Root()
 	}
 	if _, err := Execute(
 		t.Context(),

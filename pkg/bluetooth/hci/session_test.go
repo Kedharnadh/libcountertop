@@ -97,7 +97,7 @@ func TestAnAnswerIsFoundAmongTheAdvertisements(t *testing.T) {
 	go func() {
 		defer close(noise)
 		for range 20 {
-			chip.Write(advert([6]byte{0x11, 0x22, 0x33, 0x44, 0x55, 0x66}, -50))
+			_, _ = chip.Write(advert([6]byte{0x11, 0x22, 0x33, 0x44, 0x55, 0x66}, -50))
 			time.Sleep(time.Millisecond)
 		}
 	}()
@@ -106,17 +106,17 @@ func TestAnAnswerIsFoundAmongTheAdvertisements(t *testing.T) {
 		want, _ := command(hciReadAddress)
 		got := make([]byte, len(want))
 
-		chip.SetReadDeadline(time.Now().Add(2 * time.Second))
+		_ = chip.SetReadDeadline(time.Now().Add(2 * time.Second))
 		if _, err := io.ReadFull(chip, got); err != nil {
 			return
 		}
-		chip.SetReadDeadline(time.Time{})
+		_ = chip.SetReadDeadline(time.Time{})
 
 		// Six bytes of address after the status, least significant first.
 		out := []byte{typeEvent, eventCommandComplete, 0x0a, 0x01}
 		out = binary.LittleEndian.AppendUint16(out, hciReadAddress)
 		out = append(out, 0x00, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01)
-		chip.Write(out)
+		_, _ = chip.Write(out)
 	}()
 
 	said, err := s.Command(hciReadAddress, nil...)
@@ -141,11 +141,11 @@ func TestARefusalIsAnAnswer(t *testing.T) {
 		want, _ := command(hciWriteSimplePairing, 0x01)
 		got := make([]byte, len(want))
 
-		chip.SetReadDeadline(time.Now().Add(2 * time.Second))
+		_ = chip.SetReadDeadline(time.Now().Add(2 * time.Second))
 		if _, err := io.ReadFull(chip, got); err != nil {
 			return
 		}
-		chip.Write(answerTo(hciWriteSimplePairing, 0x12))
+		_, _ = chip.Write(answerTo(hciWriteSimplePairing, 0x12))
 	}()
 
 	if _, err := s.Command(hciWriteSimplePairing, 0x01); err == nil {
@@ -164,7 +164,7 @@ func TestTheSameCommandTwiceAtOnceIsRefused(t *testing.T) {
 	started := make(chan struct{})
 	go func() {
 		close(started)
-		s.Ask(cmd, 500*time.Millisecond)
+		_, _ = s.Ask(cmd, 500*time.Millisecond)
 	}()
 	<-started
 

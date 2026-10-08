@@ -17,9 +17,9 @@ func TestWakingPastWhatIsAlreadyOnTheLine(t *testing.T) {
 	p.asleep.Store(true)
 
 	go func() {
-		chip.Write(advertising())
-		chip.Write(advertising())
-		chip.Write([]byte{ibsWakeAck})
+		_, _ = chip.Write(advertising())
+		_, _ = chip.Write(advertising())
+		_, _ = chip.Write([]byte{ibsWakeAck})
 	}()
 
 	done := make(chan error, 1)
@@ -44,8 +44,8 @@ func TestWakingKeepsTheEventsItReadPastAsleep(t *testing.T) {
 	p.asleep.Store(true)
 
 	go func() {
-		chip.Write(advertising())
-		chip.Write([]byte{ibsWakeAck})
+		_, _ = chip.Write(advertising())
+		_, _ = chip.Write([]byte{ibsWakeAck})
 	}()
 
 	if err := p.rouse(); err != nil {

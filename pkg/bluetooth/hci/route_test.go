@@ -26,10 +26,10 @@ const soon = 2 * time.Second
 func TestAPacketSplitAcrossReads(t *testing.T) {
 	p, w := wired(t)
 
-	w.Write([]byte{typeEvent, 0x0e, 0x02})
+	_, _ = w.Write([]byte{typeEvent, 0x0e, 0x02})
 	go func() {
 		time.Sleep(20 * time.Millisecond)
-		w.Write([]byte{0xbb, 0xcc})
+		_, _ = w.Write([]byte{0xbb, 0xcc})
 	}()
 
 	got, err := p.Read(soon)
@@ -44,7 +44,7 @@ func TestAPacketSplitAcrossReads(t *testing.T) {
 func TestQueuedEventsKeepTheirOrder(t *testing.T) {
 	p, w := wired(t)
 
-	w.Write([]byte{
+	_, _ = w.Write([]byte{
 		typeEvent, 0x10, 0x00,
 		typeEvent, 0x11, 0x00,
 		typeEvent, 0x12, 0x00,
@@ -72,7 +72,7 @@ func TestAQuietLine(t *testing.T) {
 func TestReadingPastRubbishOnTheLine(t *testing.T) {
 	p, w := wired(t)
 
-	w.Write([]byte{0xaa, 0xbb, typeEvent, 0x01, 0x01, 0xcc})
+	_, _ = w.Write([]byte{0xaa, 0xbb, typeEvent, 0x01, 0x01, 0xcc})
 
 	got, err := p.Read(soon)
 	if err != nil {
