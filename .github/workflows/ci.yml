@@ -19,8 +19,16 @@ jobs:
           GOOS=linux GOARCH=arm CGO_ENABLED=0 go build ./...
           GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build ./...
           GOOS=linux GOARCH=arm CGO_ENABLED=0 go build -tags noasm ./...
-      - name: check formatting
-        run: test -z "$(gofmt -l .)"
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.2
+          install-only: true
+      - name: format check
+        run: golangci-lint fmt --diff
+      - name: lint
+        run: golangci-lint run
+      - name: lint for the device
+        run: GOOS=linux GOARCH=arm golangci-lint run
   native:
     runs-on: ubuntu-latest
     strategy:
