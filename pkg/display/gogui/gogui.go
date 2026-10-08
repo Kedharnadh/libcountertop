@@ -15,6 +15,8 @@ import (
 
 	"github.com/go-gui-org/go-glyph"
 
+	"github.com/ygelfand/libcountertop/pkg/display/icons"
+
 	"github.com/go-gui-org/go-gui/gui"
 	"github.com/go-gui-org/go-gui/gui/shader"
 	"github.com/go-gui-org/go-gui/gui/svg"
@@ -133,6 +135,9 @@ func New(sink Sink, w *gui.Window) (*Renderer, error) {
 		if err := ts.AddFontBytes(data); err != nil {
 			slog.Warn("gogui: icon font", "err", err)
 		}
+	}
+	if err := ts.AddFontBytes(icons.MDI); err != nil {
+		slog.Warn("gogui: material design icons", "err", err)
 	}
 	gui.LoadAppFonts(ts, "gogui")
 	r.textSys = ts

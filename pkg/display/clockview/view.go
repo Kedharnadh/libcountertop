@@ -3,8 +3,6 @@ package clockview
 import (
 	"fmt"
 	"hash/fnv"
-	"image"
-	"image/draw"
 	"math"
 	"strings"
 
@@ -281,22 +279,6 @@ func hand(cx, cy, length, width float32, deg float64) []float32 {
 		tipX - px*tip, tipY - py*tip,
 		tailX - px*half, tailY - py*half,
 	}
-}
-
-func ImageSource(key string, img image.Image) string {
-	if img == nil {
-		return ""
-	}
-	if gogui.HasImage(key) {
-		return "mem:" + key
-	}
-	b := img.Bounds()
-	n, ok := img.(*image.NRGBA)
-	if !ok || n.Rect.Min != (image.Point{}) || n.Stride != b.Dx()*4 {
-		n = image.NewNRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
-		draw.Draw(n, n.Bounds(), img, b.Min, draw.Src)
-	}
-	return gogui.UseImage(key, b.Dx(), b.Dy(), n.Pix)
 }
 
 func Words(w *gogui.Window, box ui.Rect, r face.Reading, ink theme.Theme) gogui.View {

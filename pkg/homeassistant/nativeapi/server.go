@@ -86,8 +86,19 @@ func (a *Server) Start(context.Context) error {
 	if err != nil {
 		return err
 	}
-	info := id.Info
+	a.id = id
+	a.srv = &esphome.Server{
+		Addr:               id.Addr,
+		WriteTimeout:       writeTimeout,
+		PSK:                psk,
+		Logger:             slog.Default(),
+		OnSetEncryptionKey: func(k esphome.PSK) error { return writePSK(a.deps.KeyPath, k) },
+		OnSubscribed:       a.subscribed,
+	}
+	return a.register()
+}
 
+func (a *Server) register() error {
 	registered := a.deps.Registry.Entities()
 	ents := esphome.NewEntities()
 	if err := ents.Add(registered...); err != nil {
@@ -96,24 +107,13 @@ func (a *Server) Start(context.Context) error {
 	if err := ents.AddActions(a.deps.Registry.Actions()...); err != nil {
 		return err
 	}
-
+	info := a.id.Info
 	info.Devices = SubDevices(info.Devices, registered)
 	if a.deps.Bluetooth != nil {
 		info.BluetoothFeatures = a.deps.Bluetooth()
 	}
-
-	a.id = id
-	a.srv = &esphome.Server{
-		Addr:               id.Addr,
-		WriteTimeout:       writeTimeout,
-		Info:               info,
-		PSK:                psk,
-		Logger:             slog.Default(),
-		OnSetEncryptionKey: func(k esphome.PSK) error { return writePSK(a.deps.KeyPath, k) },
-		OnSubscribed:       a.subscribed,
-		Handler: esphome.Chain(
-			append([]esphome.Handler{ents}, a.deps.Registry.Handlers()...)...),
-	}
+	a.srv.Info = info
+	a.srv.Handler = esphome.Chain(append([]esphome.Handler{ents}, a.deps.Registry.Handlers()...)...)
 	return nil
 }
 
@@ -153,10 +153,10 @@ func (a *Server) Run(ctx context.Context) error {
 			return err
 		}
 
-		if a.deps.Bluetooth != nil {
-			a.srv.Info.BluetoothFeatures = a.deps.Bluetooth()
-			slog.Info("serving again", "bluetooth", a.srv.Info.BluetoothFeatures)
+		if err := a.register(); err != nil {
+			return err
 		}
+		slog.Info("serving again", "bluetooth", a.srv.Info.BluetoothFeatures)
 	}
 }
 

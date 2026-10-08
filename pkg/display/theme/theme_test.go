@@ -166,3 +166,19 @@ func TestAThemeRetonedForABackdropReadsOnIt(t *testing.T) {
 		}
 	}
 }
+
+func TestEveryRoleStandsOffTheSurface(t *testing.T) {
+	for _, th := range All {
+		for i, c := range th.Roles.All() {
+			if r := Contrast(c, th.Surface); r < 2 {
+				t.Errorf(
+					"%s: role %d (%s) on surface is %.1f:1, want at least 2:1",
+					th.Name,
+					i,
+					c,
+					r,
+				)
+			}
+		}
+	}
+}

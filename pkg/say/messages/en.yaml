@@ -277,6 +277,9 @@ home.group.home: Home control
 home.group.none: Every device on its own card
 home.label.count: "{{.N}} device{{if ne .N 1}}s{{end}}"
 home.loading: Loading…
+home.mode: Mode
+home.mode.native: Native
+home.mode.tessera: Tessera
 home.noarea: No area
 home.none: None
 home.picked.areas: "{{.N}} area{{if ne .N 1}}s{{end}}"
@@ -295,8 +298,19 @@ home.setting.control.switches: Control switches
 home.setting.enabled: Enable home control
 home.setting.group.lights: Group lights from
 home.setting.group.switches: Group switches from
+home.setting.mode: Home control mode
+home.setting.tessera.columns: Tessera tiles along the long side
+home.setting.tessera.home_after_idle: "Tessera: back to the home page after the screensaver"
+home.setting.tessera.landscape: "Tessera: landscape screen"
+home.setting.tessera.portrait: "Tessera: portrait screen"
+home.setting.tessera.rows: Tessera tiles along the short side
 home.tab.labels: Labels
 home.tab.manual: Manual
+home.tessera.columns: Long side
+home.tessera.landscape: Enable landscape
+home.tessera.portrait: Enable portrait
+home.tessera.return: Go back to the home page after the screensaver
+home.tessera.rows: Short side
 home.tile.all.off: All off
 home.tile.all.on: All on
 home.tile.area: "{{.N}} of {{.Of}} on"
@@ -482,6 +496,93 @@ system.adb.hint: Unauthenticated root shell on 5555
 system.certificates: Verify certificates
 system.certificates.hint: TLS certificate validation
 system.title: System
+tessera.again: Tap again to unlock
+tessera.binary.battery.off: Normal
+tessera.binary.battery.on: Low
+tessera.binary.battery_charging.off: Not charging
+tessera.binary.battery_charging.on: Charging
+tessera.binary.carbon_monoxide.off: Clear
+tessera.binary.carbon_monoxide.on: Detected
+tessera.binary.cold.off: Normal
+tessera.binary.cold.on: Cold
+tessera.binary.connectivity.off: Disconnected
+tessera.binary.connectivity.on: Connected
+tessera.binary.door.off: Closed
+tessera.binary.door.on: Open
+tessera.binary.garage_door.off: Closed
+tessera.binary.garage_door.on: Open
+tessera.binary.gas.off: Clear
+tessera.binary.gas.on: Detected
+tessera.binary.heat.off: Normal
+tessera.binary.heat.on: Hot
+tessera.binary.light.off: No light
+tessera.binary.light.on: Light detected
+tessera.binary.lock.off: Locked
+tessera.binary.lock.on: Unlocked
+tessera.binary.moisture.off: Dry
+tessera.binary.moisture.on: Wet
+tessera.binary.motion.off: Clear
+tessera.binary.motion.on: Detected
+tessera.binary.moving.off: Not moving
+tessera.binary.moving.on: Moving
+tessera.binary.occupancy.off: Clear
+tessera.binary.occupancy.on: Detected
+tessera.binary.opening.off: Closed
+tessera.binary.opening.on: Open
+tessera.binary.plug.off: Unplugged
+tessera.binary.plug.on: Plugged in
+tessera.binary.power.off: "Off"
+tessera.binary.power.on: "On"
+tessera.binary.presence.off: Away
+tessera.binary.presence.on: Home
+tessera.binary.problem.off: "OK"
+tessera.binary.problem.on: Problem
+tessera.binary.running.off: Not running
+tessera.binary.running.on: Running
+tessera.binary.safety.off: Safe
+tessera.binary.safety.on: Unsafe
+tessera.binary.smoke.off: Clear
+tessera.binary.smoke.on: Detected
+tessera.binary.sound.off: Clear
+tessera.binary.sound.on: Detected
+tessera.binary.tamper.off: Clear
+tessera.binary.tamper.on: Tampering detected
+tessera.binary.update.off: Up-to-date
+tessera.binary.update.on: Update available
+tessera.binary.vibration.off: Clear
+tessera.binary.vibration.on: Detected
+tessera.binary.window.off: Closed
+tessera.binary.window.on: Open
+tessera.last.date: "Last {{.D}}"
+tessera.last.time: "Last {{.T}}"
+tessera.last.yest: "Yest. {{.T}}"
+tessera.last.yesterday: "Yesterday {{.T}}"
+tessera.lock.jammed: Jammed
+tessera.lock.locked: Locked
+tessera.lock.locking: Locking
+tessera.lock.open: Open
+tessera.lock.opening: Opening
+tessera.lock.unlocked: Unlocked
+tessera.lock.unlocking: Unlocking
+tessera.never: Never run
+tessera.paused: "Paused {{.T}}"
+tessera.ago: "{{.T}} ago"
+tessera.connected: Set up this screen in Tessera
+tessera.empty: "Configure and add tiles to this screen ({{.Name}}) in Tessera."
+tessera.enable: Turn on landscape or portrait in Settings, Home control, Tessera.
+tessera.in: "in {{.T}}"
+tessera.install: Install Tessera Screen Manager in Home Assistant, then add this screen to it.
+tessera.now: Just now
+tessera.off: Tessera is off
+tessera.refused: Refused
+tessera.running: Running...
+tessera.lapsed: Tessera not active
+tessera.key.activate: Activate
+tessera.key.press: Press
+tessera.key.run: Run
+tessera.silent: No answer
+tessera.updating: Updating…
+tessera.waiting: Install Tessera
 theme.default: Default
 theme.title: Theme
 tone.alert: Alert

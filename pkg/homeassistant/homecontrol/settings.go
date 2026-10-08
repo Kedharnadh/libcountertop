@@ -16,8 +16,14 @@ type Setting = setting.Setting[config.Home]
 const Group setting.Group = "Home"
 
 const (
-	enabled = "enabled"
-	combine = "combine"
+	enabled        = "enabled"
+	combine        = "combine"
+	mode           = "mode"
+	tesseraColumns = "tessera.columns"
+	tesseraRows    = "tessera.rows"
+	tesseraReturn  = "tessera.home_after_idle"
+	tesseraWide    = "tessera.landscape"
+	tesseraTall    = "tessera.portrait"
 )
 
 func (e *Engine) Controls() *setting.Controls[config.Home] { return e.knobs }
@@ -40,6 +46,31 @@ func (e *Engine) table() *setting.Table[config.Home] {
 		setting.Flag(
 			Setting{Name: combine, Group: Group, Icon: "mdi:set-merge"},
 			func(h *config.Home) *bool { return &h.Combine },
+		),
+		setting.Pick(
+			Setting{Name: mode, Group: Group, Icon: "mdi:view-dashboard-variant"},
+			config.HomeModes(),
+			func(h *config.Home) *config.HomeMode { return &h.Mode },
+		),
+		e.gridRow(
+			Setting{Name: tesseraColumns, Group: Group, Icon: "mdi:view-column"},
+			func(g *config.TesseraGrid) *int { return &g.Columns },
+		),
+		e.gridRow(
+			Setting{Name: tesseraRows, Group: Group, Icon: "mdi:view-sequential"},
+			func(g *config.TesseraGrid) *int { return &g.Rows },
+		),
+		setting.Flag(
+			Setting{Name: tesseraReturn, Group: Group, Icon: "mdi:home-import-outline"},
+			func(h *config.Home) *bool { return &h.Return },
+		),
+		setting.Flag(
+			Setting{Name: tesseraWide, Group: Group, Icon: "mdi:phone-rotate-landscape"},
+			func(h *config.Home) *bool { return &h.Wide },
+		),
+		setting.Flag(
+			Setting{Name: tesseraTall, Group: Group, Icon: "mdi:phone-rotate-portrait"},
+			func(h *config.Home) *bool { return &h.Tall },
 		),
 	}
 	for _, s := range e.selections {
@@ -106,6 +137,12 @@ func (e *Engine) store(s Setting, v string) error {
 		e.options.Client.Enable(e.Enabled())
 		e.cache.clear()
 	}
+	switch s.Name {
+	case enabled, mode, tesseraWide, tesseraTall:
+		e.Speaking.Emit(e.Speaks())
+	case tesseraColumns, tesseraRows:
+		e.Regrid.Emit(e.Grid())
+	}
 	e.options.Shell.Redraw()
 	return err
 }
@@ -114,4 +151,14 @@ func (e *Engine) set(name, v string) {
 	if err := e.knobs.Change(name, v); err != nil {
 		slog.Error("the home control setting could not be saved", "setting", name, "err", err)
 	}
+}
+
+func (e *Engine) gridRow(s Setting, field func(*config.TesseraGrid) *int) Setting {
+	s.Min, s.Max = 1, config.TesseraMost
+	s = setting.Count(s, func(h *config.Home) *int { return field(&h.Tessera) })
+	s.Read = func(h *config.Home) string {
+		g := h.Tessera.Or(e.options.Grid)
+		return strconv.Itoa(*field(&g))
+	}
+	return s
 }

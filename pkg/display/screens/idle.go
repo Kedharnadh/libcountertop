@@ -24,6 +24,9 @@ func (a *App) idleScreen(v *idleview.View) *Screen {
 }
 
 func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
+	if a.o.Tessera != nil {
+		a.o.Tessera.Rested()
+	}
 	vw, vh := w.WindowSize()
 	cfg := a.o.Settings()
 	pal := a.ui.Palette()
@@ -58,7 +61,7 @@ func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
 				layers,
 				widgets.Placed(
 					ui.Rect{W: vw, H: vh},
-					widgets.Picture(clockview.ImageSource("poster/"+behind, backdrop), vw, vh),
+					widgets.Picture(widgets.ImageSource("poster/"+behind, backdrop), vw, vh),
 				),
 			)
 		}

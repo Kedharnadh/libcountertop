@@ -93,6 +93,8 @@ func (kit *Toolkit) Row(
 		content = append(content, render.Grip(kit.Slider(level)))
 	case menu.Field:
 		content = append(content, render.Field(page+"/"+id, r))
+	case menu.Segments:
+		content = append(content, kit.segments(id, r, tap))
 	case menu.Chevron:
 		if r.Value != "" {
 			content = append(content, gogui.Label(r.Value, secondary()))
@@ -151,4 +153,53 @@ func (kit *Toolkit) Tile(
 	}
 	kit.controls().Tile(&cfg, Chosen(selected))
 	return kit.Pressable(gogui.Column, cfg, interaction.Tapped(tap, 0))
+}
+
+func (kit *Toolkit) segments(id string, r menu.Row, tap func(int)) gogui.View {
+	var chips []gogui.View
+	for i, option := range r.Options {
+		st := gogui.CurrentTheme().Cfg.TextStyleDef
+		cfg := gogui.ContainerCfg{
+			ID:      fmt.Sprintf("%s-segment-%d", id, i),
+			Padding: gogui.PaddingMedium,
+			VAlign:  gogui.VAlignMiddle,
+		}
+		kit.Tab(&cfg, &st, Chosen(i == r.Level))
+		cfg.Content = []gogui.View{gogui.Label(option, st)}
+		if i < len(r.Marks) {
+			if mark := markView(
+				fmt.Sprintf("%s-mark-%d", id, i),
+				r.Marks[i],
+				st.Size*1.1,
+			); mark != nil {
+				cfg.Spacing = gogui.SpacingSmall
+				cfg.Content = append([]gogui.View{mark}, cfg.Content...)
+			}
+		}
+		chips = append(chips, kit.Pressable(gogui.Row, cfg, func(e gogui.EventCtx) {
+			if tap != nil && i != r.Level {
+				tap(i)
+			}
+			e.Consume()
+			e.Window.InvalidateLayout()
+		}))
+	}
+	return gogui.Row(gogui.ContainerCfg{
+		Padding: gogui.NoPadding,
+		Spacing: gogui.SpacingSmall,
+		Content: chips,
+	})
+}
+
+func markView(id string, m menu.Mark, side float32) gogui.View {
+	switch {
+	case m.SVG != "":
+		return gogui.Svg(gogui.SvgCfg{ID: id, SvgData: m.SVG, Width: side, Height: side})
+	case m.Image != nil:
+		b := m.Image.Bounds()
+		width := side * float32(b.Dx()) / float32(b.Dy())
+		src := ImageSource(fmt.Sprintf("mark/%p", m.Image), m.Image)
+		return gogui.Image(gogui.ImageCfg{ID: id, Src: src, Width: width, Height: side})
+	}
+	return nil
 }

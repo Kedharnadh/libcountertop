@@ -38,6 +38,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/input/touch"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
+	tesseraview "github.com/ygelfand/libcountertop/pkg/tessera/widgets"
 )
 
 //go:embed esphome.svg
@@ -123,6 +124,7 @@ type Options struct {
 
 	Brand    func() theme.Theme
 	Logo     func() image.Image
+	Mark     func() image.Image
 	Night    func() image.Image
 	Offering func() string
 
@@ -140,6 +142,7 @@ type Options struct {
 	Tabs      *dashboard.Tabs
 	Home      *homecontrol.Engine
 	HomeHA    homeview.Client
+	Tessera   *tesseraview.View
 	Forecast  Weather
 
 	WeatherPage func() shell.View
@@ -201,8 +204,13 @@ func New(o Options) *App {
 		WeatherPage: o.WeatherPage,
 		Shell:       o.Shell,
 		Logo:        esphomeLogo,
+		TesseraMark: tesseraview.Mark,
+		NativeMark:  o.Mark,
 		UI:          o.UI,
 	})
+	if o.Tessera != nil {
+		a.home.Listen(o.Tessera)
+	}
 	return a
 }
 

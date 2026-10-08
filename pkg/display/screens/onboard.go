@@ -9,6 +9,7 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/display/clockview"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
+	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/say"
 )
 
@@ -159,7 +160,7 @@ func (a *App) onboardWords(
 		Content: []gogui.View{
 			gogui.Image(
 				gogui.ImageCfg{
-					Src:    clockview.ImageSource("logo/light", mark),
+					Src:    widgets.ImageSource("logo/light", mark),
 					Width:  markH * float32(mw) / float32(max(mh, 1)),
 					Height: markH,
 				},

@@ -3,6 +3,9 @@ package homeview
 import (
 	"errors"
 	"fmt"
+	"image"
+	"slices"
+	"strconv"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
@@ -59,24 +62,35 @@ func (view *Renderer) Body(w *gogui.Window) gogui.View {
 		)
 	}
 
-	views := []gogui.View{master}
-	for i, s := range view.options.Engine.Selections() {
-		views = append(views, view.options.UI.Row(fmt.Sprintf("sel-%d", i), "home",
-			menu.Row{Label: s.Name(), Kind: menu.Chevron, Value: homecontrol.Summary(s.Pick())},
-			func(int) { view.options.Shell.Push(view.options.Engine.SelectionPage(s)) }, false))
+	engine := view.options.Engine
+	modes := schema.HomeModes()
+	speaks := slices.Index(modes, engine.Speaks())
+	labels := make([]string, len(modes))
+	for i, m := range modes {
+		labels[i] = m.Label()
 	}
-	wc := view.options.Weather.Read()
-	says := say.T("weather.off")
-	if wc.Entity != "" {
-		says = wc.Entity
+	views := []gogui.View{
+		master,
+		view.options.UI.Row(
+			"mode",
+			"home",
+			menu.Row{
+				Label:   say.T("home.mode"),
+				Kind:    menu.Segments,
+				Options: labels,
+				Marks:   view.marks(modes),
+				Level:   speaks,
+			},
+			func(i int) { engine.SetMode(modes[i]) },
+			false,
+		),
+		view.options.UI.Row("native", "home",
+			menu.Row{Label: schema.HomeNative.Label(), Kind: menu.Chevron, Dim: !engine.Native()},
+			func(int) { view.options.Shell.Push(view.NativePage()) }, false),
+		view.options.UI.Row("tessera", "home",
+			menu.Row{Label: schema.HomeTessera.Label(), Kind: menu.Chevron, Dim: !engine.Tessera()},
+			func(int) { view.options.Shell.Push(view.TesseraPage()) }, false),
 	}
-	views = append(views, view.options.UI.Row("weather", "home",
-		menu.Row{Label: say.T("weather.title"), Kind: menu.Chevron, Value: says},
-		func(int) { view.options.Shell.Push(view.options.WeatherPage()) }, false))
-	views = append(views, Separator())
-	views = append(views, view.options.UI.Row("refresh", "home",
-		menu.Row{Label: say.T("home.refresh")},
-		func(int) { view.options.Engine.Refresh() }, false))
 	return Column(views)
 }
 
@@ -386,9 +400,22 @@ type Dependencies struct {
 	WeatherPage func() shell.View
 	Shell       *shell.Shell
 	Logo        string
+	TesseraMark string
+	NativeMark  func() image.Image
 	UI          *widgets.UI
 }
-type Renderer struct{ options Dependencies }
+
+type Listener interface {
+	Hint() (title, body string)
+	Turns() bool
+}
+
+type Renderer struct {
+	options Dependencies
+	tessera Listener
+}
+
+func (view *Renderer) Listen(l Listener) { view.tessera = l }
 
 func New(o Dependencies) *Renderer { return &Renderer{options: o} }
 func reach() float32               { return style.Reach() }
@@ -402,4 +429,108 @@ func icon(glyph string, c gogui.Color) gogui.View {
 	st := gogui.CurrentTheme().TextStyleIconMedium
 	st.Color = c
 	return gogui.Label(glyph, st)
+}
+
+func (view *Renderer) NativePage() *shell.Page {
+	return &shell.Page{
+		Title: schema.HomeNative.Label(),
+		Build: func() ([]menu.Row, []func(int)) {
+			engine := view.options.Engine
+			var (
+				rows []menu.Row
+				taps []func(int)
+			)
+			for _, s := range engine.Selections() {
+				rows = append(rows, menu.Row{
+					Label: s.Name(),
+					Kind:  menu.Chevron,
+					Value: homecontrol.Summary(s.Pick()),
+				})
+				taps = append(taps, func(int) { view.options.Shell.Push(engine.SelectionPage(s)) })
+			}
+			says := say.T("weather.off")
+			if wc := view.options.Weather.Read(); wc.Entity != "" {
+				says = wc.Entity
+			}
+			rows = append(rows,
+				menu.Row{Label: say.T("weather.title"), Kind: menu.Chevron, Value: says},
+				menu.Row{Label: say.T("home.refresh")},
+			)
+			taps = append(taps,
+				func(int) { view.options.Shell.Push(view.options.WeatherPage()) },
+				func(int) { engine.Refresh() },
+			)
+			return rows, taps
+		},
+	}
+}
+
+func (view *Renderer) TesseraPage() *shell.Page {
+	return &shell.Page{
+		Title: schema.HomeTessera.Label(),
+		Build: func() ([]menu.Row, []func(int)) {
+			engine := view.options.Engine
+			g := engine.Grid()
+			back := engine.ReturnHome()
+			rows := []menu.Row{
+				gridRow(say.T("home.tessera.columns"), g.Columns),
+				gridRow(say.T("home.tessera.rows"), g.Rows),
+				{Label: say.T("home.tessera.return"), Kind: menu.Toggle, On: back},
+			}
+			taps := []func(int){
+				func(level int) { engine.SetGrid(schema.TesseraGrid{Columns: gridOf(level), Rows: g.Rows}) },
+				func(level int) { engine.SetGrid(schema.TesseraGrid{Columns: g.Columns, Rows: gridOf(level)}) },
+				func(int) { engine.SetReturnHome(!back) },
+			}
+			if t := view.tessera; t != nil && t.Turns() {
+				wide, tall := engine.Landscape(), engine.Portrait()
+				rows = append(rows,
+					menu.Row{Label: say.T("home.tessera.landscape"), Kind: menu.Toggle, On: wide},
+					menu.Row{Label: say.T("home.tessera.portrait"), Kind: menu.Toggle, On: tall},
+				)
+				taps = append(taps,
+					func(int) { engine.SetLandscape(!wide) },
+					func(int) { engine.SetPortrait(!tall) },
+				)
+			}
+			if t := view.tessera; t != nil && engine.Tessera() {
+				if title, body := t.Hint(); title != "" {
+					rows = append([]menu.Row{{Label: title, Hint: body}}, rows...)
+					taps = append([]func(int){nil}, taps...)
+				}
+			}
+			return rows, taps
+		},
+	}
+}
+
+func gridRow(label string, n int) menu.Row {
+	return menu.Row{
+		Label: label,
+		Kind:  menu.Slider,
+		Level: gridLevel(n),
+		Snap:  func(level int) int { return gridLevel(gridOf(level)) },
+		Value: strconv.Itoa(n),
+	}
+}
+
+func gridOf(level int) int {
+	return min(max(1+(level*(schema.TesseraMost-1)+50)/100, 1), schema.TesseraMost)
+}
+
+func gridLevel(n int) int { return (n - 1) * 100 / (schema.TesseraMost - 1) }
+
+func (view *Renderer) marks(modes []schema.HomeMode) []menu.Mark {
+	out := make([]menu.Mark, len(modes))
+	for i, m := range modes {
+		switch m {
+		case schema.HomeTessera:
+			out[i].SVG = view.options.TesseraMark
+		case schema.HomeNative:
+			if view.options.NativeMark != nil {
+				out[i].Image = view.options.NativeMark()
+			}
+		}
+	}
+	return out
 }

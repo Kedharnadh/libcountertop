@@ -8,6 +8,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	ha "github.com/ygelfand/libcountertop/pkg/homeassistant"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant/states"
+	"github.com/ygelfand/libcountertop/pkg/hook"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
@@ -30,8 +31,12 @@ type Dependencies struct {
 	Client   Client
 	States   States
 	Shell    *shell.Shell
+	Grid     config.TesseraGrid
 }
 type Engine struct {
+	Speaking hook.Hook[config.HomeMode]
+	Regrid   hook.Hook[config.TesseraGrid]
+
 	options    Dependencies
 	ctx        context.Context
 	stop       context.CancelFunc

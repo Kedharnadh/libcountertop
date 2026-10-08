@@ -159,7 +159,7 @@ func (a *App) upgradeCard(w *gogui.Window) gogui.View {
 	if theme.Dark(pal.Background) {
 		img, key = a.o.Night(), "logo/night"
 	}
-	return widgets.UpgradeCard(w, up, pal, clockview.ImageSource(key, img))
+	return widgets.UpgradeCard(w, up, pal, widgets.ImageSource(key, img))
 }
 
 func iconStyle(c gogui.Color) gogui.TextStyle {
@@ -167,8 +167,6 @@ func iconStyle(c gogui.Color) gogui.TextStyle {
 	st.Color = c
 	return st
 }
-
-func icon(glyph string, c gogui.Color) gogui.View { return gogui.Label(glyph, iconStyle(c)) }
 
 func secondary() gogui.TextStyle {
 	t := gogui.CurrentTheme().Cfg

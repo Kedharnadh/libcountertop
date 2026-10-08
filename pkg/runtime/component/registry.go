@@ -145,7 +145,7 @@ func (r *Registry[T]) AddTo(g *service.Group) {
 		if !starts && !closes {
 			continue
 		}
-		g.Add(oneshot{e.c}, append(slices.Clone(e.opts), service.Once())...)
+		g.Add(oneshot{e.c}, append([]service.Option{service.Once()}, e.opts...)...)
 	}
 }
 

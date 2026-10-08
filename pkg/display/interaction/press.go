@@ -158,9 +158,17 @@ func (p *Presses) Pressable(
 		}
 	}
 	cfg.OnMouseUp = fire
+	inner := cfg.OnGesture
 	cfg.OnGesture = func(e gogui.EventCtx) {
+		if inner != nil {
+			inner(e)
+		}
 		switch {
 		case e.Event == nil:
+		case e.Event.IsHandled:
+			if p.armed == id {
+				p.Release(e)
+			}
 		case e.Event.GestureType == gogui.GesturePan:
 			if p.armed == id {
 				p.Release(e)

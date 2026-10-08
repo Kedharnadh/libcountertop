@@ -57,12 +57,36 @@ func Summary(p config.HomePick) string {
 }
 
 func (s Selection) Controlled() bool {
-	return s.engine.Enabled() && s.engine.options.Settings.Read().Control[s.Key]
+	return s.engine.Native() && s.engine.options.Settings.Read().Control[s.Key]
 }
 
 func (e *Engine) Enabled() bool { return e.options.Settings.Read().Enabled }
 
 func (e *Engine) SetEnabled(on bool) { e.set(enabled, setting.OnOff(on)) }
+
+func (e *Engine) Speaks() config.HomeMode {
+	h := e.options.Settings.Read()
+	if !h.Enabled {
+		return ""
+	}
+	return h.Speaks()
+}
+
+func (e *Engine) Native() bool { return e.Speaks() == config.HomeNative }
+
+func (e *Engine) Tessera() bool { return e.Speaks() == config.HomeTessera }
+
+func (e *Engine) SetMode(m config.HomeMode) { e.set(mode, string(m)) }
+
+func (e *Engine) Grid() config.TesseraGrid {
+	return e.options.Settings.Read().Tessera.Or(e.options.Grid)
+}
+
+func (e *Engine) SetGrid(g config.TesseraGrid) {
+	g = g.Or(e.Grid())
+	e.set(tesseraColumns, strconv.Itoa(g.Columns))
+	e.set(tesseraRows, strconv.Itoa(g.Rows))
+}
 
 func (s Selection) GroupFrom() int { return s.engine.options.Settings.Read().Grouped(s.Key) }
 
@@ -138,3 +162,15 @@ type Home struct{}
 func (e *Engine) Page() *Home        { return e.home }
 func (*Home) Covers() bool           { return true }
 func (*Home) Timeout() time.Duration { return shell.SettingsTimeout }
+
+func (e *Engine) ReturnHome() bool { return e.options.Settings.Read().Return }
+
+func (e *Engine) SetReturnHome(on bool) { e.set(tesseraReturn, setting.OnOff(on)) }
+
+func (e *Engine) Landscape() bool { return e.Tessera() && e.options.Settings.Read().Wide }
+
+func (e *Engine) Portrait() bool { return e.Tessera() && e.options.Settings.Read().Tall }
+
+func (e *Engine) SetLandscape(on bool) { e.set(tesseraWide, setting.OnOff(on)) }
+
+func (e *Engine) SetPortrait(on bool) { e.set(tesseraTall, setting.OnOff(on)) }

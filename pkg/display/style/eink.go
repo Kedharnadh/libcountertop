@@ -8,7 +8,7 @@ const Eink = "eink"
 
 var einkStyle = Style{
 	Name:    Eink,
-	Palette: "Paper",
+	Palette: "Ink",
 	Family:  sans,
 	Kit:     eink{},
 	Shape: func(c *gogui.ThemeCfg) {

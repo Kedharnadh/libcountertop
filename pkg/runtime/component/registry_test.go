@@ -2,11 +2,14 @@ package component
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"testing"
 	"time"
 
 	esphome "github.com/ygelfand/go-esphome-device"
+
+	"github.com/ygelfand/libcountertop/pkg/runtime/service"
 )
 
 type testConfig struct{}
@@ -159,5 +162,41 @@ func TestRegisterTakesATypedMaker(t *testing.T) {
 	all := r.All()
 	if len(all) != 1 || all[0].Name() != "typed" {
 		t.Fatalf("registered %v, want the typed component", all)
+	}
+}
+
+type late struct {
+	bare
+	tries int
+	up    chan struct{}
+}
+
+func (l *late) Start(context.Context) error {
+	l.tries++
+	if l.tries == 1 {
+		return errors.New("not there yet")
+	}
+	close(l.up)
+	return nil
+}
+
+func TestOneShotKeepsItsRestartPolicy(t *testing.T) {
+	r := New[testConfig](nil)
+	radio := &late{bare: bare{"bluetooth"}, up: make(chan struct{})}
+	r.Add(Hardware, val(radio), Supervise(service.Restart(time.Millisecond, time.Millisecond)))
+
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+	done := make(chan error, 1)
+	go func() { done <- r.Group().Run(ctx) }()
+
+	select {
+	case <-radio.up:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("a one-shot that asked for restarts was started %d times, never again", radio.tries)
+	}
+	stop()
+	if err := <-done; err != nil {
+		t.Fatalf("Run: %v", err)
 	}
 }

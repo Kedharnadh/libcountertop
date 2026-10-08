@@ -69,6 +69,7 @@ type Driver struct {
 	dropped  error
 
 	Released hook.Hook[Priority]
+	Attached hook.Hook[struct{}]
 
 	info string
 
@@ -193,6 +194,7 @@ func (d *Driver) Start(ctx context.Context) error {
 		slog.Error("backlight", "err", err)
 	}
 	slog.Info("panel", "geometry", info, "brightness", brightness)
+	d.Attached.Emit(struct{}{})
 	return nil
 }
 

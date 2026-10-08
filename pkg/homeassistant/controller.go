@@ -202,7 +202,7 @@ func (h *Controller) reprobe(conn sender) {
 }
 
 func (h *Controller) probe(ctx context.Context, conn sender) {
-	_, err := h.call(ctx, carrier, carrierData(), "ok")
+	_, err := h.call(ctx, carrier, carrierData(), nil, "ok")
 	switch {
 	case err == nil:
 		h.settle(conn, Allowed)
@@ -258,12 +258,21 @@ func (h *Controller) lost(conn sender) {
 }
 
 func (h *Controller) Call(ctx context.Context, action string, data map[string]string) error {
-	_, err := h.call(ctx, action, data, "")
+	_, err := h.call(ctx, action, data, nil, "")
+	return err
+}
+
+func (h *Controller) Perform(
+	ctx context.Context,
+	action string,
+	data, templates map[string]string,
+) error {
+	_, err := h.call(ctx, action, data, templates, "")
 	return err
 }
 
 func (h *Controller) Template(ctx context.Context, tmpl string) (json.RawMessage, error) {
-	raw, err := h.call(ctx, carrier, carrierData(), tmpl)
+	raw, err := h.call(ctx, carrier, carrierData(), nil, tmpl)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +299,7 @@ func carrierData() map[string]string {
 func (h *Controller) call(
 	ctx context.Context,
 	action string,
-	data map[string]string,
+	data, templates map[string]string,
 	tmpl string,
 ) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
@@ -324,9 +333,14 @@ func (h *Controller) call(
 	for k, v := range data {
 		fields = append(fields, &api.HomeassistantServiceMap{Key: k, Value: v})
 	}
+	shaped := make([]*api.HomeassistantServiceMap, 0, len(templates))
+	for k, v := range templates {
+		shaped = append(shaped, &api.HomeassistantServiceMap{Key: k, Value: v})
+	}
 	req := &api.HomeassistantActionRequest{
 		Service:          action,
 		Data:             fields,
+		DataTemplate:     shaped,
 		CallId:           id,
 		WantsResponse:    tmpl != "",
 		ResponseTemplate: tmpl,

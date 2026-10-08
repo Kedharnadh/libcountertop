@@ -75,24 +75,67 @@ func (a *App) root(w *gogui.Window) gogui.View {
 
 func (a *App) dashboard(w *gogui.Window) gogui.View {
 	vw, vh := w.WindowSize()
-	cfg := a.o.Settings()
 	pal := a.ui.Palette()
+	tabs := a.o.Tabs.List()
+	showing, _ := a.o.Tabs.Showing()
+	margin := int(reach() * 0.5)
+	strip := ui.Rect{X: margin, Y: margin, W: vw - 2*margin, H: int(reach() * 2)}
+	top := 0
+	if len(tabs) > 0 {
+		top = strip.Y + strip.H
+	}
+
+	var layers []gogui.View
+	if a.o.Home != nil && a.o.Home.Tessera() {
+		layers = a.tesseraDash(w, vw, vh, top, margin)
+	} else {
+		layers = a.nativeDash(w, vw, vh, top, margin, pal)
+	}
+	if len(tabs) > 0 {
+		layers = append(layers, a.tabStrip(strip, tabs, showing.Key))
+	}
+
+	dash := gogui.Column(gogui.ContainerCfg{
+		ID:      "dashboard",
+		Sizing:  gogui.FillFill,
+		Padding: gogui.NoPadding,
+		Content: layers,
+	})
+	return gogui.Column(
+		gogui.ContainerCfg{
+			Sizing:  gogui.FillFill,
+			Padding: gogui.NoPadding,
+			Color:   color(pal.Background),
+			Content: []gogui.View{dash},
+		},
+	)
+}
+
+func (a *App) tesseraDash(w *gogui.Window, vw, vh, top, margin int) []gogui.View {
+	if a.o.Tessera == nil {
+		return nil
+	}
+	inset := ui.Rect{X: margin, Y: top + margin, W: vw - 2*margin, H: vh - top - 2*margin}
+	if n := a.o.Tessera.Notice(inset); n != nil {
+		return []gogui.View{widgets.Placed(inset, n)}
+	}
+	return a.o.Tessera.Draw(w, ui.Rect{Y: top, W: vw, H: vh - top})
+}
+
+func (a *App) nativeDash(w *gogui.Window, vw, vh, top, margin int, pal theme.Theme) []gogui.View {
+	cfg := a.o.Settings()
 	ink := cfg.Clock.Ink.Over(pal)
 	r := face.Read(time.Now(), cfg.Screen.Hours == schema.TwentyFourHour)
 	if !cfg.Clock.Date {
 		r = r.Undated()
 	}
 	box := dashboard.Box(cfg.Clock.Position, cfg.Clock.Size, vw, vh)
-	tabs := a.o.Tabs.List()
-	showing, tabbed := a.o.Tabs.Showing()
-	kind, drawn := a.boards[showing.Kind]
-	margin := int(reach() * 0.5)
-	strip := ui.Rect{X: margin, Y: margin, W: vw - 2*margin, H: int(reach() * 2)}
-	if len(tabs) > 0 && box.Y < strip.Y+strip.H {
-		shift := strip.Y + strip.H - box.Y
+	if top > box.Y {
+		shift := top - box.Y
 		box.Y += shift
 		box.H = max(box.H-shift, 1)
 	}
+	showing, tabbed := a.o.Tabs.Showing()
 
 	var layers []gogui.View
 	if backdrop, behind := a.o.Poster.
@@ -106,53 +149,27 @@ func (a *App) dashboard(w *gogui.Window) gogui.View {
 			layers,
 			widgets.Placed(
 				ui.Rect{W: vw, H: vh},
-				widgets.Picture(clockview.ImageSource("poster/"+behind, backdrop), vw, vh),
+				widgets.Picture(widgets.ImageSource("poster/"+behind, backdrop), vw, vh),
 			),
 		)
 	}
-
-	switch build, ok := clockview.Of(cfg.Clock.Face); {
-	case tabbed && drawn:
-		below := strip.Y + strip.H + margin
-		layers = append(
-			layers,
-			kind.Draw(
-				ui.Rect{X: margin, Y: below, W: vw - 2*margin, H: vh - below - margin},
-				showing,
-				pal,
-			),
-		)
-	case ok:
+	if kind, drawn := a.boards[showing.Kind]; tabbed && drawn {
+		below := top + margin
+		return append(layers, kind.Draw(
+			ui.Rect{X: margin, Y: below, W: vw - 2*margin, H: vh - below - margin},
+			showing,
+			pal,
+		))
+	}
+	if build, ok := clockview.Of(cfg.Clock.Face); ok {
 		layers = append(layers, widgets.Placed(box, build(w, box, r, ink)))
 	}
-	if wc := cfg.Weather; wc.Dashboard && (!tabbed || !drawn) {
-		top := float32(0)
-		if len(tabs) > 0 {
-			top = float32(strip.Y + strip.H)
-		}
-		if v := a.weatherLayer(w, vw, vh, top, pal); v != nil {
+	if cfg.Weather.Dashboard {
+		if v := a.weatherLayer(w, vw, vh, float32(top), pal); v != nil {
 			layers = append(layers, v)
 		}
 	}
-	if len(tabs) > 0 {
-		layers = append(layers, a.tabStrip(strip, tabs, showing.Key))
-	}
-
-	frame := gogui.ContainerCfg{
-		ID:      "dashboard",
-		Sizing:  gogui.FillFill,
-		Padding: gogui.NoPadding,
-		Content: layers,
-	}
-	dash := gogui.Column(frame)
-	return gogui.Column(
-		gogui.ContainerCfg{
-			Sizing:  gogui.FillFill,
-			Padding: gogui.NoPadding,
-			Color:   color(pal.Background),
-			Content: []gogui.View{dash},
-		},
-	)
+	return layers
 }
 
 func (a *App) page(w *gogui.Window, p *Screen) gogui.View {

@@ -1,10 +1,17 @@
 package menu
 
 import (
+	"image"
+
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
+
+type Mark struct {
+	SVG   string
+	Image image.Image
+}
 
 type Kind int
 
@@ -14,6 +21,7 @@ const (
 	Toggle
 	Slider
 	Field
+	Segments
 )
 
 type Row struct {
@@ -24,6 +32,9 @@ type Row struct {
 	Snap func(level int) int
 
 	Value string
+
+	Options []string
+	Marks   []Mark
 
 	Kind  Kind
 	On    bool

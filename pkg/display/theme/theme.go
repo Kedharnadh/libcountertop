@@ -55,6 +55,23 @@ type Theme struct {
 	Success Color
 	Warning Color
 	Danger  Color
+
+	Roles Roles
+}
+
+type Roles struct {
+	Warm   Color
+	Heat   Color
+	Cool   Color
+	Air    Color
+	Motion Color
+	Media  Color
+	Choice Color
+	Level  Color
+}
+
+func (r Roles) All() []Color {
+	return []Color{r.Warm, r.Heat, r.Cool, r.Air, r.Motion, r.Media, r.Choice, r.Level}
 }
 
 var (

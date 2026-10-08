@@ -78,3 +78,16 @@ func TestAllKeepsTheManualPicks(t *testing.T) {
 		t.Errorf("after All on and off: %+v", got)
 	}
 }
+
+func TestATesseraGridKeepsAPageWithinItsCells(t *testing.T) {
+	for _, tt := range []struct{ in, fallback, want TesseraGrid }{
+		{TesseraGrid{}, TesseraGrid{Columns: 8, Rows: 5}, TesseraGrid{Columns: 8, Rows: 5}},
+		{TesseraGrid{Columns: 12, Rows: 12}, TesseraGrid{}, TesseraGrid{Columns: 12, Rows: 5}},
+		{TesseraGrid{Columns: 20, Rows: 2}, TesseraGrid{}, TesseraGrid{Columns: 12, Rows: 2}},
+		{TesseraGrid{Columns: 8, Rows: 8}, TesseraGrid{}, TesseraGrid{Columns: 8, Rows: 8}},
+	} {
+		if got := tt.in.Or(tt.fallback); got != tt.want {
+			t.Errorf("%+v.Or(%+v) = %+v, want %+v", tt.in, tt.fallback, got, tt.want)
+		}
+	}
+}

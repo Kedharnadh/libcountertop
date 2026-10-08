@@ -2,6 +2,8 @@ package widgets
 
 import (
 	"fmt"
+	"image"
+	"image/draw"
 
 	gui "github.com/go-gui-org/go-gui/gui"
 
@@ -35,4 +37,20 @@ func NRGBA(img *ui.Image) []byte {
 
 func Picture(src string, w, h int) gui.View {
 	return gui.Image(gui.ImageCfg{Src: src, Width: float32(w), Height: float32(h)})
+}
+
+func ImageSource(key string, img image.Image) string {
+	if img == nil {
+		return ""
+	}
+	if gui.HasImage(key) {
+		return "mem:" + key
+	}
+	b := img.Bounds()
+	n, ok := img.(*image.NRGBA)
+	if !ok || n.Rect.Min != (image.Point{}) || n.Stride != b.Dx()*4 {
+		n = image.NewNRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
+		draw.Draw(n, n.Bounds(), img, b.Min, draw.Src)
+	}
+	return gui.UseImage(key, b.Dx(), b.Dy(), n.Pix)
 }
