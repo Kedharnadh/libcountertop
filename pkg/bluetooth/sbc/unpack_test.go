@@ -20,8 +20,6 @@ func TestTheBitReaderTakesBitsMostSignificantFirst(t *testing.T) {
 	}
 }
 
-// Running off the end is an error, not zeros. A frame claiming more than it holds would otherwise
-// decode to silence and read as a quiet passage.
 func TestReadingPastTheEndIsAnError(t *testing.T) {
 	r := &bitReader{buf: []byte{0xff}}
 
@@ -36,7 +34,9 @@ func TestReadingPastTheEndIsAnError(t *testing.T) {
 func TestAligningToAByte(t *testing.T) {
 	r := &bitReader{buf: make([]byte, 4)}
 
-	r.read(3)
+	if _, err := r.read(3); err != nil {
+		t.Fatal(err)
+	}
 	r.align()
 	if r.at != 8 {
 		t.Errorf("aligned to bit %d, want 8", r.at)
@@ -48,7 +48,6 @@ func TestAligningToAByte(t *testing.T) {
 	}
 }
 
-// built is a whole frame with its check byte set, so Unpack will accept it.
 func built(t *testing.T, mode, alloc, bitpool int, fill func(i int) byte) []byte {
 	t.Helper()
 
@@ -107,8 +106,6 @@ func TestUnpackingAFrame(t *testing.T) {
 	}
 }
 
-// A frame whose check byte does not match is refused rather than decoded. Decoding a corrupt frame
-// produces a burst of noise through the speaker, which is worse than a dropped frame.
 func TestACorruptFrameIsRefused(t *testing.T) {
 	frame := built(t, Stereo, Loudness, 53, func(i int) byte { return byte(i) })
 	frame[3] ^= 0xff
@@ -126,7 +123,6 @@ func TestAFrameThatHasNotAllArrived(t *testing.T) {
 	}
 }
 
-// Every mode has to unpack, since a phone chooses and we do not.
 func TestEveryModeUnpacks(t *testing.T) {
 	for _, mode := range []int{Mono, DualChannel, Stereo, JointStereo} {
 		for _, alloc := range []int{Loudness, SNR} {
@@ -148,10 +144,8 @@ func TestEveryModeUnpacks(t *testing.T) {
 	}
 }
 
-// Joint stereo carries nrof_subbands-1 flags in nrof_subbands bits: the last is reserved. Reading
-// the reserved bit as a flag makes the top subband decode as sum and difference when it is not.
 func TestJointStereoReadsOneFewerFlagThanBits(t *testing.T) {
-	// Set every bit of the join field, which is the first byte after the header.
+	// The join field is the first byte after the header.
 	frame := built(t, JointStereo, Loudness, 53, func(i int) byte {
 		if i == headerBytes {
 			return 0xff
@@ -164,7 +158,6 @@ func TestJointStereoReadsOneFewerFlagThanBits(t *testing.T) {
 		t.Fatalf("Unpack: %v", err)
 	}
 
-	// Seven flags for eight subbands, so the top one must not be joined however the bits read.
 	if f.Join&(1<<7) != 0 {
 		t.Error("the reserved bit was read as a join flag for the top subband")
 	}
@@ -173,9 +166,6 @@ func TestJointStereoReadsOneFewerFlagThanBits(t *testing.T) {
 	}
 }
 
-// Unjoining turns sum and difference back into two channels. Skipping it does not fail — it gives
-// audio where one channel is the mix and the other the difference, which sounds like a broken
-// stereo image rather than an error.
 func TestUnjoiningRecoversTheTwoChannels(t *testing.T) {
 	f := &Frame{
 		Header: Header{Mode: JointStereo, Blocks: 1, Subbands: 2},
@@ -196,13 +186,11 @@ func TestUnjoiningRecoversTheTwoChannels(t *testing.T) {
 		t.Errorf("the joined subband's right came back %d, want 60", f.Samples[0][1][0])
 	}
 
-	// The subband that was not joined is untouched.
 	if f.Samples[0][0][1] != 7 || f.Samples[0][1][1] != 9 {
 		t.Errorf("an unjoined subband changed: %d %d", f.Samples[0][0][1], f.Samples[0][1][1])
 	}
 }
 
-// Nothing to unjoin in the other modes, and running it anyway would corrupt them.
 func TestUnjoiningDoesNothingOutsideJointStereo(t *testing.T) {
 	f := &Frame{
 		Header:  Header{Mode: Stereo, Blocks: 1, Subbands: 1},
@@ -217,10 +205,7 @@ func TestUnjoiningDoesNothingOutsideJointStereo(t *testing.T) {
 	}
 }
 
-// A subband allocated no bits decodes to zero rather than being read from the stream, and reading
-// it anyway would shift everything after it.
 func TestASubbandWithNoBitsIsSilentAndConsumesNothing(t *testing.T) {
-	// A tiny bitpool, so most subbands get nothing.
 	frame := built(t, Mono, Loudness, 4, func(i int) byte { return byte(i * 3) })
 
 	f, err := Unpack(frame)

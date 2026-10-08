@@ -7,7 +7,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
-// Page describes a settings page independently of its renderer.
 type Page struct {
 	Title string
 

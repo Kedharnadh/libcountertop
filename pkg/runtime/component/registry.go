@@ -11,12 +11,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/runtime/service"
 )
 
-// Registry is everything registered, in the order it happens.
-//
-// Order is declared, never inferred. Components register from init, and Go decides that order from
-// the import graph — which is not something the boot screen coming up before the dashboard should
-// depend on. So entries sort by phase, then by a declared Order, then by name, and the result is the
-// same whatever the linker did.
 type Registry[T any] struct {
 	eligible func(uint64) bool
 	mu       sync.Mutex
@@ -33,28 +27,20 @@ type entry struct {
 	needs uint64
 }
 
-// resolve builds the component, once. Every walk goes through sorted, which resolves before anything
-// reads c.
 func (e *entry) resolve() { e.once.Do(func() { e.c = e.make() }) }
 
-// Option adjusts one registration.
 type Option func(*entry)
 
-// Order places a component within its phase. Lower comes first; equal orders fall back to the name.
 func Order(n int) Option { return func(e *entry) { e.order = n } }
 
-// Supervise passes the policy through to the supervisor, for a component with a loop.
 func Supervise(opts ...service.Option) Option {
 	return func(e *entry) { e.opts = append(e.opts, opts...) }
 }
 
-// New creates an empty registry with an optional capability filter. There is a process-wide one for components to register into; this is
-// for tests, which want their own.
 func Needs(capabilities uint64) Option { return func(e *entry) { e.needs |= capabilities } }
 
 func New[T any](eligible func(uint64) bool) *Registry[T] { return &Registry[T]{eligible: eligible} }
 
-// Add registers a component, built on first use and once.
 func (r *Registry[T]) Add(p Phase, make func() Component, opts ...Option) {
 	e := &entry{make: make, phase: p}
 	for _, o := range opts {
@@ -66,7 +52,6 @@ func (r *Registry[T]) Add(p Phase, make func() Component, opts ...Option) {
 	r.entries = append(r.entries, e)
 }
 
-// All is every component, in the order they come up.
 func (r *Registry[T]) All() []Component {
 	sorted := r.sorted()
 	out := make([]Component, 0, len(sorted))
@@ -76,7 +61,6 @@ func (r *Registry[T]) All() []Component {
 	return out
 }
 
-// Entities is everything the components show Home Assistant.
 func (r *Registry[T]) Entities() []esphome.Entity {
 	var out []esphome.Entity
 	for _, e := range r.sorted() {
@@ -87,7 +71,6 @@ func (r *Registry[T]) Entities() []esphome.Entity {
 	return out
 }
 
-// Actions is everything the components let Home Assistant call.
 func (r *Registry[T]) Actions() []*esphome.Action {
 	var out []*esphome.Action
 	for _, e := range r.sorted() {
@@ -98,7 +81,6 @@ func (r *Registry[T]) Actions() []*esphome.Action {
 	return out
 }
 
-// Handlers is the components that answer protocol messages themselves.
 func (r *Registry[T]) Handlers() []esphome.Handler {
 	var out []esphome.Handler
 	for _, e := range r.sorted() {
@@ -109,8 +91,6 @@ func (r *Registry[T]) Handlers() []esphome.Handler {
 	return out
 }
 
-// Progress is what every component that has something to say about coming up is doing, in the
-// order they start.
 func (r *Registry[T]) Progress() []Progress {
 	var out []Progress
 	for _, e := range r.sorted() {
@@ -126,7 +106,6 @@ func (r *Registry[T]) Progress() []Progress {
 	return out
 }
 
-// Ready reports whether everything the boot screen waits for is up.
 func (r *Registry[T]) Ready() bool {
 	for _, p := range r.Progress() {
 		if !p.Settled() {
@@ -136,8 +115,6 @@ func (r *Registry[T]) Ready() bool {
 	return true
 }
 
-// Restore puts every component back the way the device was left. Order matters and is the
-// registration order: the hardware has to be where it was before anything shows what it is doing.
 func (r *Registry[T]) Restore(c T) {
 	for _, e := range r.sorted() {
 		if v, ok := e.c.(Restorer[T]); ok {
@@ -146,18 +123,12 @@ func (r *Registry[T]) Restore(c T) {
 	}
 }
 
-// Group is the components as a supervisor, for a caller with nothing to wire either side.
 func (r *Registry[T]) Group() *service.Group {
 	g := service.New()
 	r.AddTo(g)
 	return g
 }
 
-// AddTo hands the components to a supervisor, in order. It adds rather than owning the group,
-// because the group starts in add order and there is still hand-wired work either side.
-//
-// A component with no loop is added too, as long as it has something to start or close: plenty of
-// what a device does at boot happens once and still belongs in the ordered list.
 func (r *Registry[T]) AddTo(g *service.Group) {
 	for _, e := range r.sorted() {
 		if svc, ok := e.c.(service.Service); ok {
@@ -174,11 +145,7 @@ func (r *Registry[T]) AddTo(g *service.Group) {
 	}
 }
 
-// oneshot gives a component with no loop the Run the supervisor needs. Returning nil immediately is
-// how service.Once reads a service that finished rather than one that died.
-//
-// Start and Close are forwarded by hand: embedding a Component promotes only the methods of that
-// interface, so the wrapper would otherwise hide the very halves it exists to run.
+// Embedding an interface promotes only that interface's methods.
 type oneshot struct{ Component }
 
 func (oneshot) Run(context.Context) error { return nil }
@@ -197,14 +164,11 @@ func (o oneshot) Close() error {
 	return nil
 }
 
-// sorted is the entries in the order everything walks them.
 func (r *Registry[T]) sorted() []*entry {
 	r.mu.Lock()
 	out := slices.Clone(r.entries)
 	r.mu.Unlock()
 
-	// Outside the lock: a constructor is the component's own code and has no business being run with
-	// the registry held.
 	if r.eligible != nil {
 		out = slices.DeleteFunc(out, func(e *entry) bool { return !r.eligible(e.needs) })
 	}

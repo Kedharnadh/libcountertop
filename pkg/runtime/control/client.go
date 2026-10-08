@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -13,7 +14,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Sequence reads newline-delimited scripts or semicolon-separated command-line sequences.
 func Sequence(stdin io.Reader, args []string) ([]string, error) {
 	if len(args) == 1 && args[0] == "-" {
 		var out []string
@@ -36,18 +36,30 @@ func Sequence(stdin io.Reader, args []string) ([]string, error) {
 	return out, nil
 }
 
-// Answer reads a terminal response without discarding output preceding a failure.
+const (
+	markOutput = "|"
+	markError  = "!"
+	endOK      = "ok"
+	endError   = "error"
+)
+
 func Answer(in *bufio.Scanner, out io.Writer) error {
+	var failed []string
 	for in.Scan() {
 		line := in.Text()
-		if line == "ok" {
+		switch {
+		case line == endOK:
 			return nil
-		}
-		if after, found := strings.CutPrefix(line, "error: "); found {
-			return fmt.Errorf("%s", after)
-		}
-		if _, err := fmt.Fprintln(out, line); err != nil {
-			return err
+		case line == endError:
+			return errors.New(strings.Join(failed, "\n"))
+		case strings.HasPrefix(line, markOutput):
+			if _, err := fmt.Fprintln(out, line[len(markOutput):]); err != nil {
+				return err
+			}
+		case strings.HasPrefix(line, markError):
+			failed = append(failed, line[len(markError):])
+		default:
+			return fmt.Errorf("unframed reply line %q", line)
 		}
 	}
 	if err := in.Err(); err != nil {
@@ -56,7 +68,6 @@ func Answer(in *bufio.Scanner, out io.Writer) error {
 	return fmt.Errorf("the daemon closed the connection")
 }
 
-// Send runs commands sequentially on one connection, stopping at the first failure.
 func Send(ctx context.Context, socket string, commands []string, out io.Writer) error {
 	dialer := net.Dialer{Timeout: 2 * time.Second}
 	conn, err := dialer.DialContext(ctx, "unix", socket)
@@ -87,7 +98,6 @@ type ClientOptions struct {
 	Local        func([]string) (string, error)
 }
 
-// ClientCommand exposes the same harness client syntax for each product daemon.
 func ClientCommand(options ClientOptions) *cobra.Command {
 	localHelp := ""
 	if options.Local != nil {
@@ -103,7 +113,7 @@ func ClientCommand(options ClientOptions) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 && args[0] == "-l" && options.Local != nil {
 				out, err := options.Local(args[1:])
-				fmt.Fprint(cmd.OutOrStdout(), out)
+				_, _ = fmt.Fprint(cmd.OutOrStdout(), out)
 				return err
 			}
 			if len(args) == 0 {
@@ -124,8 +134,6 @@ func ClientCommand(options ClientOptions) *cobra.Command {
 	}
 }
 
-// argumentSequence preserves argv boundaries, including spaces and semicolons within values.
-// A standalone semicolon separates commands; a single script argument uses Sequence instead.
 func argumentSequence(args []string) ([]string, error) {
 	var commands []string
 	var command []string

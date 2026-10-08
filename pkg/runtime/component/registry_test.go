@@ -11,12 +11,10 @@ import (
 
 type testConfig struct{}
 
-// bare is a component that is nothing but a name, which is all a component has to be.
 type bare struct{ name string }
 
 func (b bare) Name() string { return b.name }
 
-// full implements every optional half, and records what was called on it.
 type full struct {
 	bare
 	entity   *esphome.Switch
@@ -45,12 +43,8 @@ func names(cs []Component) []string {
 	return out
 }
 
-// val registers a component that is already built, which is what these tests want: they are about
-// ordering and wiring, not construction.
 func val(c Component) func() Component { return func() Component { return c } }
 
-// Phase decides first, then the declared order, then the name. Registration order decides nothing,
-// because it is Go's import graph and not a decision anybody made.
 func TestOrderIsDeclaredNotRegistered(t *testing.T) {
 	r := New[testConfig](nil)
 
@@ -67,7 +61,6 @@ func TestOrderIsDeclaredNotRegistered(t *testing.T) {
 	}
 }
 
-// once has work to do at start-up and no loop, which is what most boot-time setup looks like.
 type once struct {
 	bare
 	started chan struct{}
@@ -81,8 +74,6 @@ func newOnce(name string) *once {
 func (o *once) Start(context.Context) error { close(o.started); return nil }
 func (o *once) Close() error                { o.closed = true; return nil }
 
-// A component with nothing to do is skipped; one with a loop is supervised; and one that only has
-// work to do at start-up is still started, in its place in the order, rather than silently ignored.
 func TestWhatReachesTheSupervisor(t *testing.T) {
 	r := New[testConfig](nil)
 	loop, setup := newFull("speaker"), newOnce("procs")
@@ -116,7 +107,6 @@ func TestWhatReachesTheSupervisor(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 
-	// Run has returned, so everything the group did is visible here.
 	if !loop.ran {
 		t.Error("the component with a loop never ran")
 	}
@@ -125,7 +115,6 @@ func TestWhatReachesTheSupervisor(t *testing.T) {
 	}
 }
 
-// Entities, restores and samples all follow the same order, and skip the components that have none.
 func TestOptionalHalves(t *testing.T) {
 	r := New[testConfig](nil)
 	second, first := newFull("second"), newFull("first")
@@ -149,7 +138,6 @@ func TestOptionalHalves(t *testing.T) {
 	}
 }
 
-// Nothing registered is not a failure: a device with no hardware at all still starts.
 func TestEmptyRegistry(t *testing.T) {
 	r := New[testConfig](nil)
 

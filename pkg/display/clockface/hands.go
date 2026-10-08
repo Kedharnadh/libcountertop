@@ -7,14 +7,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
-// The geometry of a dial, kept apart from the face that draws one: this is trigonometry and the
-// face is a look, and the two change for different reasons.
-
-// hand is one hand as a tapered quadrilateral: wide at the tail, narrower at the tip, and carried a
-// little past the center so it looks pinned rather than balanced on a point.
-//
-// Degrees clockwise from twelve, which is how a clock is described and not how the maths works, so
-// the conversion happens here once instead of at each caller.
 func hand(cx, cy, length, width int, deg float64) []ui.Point {
 	dx, dy := heading(deg)
 	px, py := -dy, dx
@@ -35,9 +27,6 @@ func hand(cx, cy, length, width int, deg float64) []ui.Point {
 	}
 }
 
-// numerals puts 12, 3, 6 and 9 around the center, each centered on its own position rather than on
-// its line box: a numeral placed by its box sits low, because the box reserves a descent the digits
-// do not use.
 func numerals(s ui.Surface, cx, cy, dial int, palette theme.Theme) {
 	font := ui.MustLoad(ui.Bold, max(int(float64(dial)*numeralOfDial), 1))
 	radius := float64(dial) * numeralRadius
@@ -56,8 +45,6 @@ func numerals(s ui.Surface, cx, cy, dial int, palette theme.Theme) {
 	}
 }
 
-// heading is the unit vector at an angle clockwise from twelve, in screen coordinates where down is
-// positive.
 func heading(deg float64) (dx, dy float64) {
 	rad := deg * math.Pi / 180
 	return math.Sin(rad), -math.Cos(rad)

@@ -9,7 +9,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/runtime/startup"
 )
 
-// Moment is the reveal's clock, the traced share of the arch, the move into the header and the finish.
 type Moment = startup.Moment
 
 type Reveal struct {
@@ -20,14 +19,20 @@ type Reveal struct {
 	width, height float32
 }
 
-// NewReveal binds a product shader and artwork to the shared reveal geometry.
 func NewReveal(palette theme.Theme, shader string, src image.Image, width, height float32) *Reveal {
 	if src == nil {
 		src = image.NewRGBA(image.Rect(0, 0, 1, 1))
 	}
 	logo := image.NewRGBA(src.Bounds())
 	draw.Draw(logo, logo.Bounds(), src, src.Bounds().Min, draw.Src)
-	return &Reveal{logo: logo, bg: palette.Background, dark: theme.Dark(palette.Background), shader: shader, width: max(width, 1), height: max(height, 1)}
+	return &Reveal{
+		logo:   logo,
+		bg:     palette.Background,
+		dark:   theme.Dark(palette.Background),
+		shader: shader,
+		width:  max(width, 1),
+		height: max(height, 1),
+	}
 }
 
 func (r *Reveal) centred(w, h int) (float32, float32, float32) {
@@ -35,7 +40,6 @@ func (r *Reveal) centred(w, h int) (float32, float32, float32) {
 	return float32(w) / 2, float32(h) * 0.46, s
 }
 
-// LogoShare is how much of the long edge the mark takes once the list is up.
 const LogoShare = 0.42
 
 func (r *Reveal) header(w, h int) (float32, float32, float32) {

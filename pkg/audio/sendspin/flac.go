@@ -9,14 +9,10 @@ import (
 	"github.com/mewkiz/flac"
 )
 
-// chunkFeed is the reader the parser pulls from. feed hands over one chunk and returns only once the
-// parser has taken all of it and come back for more, which is the parser saying it cannot finish another
-// frame out of what it has. Waiting for that is what keeps a frame's placement off the scheduler: by the
-// time feed returns, every frame the chunk completed is already queued.
 type chunkFeed struct {
 	mu     sync.Mutex
-	ready  *sync.Cond // there are bytes to read, or the feed is done
-	hungry *sync.Cond // the parser is waiting on bytes that have not arrived
+	ready  *sync.Cond
+	hungry *sync.Cond
 
 	pending []byte
 	wants   bool
@@ -69,8 +65,6 @@ func (f *chunkFeed) feed(chunk []byte) error {
 	return nil
 }
 
-// stop wakes both sides for good: the parser reads EOF, and a feed waiting on a parser that has already
-// given up stops waiting for a hunger that will never come.
 func (f *chunkFeed) stop() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -81,9 +75,6 @@ func (f *chunkFeed) stop() {
 	f.hungry.Broadcast()
 }
 
-// flacDecoder bridges chunks to mewkiz/flac, which wants a stream rather than pieces of one. The header
-// from stream/start goes in front of every chunk fed after it, and a goroutine parses frames out the far
-// side onto queue.
 type flacDecoder struct {
 	feed *chunkFeed
 	done chan struct{}
@@ -117,13 +108,10 @@ func (d *flacDecoder) parse(header []byte) {
 		return
 	}
 
-	// The stream says what it is rather than the format we asked for, and narrowing to what the speaker
-	// takes is the same trade the pcm decoder makes.
 	channels := int(stream.Info.NChannels)
 	shift := int(stream.Info.BitsPerSample) - Bits
 
 	for {
-		// Any error ends this: end of stream, or the feed closed because the decoder was let go.
 		frame, err := stream.ParseNext()
 		if err != nil {
 			return
@@ -143,8 +131,6 @@ func (d *flacDecoder) parse(header []byte) {
 	}
 }
 
-// push holds the frame on an unbounded queue rather than a sized channel. A parser blocked handing a
-// frame over would never come back for bytes, and feed would wait on it forever.
 func (d *flacDecoder) push(pcm []int16) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -175,8 +161,6 @@ func (d *flacDecoder) failure() error {
 	return d.err
 }
 
-// decode hands back one frame, or nothing when this chunk did not finish one. Never more than one: they
-// would all be placed at this chunk's timestamp, and where a frame belongs is the whole point.
 func (d *flacDecoder) decode(chunk []byte) ([]int16, error) {
 	if err := d.failure(); err != nil {
 		return nil, err
@@ -191,7 +175,6 @@ func (d *flacDecoder) decode(chunk []byte) ([]int16, error) {
 	return d.pop(), nil
 }
 
-// close stops the parser and waits for it, so a track change does not leave a goroutine behind.
 func (d *flacDecoder) close() error {
 	d.feed.stop()
 	<-d.done

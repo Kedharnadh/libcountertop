@@ -1,4 +1,3 @@
-// Package rtsp serves H.264 over RTSP and RTP: interleaved on the RTSP connection or unicast UDP.
 package rtsp
 
 const (
@@ -8,7 +7,6 @@ const (
 	nalAUD = 9
 )
 
-// NALUs splits an Annex-B byte stream into NAL units, without their start codes.
 func NALUs(b []byte) [][]byte {
 	var out [][]byte
 	start := -1

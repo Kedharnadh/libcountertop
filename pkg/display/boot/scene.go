@@ -3,6 +3,7 @@ package boot
 import (
 	"github.com/go-gui-org/go-glyph"
 	gui "github.com/go-gui-org/go-gui/gui"
+
 	backend "github.com/ygelfand/libcountertop/pkg/display/gogui"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/surface"
@@ -11,7 +12,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/runtime/startup"
 )
 
-// Split reserves the reveal area beside or above the progress list.
 func Split(w, h int) (logo, list ui.Rect) {
 	if w >= h {
 		n := int(float64(w) * 0.42)
@@ -27,7 +27,6 @@ func Skip(w, h int) ui.Rect {
 	return ui.Rect{X: w - 3*high - pad, Y: h - high - 2*pad, W: 3 * high, H: high}
 }
 
-// Scene renders the progress overlay with go-gui; the branded reveal stays underneath.
 type Scene struct {
 	c             *surface.Client
 	id            uint32
@@ -40,7 +39,13 @@ type Scene struct {
 	listed        bool
 }
 
-func NewScene(c *surface.Client, id uint32, nw, nh, w, h, rotation int, p theme.Theme, version, skip string) (*Scene, error) {
+func NewScene(
+	c *surface.Client,
+	id uint32,
+	nw, nh, w, h, rotation int,
+	p theme.Theme,
+	version, skip string,
+) (*Scene, error) {
 	if err := c.UIOpen(id, nw, nh, 2); err != nil {
 		return nil, err
 	}
@@ -49,7 +54,7 @@ func NewScene(c *surface.Client, id uint32, nw, nh, w, h, rotation int, p theme.
 	s.w.SetTheme(bootTheme(p))
 	r, err := backend.New(surface.UILayer{C: c, ID: id}, s.w)
 	if err != nil {
-		c.VideoClose(id)
+		_ = c.VideoClose(id)
 		return nil, err
 	}
 	s.r = r
@@ -73,10 +78,32 @@ func (s *Scene) Draw(p []startup.Progress, listed bool) error {
 }
 func color(c theme.Color) gui.Color { return gui.RGB(c.R, c.G, c.B) }
 func box(at ui.Rect, bg theme.Color, content ...gui.View) gui.View {
-	return gui.Column(gui.ContainerCfg{Float: true, FloatOffsetX: float32(at.X), FloatOffsetY: float32(at.Y), Width: float32(at.W), Height: float32(at.H), Sizing: gui.FixedFixed, Padding: gui.NoPadding, Spacing: gui.NoSpacing, ClipContents: true, Color: color(bg), Content: content})
+	return gui.Column(
+		gui.ContainerCfg{
+			Float:        true,
+			FloatOffsetX: float32(at.X),
+			FloatOffsetY: float32(at.Y),
+			Width:        float32(at.W),
+			Height:       float32(at.H),
+			Sizing:       gui.FixedFixed,
+			Padding:      gui.NoPadding,
+			Spacing:      gui.NoSpacing,
+			ClipContents: true,
+			Color:        color(bg),
+			Content:      content,
+		},
+	)
 }
 func text(value string, size float32, c theme.Color) gui.View {
-	return gui.Label(value, gui.TextStyle{Family: style.ByName("standard").Family, Typeface: glyph.TypefaceRegular, Size: max(size, 1), Color: color(c)})
+	return gui.Label(
+		value,
+		gui.TextStyle{
+			Family:   style.ByName("standard").Family,
+			Typeface: glyph.TypefaceRegular,
+			Size:     max(size, 1),
+			Color:    color(c),
+		},
+	)
 }
 func (s *Scene) view(w *gui.Window) gui.View {
 	p := s.palette
@@ -104,33 +131,80 @@ func (s *Scene) view(w *gui.Window) gui.View {
 				room := max(colw-row-dot-row/3, 1)
 				gap := max(row/16, 1)
 				name := ui.Rect{X: left, Y: y + row/12, W: room, H: max(row*7/16, 1)}
-				items = append(items, line(w, name, p.Background, r.Name, min(float32(row)*0.36, 22), p.Text))
+				items = append(
+					items,
+					line(w, name, p.Background, r.Name, min(float32(row)*0.36, 22), p.Text),
+				)
 				if r.Doing != "" {
 					ink := p.Muted
 					if r.Failed {
 						ink = p.Warning
 					}
-					doing := ui.Rect{X: left, Y: name.Y + name.H + gap, W: room, H: max(row*5/16, 1)}
-					items = append(items, line(w, doing, p.Background, r.Doing, min(float32(row)*0.26, 16), ink))
+					doing := ui.Rect{
+						X: left,
+						Y: name.Y + name.H + gap,
+						W: room,
+						H: max(row*5/16, 1),
+					}
+					items = append(
+						items,
+						line(w, doing, p.Background, r.Doing, min(float32(row)*0.26, 16), ink),
+					)
 				}
-
 			}
 		}
 		if !startup.Settled(s.progress) {
 			at := Skip(s.width, s.height)
-			items = append(items, centeredBox(at, p.Surface, text(s.skip, float32(at.H)*0.4, p.Text)))
+			items = append(
+				items,
+				centeredBox(at, p.Surface, text(s.skip, float32(at.H)*0.4, p.Text)),
+			)
 		}
 	}
 	size := max(float32(short)*0.024, 1)
-	items = append(items, box(ui.Rect{X: s.width / 2, Y: s.height - int(size*3), W: s.width/2 - int(size), H: int(size * 2)}, p.Background, text(s.version, size, p.Muted)))
-	return gui.Column(gui.ContainerCfg{Sizing: gui.FillFill, Padding: gui.NoPadding, Spacing: gui.NoSpacing, Content: items})
+	items = append(
+		items,
+		box(
+			ui.Rect{
+				X: s.width / 2,
+				Y: s.height - int(size*3),
+				W: s.width/2 - int(size),
+				H: int(size * 2),
+			},
+			p.Background,
+			text(s.version, size, p.Muted),
+		),
+	)
+	return gui.Column(
+		gui.ContainerCfg{
+			Sizing:  gui.FillFill,
+			Padding: gui.NoPadding,
+			Spacing: gui.NoSpacing,
+			Content: items,
+		},
+	)
 }
 
 func centeredBox(at ui.Rect, bg theme.Color, content ...gui.View) gui.View {
-	return gui.Column(gui.ContainerCfg{Float: true, FloatOffsetX: float32(at.X), FloatOffsetY: float32(at.Y), Width: float32(at.W), Height: float32(at.H), Sizing: gui.FixedFixed, Padding: gui.NoPadding, Spacing: gui.NoSpacing, ClipContents: true, Color: color(bg), HAlign: gui.HAlignCenter, VAlign: gui.VAlignMiddle, Content: content})
+	return gui.Column(
+		gui.ContainerCfg{
+			Float:        true,
+			FloatOffsetX: float32(at.X),
+			FloatOffsetY: float32(at.Y),
+			Width:        float32(at.W),
+			Height:       float32(at.H),
+			Sizing:       gui.FixedFixed,
+			Padding:      gui.NoPadding,
+			Spacing:      gui.NoSpacing,
+			ClipContents: true,
+			Color:        color(bg),
+			HAlign:       gui.HAlignCenter,
+			VAlign:       gui.VAlignMiddle,
+			Content:      content,
+		},
+	)
 }
 
-// bootTheme supplies the palette without inheriting theme-specific layout sizing.
 func bootTheme(p theme.Theme) gui.Theme {
 	cfg := gui.ThemeLight.Cfg
 	if p.Dark {
@@ -145,9 +219,20 @@ func bootTheme(p theme.Theme) gui.Theme {
 	return gui.ThemeMaker(cfg)
 }
 
-// line fits one line using the same font metrics as the renderer.
-func line(w *gui.Window, at ui.Rect, bg theme.Color, value string, size float32, ink theme.Color) gui.View {
-	st := gui.TextStyle{Family: style.ByName("standard").Family, Typeface: glyph.TypefaceRegular, Size: max(size, 1), Color: color(ink)}
+func line(
+	w *gui.Window,
+	at ui.Rect,
+	bg theme.Color,
+	value string,
+	size float32,
+	ink theme.Color,
+) gui.View {
+	st := gui.TextStyle{
+		Family:   style.ByName("standard").Family,
+		Typeface: glyph.TypefaceRegular,
+		Size:     max(size, 1),
+		Color:    color(ink),
+	}
 	if m := w.TextMeasurer(); m != nil {
 		for range 4 {
 			height := m.FontHeight(st)
@@ -164,10 +249,13 @@ func line(w *gui.Window, at ui.Rect, bg theme.Color, value string, size float32,
 		}
 		value = string(runes) + "…"
 	}
-	return box(at, bg, gui.Text(gui.TextCfg{Text: value, TextStyle: st, Mode: gui.TextModeSingleLine, Clip: true}))
+	return box(
+		at,
+		bg,
+		gui.Text(gui.TextCfg{Text: value, TextStyle: st, Mode: gui.TextModeSingleLine, Clip: true}),
+	)
 }
 
-// progressArea reserves a bottom footer in both orientations.
 func progressArea(w, h int) ui.Rect {
 	_, list := Split(w, h)
 	skip := Skip(w, h)
@@ -176,7 +264,6 @@ func progressArea(w, h int) ui.Rect {
 	return list
 }
 
-// rowLayout keeps readable rows, adding a column before reducing their height.
 func rowLayout(in ui.Rect, count int) (row, per, width int) {
 	columns := 1
 	if count*64 > in.H {

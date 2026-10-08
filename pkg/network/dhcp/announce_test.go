@@ -9,9 +9,6 @@ import (
 
 var testMAC = net.HardwareAddr{0x00, 0xf4, 0x8d, 0x47, 0x69, 0x21}
 
-// The frame is what every other DHCP client on the network sends when it takes a lease, and what
-// an access point doing proxy ARP learns a client from. Checked field by field, because a frame
-// that is almost right is one nothing answers and nothing complains about.
 func TestArpAnnounceFrame(t *testing.T) {
 	ip := net.IPv4(10, 100, 101, 106)
 	frame := arpAnnounce(testMAC, ip)
@@ -49,8 +46,6 @@ func TestArpAnnounceFrame(t *testing.T) {
 	}
 }
 
-// Sender and target are both this device: asking about itself is what makes it an announcement
-// rather than a question, and it is why nothing answers.
 func TestArpAnnounceAsksAboutItself(t *testing.T) {
 	ip := net.IPv4(10, 100, 101, 106)
 	arp := arpAnnounce(testMAC, ip)[ethHeader:]
@@ -65,14 +60,11 @@ func TestArpAnnounceAsksAboutItself(t *testing.T) {
 		t.Errorf("target address = %v, want %v", net.IP(arp[24:28]), ip)
 	}
 
-	// What an answer would carry, so it is left empty.
 	if !bytes.Equal(arp[18:24], make([]byte, 6)) {
 		t.Error("the target hardware address is filled in")
 	}
 }
 
-// The address arrives from a lease in whichever form net chose, and the frame has room for four
-// bytes. A sixteen byte spelling copied in whole would overrun the sender field into the target.
 func TestArpAnnounceTakesTheSixteenByteForm(t *testing.T) {
 	four := arpAnnounce(testMAC, net.IPv4(10, 100, 101, 106).To4())
 	sixteen := arpAnnounce(testMAC, net.IPv4(10, 100, 101, 106).To16())
@@ -82,7 +74,6 @@ func TestArpAnnounceTakesTheSixteenByteForm(t *testing.T) {
 	}
 }
 
-// Nothing to announce is not a frame to send.
 func TestArpAnnounceRefusesWhatItCannotSend(t *testing.T) {
 	if arpAnnounce(testMAC, net.ParseIP("fd06:16d4:6833:e408::1")) != nil {
 		t.Error("an IPv6 address produced a frame")

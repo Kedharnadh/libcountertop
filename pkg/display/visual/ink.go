@@ -107,13 +107,31 @@ func (v *ink) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 		a := float32(0.3 * k * smoothstep(0, 0.35, d.age))
 		for i := range 3 {
 			jx, jy := (v.r.next()-0.5)*14*u, (v.r.next()-0.5)*14*u-float64(i)*6*u
-			v.pts = append(v.pts, Point{X: float32(d.x + jx), Y: float32(d.y + jy), Size: float32((34 + 40*k) * d.size * u),
-				R: d.c[0], G: d.c[1], B: d.c[2], A: a, Feed: true, Round: true})
+			v.pts = append(
+				v.pts,
+				Point{
+					X:     float32(d.x + jx),
+					Y:     float32(d.y + jy),
+					Size:  float32((34 + 40*k) * d.size * u),
+					R:     d.c[0],
+					G:     d.c[1],
+					B:     d.c[2],
+					A:     a,
+					Feed:  true,
+					Round: true,
+				},
+			)
 		}
 	}
 	if err := g.Points(v.pts); err != nil {
 		return err
 	}
-	vals := []float32{float32(v.st.w), float32(v.st.h), float32(math.Mod(f.t, 1000)), float32(v.stir), 0.997}
+	vals := []float32{
+		float32(v.st.w),
+		float32(v.st.h),
+		float32(math.Mod(f.t, 1000)),
+		float32(v.stir),
+		0.997,
+	}
 	return g.Values(vals, 0.45, 0.03, 2)
 }

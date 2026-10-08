@@ -2,12 +2,11 @@ package widgets
 
 import (
 	gui "github.com/go-gui-org/go-gui/gui"
+
 	"github.com/ygelfand/libcountertop/pkg/display/model"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 )
 
-// Editor owns text drafts, focus, and keyboard state for one GUI session.
-// Its methods run on the window's UI loop.
 type Editor struct {
 	drafts  map[string]string
 	leaf    string
@@ -41,10 +40,11 @@ func (e *Editor) Clear(w *gui.Window, bottom float32) {
 		return
 	}
 	by := bottom - e.Top + style.Reach()*0.5
-	w.QueueCommand(func(w *gui.Window) { w.ScrollVerticalTo("page", w.ScrollVerticalOffset("page")-by) })
+	w.QueueCommand(
+		func(w *gui.Window) { w.ScrollVerticalTo("page", w.ScrollVerticalOffset("page")-by) },
+	)
 }
 
-// Field styles an input and registers its save action while focused.
 func (e *Editor) Field(kit style.Kit, cfg gui.InputCfg, save func()) gui.View {
 	kit.Field(&cfg)
 	leaf, blur := cfg.ID, cfg.OnBlur
@@ -68,7 +68,6 @@ func (e *Editor) Field(kit style.Kit, cfg gui.InputCfg, save func()) gui.View {
 	})
 }
 
-// Row builds an editable row using a page-qualified identifier.
 func (e *Editor) Row(kit style.Kit, id string, r model.Row) gui.View {
 	fid := id + "-field"
 	text, ok := e.drafts[fid]
@@ -76,7 +75,9 @@ func (e *Editor) Row(kit style.Kit, id string, r model.Row) gui.View {
 		text = r.Value
 	}
 	return e.Field(kit, gui.InputCfg{
-		ID: fid, Text: text, Sizing: gui.FillFit,
+		ID:            fid,
+		Text:          text,
+		Sizing:        gui.FillFit,
 		OnTextChanged: func(s string, ev gui.EventCtx) { e.drafts[fid] = s; ev.Window.InvalidateLayout() },
 		OnTextCommit: func(_ string, _ gui.InputCommitReason, ev gui.EventCtx) {
 			delete(e.drafts, fid)

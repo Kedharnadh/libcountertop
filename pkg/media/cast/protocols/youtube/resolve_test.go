@@ -115,16 +115,48 @@ func TestTheOriginalLanguageIsChosenOverADubOrAProcessedCopy(t *testing.T) {
 func TestTheTallestVP9ThatTheDecoderKeepsUpWithIsChosen(t *testing.T) {
 	formats := yt.FormatList{
 		{ItagNo: 251, MimeType: `audio/webm; codecs="opus"`, Bitrate: 147426},
-		{ItagNo: 137, MimeType: `video/mp4; codecs="avc1.640028"`, Height: 1080, FPS: 30, Bitrate: 4000000},
+		{
+			ItagNo:   137,
+			MimeType: `video/mp4; codecs="avc1.640028"`,
+			Height:   1080,
+			FPS:      30,
+			Bitrate:  4000000,
+		},
 		{ItagNo: 247, MimeType: `video/webm; codecs="vp9"`, Height: 720, FPS: 30, Bitrate: 1500000},
-		{ItagNo: 248, MimeType: `video/webm; codecs="vp9"`, Height: 1080, FPS: 30, Bitrate: 2500000},
-		{ItagNo: 303, MimeType: `video/webm; codecs="vp9"`, Height: 1080, FPS: 60, Bitrate: 4000000},
-		{ItagNo: 271, MimeType: `video/webm; codecs="vp9"`, Height: 1440, FPS: 30, Bitrate: 9000000},
+		{
+			ItagNo:   248,
+			MimeType: `video/webm; codecs="vp9"`,
+			Height:   1080,
+			FPS:      30,
+			Bitrate:  2500000,
+		},
+		{
+			ItagNo:   303,
+			MimeType: `video/webm; codecs="vp9"`,
+			Height:   1080,
+			FPS:      60,
+			Bitrate:  4000000,
+		},
+		{
+			ItagNo:   271,
+			MimeType: `video/webm; codecs="vp9"`,
+			Height:   1440,
+			FPS:      30,
+			Bitrate:  9000000,
+		},
 	}
-	if f := bestVP9(formats, playback.Target{Tallest: 1080, Fastest: 60}); f == nil || f.ItagNo != 303 {
+	if f := bestVP9(
+		formats,
+		playback.Target{Tallest: 1080, Fastest: 60},
+	); f == nil ||
+		f.ItagNo != 303 {
 		t.Errorf("chose %+v", f)
 	}
-	if f := bestVP9(yt.FormatList{formats[4]}, playback.Target{Tallest: 1080, Fastest: 60}); f == nil || f.ItagNo != 303 {
+	if f := bestVP9(
+		yt.FormatList{formats[4]},
+		playback.Target{Tallest: 1080, Fastest: 60},
+	); f == nil ||
+		f.ItagNo != 303 {
 		t.Errorf("with only 60 fps on offer, chose %+v", f)
 	}
 	if f := bestVP9(formats[:2], playback.Target{Tallest: 1080, Fastest: 60}); f != nil {
@@ -150,7 +182,13 @@ func TestAChunkIsFifteenSecondsOfItsStream(t *testing.T) {
 
 func TestTheTallestPictureFollowsThePanel(t *testing.T) {
 	formats := yt.FormatList{
-		{ItagNo: 248, MimeType: `video/webm; codecs="vp9"`, Height: 1080, FPS: 30, Bitrate: 2500000},
+		{
+			ItagNo:   248,
+			MimeType: `video/webm; codecs="vp9"`,
+			Height:   1080,
+			FPS:      30,
+			Bitrate:  2500000,
+		},
 		{ItagNo: 247, MimeType: `video/webm; codecs="vp9"`, Height: 720, FPS: 30, Bitrate: 1200000},
 		{ItagNo: 244, MimeType: `video/webm; codecs="vp9"`, Height: 480, FPS: 30, Bitrate: 600000},
 	}

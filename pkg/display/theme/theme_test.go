@@ -37,7 +37,6 @@ func TestNamesCoversEveryTheme(t *testing.T) {
 	}
 }
 
-// Two themes with one name is a select with a row that cannot be chosen.
 func TestNamesAreDistinct(t *testing.T) {
 	seen := map[string]bool{}
 	for _, name := range Names() {
@@ -54,8 +53,7 @@ func TestEnoughThemesToChooseFrom(t *testing.T) {
 	}
 }
 
-// Text on background is the one pairing every screen uses, so it has to be readable in all of
-// them. The ratio is the WCAG contrast formula; 4.5 is its threshold for body text.
+// WCAG 2 contrast threshold for body text is 4.5:1.
 func TestTextIsReadableOnBackground(t *testing.T) {
 	for _, th := range All {
 		if r := Contrast(th.Text, th.Background); r < 4.5 {
@@ -64,7 +62,6 @@ func TestTextIsReadableOnBackground(t *testing.T) {
 	}
 }
 
-// Muted text is secondary, so it may be softer — but it still has to be legible across a room.
 func TestMutedIsLegibleOnBackground(t *testing.T) {
 	for _, th := range All {
 		if r := Contrast(th.Muted, th.Background); r < 3 {
@@ -81,7 +78,6 @@ func TestTextIsReadableOnSurface(t *testing.T) {
 	}
 }
 
-// A surface has to be distinguishable from the background it sits on, or a card has no edges.
 func TestSurfaceIsDistinctFromBackground(t *testing.T) {
 	for _, th := range All {
 		if th.Surface == th.Background {
@@ -90,8 +86,6 @@ func TestSurfaceIsDistinctFromBackground(t *testing.T) {
 	}
 }
 
-// Dark says which way round a theme is, and the drawing code uses it to decide things like
-// whether a shadow or a glow is wanted.
 func TestDarkMatchesTheBackground(t *testing.T) {
 	for _, th := range All {
 		light := luminance(th.Background) > 0.5
@@ -102,8 +96,7 @@ func TestDarkMatchesTheBackground(t *testing.T) {
 	}
 }
 
-// Contrast picks what goes on an accent. Accents carry large text and shapes rather than body
-// copy, which is the 3:1 threshold rather than 4.5:1.
+// WCAG 2 contrast threshold for large text is 3:1.
 func TestContrastIsReadableOnEveryAccent(t *testing.T) {
 	for _, th := range All {
 		for _, on := range []struct {
@@ -135,7 +128,6 @@ func TestBlend(t *testing.T) {
 		t.Errorf("blending half way gave %v, want about half", half)
 	}
 
-	// Out of range must not wrap round to a wildly different color.
 	if got := black.Blend(white, -1); got != black {
 		t.Errorf("a negative amount gave %v, want the original", got)
 	}
@@ -155,7 +147,12 @@ func TestAThemeRetonedForABackdropReadsOnIt(t *testing.T) {
 		for _, dark := range []bool{true, false} {
 			on := th.On(dark)
 			if on.Dark != dark || Dark(on.Background) != dark {
-				t.Errorf("%s on dark=%v: background %v reads the wrong way", th.Name, dark, on.Background)
+				t.Errorf(
+					"%s on dark=%v: background %v reads the wrong way",
+					th.Name,
+					dark,
+					on.Background,
+				)
 			}
 			if c := Contrast(on.Text, on.Background); c < 4.5 {
 				t.Errorf("%s on dark=%v: text contrast %.1f", th.Name, dark, c)

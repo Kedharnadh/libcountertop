@@ -23,7 +23,6 @@ const (
 	stateStopped = 0
 )
 
-// station is one lounge screen's player: the phone's playlist and the track playing from it.
 type station struct {
 	theme   string
 	env     cast.Env
@@ -133,7 +132,9 @@ func (s *station) attend() {
 		s.env.Output.Attend(nil)
 		return
 	}
-	s.env.Output.Attend(&playback.Session{Label: label, Logo: s.logo(), Pictured: pictured(s.theme)})
+	s.env.Output.Attend(
+		&playback.Session{Label: label, Logo: s.logo(), Pictured: pictured(s.theme)},
+	)
 }
 
 func (s *station) logo() string {
@@ -176,7 +177,6 @@ func (s *station) around() (prev, next bool) {
 	return s.prev != nil, s.next != nil
 }
 
-// coming is what the card lists as up next.
 type queued struct {
 	Track
 	index int
@@ -193,7 +193,16 @@ func (s *station) coming() []playback.Upcoming {
 		if q.index >= 0 {
 			play = func() { s.jump(q.index) }
 		}
-		out = append(out, playback.Upcoming{Title: q.Title, Artist: q.Author, Length: q.Duration, Art: "https://i.ytimg.com/vi/" + q.ID + "/mqdefault.jpg", Play: play})
+		out = append(
+			out,
+			playback.Upcoming{
+				Title:  q.Title,
+				Artist: q.Author,
+				Length: q.Duration,
+				Art:    "https://i.ytimg.com/vi/" + q.ID + "/mqdefault.jpg",
+				Play:   play,
+			},
+		)
 	}
 	return out
 }
@@ -259,7 +268,6 @@ func (s *station) jump(i int) {
 	s.start(pos, 0)
 }
 
-// handle acts on one lounge message.
 func (s *station) handle(m Message) {
 	f := fields(m.Payload)
 	switch m.Name {
@@ -280,7 +288,10 @@ func (s *station) handle(m Message) {
 	case "loungeStatus":
 		s.send(
 			Out{Name: "onHasPreviousNextChanged", Fields: s.navigation()},
-			Out{Name: "onAutoplayModeChanged", Fields: map[string]string{"autoplayMode": "UNSUPPORTED"}},
+			Out{
+				Name:   "onAutoplayModeChanged",
+				Fields: map[string]string{"autoplayMode": "UNSUPPORTED"},
+			},
 		)
 	case "getNowPlaying", "onUserActivity":
 		s.report(s.state())
@@ -348,14 +359,15 @@ func (s *station) setPlaylist(f map[string]string) {
 	s.mu.Unlock()
 
 	if id != "" {
-		s.start(Position{Video: id, List: f["listId"], Index: index, Params: params}, time.Duration(at*float64(time.Second)))
+		s.start(
+			Position{Video: id, List: f["listId"], Index: index, Params: params},
+			time.Duration(at*float64(time.Second)),
+		)
 	}
 }
 
-// start plays a video from at, abandoning whatever was playing or opening.
 func (s *station) start(pos Position, at time.Duration) { s.open(pos, at, false) }
 
-// open is start, beginning paused when held.
 func (s *station) open(pos Position, at time.Duration, held bool) {
 	id := pos.Video
 	if err := s.refused(); err != nil {
@@ -373,7 +385,10 @@ func (s *station) open(pos Position, at time.Duration, held bool) {
 	s.index, s.list, s.params, s.want, s.held = pos.Index, pos.List, pos.Params, pos, held
 	s.prev, s.next = nil, nil
 	if same {
-		s.upcoming = slices.DeleteFunc(slices.Clone(s.upcoming), func(q queued) bool { return q.index <= pos.Index })
+		s.upcoming = slices.DeleteFunc(
+			slices.Clone(s.upcoming),
+			func(q queued) bool { return q.index <= pos.Index },
+		)
 	} else {
 		s.upcoming = nil
 	}
@@ -408,7 +423,21 @@ func (s *station) open(pos Position, at time.Duration, held bool) {
 		held := s.held
 		s.mu.Unlock()
 
-		slog.Info("youtube playing", "theme", s.theme, "video", id, "title", t.info.Title, "at", at, "since asked", s.sinceAsked(), "paused", held)
+		slog.Info(
+			"youtube playing",
+			"theme",
+			s.theme,
+			"video",
+			id,
+			"title",
+			t.info.Title,
+			"at",
+			at,
+			"since asked",
+			s.sinceAsked(),
+			"paused",
+			held,
+		)
 		if s.env.Output != nil {
 			s.env.Output.Play(t)
 			if held {
@@ -425,8 +454,6 @@ func (s *station) open(pos Position, at time.Duration, held bool) {
 	}()
 }
 
-// lookAround asks what is either side of the track in the phone's queue, and fetches the next one's
-// title for the card.
 func (s *station) lookAround(ctx context.Context, t *track, pos Position) {
 	s.mu.Lock()
 	phones := slices.Clone(s.phones)
@@ -442,7 +469,17 @@ func (s *station) lookAround(ctx context.Context, t *track, pos Position) {
 		var err error
 		prev, next, err = neighbours(ctx, s.env.HTTP, pos, phones)
 		if err != nil {
-			slog.Debug("youtube queue", "theme", s.theme, "list", pos.List, "index", pos.Index, "err", err)
+			slog.Debug(
+				"youtube queue",
+				"theme",
+				s.theme,
+				"list",
+				pos.List,
+				"index",
+				pos.Index,
+				"err",
+				err,
+			)
 			return
 		}
 		if next != nil {
@@ -466,7 +503,6 @@ func (s *station) lookAround(ctx context.Context, t *track, pos Position) {
 	s.send(Out{Name: "onHasPreviousNextChanged", Fields: s.navigation()})
 }
 
-// halt stops what is playing or opening without telling the phone.
 func (s *station) halt() { s.end(false) }
 
 func (s *station) end(handoff bool) {
@@ -505,8 +541,6 @@ func (s *station) play() {
 	s.report(statePlaying)
 }
 
-// whileOpening keeps a play or pause that arrives while the next track is still opening, for it to
-// start in, and reports whether one was.
 func (s *station) whileOpening(held bool) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -559,7 +593,6 @@ func (s *station) seek(at time.Duration) {
 	s.open(pos, at, held)
 }
 
-// skipWhenHeard seeks past seg once playback has reached it.
 func (s *station) skipWhenHeard(t *track, seg Segment) {
 	until := time.Now().Add(skipWait)
 	for time.Now().Before(until) {
@@ -584,7 +617,6 @@ const (
 	skipWait  = 2 * time.Minute
 )
 
-// step moves through the phone's list when it sent one, or to what YouTube says is either side.
 func (s *station) step(by int) {
 	s.mu.Lock()
 	var pos Position
@@ -597,9 +629,19 @@ func (s *station) step(by int) {
 		}
 		pos = Position{Video: s.ids[i], List: s.list, Index: i}
 	case by > 0 && s.next != nil:
-		pos = Position{Video: s.next.ID, List: s.next.List, Index: s.next.Index, Params: s.next.Params}
+		pos = Position{
+			Video:  s.next.ID,
+			List:   s.next.List,
+			Index:  s.next.Index,
+			Params: s.next.Params,
+		}
 	case by < 0 && s.prev != nil:
-		pos = Position{Video: s.prev.ID, List: s.prev.List, Index: s.prev.Index, Params: s.prev.Params}
+		pos = Position{
+			Video:  s.prev.ID,
+			List:   s.prev.List,
+			Index:  s.prev.Index,
+			Params: s.prev.Params,
+		}
 	default:
 		s.mu.Unlock()
 		return
@@ -613,7 +655,6 @@ func (s *station) stop() {
 	s.report(stateStopped)
 }
 
-// finished is a track that has decoded to its end. What it queued plays out before the next starts.
 func (s *station) finished(t *track) {
 	for s.env.Output != nil && s.env.Output.Behind(t) > 0 {
 		select {
@@ -657,7 +698,6 @@ func (s *station) state() int {
 	return statePlaying
 }
 
-// heard is how far into the current track the room has actually heard.
 func (s *station) heard(t *track) time.Duration {
 	if s.env.Output == nil {
 		return t.elapsed()
@@ -668,7 +708,10 @@ func (s *station) heard(t *track) time.Duration {
 
 func (s *station) navigation() map[string]string {
 	prev, next := s.around()
-	return map[string]string{"hasPrevious": strconv.FormatBool(prev), "hasNext": strconv.FormatBool(next)}
+	return map[string]string{
+		"hasPrevious": strconv.FormatBool(prev),
+		"hasNext":     strconv.FormatBool(next),
+	}
 }
 
 func (s *station) reportLoading(id string, at time.Duration) {
@@ -688,7 +731,6 @@ func (s *station) reportLoading(id string, at time.Duration) {
 	s.publish(id, nil, stateLoading)
 }
 
-// report tells the phone what is playing and where it has got to.
 func (s *station) report(state int) {
 	t := s.current()
 	if t == nil {
@@ -732,7 +774,12 @@ func (s *station) volume() {
 	if s.env.Volume != nil {
 		v = s.env.Volume()
 	}
-	s.send(Out{Name: "onVolumeChanged", Fields: map[string]string{"volume": strconv.Itoa(v), "muted": "false"}})
+	s.send(
+		Out{
+			Name:   "onVolumeChanged",
+			Fields: map[string]string{"volume": strconv.Itoa(v), "muted": "false"},
+		},
+	)
 }
 
 func (s *station) discovery() {
@@ -761,7 +808,6 @@ func (s *station) send(out ...Out) {
 	}
 }
 
-// fields reads a lounge payload's values as strings, which is how the lounge sends them.
 func fields(raw json.RawMessage) map[string]string {
 	var m map[string]any
 	if json.Unmarshal(raw, &m) != nil {

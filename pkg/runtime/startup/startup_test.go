@@ -51,7 +51,11 @@ func TestSummaryTracksFailureAndCompletion(t *testing.T) {
 }
 
 func TestDisplayUnifiesBoardNamesWithoutChangingReadiness(t *testing.T) {
-	p := []Progress{{Name: "wifi", Doing: "joining"}, {Name: "capture", Failed: true}, {Name: "display", Done: true}}
+	p := []Progress{
+		{Name: "wifi", Doing: "joining"},
+		{Name: "capture", Failed: true},
+		{Name: "display", Done: true},
+	}
 	rows := Display(p)
 	if rows[0].Name != "Display" || rows[1].Name != "Microphones" || rows[2].Name != "Wi-Fi" {
 		t.Fatalf("Display order = %+v", rows)

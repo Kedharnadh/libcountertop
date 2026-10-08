@@ -9,11 +9,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// apply puts the lease on the interface: the address, then the default route.
-//
-// Over rtnetlink rather than ip(8). The binary is a toybox applet on a system the product is actively
-// stripping, and a service that stops working because an applet went away is a bad way to lose the
-// network.
 func apply(iface string, l *Lease) error {
 	link, err := net.InterfaceByName(iface)
 	if err != nil {
@@ -38,7 +33,6 @@ func apply(iface string, l *Lease) error {
 	}
 
 	if !held {
-		// The broadcast address the kernel would otherwise have to be told separately.
 		brd := make(net.IP, net.IPv4len)
 		binary.BigEndian.PutUint32(brd,
 			binary.BigEndian.Uint32(addr)|^binary.BigEndian.Uint32(net.IP(l.Address.Mask).To4()))
@@ -62,7 +56,6 @@ func apply(iface string, l *Lease) error {
 		return nil
 	}
 
-	// Replace rather than add: a default route left by a previous lease is not an error to hit.
 	if err := conn.Route.Replace(&rtnetlink.RouteMessage{
 		Family:    unix.AF_INET,
 		Table:     unix.RT_TABLE_MAIN,
@@ -81,13 +74,6 @@ func apply(iface string, l *Lease) error {
 	return nil
 }
 
-// flush removes the IPv4 addresses on the interface apart from the one the lease is for, and says
-// whether that one was already there.
-//
-// The exception is the point. Deleting an address takes every socket bound to it with it, and a
-// lease is usually renewed onto the address it already had — so flushing first would drop the
-// connection to Home Assistant, the web server and mDNS every time the lease came up, which on
-// this network is every half hour.
 func flush(conn *rtnetlink.Conn, index int, keep net.IP, prefix uint8) (held bool, err error) {
 	addrs, err := conn.Address.List()
 	if err != nil {
@@ -109,7 +95,6 @@ func flush(conn *rtnetlink.Conn, index int, keep net.IP, prefix uint8) (held boo
 	return held, nil
 }
 
-// release drops whatever the lease put on, for a clean stop.
 func release(iface string) {
 	link, err := net.InterfaceByName(iface)
 	if err != nil {
@@ -121,6 +106,5 @@ func release(iface string) {
 	}
 	defer conn.Close()
 
-	// Nothing kept: this is the device letting the address go, not renewing it.
-	flush(conn, link.Index, nil, 0)
+	_, _ = flush(conn, link.Index, nil, 0)
 }

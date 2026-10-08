@@ -1,4 +1,3 @@
-// Package callstatus exchanges call mute state and camera dimensions.
 package callstatus
 
 import (

@@ -1,31 +1,12 @@
 package tz
 
-// Zone is somewhere to keep time: the name people recognize, and the rules the device runs on.
 type Zone struct {
-	// Name is the IANA name, which is the only part anybody wants to read.
 	Name string
 
-	// Spec is the POSIX TZ string. This device has no zone files to look a name up in — working
-	// from rules instead is what this package is for — so the rules are carried here.
 	Spec string
 }
 
-// Zones is what the device offers to be set to.
-//
-// Deliberately a short list and not a database. Every entry is written out by hand, so every entry
-// is a chance to get a daylight saving rule wrong; TestEveryZoneMatchesTheRealOne checks each one
-// against the host's own tzdata across a year and fails on any day that disagrees. Adding a zone
-// means adding the pair and letting the test say whether the rules are right.
-//
-// Enough of the world to cover where one of these is likely to sit. Anything missing is a pair
-// away, and the alternative — every zone there is — would be a megabyte of tables for a setting
-// most devices never touch, when Home Assistant already sends the right answer for almost all of
-// them.
-//
-// Not every zone can be offered. America/Vancouver is left out because tzdata has British Columbia
-// going to permanent daylight time part way through 2026, modeled as a move to MST; a POSIX rule
-// repeats every year and cannot say "and then something else from November". Any zone the test
-// rejects for that reason belongs out of this list rather than approximated into it.
+// America/Vancouver is absent: tzdata puts British Columbia on permanent MST from 2026.
 func Zones() []Zone {
 	return []Zone{
 		{"UTC", "UTC0"},
@@ -75,11 +56,6 @@ func Zones() []Zone {
 	}
 }
 
-// Region is the part of the world a zone is in, taken from its name. Empty for a name with no
-// region in it, which is UTC and anything else that stands on its own.
-//
-// Derived rather than carried in a field: the name already says which is which, and a second
-// source of the same fact is a second thing to get wrong.
 func Region(name string) string {
 	for i := range name {
 		if name[i] == '/' {
@@ -89,8 +65,6 @@ func Region(name string) string {
 	return ""
 }
 
-// Regions is every part of the world with zones in it, first seen first. A screen holds about a
-// dozen rows and does not scroll, so the list is offered a region at a time.
 func Regions() []string {
 	var out []string
 	seen := map[string]bool{}
@@ -106,7 +80,6 @@ func Regions() []string {
 	return out
 }
 
-// In is every zone in one region. The empty region is the ones that stand on their own.
 func In(region string) []Zone {
 	var out []Zone
 
@@ -118,7 +91,6 @@ func In(region string) []Zone {
 	return out
 }
 
-// Named is the zone with this IANA name.
 func Named(name string) (Zone, bool) {
 	for _, z := range Zones() {
 		if z.Name == name {
@@ -128,7 +100,6 @@ func Named(name string) (Zone, bool) {
 	return Zone{}, false
 }
 
-// Names is every zone on offer, in the order Zones lists them.
 func Names() []string {
 	zones := Zones()
 

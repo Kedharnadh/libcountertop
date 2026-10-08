@@ -28,8 +28,6 @@ func broadcastShape(a, b []int) ([]int, error) {
 	return out, nil
 }
 
-// strides maps src onto the axes of out, giving the offset to add when walking each output axis.
-// A broadcast axis gets a stride of zero so it reads the same element repeatedly.
 func strides(src, out []int) []int {
 	s := make([]int, len(out))
 	stride := 1
@@ -47,7 +45,6 @@ func strides(src, out []int) []int {
 	return s
 }
 
-// step1 advances an odometer over shape and returns the source offset for the new position.
 func step1(idx, shape, strides []int, off int) int {
 	for d := len(shape) - 1; d >= 0; d-- {
 		idx[d]++
@@ -159,8 +156,6 @@ func reduceOp(init float32, combine func(acc, v float32) float32, mean bool) ker
 		}
 		y.resize(shape)
 
-		// Output strides indexed by input axis: reduced axes contribute nothing, and the
-		// remaining axes keep their relative order, which is what the output shape is.
 		os := make([]int, rank)
 		stride := 1
 		for d := rank - 1; d >= 0; d-- {
@@ -401,9 +396,13 @@ func init() {
 
 		OpLeakyRelu: leakyRelu,
 
-		OpMean:      reduceOp(0, func(a, v float32) float32 { return a + v }, true),
-		OpSum:       reduceOp(0, func(a, v float32) float32 { return a + v }, false),
-		OpReduceMax: reduceOp(float32(math.Inf(-1)), func(a, v float32) float32 { return max(a, v) }, false),
+		OpMean: reduceOp(0, func(a, v float32) float32 { return a + v }, true),
+		OpSum:  reduceOp(0, func(a, v float32) float32 { return a + v }, false),
+		OpReduceMax: reduceOp(
+			float32(math.Inf(-1)),
+			func(a, v float32) float32 { return max(a, v) },
+			false,
+		),
 
 		OpPad:        padZero,
 		OpTranspose:  transpose,

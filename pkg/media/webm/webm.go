@@ -1,5 +1,3 @@
-// Package webm reads audio or video frames out of a WebM (Matroska) stream as it arrives: the track it
-// carries, then each block's frame and timestamp. Everything else in the file is skipped.
 package webm
 
 import (
@@ -39,10 +37,9 @@ const (
 	idBlock              = 0xA1
 )
 
-// unknown is the size of an element that runs until its parent ends.
+// Matroska unknown size: the element runs until its parent ends.
 const unknown = -1
 
-// Track is the audio or video track a stream carries.
 type Track struct {
 	Number   uint64
 	Codec    string
@@ -53,7 +50,6 @@ type Track struct {
 	Width, Height int
 }
 
-// Frame is one block's payload and when it plays, in nanoseconds from the start.
 type Frame struct {
 	Track uint64
 	Time  int64
@@ -61,7 +57,6 @@ type Frame struct {
 	Key   bool
 }
 
-// Reader walks a stream once, front to back.
 type Reader struct {
 	r *bufio.Reader
 
@@ -126,7 +121,6 @@ func NewVideoReader(r io.Reader) *Reader {
 	return v
 }
 
-// Track reads until the track header has gone past and returns the first track of the reader's kind.
 func (r *Reader) Track() (Track, error) {
 	for r.track == nil {
 		if _, err := r.step(); err != nil {
@@ -136,7 +130,6 @@ func (r *Reader) Track() (Track, error) {
 	return *r.track, nil
 }
 
-// Next is the next frame of the track, or io.EOF at the end of the stream.
 func (r *Reader) Next() (Frame, error) {
 	for {
 		f, err := r.step()
@@ -149,7 +142,6 @@ func (r *Reader) Next() (Frame, error) {
 	}
 }
 
-// step reads one element, descending into the containers that hold what is wanted.
 func (r *Reader) step() (*Frame, error) {
 	id, err := r.id()
 	if err != nil {
@@ -357,7 +349,6 @@ func (r *Reader) skip(size int64) error {
 	return noEOF(err)
 }
 
-// each walks the elements packed in a buffer.
 func each(b []byte, fn func(id uint64, body []byte) error) error {
 	for len(b) > 0 {
 		id, n := vint(b, false)
@@ -377,7 +368,6 @@ func each(b []byte, fn func(id uint64, body []byte) error) error {
 	return nil
 }
 
-// vint reads a variable-length integer, with the length marker cleared for a size or kept for an id.
 func vint(b []byte, clear bool) (uint64, int) {
 	if len(b) == 0 {
 		return 0, 0

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	gui "github.com/go-gui-org/go-gui/gui"
+
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )

@@ -6,7 +6,9 @@ import (
 
 var (
 	ErrNotConnected = errors.New("homeassistant: not connected")
-	ErrNotAllowed   = errors.New("homeassistant: actions are not allowed for this device; enable them in the ESPHome integration's options")
+	ErrNotAllowed   = errors.New(
+		"homeassistant: actions are not allowed for this device; enable them in the ESPHome integration's options",
+	)
 )
 
 type Access int

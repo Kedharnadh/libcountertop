@@ -2,7 +2,6 @@ package clockview
 
 import "github.com/ygelfand/libcountertop/pkg/display/clockkind"
 
-// Of resolves a clock identifier, reporting false for unsupported choices or no clock.
 func Of(kind clockkind.Kind) (View, bool) {
 	switch kind {
 	case clockkind.Plain:

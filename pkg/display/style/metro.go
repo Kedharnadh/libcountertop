@@ -6,9 +6,15 @@ import (
 
 const Metro = "metro"
 
-var metroStyle = Style{Name: Metro, Palette: "Ocean", Family: sans, Kit: metro{}, Shape: func(c *gogui.ThemeCfg) {
-	c.Radius, c.RadiusSmall, c.RadiusMedium, c.RadiusLarge = 0, 0, 0, 0
-}}
+var metroStyle = Style{
+	Name:    Metro,
+	Palette: "Ocean",
+	Family:  sans,
+	Kit:     metro{},
+	Shape: func(c *gogui.ThemeCfg) {
+		c.Radius, c.RadiusSmall, c.RadiusMedium, c.RadiusLarge = 0, 0, 0, 0
+	},
+}
 
 type metro struct{}
 
@@ -108,7 +114,9 @@ func flat(vertical bool, marks []Span) func(gogui.SliderLookState) gogui.SliderP
 
 func (metro) Progress(cfg *gogui.ProgressBarCfg) {
 	t := gogui.CurrentTheme().Cfg
-	cfg.Radius, cfg.Color, cfg.ColorBar = gogui.NoRadius, t.ColorTextSecondary.WithOpacity(0.4), t.ColorAccent
+	cfg.Radius, cfg.Color, cfg.ColorBar = gogui.NoRadius, t.ColorTextSecondary.WithOpacity(
+		0.4,
+	), t.ColorAccent
 }
 
 func (metro) Field(cfg *gogui.InputCfg) {

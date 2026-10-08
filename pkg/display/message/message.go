@@ -1,8 +1,3 @@
-// Package message is what Home Assistant can put on the screen: a doorbell, a reminder, a warning
-// that something needs attention.
-//
-// An action rather than an entity, because it takes arguments and says nothing about itself
-// between calls.
 package message
 
 import (
@@ -13,10 +8,10 @@ import (
 	"time"
 
 	esphome "github.com/ygelfand/go-esphome-device"
+
 	"github.com/ygelfand/libcountertop/pkg/hook"
 )
 
-// How long a message stays up when the caller does not say.
 const (
 	DefaultSeconds = 15
 	MaxSeconds     = 3600
@@ -48,8 +43,6 @@ func New() *Messages                              { return &Messages{} }
 func (m *Messages) Run(ctx context.Context) error { <-ctx.Done(); m.Close(); return nil }
 func (m *Messages) Close()                        { m.Hide() }
 
-// dismiss takes a message away because someone touched it, which only means anything while one is
-// up.
 func (m *Messages) Dismiss(id int) {
 	m.mu.Lock()
 	showing := m.timer != nil
@@ -68,7 +61,6 @@ func (m *Messages) Dismiss(id int) {
 
 func (m *Messages) Name() string { return "messages" }
 
-// Actions is what Home Assistant may call.
 func (m *Messages) Actions() []*esphome.Action {
 	return []*esphome.Action{
 		{
@@ -100,8 +92,6 @@ func (m *Messages) Actions() []*esphome.Action {
 	}
 }
 
-// Show puts a message up for a while. A second message replaces the first rather than queueing:
-// what is worth showing is what just happened.
 func (m *Messages) Show(msg Message, hold time.Duration) {
 	m.mu.Lock()
 	m.current = msg
@@ -116,7 +106,6 @@ func (m *Messages) Show(msg Message, hold time.Duration) {
 	m.Changed.Emit(true)
 }
 
-// Info presents an informational message for the given duration.
 func (m *Messages) Info(title, body string, hold time.Duration) {
 	m.Show(Message{Title: title, Body: body, Tone: ToneInfo}, hold)
 }
@@ -134,8 +123,6 @@ func (m *Messages) Hide() {
 	m.Changed.Emit(false)
 }
 
-// tone reads what the caller asked for, treating anything unrecognized as ordinary rather than
-// refusing the message.
 func tone(name string) Tone {
 	for _, t := range Tones() {
 		if string(t) == name {
@@ -145,8 +132,6 @@ func tone(name string) Tone {
 	return ToneInfo
 }
 
-// Hold bounds how long a message may keep the screen, since it outranks everything the device
-// shows on its own. Zero or less is the default, and anything past the ceiling is the ceiling.
 func Hold(v int) time.Duration {
 	switch {
 	case v <= 0:

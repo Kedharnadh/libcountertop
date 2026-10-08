@@ -2,7 +2,6 @@ package component
 
 import "testing"
 
-// coming is a component that says how it is coming up.
 type coming struct {
 	name string
 	p    Progress
@@ -11,7 +10,6 @@ type coming struct {
 func (c *coming) Name() string      { return c.name }
 func (c *coming) Startup() Progress { return c.p }
 
-// quiet has nothing to say about starting, which most components do not.
 type quiet struct{ name string }
 
 func (q *quiet) Name() string { return q.name }
@@ -30,7 +28,6 @@ func TestProgressOnlyCollectsWhatSpeaks(t *testing.T) {
 	}
 }
 
-// The name comes from the component rather than being repeated in what it reports.
 func TestProgressCarriesTheName(t *testing.T) {
 	r := &Registry[testConfig]{}
 	r.Add(Hardware, func() Component { return &coming{name: "dhcp", p: Progress{Doing: "asking"}} })

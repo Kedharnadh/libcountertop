@@ -15,8 +15,6 @@ var brownNoise = Sound{
 	},
 }
 
-// brown integrates white. The leak is what stops it walking off to a rail and staying there, and it
-// puts a corner at about 150 Hz, below which brown flattens rather than rising forever.
 type brown struct{ sum float32 }
 
 func (b *brown) next(g *Gen) float32 {

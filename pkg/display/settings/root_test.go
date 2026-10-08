@@ -10,7 +10,17 @@ import (
 func TestRootCreatesPagesOnlyWhenOpened(t *testing.T) {
 	created := 0
 	page := func() shell.View { created++; return &shell.Page{} }
-	o := RootDependencies{Network: rootNetwork{}, Screen: rootScreen{}, Volume: rootVolume{}, Shell: shell.New(), Assistants: &AssistantPages{options: AssistantDependencies{Slots: 0}}, NetworkPage: page, FeaturesPage: page, VolumePage: page, AboutPage: page}
+	o := RootDependencies{
+		Network:      rootNetwork{},
+		Screen:       rootScreen{},
+		Volume:       rootVolume{},
+		Shell:        shell.New(),
+		Assistants:   &AssistantPages{options: AssistantDependencies{Slots: 0}},
+		NetworkPage:  page,
+		FeaturesPage: page,
+		VolumePage:   page,
+		AboutPage:    page,
+	}
 
 	rows, actions := RootPage(o).Build()
 	if created != 0 || len(rows) != len(actions) {

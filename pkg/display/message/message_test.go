@@ -5,6 +5,7 @@ import (
 	"time"
 
 	esphome "github.com/ygelfand/go-esphome-device"
+
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 )
 
@@ -31,8 +32,6 @@ func TestToneFallsBackToInfo(t *testing.T) {
 	}
 }
 
-// A message outranks everything the device shows on its own, so how long it may hold the screen is
-// bounded at both ends.
 func TestSeconds(t *testing.T) {
 	tests := []struct {
 		name string
@@ -55,7 +54,6 @@ func TestSeconds(t *testing.T) {
 	}
 }
 
-// Every tone has to draw a color that is actually in the theme, or a message is invisible.
 func TestEveryToneHasAColor(t *testing.T) {
 	palette := theme.Default()
 
@@ -94,7 +92,6 @@ func TestActions(t *testing.T) {
 		}
 		found = true
 
-		// The zero call carries no arguments, which is what a caller who forgot the body sends.
 		if _, err := a.Run(esphome.Call{}); err == nil {
 			t.Error("show_message with no body was accepted")
 		}
@@ -104,8 +101,6 @@ func TestActions(t *testing.T) {
 	}
 }
 
-// Touching the screen when nothing is up must do nothing at all, rather than hiding a message
-// that was never shown.
 func TestDismissWithNothingShowing(t *testing.T) {
 	m := New()
 

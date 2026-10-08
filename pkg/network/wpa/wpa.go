@@ -1,11 +1,3 @@
-// Package wpa is wpa_supplicant's control protocol, without a transport.
-//
-// The supplicant is spoken to two ways here: the installer runs wpa_cli over adb, and the device
-// opens the control socket itself. Those differ only in how a command and its reply travel, so
-// what a command says and what a reply means live here and each side brings its own Conn.
-//
-// Nothing here composes a wpa_supplicant.conf. The supplicant owns its configuration and writes it
-// itself, which is also why a network added this way survives a reboot.
 package wpa
 
 import (
@@ -17,17 +9,11 @@ import (
 	"strings"
 )
 
-// Conn is one command and its reply. Commands are given lowercase, as wpa_cli takes them; a
-// transport that needs them another way is the one that knows so.
 type Conn interface {
 	Cmd(words ...string) (string, error)
 }
 
-// Security is how a network is protected.
-//
-// What this device can join is fixed by its supplicant, which reports key_mgmt as
-// "NONE IEEE8021X WPA-EAP WPA-PSK". There is no SAE, so a WPA3-only network cannot be joined at
-// all, while one in WPA2/WPA3 transition mode advertises PSK alongside SAE and joins as PSK.
+// The supplicant reports key_mgmt "NONE IEEE8021X WPA-EAP WPA-PSK": no SAE.
 type Security int
 
 const (
@@ -49,11 +35,9 @@ func (s Security) String() string {
 	return "enterprise"
 }
 
-// Supported reports whether this device's supplicant can join.
 func (s Security) Supported() bool { return s == Open || s == PSK }
 
-// SecurityOf reads the flags a scan reports. PSK wins over SAE: an access point advertising both is
-// in transition mode, and PSK is the half this device can use.
+// An access point advertising both PSK and SAE is in WPA2/WPA3 transition mode.
 func SecurityOf(flags string) Security {
 	switch {
 	case strings.Contains(flags, "EAP"):
@@ -66,7 +50,6 @@ func SecurityOf(flags string) Security {
 	return Open
 }
 
-// Network is one access point a scan found.
 type Network struct {
 	SSID     string
 	Signal   int
@@ -81,8 +64,6 @@ func (n Network) String() string {
 	return fmt.Sprintf("%s (%d dBm, %s)", n.SSID, n.Signal, n.Security)
 }
 
-// ParseScan reads scan_results, keeping the strongest sighting of each name and dropping the
-// unnamed ones, which are access points hiding their SSID.
 func ParseScan(out string) map[string]Network {
 	best := map[string]Network{}
 	for line := range strings.SplitSeq(out, "\n") {
@@ -97,14 +78,18 @@ func ParseScan(out string) map[string]Network {
 			continue
 		}
 		if seen, ok := best[ssid]; !ok || signal > seen.Signal {
-			best[ssid] = Network{SSID: ssid, Signal: signal, Flags: fields[3], Security: SecurityOf(fields[3])}
+			best[ssid] = Network{
+				SSID:     ssid,
+				Signal:   signal,
+				Flags:    fields[3],
+				Security: SecurityOf(fields[3]),
+			}
 		}
 	}
 	return best
 }
 
-// ParseNetworks reads list_networks, which is a header and then one tab-separated row per network.
-// A row counts only when it starts with an id and carries a name.
+// list_networks: a header line, then one tab-separated row per network.
 func ParseNetworks(out string) []string {
 	var names []string
 	for line := range strings.SplitSeq(out, "\n") {
@@ -119,8 +104,6 @@ func ParseNetworks(out string) []string {
 	return names
 }
 
-// IDs reads list_networks for the ids of every network with this name. Several can share one: a
-// join that failed and was left behind is a second row with the same name.
 func IDs(out, ssid string) []string {
 	var ids []string
 	for line := range strings.SplitSeq(out, "\n") {
@@ -136,24 +119,15 @@ func IDs(out, ssid string) []string {
 	return ids
 }
 
-// State is what the supplicant says about the connection.
 type State struct {
 	SSID    string
 	State   string
 	Address string
 }
 
-// Associated reports whether the supplicant got as far as authenticating, which is what says the
-// passphrase was right. An address is a separate matter.
 func (s State) Associated() bool { return s.State == "COMPLETED" }
 
-// Joined reports whether the device is associated to this network. An empty ssid accepts any, for a
-// join where the name was never chosen — WPS.
-//
-// The name matters because COMPLETED alone is also true of the network the device was already on.
-// select_network does not tear the old association down at once, so for a second or two after
-// asking to switch, the supplicant still reports the previous network as connected. Judging on
-// state alone reports success for the network being left.
+// COMPLETED still names the previous network for a moment after select_network.
 func (s State) Joined(ssid string) bool {
 	if !s.Associated() {
 		return false
@@ -168,8 +142,6 @@ func (s State) String() string {
 	return fmt.Sprintf("%s, %s, %s", s.SSID, strings.ToLower(s.State), s.Address)
 }
 
-// ParseStatus reads the key=value lines status answers with, keeping the three that say what the
-// connection is.
 func ParseStatus(out string) State {
 	var s State
 	for line := range strings.SplitSeq(out, "\n") {
@@ -189,19 +161,16 @@ func ParseStatus(out string) State {
 	return s
 }
 
-// Key turns a passphrase into the 256-bit key wpa_supplicant would derive from it anyway: PBKDF2
-// over the passphrase with the network name as salt, 4096 rounds. Passing that instead of the
-// passphrase keeps the text out of every parser between here and the supplicant, and out of the
-// config file it writes.
-//
-// A 64-character hex string is already a key rather than a passphrase, so it goes through
-// untouched.
+// PSK = PBKDF2-SHA1(passphrase, ssid, 4096, 32); 64 hex characters are already a PSK.
 func Key(ssid, passphrase string) (string, error) {
 	if len(passphrase) == 64 && isHex(passphrase) {
 		return passphrase, nil
 	}
 	if len(passphrase) < 8 || len(passphrase) > 63 {
-		return "", fmt.Errorf("wpa: a WPA passphrase is 8 to 63 characters, this one is %d", len(passphrase))
+		return "", fmt.Errorf(
+			"wpa: a WPA passphrase is 8 to 63 characters, this one is %d",
+			len(passphrase),
+		)
 	}
 
 	psk, err := pbkdf2.Key(sha1.New, passphrase, []byte(ssid), 4096, 32)
@@ -216,8 +185,7 @@ func isHex(s string) bool {
 	return err == nil
 }
 
-// LastLine is the last non-empty line of a reply, which is where wpa_cli puts the answer after its
-// own preamble about which interface it selected.
+// wpa_cli prints the interface it selected before the answer.
 func LastLine(out string) string {
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	return lines[len(lines)-1]

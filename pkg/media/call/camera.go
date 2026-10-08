@@ -12,7 +12,6 @@ import (
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
-// Select chooses the saved stream, falling back to main when no substream is enabled.
 func (c *Camera) Select(stream config.CallStream) (int, Size, bool) {
 	sizes := c.sessions.Sizes()
 	if len(sizes) == 0 {
@@ -24,25 +23,20 @@ func (c *Camera) Select(stream config.CallStream) (int, Size, bool) {
 	return 0, sizes[0], true
 }
 
-// Camera adapts the shared vendor session hub to RTC frames and local preview.
 type Camera struct {
 	sessions *camerasession.Hub
 }
 
-// NewCamera uses the existing camera owner; it never opens vendor camera nodes.
 func NewCamera(sessions *camerasession.Hub) *Camera {
 	return &Camera{sessions: sessions}
 }
 
-// Key asks the camera owner for a new keyframe.
 func (c *Camera) Key() {
 	if err := c.sessions.RequestKey(); err != nil {
 		slog.Debug("call keyframe not requested", "err", err)
 	}
 }
 
-// Frames supplies encoded frames and rejoins when the camera session changes.
-// sized may be nil. Release cancels the stream and waits for its worker to exit.
 func (c *Camera) Frames(at int, sized func(Size)) (<-chan rtc.Frame, func()) {
 	out := make(chan rtc.Frame, 8)
 	ctx, stop := context.WithCancel(context.Background())
@@ -58,7 +52,8 @@ func (c *Camera) Frames(at int, sized func(Size)) (<-chan rtc.Frame, func()) {
 			} else {
 				func() {
 					defer c.sessions.Leave(s, frames)
-					if sizes := c.sessions.Sizes(); at >= 0 && at < len(sizes) && sizes[at] != size {
+					if sizes := c.sessions.Sizes(); at >= 0 && at < len(sizes) &&
+						sizes[at] != size {
 						size = sizes[at]
 						if sized != nil {
 							sized(size)

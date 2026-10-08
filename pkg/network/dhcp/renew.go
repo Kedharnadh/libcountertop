@@ -10,19 +10,15 @@ import (
 	"github.com/insomniacslk/dhcp/dhcpv4"
 )
 
-// errRefused is a server saying no. A NAK ends the lease then and there: the address is not the
-// client's any more, so there is nothing left to extend and the only way forward is to start again.
 var errRefused = errors.New("dhcp: the server refused the renewal")
 
-// renewMessage is the DHCPREQUEST a client sends to keep the address it already has, as RFC 2131
-// section 4.3.2 describes the RENEWING and REBINDING forms.
-//
-// It is told apart from the request that follows an offer by what is in it rather than by a flag.
-// ciaddr carries the address, because the client is using it; the requested-address option MUST NOT
-// be set, because that option is for an address the client does not have yet. The server identifier
-// is left out too — in RENEWING the message is unicast, so it is already addressed to the one
-// server, and in REBINDING any server may answer and naming one would stop the others.
-func renewMessage(mac net.HardwareAddr, addr net.IP, broadcasting bool, hostname string) (*dhcpv4.DHCPv4, error) {
+// RFC 2131 table 5: RENEWING and REBINDING set ciaddr, never requested-address or server identifier.
+func renewMessage(
+	mac net.HardwareAddr,
+	addr net.IP,
+	broadcasting bool,
+	hostname string,
+) (*dhcpv4.DHCPv4, error) {
 	if addr.To4() == nil {
 		return nil, fmt.Errorf("dhcp: %s is not an IPv4 address", addr)
 	}
@@ -39,28 +35,14 @@ func renewMessage(mac net.HardwareAddr, addr net.IP, broadcasting bool, hostname
 
 	msg.ClientIPAddr = addr.To4()
 
-	// The broadcast flag asks the server to reply to everyone, which a client that already holds an
-	// address never needs: it can receive a unicast reply, and RFC 2131 section 4.4.5 says a
-	// rebinding client broadcasts the request, not that it wants the answer broadcast back.
 	msg.SetUnicast()
 
 	return msg, nil
 }
 
-// renewWait is how long one attempt waits for an answer before trying again. RFC 2131 retransmits
-// at half the remaining time; this is the floor under that, so a lease with hours left does not
-// make the first retry hours away.
 const renewWait = 10 * time.Second
 
-// extend keeps the address the device already has, rather than negotiating a new one.
-//
-// Two states, and the only difference between them is who the message goes to. RENEWING unicasts to
-// the server that granted the lease, from T1 until T2. REBINDING broadcasts from T2 until the lease
-// expires, because a server that has stopped answering is the case that state exists for, and any
-// server on the segment may take over.
-//
-// A refusal is returned as it is. Everything else — a server that says nothing, a socket that will
-// not open — is a timeout, and the caller falls back to asking from scratch.
+// RFC 2131 4.4.5: RENEWING unicasts to the granting server from T1; REBINDING broadcasts from T2.
 func extend(ctx context.Context, iface string, lease *Lease, hostname string) (*Lease, error) {
 	link, err := net.InterfaceByName(iface)
 	if err != nil {
@@ -87,8 +69,7 @@ func extend(ctx context.Context, iface string, lease *Lease, hostname string) (*
 				return got, nil
 			}
 
-			// Half the time that is left, which is RFC 2131 section 4.4.5's schedule, floored so a
-			// long lease does not wait hours between two attempts.
+			// RFC 2131 4.4.5: retransmit at half the remaining time.
 			if err := sleep(ctx, max(time.Until(phase.until)/2, renewWait)); err != nil {
 				return nil, err
 			}
@@ -97,8 +78,13 @@ func extend(ctx context.Context, iface string, lease *Lease, hostname string) (*
 	return nil, fmt.Errorf("dhcp: %s could not be renewed before it expired", lease.Address.IP)
 }
 
-// ask sends one renewal and reads the answer.
-func ask(ctx context.Context, link *net.Interface, lease *Lease, broadcasting bool, hostname string) (*Lease, error) {
+func ask(
+	ctx context.Context,
+	link *net.Interface,
+	lease *Lease,
+	broadcasting bool,
+	hostname string,
+) (*Lease, error) {
 	msg, err := renewMessage(link.HardwareAddr, lease.Address.IP, broadcasting, hostname)
 	if err != nil {
 		return nil, err
@@ -109,14 +95,23 @@ func ask(ctx context.Context, link *net.Interface, lease *Lease, broadcasting bo
 		to = net.IPv4bcast
 	}
 
-	conn, err := net.DialUDP("udp4",
-		&net.UDPAddr{IP: lease.Address.IP, Port: clientPort},
-		&net.UDPAddr{IP: to, Port: serverPort})
+	conn, err := net.ListenUDP("udp4", &net.UDPAddr{IP: lease.Address.IP, Port: clientPort})
 	if err != nil {
 		return nil, fmt.Errorf("dhcp: renewing to %s: %w", to, err)
 	}
 	defer conn.Close()
 
+	return exchange(ctx, conn, &net.UDPAddr{IP: to, Port: serverPort}, msg, lease.Address.IP)
+}
+
+// A rebinding reply may come from any server.
+func exchange(
+	ctx context.Context,
+	conn *net.UDPConn,
+	to *net.UDPAddr,
+	msg *dhcpv4.DHCPv4,
+	addr net.IP,
+) (*Lease, error) {
 	deadline, ok := ctx.Deadline()
 	if soon := time.Now().Add(renewWait); !ok || soon.Before(deadline) {
 		deadline = soon
@@ -125,17 +120,15 @@ func ask(ctx context.Context, link *net.Interface, lease *Lease, broadcasting bo
 		return nil, err
 	}
 
-	if _, err := conn.Write(msg.ToBytes()); err != nil {
-		return nil, fmt.Errorf("dhcp: renewing %s: %w", lease.Address.IP, err)
+	if _, err := conn.WriteToUDP(msg.ToBytes(), to); err != nil {
+		return nil, fmt.Errorf("dhcp: renewing %s: %w", addr, err)
 	}
 
-	// Anything else on the port is somebody else's exchange, so reading goes on until the answer
-	// to this one arrives or the deadline passes.
 	buf := make([]byte, 1500)
 	for {
-		n, err := conn.Read(buf)
+		n, _, err := conn.ReadFromUDP(buf)
 		if err != nil {
-			return nil, fmt.Errorf("dhcp: waiting for a renewal of %s: %w", lease.Address.IP, err)
+			return nil, fmt.Errorf("dhcp: waiting for a renewal of %s: %w", addr, err)
 		}
 
 		reply, err := dhcpv4.FromBytes(buf[:n])

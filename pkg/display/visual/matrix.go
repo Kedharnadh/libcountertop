@@ -185,7 +185,13 @@ func (v *matrix) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 	if err := g.Texture(0, v.state); err != nil {
 		return err
 	}
-	vals := []float32{float32(v.st.w), float32(v.st.h), float32(math.Mod(x.Now.Seconds(), 1000)), float32(v.size()),
-		float32(v.rows(0)), float32(v.rows(1))}
+	vals := []float32{
+		float32(v.st.w),
+		float32(v.st.h),
+		float32(math.Mod(x.Now.Seconds(), 1000)),
+		float32(v.size()),
+		float32(v.rows(0)),
+		float32(v.rows(1)),
+	}
 	return g.Values(vals, 0.5, 0.025, 2)
 }

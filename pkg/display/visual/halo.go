@@ -101,7 +101,18 @@ func (v *halo) advance(f frame, W, H, u float64, portrait bool) (cx, cy, r0, uni
 				p = 72 - q
 			}
 			sp := (90 + 160*lv) * u
-			v.sparks = append(v.sparks, spark{cx + math.Cos(an)*rad, cy + math.Sin(an)*rad, math.Cos(an) * sp, math.Sin(an) * sp, 0, 0.6 + v.r.next()*0.6, v.pal(float64(p) / 36)})
+			v.sparks = append(
+				v.sparks,
+				spark{
+					cx + math.Cos(an)*rad,
+					cy + math.Sin(an)*rad,
+					math.Cos(an) * sp,
+					math.Sin(an) * sp,
+					0,
+					0.6 + v.r.next()*0.6,
+					v.pal(float64(p) / 36),
+				},
+			)
 		}
 	}
 	kept := v.sparks[:0]
@@ -161,8 +172,18 @@ func (v *halo) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 	size := float32(math.Max(4*u, 2))
 	for _, sp := range v.sparks {
 		a := float32(0.9 * (1 - sp.age/sp.life))
-		pts = append(pts, Point{X: float32(sp.x), Y: float32(sp.y), Size: size,
-			R: float32(sp.c[0] / 255), G: float32(sp.c[1] / 255), B: float32(sp.c[2] / 255), A: a, Feed: true})
+		pts = append(pts, Point{
+			X:    float32(sp.x),
+			Y:    float32(sp.y),
+			Size: size,
+			R: float32(
+				sp.c[0] / 255,
+			),
+			G:    float32(sp.c[1] / 255),
+			B:    float32(sp.c[2] / 255),
+			A:    a,
+			Feed: true,
+		})
 	}
 	if err := g.Points(pts); err != nil {
 		return err

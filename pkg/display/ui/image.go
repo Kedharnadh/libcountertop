@@ -6,14 +6,11 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 )
 
-// Image is a surface in memory, for drawing something before it goes to the panel and for
-// checking what was drawn without one.
 type Image struct {
 	w, h int
 	px   []theme.Color
 }
 
-// NewImage is a surface of this size, filled with a color.
 func NewImage(w, h int, c theme.Color) *Image {
 	img := &Image{w: w, h: h, px: make([]theme.Color, w*h)}
 	img.FillRect(Rect{W: w, H: h}, c)
@@ -29,8 +26,6 @@ func (i *Image) Set(x, y int, c theme.Color) {
 	i.px[y*i.w+x] = c
 }
 
-// At is the color of one pixel. A point outside the image is the zero color, since nothing was
-// drawn there.
 func (i *Image) At(x, y int) theme.Color {
 	if x < 0 || y < 0 || x >= i.w || y >= i.h {
 		return theme.Color{}
@@ -38,14 +33,10 @@ func (i *Image) At(x, y int) theme.Color {
 	return i.px[y*i.w+x]
 }
 
-// RGBADrawer is a surface that takes a whole RGBA image at once, each pixel scale times across and
-// down, painting only inside clip.
 type RGBADrawer interface {
 	DrawRGBA(x, y int, img *image.RGBA, scale int, clip Rect)
 }
 
-// DrawRGBA paints img onto s through its RGBADrawer when it has one, and a pixel at a time when
-// it does not.
 func DrawRGBA(s Surface, x, y int, img *image.RGBA, scale int, clip Rect) {
 	if d, ok := s.(RGBADrawer); ok {
 		d.DrawRGBA(x, y, img, scale, clip)
@@ -105,10 +96,6 @@ func (i *Image) DrawRGBA(x, y int, img *image.RGBA, scale int, clip Rect) {
 	}
 }
 
-// Draw copies an image onto a surface with its top-left corner at x, y.
-//
-// What lands outside is worked out once rather than per pixel: a full screen is two million of
-// them, and asking the surface its size that many times costs more than the copy.
 func Draw(s Surface, img *Image, x, y int) {
 	w, h := s.Size()
 
@@ -131,16 +118,11 @@ func Draw(s Surface, img *Image, x, y int) {
 	}
 }
 
-// DrawScaled copies an image to fill a rectangle, cropping to a square of it rather than squashing:
-// album art is square and a panel's box for it may not be.
-//
-// Nearest neighbor. It runs when a screen is drawn, not per frame.
 func DrawScaled(s Surface, img *Image, r Rect) {
 	if r.W <= 0 || r.H <= 0 || img.w <= 0 || img.h <= 0 {
 		return
 	}
 
-	// The largest centered piece of the source with the destination's proportions.
 	sw, sh := img.w, img.h
 	if sw*r.H > sh*r.W {
 		sw = sh * r.W / r.H
@@ -157,13 +139,6 @@ func DrawScaled(s Surface, img *Image, r Rect) {
 	}
 }
 
-// FillRect paints whole rows of the pixel slice, which is what makes the drawing benchmarks
-// measure the drawing rather than the bounds checks.
-//
-// One row written a pixel at a time, then copied into the others. A pixel is three bytes, so
-// assigning one cannot be a word-sized store and a loop over every pixel moves the screen at a
-// fraction of what the memory will take; copy is memmove, which moves words and does not care that
-// three does not divide eight.
 func (i *Image) FillRect(r Rect, c theme.Color) {
 	x0, y0 := max(r.X, 0), max(r.Y, 0)
 	x1, y1 := min(r.X+r.W, i.w), min(r.Y+r.H, i.h)
@@ -181,9 +156,6 @@ func (i *Image) FillRect(r Rect, c theme.Color) {
 	}
 }
 
-// DrawImageScaled paints an image.Image into a box, nearest-neighbour, composited over a background
-// colour. It is how an asset that is not a ui.Image — a decoded PNG, a rendered icon — reaches a
-// surface.
 func DrawImageScaled(s Surface, img image.Image, at Rect, on theme.Color) {
 	b := img.Bounds()
 
@@ -192,8 +164,7 @@ func DrawImageScaled(s Surface, img image.Image, at Rect, on theme.Color) {
 		for x := range at.W {
 			sx := b.Min.X + x*b.Dx()/at.W
 
-			// RGBA() is alpha-premultiplied, which is what source-over wants:
-			// out = src + dst*(1-alpha).
+			// RGBA() is alpha-premultiplied.
 			sr, sg, sb, sa := img.At(sx, sy).RGBA()
 			if sa == 0 {
 				continue

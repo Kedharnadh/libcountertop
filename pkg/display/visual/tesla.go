@@ -66,7 +66,16 @@ func (v *tesla) setup() {
 		if i < 5 {
 			on = 1
 		}
-		v.fil = append(v.fil, filament{lon: v.r.next() * 2 * math.Pi, lat: (v.r.next() - 0.5) * 2.4, sp: 0.15 + v.r.next()*0.3, seed: v.r.next() * 100, on: on})
+		v.fil = append(
+			v.fil,
+			filament{
+				lon:  v.r.next() * 2 * math.Pi,
+				lat:  (v.r.next() - 0.5) * 2.4,
+				sp:   0.15 + v.r.next()*0.3,
+				seed: v.r.next() * 100,
+				on:   on,
+			},
+		)
 	}
 
 	cx, cy, rg, u := v.cx, v.cy, v.rg, v.st.u
@@ -149,8 +158,18 @@ func (v *tesla) advance(f frame) (cA, cB [3]float64) {
 	if f.onset && talk {
 		v.flash = 1
 		for range 3 + int(f.voice*4) {
-			v.branches = append(v.branches, branch{t0: t, fi: int(v.r.next() * float64(nf)), at: 0.35 + v.r.next()*0.5,
-				lon: v.r.next() * 2 * math.Pi, lat: (v.r.next() - 0.5) * 2.6, seed: v.r.next() * 99, len: 0.25 + 0.35*v.r.next()})
+			v.branches = append(
+				v.branches,
+				branch{
+					t0:   t,
+					fi:   int(v.r.next() * float64(nf)),
+					at:   0.35 + v.r.next()*0.5,
+					lon:  v.r.next() * 2 * math.Pi,
+					lat:  (v.r.next() - 0.5) * 2.6,
+					seed: v.r.next() * 99,
+					len:  0.25 + 0.35*v.r.next(),
+				},
+			)
 		}
 	}
 	v.flash = math.Max(0, v.flash-dt*4)
@@ -197,7 +216,10 @@ func (v *tesla) advance(f frame) (cA, cB [3]float64) {
 			ag := (t - b.t0) / 0.28
 			bl, bu, l2 := math.Cos(b.lat)*math.Sin(b.lon), math.Sin(b.lat), rg*b.len
 			v.arc(bx, by, bx+bl*l2, by-bu*l2, b.seed, 0.35, t, lv)
-			v.paths = append(v.paths, teslaPath{x: v.px, y: v.py, bright: (1 - ag) * 0.9, width: 0.6})
+			v.paths = append(
+				v.paths,
+				teslaPath{x: v.px, y: v.py, bright: (1 - ag) * 0.9, width: 0.6},
+			)
 		}
 	}
 	return cA, cB
@@ -237,8 +259,22 @@ func (v *tesla) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 		}{{10, 0.07, cB}, {3.6, 0.32, cA}, {1.3, 0.85, core}} {
 			a := float32(math.Min(layer.a*pa.bright, 1))
 			for i := range 64 {
-				segs = append(segs, Segment{X0: float32(pa.x[i]), Y0: float32(pa.y[i]), X1: float32(pa.x[i+1]), Y1: float32(pa.y[i+1]),
-					Width: float32(layer.w * u * pa.width), R: float32(layer.c[0] / 255), G: float32(layer.c[1] / 255), B: float32(layer.c[2] / 255), A: a})
+				segs = append(
+					segs,
+					Segment{
+						X0: float32(pa.x[i]),
+						Y0: float32(pa.y[i]),
+						X1: float32(pa.x[i+1]),
+						Y1: float32(pa.y[i+1]),
+						Width: float32(
+							layer.w * u * pa.width,
+						),
+						R: float32(layer.c[0] / 255),
+						G: float32(layer.c[1] / 255),
+						B: float32(layer.c[2] / 255),
+						A: a,
+					},
+				)
 			}
 		}
 	}
@@ -249,14 +285,38 @@ func (v *tesla) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 	for k := range 3 {
 		vals[k], vals[3+k] = float32(cA[k]/255), float32(cB[k]/255)
 	}
-	vals[6], vals[7], vals[8], vals[9], vals[10] = float32(v.cx), float32(v.cy), float32(v.rg), float32(lv), float32(v.flash)
+	vals[6], vals[7], vals[8], vals[9], vals[10] = float32(
+		v.cx,
+	), float32(
+		v.cy,
+	), float32(
+		v.rg,
+	), float32(
+		lv,
+	), float32(
+		v.flash,
+	)
 	vals[11] = float32(v.rg * 0.075 * (1.1 + 0.5*lv + 0.9*v.flash))
 	vals[14], vals[15] = float32(v.st.w), float32(v.st.h)
 	tip := mixc(cA, [3]float64{255, 255, 255}, 0.6)
 	pts := make([]Point, 0, len(v.ends))
 	for _, e := range v.ends {
-		pts = append(pts, Point{X: float32(e.x), Y: float32(e.y), Size: float32(2 * v.rg * (0.05 + 0.04*lv)),
-			R: float32(tip[0] / 255), G: float32(tip[1] / 255), B: float32(tip[2] / 255), A: float32(math.Min(0.8*e.bright, 1)), Round: true, Light: true})
+		pts = append(
+			pts,
+			Point{
+				X:    float32(e.x),
+				Y:    float32(e.y),
+				Size: float32(2 * v.rg * (0.05 + 0.04*lv)),
+				R: float32(
+					tip[0] / 255,
+				),
+				G:     float32(tip[1] / 255),
+				B:     float32(tip[2] / 255),
+				A:     float32(math.Min(0.8*e.bright, 1)),
+				Round: true,
+				Light: true,
+			},
+		)
 	}
 	if err := g.Points(pts); err != nil {
 		return err

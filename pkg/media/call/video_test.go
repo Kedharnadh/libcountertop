@@ -21,10 +21,38 @@ func TestArrange(t *testing.T) {
 		remote, own Size
 		side        bool
 	}{
-		{"portrait screen, landscape caller", 1200, 1920, Size{Width: 768, Height: 432}, Size{Width: 480, Height: 640}, true},
-		{"landscape screen, portrait caller", 1024, 600, Size{Width: 480, Height: 640}, Size{Width: 768, Height: 432}, true},
-		{"landscape screen, landscape caller", 1024, 600, Size{Width: 768, Height: 432}, Size{Width: 768, Height: 432}, false},
-		{"portrait screen, portrait caller", 1200, 1920, Size{Width: 480, Height: 640}, Size{Width: 480, Height: 640}, false},
+		{
+			"portrait screen, landscape caller",
+			1200,
+			1920,
+			Size{Width: 768, Height: 432},
+			Size{Width: 480, Height: 640},
+			true,
+		},
+		{
+			"landscape screen, portrait caller",
+			1024,
+			600,
+			Size{Width: 480, Height: 640},
+			Size{Width: 768, Height: 432},
+			true,
+		},
+		{
+			"landscape screen, landscape caller",
+			1024,
+			600,
+			Size{Width: 768, Height: 432},
+			Size{Width: 768, Height: 432},
+			false,
+		},
+		{
+			"portrait screen, portrait caller",
+			1200,
+			1920,
+			Size{Width: 480, Height: 640},
+			Size{Width: 480, Height: 640},
+			false,
+		},
 		{"size not known yet", 1024, 600, Size{}, Size{Width: 768, Height: 432}, false},
 	}
 	for _, c := range cases {
@@ -43,10 +71,20 @@ func TestArrange(t *testing.T) {
 				t.Fatalf("picture %+v outside remote %+v", l.Picture, l.Remote)
 			}
 			if c.side {
-				if overlaps(l.Remote, l.Panel) || overlaps(l.Self, l.Remote) || !inside(l.Self, l.Panel) {
+				if overlaps(l.Remote, l.Panel) || overlaps(l.Self, l.Remote) ||
+					!inside(l.Self, l.Panel) {
 					t.Fatalf("side layout overlaps: %+v", l)
 				}
-				if got, want := float64(l.Picture.W)/float64(l.Picture.H), float64(c.remote.Width)/float64(c.remote.Height); got < want*0.98 || got > want*1.02 {
+				if got, want := float64(
+					l.Picture.W,
+				)/float64(
+					l.Picture.H,
+				), float64(
+					c.remote.Width,
+				)/float64(
+					c.remote.Height,
+				); got < want*0.98 ||
+					got > want*1.02 {
 					t.Fatalf("picture shape %.3f, caller sends %.3f", got, want)
 				}
 			}

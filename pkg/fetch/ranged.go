@@ -13,8 +13,6 @@ import (
 	"time"
 )
 
-// Ranged reads a url front to back in fixed-size range requests, keeping at most a set number of
-// chunks fetched ahead of the reader, so a long stream is never held whole.
 type Ranged struct {
 	client *http.Client
 	url    string
@@ -42,16 +40,12 @@ type piece struct {
 
 type Ask func(req *http.Request)
 
-// Chunks is how a Ranged fetches.
 type Chunks struct {
-	// Size is each request's length, and Ahead how many may be fetched ahead of the reader.
 	Size  int64
 	Ahead int
 
 	Ask Ask
 
-	// Renew, if set, is asked for a fresh url when a chunk is refused with 403, and the chunk is
-	// tried once more with it.
 	Renew func(ctx context.Context) (string, error)
 
 	Rate  int64
@@ -61,7 +55,6 @@ type Chunks struct {
 
 const retries = 6
 
-// NewRanged starts fetching url from the beginning. size is the length if known, else 0.
 func NewRanged(ctx context.Context, client *http.Client, url string, size int64, c Chunks) *Ranged {
 	if c.Ahead < 1 {
 		c.Ahead = 1
@@ -74,7 +67,6 @@ func NewRanged(ctx context.Context, client *http.Client, url string, size int64,
 	return r
 }
 
-// Size is the length, once known.
 func (r *Ranged) Size() int64 {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -163,7 +155,6 @@ func (r *Ranged) get(ctx context.Context, off int64, later bool) ([]byte, int64,
 	return r.once(ctx, off)
 }
 
-// errRefused is a chunk the server answered with 403.
 var errRefused = errors.New("fetch: refused")
 
 func (r *Ranged) once(ctx context.Context, off int64) ([]byte, int64, error) {
@@ -192,8 +183,25 @@ func (r *Ranged) once(ctx context.Context, off int64) ([]byte, int64, error) {
 
 	if resp.StatusCode != http.StatusPartialContent && resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		slog.Warn("fetch", "range", span, "size", r.chunk, "status", resp.Status, "took", time.Since(began),
-			"url", url, "asked", req.Header, "answered", resp.Header, "body", string(body))
+		slog.Warn(
+			"fetch",
+			"range",
+			span,
+			"size",
+			r.chunk,
+			"status",
+			resp.Status,
+			"took",
+			time.Since(began),
+			"url",
+			url,
+			"asked",
+			req.Header,
+			"answered",
+			resp.Header,
+			"body",
+			string(body),
+		)
 	}
 
 	switch {
@@ -202,7 +210,19 @@ func (r *Ranged) once(ctx context.Context, off int64) ([]byte, int64, error) {
 		return nil, 0, nil
 	case resp.StatusCode == http.StatusOK && off == 0:
 		data, err := io.ReadAll(io.LimitReader(resp.Body, r.chunk+1))
-		slog.Debug("fetch", "range", span, "size", r.chunk, "status", resp.Status, "got", len(data), "took", time.Since(began))
+		slog.Debug(
+			"fetch",
+			"range",
+			span,
+			"size",
+			r.chunk,
+			"status",
+			resp.Status,
+			"got",
+			len(data),
+			"took",
+			time.Since(began),
+		)
 		if int64(len(data)) > r.chunk {
 			return nil, 0, fmt.Errorf("fetch: %s ignores ranges", url)
 		}
@@ -218,7 +238,6 @@ func (r *Ranged) once(ctx context.Context, off int64) ([]byte, int64, error) {
 	return data, total(resp.Header.Get("Content-Range")), err
 }
 
-// total reads the length out of a Content-Range header, 0 when it does not say.
 func total(h string) int64 {
 	_, after, ok := strings.Cut(h, "/")
 	if !ok || after == "*" {
@@ -228,7 +247,6 @@ func total(h string) int64 {
 	return n
 }
 
-// Read hands over bytes in order, waiting for the next chunk when the current one is spent.
 func (r *Ranged) Read(p []byte) (int, error) {
 	for {
 		r.mu.Lock()
@@ -264,7 +282,6 @@ func (r *Ranged) Read(p []byte) (int, error) {
 	}
 }
 
-// From drops what is ahead and starts again from a byte offset.
 func (r *Ranged) From(off int64) {
 	slog.Debug("fetch from", "at", off)
 	r.mu.Lock()

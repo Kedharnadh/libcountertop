@@ -42,8 +42,18 @@ func newMercury() *mercury {
 		if i%2 == 1 {
 			sp = -sp
 		}
-		v.sats = append(v.sats, satellite{a: float64(i)/6*2*math.Pi + v.r.next()*0.4, sp: sp, r0: 0.026 + v.r.next()*0.014, band: 2 + i*3,
-			wob: v.r.next() * 2 * math.Pi, ws: 0.6 + v.r.next()*0.9, o: 0.16})
+		v.sats = append(
+			v.sats,
+			satellite{
+				a:    float64(i)/6*2*math.Pi + v.r.next()*0.4,
+				sp:   sp,
+				r0:   0.026 + v.r.next()*0.014,
+				band: 2 + i*3,
+				wob:  v.r.next() * 2 * math.Pi,
+				ws:   0.6 + v.r.next()*0.9,
+				o:    0.16,
+			},
+		)
 	}
 	return v
 }
@@ -98,7 +108,17 @@ func (v *mercury) advance(f frame) (balls []mercuryBall, cx, cy float64) {
 		for range nd {
 			ang := -math.Pi * (0.08 + 0.84*v.r.next())
 			spd := 0.6 + 0.8*f.voice
-			v.drops = append(v.drops, droplet{cx + math.Cos(ang)*v.core*0.7, cy + math.Sin(ang)*v.core*0.7, math.Cos(ang) * spd, math.Sin(ang) * spd, 0.018 + 0.016*f.voice, t})
+			v.drops = append(
+				v.drops,
+				droplet{
+					cx + math.Cos(ang)*v.core*0.7,
+					cy + math.Sin(ang)*v.core*0.7,
+					math.Cos(ang) * spd,
+					math.Sin(ang) * spd,
+					0.018 + 0.016*f.voice,
+					t,
+				},
+			)
 		}
 	}
 	kept := v.drops[:0]
@@ -133,12 +153,41 @@ func (v *mercury) backdrop(back *image.RGBA, unit float64) {
 	W, H, u := float64(v.st.w), float64(v.st.h), v.st.u
 	fy := mercuryFloor * unit
 	fx.LinearRect(back, back.Bounds(), 0, 0, 0, float32(H), []fx.Stop{
-		{At: 0, C: hex(0x040509, 1)}, {At: 0.55, C: hex(0x090b12, 1)}, {At: float32(fy/H) - 0.001, C: hex(0x11141d, 1)}, {At: float32(fy / H), C: hex(0x07080c, 1)}, {At: 1, C: hex(0x020203, 1)},
+		{
+			At: 0,
+			C:  hex(0x040509, 1),
+		},
+		{At: 0.55, C: hex(0x090b12, 1)},
+		{At: float32(fy/H) - 0.001, C: hex(0x11141d, 1)},
+		{At: float32(fy / H), C: hex(0x07080c, 1)},
+		{At: 1, C: hex(0x020203, 1)},
 	}, false)
-	fx.LinearRect(back, image.Rect(0, int(fy-0.6*u), v.st.w, int(fy-0.6*u)+max(1, int(1.2*u))), 0, 0, float32(W), 0, []fx.Stop{
-		{At: 0, C: color.NRGBA{160, 175, 210, 0}}, {At: 0.5, C: color.NRGBA{160, 175, 210, 41}}, {At: 1, C: color.NRGBA{160, 175, 210, 0}},
-	}, false)
-	fx.Radial(back, float32(W/2), float32(H*0.45), 0, float32(math.Max(W, H)*0.75), []fx.Stop{{At: 0, C: color.NRGBA{}}, {At: 1, C: color.NRGBA{0, 0, 0, 178}}}, false)
+	fx.LinearRect(
+		back,
+		image.Rect(0, int(fy-0.6*u), v.st.w, int(fy-0.6*u)+max(1, int(1.2*u))),
+		0,
+		0,
+		float32(W),
+		0,
+		[]fx.Stop{
+			{
+				At: 0,
+				C:  color.NRGBA{160, 175, 210, 0},
+			},
+			{At: 0.5, C: color.NRGBA{160, 175, 210, 41}},
+			{At: 1, C: color.NRGBA{160, 175, 210, 0}},
+		},
+		false,
+	)
+	fx.Radial(
+		back,
+		float32(W/2),
+		float32(H*0.45),
+		0,
+		float32(math.Max(W, H)*0.75),
+		[]fx.Stop{{At: 0, C: color.NRGBA{}}, {At: 1, C: color.NRGBA{0, 0, 0, 178}}},
+		false,
+	)
 }
 
 //go:embed mercury.glsl
@@ -173,14 +222,34 @@ func (v *mercury) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 		if br < 0.4 {
 			continue
 		}
-		pts = append(pts, Point{X: float32(ox + b.x*unit), Y: float32(b.y * unit), Size: float32(br * 4.4), A: float32(br), Splat: true})
+		pts = append(
+			pts,
+			Point{
+				X:     float32(ox + b.x*unit),
+				Y:     float32(b.y * unit),
+				Size:  float32(br * 4.4),
+				A:     float32(br),
+				Splat: true,
+			},
+		)
 	}
 	if err := g.Points(pts); err != nil {
 		return err
 	}
 	tc := v.tint
-	vals := []float32{float32(1 / W), float32(1 / H), float32(tc[0]), float32(tc[1]), float32(tc[2]), float32(lv),
-		float32(ox + cx*unit), float32(cy * unit), float32(unit), float32(mercuryFloor * unit),
-		float32(0.55 + 1.5*lv), float32(0.3 + 1.3*lv)}
+	vals := []float32{
+		float32(1 / W),
+		float32(1 / H),
+		float32(tc[0]),
+		float32(tc[1]),
+		float32(tc[2]),
+		float32(lv),
+		float32(ox + cx*unit),
+		float32(cy * unit),
+		float32(unit),
+		float32(mercuryFloor * unit),
+		float32(0.55 + 1.5*lv),
+		float32(0.3 + 1.3*lv),
+	}
 	return g.Values(vals, float32(0.8+0.7*lv), 0.03, 2)
 }

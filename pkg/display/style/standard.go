@@ -6,7 +6,13 @@ import (
 
 const Standard = "standard"
 
-var standardStyle = Style{Name: Standard, Palette: "Paper", Family: sans, Shape: func(*gogui.ThemeCfg) {}, Kit: standard{}}
+var standardStyle = Style{
+	Name:    Standard,
+	Palette: "Paper",
+	Family:  sans,
+	Shape:   func(*gogui.ThemeCfg) {},
+	Kit:     standard{},
+}
 
 type standard struct{}
 
@@ -46,7 +52,13 @@ func (standard) Seek(marks []Span) func(gogui.SliderLookState) gogui.SliderParts
 		})
 		return gogui.SliderParts{
 			Track: track,
-			Fill:  gogui.Row(gogui.ContainerCfg{Height: size, Sizing: gogui.FixedFixed, Padding: gogui.NoPadding}),
+			Fill: gogui.Row(
+				gogui.ContainerCfg{
+					Height:  size,
+					Sizing:  gogui.FixedFixed,
+					Padding: gogui.NoPadding,
+				},
+			),
 			Handle: gogui.DrawCanvas(gogui.DrawCanvasCfg{
 				Sizing: gogui.FixedFixed,
 				Width:  thumb,
@@ -54,7 +66,14 @@ func (standard) Seek(marks []Span) func(gogui.SliderLookState) gogui.SliderParts
 				OnDraw: func(dc *gogui.DrawContext) {
 					w, edge := max(thumb/6, 4), max(thumb/24, 1.5)
 					x := (thumb - w) / 2
-					dc.FilledRoundedRect(x-edge, 0, w+2*edge, thumb, (w+2*edge)/2, t.ColorBackground)
+					dc.FilledRoundedRect(
+						x-edge,
+						0,
+						w+2*edge,
+						thumb,
+						(w+2*edge)/2,
+						t.ColorBackground,
+					)
 					dc.FilledRoundedRect(x, edge, w, thumb-2*edge, w/2, t.TextStyleDef.Color)
 				},
 			}),

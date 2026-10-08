@@ -10,8 +10,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 )
 
-// Decode turns encoded image bytes into a surface. JPEG and PNG, which is what album art arrives
-// as.
 func Decode(b []byte) (*Image, error) {
 	src, kind, err := image.Decode(bytes.NewReader(b))
 	if err != nil {
@@ -26,7 +24,6 @@ func Decode(b []byte) (*Image, error) {
 
 	for y := range out.h {
 		for x := range out.w {
-			// Sixteen bits per channel from the model, eight on the panel.
 			r, g, b, _ := src.At(box.Min.X+x, box.Min.Y+y).RGBA()
 			out.Set(x, y, theme.Color{R: uint8(r >> 8), G: uint8(g >> 8), B: uint8(b >> 8)})
 		}

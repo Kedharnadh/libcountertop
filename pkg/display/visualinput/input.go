@@ -9,6 +9,7 @@ import (
 	"time"
 
 	esphome "github.com/ygelfand/go-esphome-device"
+
 	"github.com/ygelfand/libcountertop/pkg/audio/analysis"
 	"github.com/ygelfand/libcountertop/pkg/display/visual"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -86,20 +87,20 @@ func (v *Visuals) SetLabel(s string) {
 	if len(r) > LabelMost {
 		r = r[:LabelMost]
 	}
-	if err := v.options.Settings.Update(func(c *config.Visual) { c.Label = string(r) }); err != nil {
+	if err := v.options.Settings.Update(
+		func(c *config.Visual) { c.Label = string(r) },
+	); err != nil {
 		slog.Error("saving a setting failed", "setting", v.label.ObjectID, "err", err)
 	}
 	v.Restore(v.options.Settings.Read())
 }
 
-// Kind is the visual the device is set to draw.
 func (v *Visuals) Kind() visual.Kind {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	return v.chosen
 }
 
-// SetKind changes the visual and remembers it.
 func (v *Visuals) SetKind(k visual.Kind) {
 	if err := v.options.Settings.Update(func(c *config.Visual) { c.Kind = string(k) }); err != nil {
 		slog.Error("saving a setting failed", "setting", v.kind.ObjectID, "err", err)
@@ -243,7 +244,6 @@ func (v *Visuals) hear(ctx context.Context) {
 	}
 }
 
-// Tap receives interleaved PCM while at least one visual is visible.
 type Tap interface{ Offer([]int16) }
 type Options struct {
 	MicRate, SpeakerRate, SpeakerChannels, Lift int

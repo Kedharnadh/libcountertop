@@ -69,7 +69,14 @@ func TestBloomSkipsOnlyWhatAddsNothing(t *testing.T) {
 					var bl Bloom
 					bl.Glow(got, src, amount, 0.03, 2)
 					if !bytes.Equal(want.Pix, got.Pix) {
-						t.Fatalf("%dx%d dense=%v seed %d amount %v: the skipping bloom differs", sz[0], sz[1], dense, seed, amount)
+						t.Fatalf(
+							"%dx%d dense=%v seed %d amount %v: the skipping bloom differs",
+							sz[0],
+							sz[1],
+							dense,
+							seed,
+							amount,
+						)
 					}
 				}
 			}
@@ -107,13 +114,45 @@ func TestAdditiveRadialMatchesEveryPixelPut(t *testing.T) {
 	r := rand.New(rand.NewPCG(9, 9))
 	for i := range 200 {
 		w, h := 50+r.IntN(300), 50+r.IntN(300)
-		cx, cy := r.Float32()*float32(w)*1.4-float32(w)*0.2, r.Float32()*float32(h)*1.4-float32(h)*0.2
+		cx, cy := r.Float32()*float32(
+			w,
+		)*1.4-float32(
+			w,
+		)*0.2, r.Float32()*float32(
+			h,
+		)*1.4-float32(
+			h,
+		)*0.2
 		r1 := 1 + r.Float32()*300
 		r0 := r.Float32() * r1 * 0.5
 		stops := []Stop{
-			{At: 0, C: color.NRGBA{uint8(r.IntN(256)), uint8(r.IntN(256)), uint8(r.IntN(256)), uint8(r.IntN(256))}},
-			{At: r.Float32(), C: color.NRGBA{uint8(r.IntN(256)), uint8(r.IntN(256)), uint8(r.IntN(256)), uint8(r.IntN(256))}},
-			{At: 1, C: color.NRGBA{uint8(r.IntN(256)), uint8(r.IntN(256)), uint8(r.IntN(256)), uint8(r.IntN(3))}},
+			{
+				At: 0,
+				C: color.NRGBA{
+					uint8(r.IntN(256)),
+					uint8(r.IntN(256)),
+					uint8(r.IntN(256)),
+					uint8(r.IntN(256)),
+				},
+			},
+			{
+				At: r.Float32(),
+				C: color.NRGBA{
+					uint8(r.IntN(256)),
+					uint8(r.IntN(256)),
+					uint8(r.IntN(256)),
+					uint8(r.IntN(256)),
+				},
+			},
+			{
+				At: 1,
+				C: color.NRGBA{
+					uint8(r.IntN(256)),
+					uint8(r.IntN(256)),
+					uint8(r.IntN(256)),
+					uint8(r.IntN(3)),
+				},
+			},
 		}
 		if i%3 == 0 {
 			stops[1].At, stops[1].C.A, stops[2].C.A = 0.3+r.Float32()*0.4, 0, 0
@@ -124,7 +163,16 @@ func TestAdditiveRadialMatchesEveryPixelPut(t *testing.T) {
 		radialEverywhere(want, cx, cy, r0, r1, stops)
 		Radial(got, cx, cy, r0, r1, stops, true)
 		if !bytes.Equal(want.Pix, got.Pix) {
-			t.Fatalf("case %d (%dx%d at %v,%v r %v..%v): additive radial differs", i, w, h, cx, cy, r0, r1)
+			t.Fatalf(
+				"case %d (%dx%d at %v,%v r %v..%v): additive radial differs",
+				i,
+				w,
+				h,
+				cx,
+				cy,
+				r0,
+				r1,
+			)
 		}
 	}
 }
@@ -135,7 +183,12 @@ func TestFillMatchesPutPerPixel(t *testing.T) {
 		want := scene(64, 1, true, uint64(i))
 		got := image.NewRGBA(want.Bounds())
 		copy(got.Pix, want.Pix)
-		c := color.NRGBA{uint8(r.IntN(256)), uint8(r.IntN(256)), uint8(r.IntN(256)), uint8(r.IntN(256))}
+		c := color.NRGBA{
+			uint8(r.IntN(256)),
+			uint8(r.IntN(256)),
+			uint8(r.IntN(256)),
+			uint8(r.IntN(256)),
+		}
 		additive := i%2 == 0
 		x0, x1 := r.IntN(64), r.IntN(65)
 		for x := x0; x < x1; x++ {
@@ -185,7 +238,16 @@ func TestBoxMatchesOneChannelAtATime(t *testing.T) {
 					}
 					for i := range want {
 						if want[i] != got[i] {
-							t.Fatalf("%dx%d r %d across=%v: element %d is %d, want %d", w, h, r, across, i, got[i], want[i])
+							t.Fatalf(
+								"%dx%d r %d across=%v: element %d is %d, want %d",
+								w,
+								h,
+								r,
+								across,
+								i,
+								got[i],
+								want[i],
+							)
 						}
 					}
 				}

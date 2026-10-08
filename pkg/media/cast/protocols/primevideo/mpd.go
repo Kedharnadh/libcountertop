@@ -111,7 +111,13 @@ func Summarize(data []byte) (string, error) {
 			}
 			lo, hi := "", ""
 			for i, r := range a.Reps {
-				d := fmt.Sprintf("%dx%d@%dk %s", r.Width, r.Height, r.Bandwidth/1000, first(r.Codecs, a.Codecs))
+				d := fmt.Sprintf(
+					"%dx%d@%dk %s",
+					r.Width,
+					r.Height,
+					r.Bandwidth/1000,
+					first(r.Codecs, a.Codecs),
+				)
 				if i == 0 {
 					lo = d
 				}
@@ -125,7 +131,17 @@ func Summarize(data []byte) (string, error) {
 					base += " index=" + r.Segment.Index
 				}
 			}
-			fmt.Fprintf(&b, " [%s %s reps=%d %s..%s drm=%s %s]", kind, a.Lang, len(a.Reps), lo, hi, strings.Join(schemes, ","), base)
+			fmt.Fprintf(
+				&b,
+				" [%s %s reps=%d %s..%s drm=%s %s]",
+				kind,
+				a.Lang,
+				len(a.Reps),
+				lo,
+				hi,
+				strings.Join(schemes, ","),
+				base,
+			)
 		}
 	}
 	return b.String(), nil
@@ -181,9 +197,20 @@ func Pick(data []byte, manifest string, tallest int, lang string) ([]Part, error
 		}
 		video, audio, ok := pickPeriod(p, resolve(root, m.Base, p.Base), tallest, want)
 		if !ok {
-			return nil, fmt.Errorf("prime video: no H.264 video and AAC audio under %dp in period %q: %s", tallest, p.ID, excerpt(data))
+			return nil, fmt.Errorf(
+				"prime video: no H.264 video and AAC audio under %dp in period %q: %s",
+				tallest,
+				p.ID,
+				excerpt(data),
+			)
 		}
-		part := Part{ID: p.ID, Start: at, Duration: ParseDuration(p.Duration), Video: video, Audio: audio}
+		part := Part{
+			ID:       p.ID,
+			Start:    at,
+			Duration: ParseDuration(p.Duration),
+			Video:    video,
+			Audio:    audio,
+		}
 		parts = append(parts, part)
 		at += part.Duration
 	}
@@ -209,7 +236,8 @@ func pickPeriod(p period, base *url.URL, tallest int, want string) (video, audio
 				if !strings.HasPrefix(rep.Codecs, "avc1") || rep.Height > tallest {
 					continue
 				}
-				if !haveVideo || rep.Height > video.Height || rep.Height == video.Height && rep.Bandwidth > video.Bandwidth {
+				if !haveVideo || rep.Height > video.Height ||
+					rep.Height == video.Height && rep.Bandwidth > video.Bandwidth {
 					video, haveVideo = rep, true
 				}
 			case "audio":
@@ -401,9 +429,21 @@ func Describe(parts []Part) string {
 		if i > 0 {
 			b.WriteString(" | ")
 		}
-		fmt.Fprintf(&b, "%d id=%q at=%s for=%s video=%dx%d kid=%s offset=%s audio=%s kid=%s base=%s",
-			i, p.ID, p.Start.Round(time.Millisecond), p.Duration.Round(time.Millisecond),
-			p.Video.Width, p.Video.Height, p.Video.KID, p.Video.Offset, p.Audio.Lang, p.Audio.KID, path.Dir(urlPath(p.Video.URL)))
+		fmt.Fprintf(
+			&b,
+			"%d id=%q at=%s for=%s video=%dx%d kid=%s offset=%s audio=%s kid=%s base=%s",
+			i,
+			p.ID,
+			p.Start.Round(time.Millisecond),
+			p.Duration.Round(time.Millisecond),
+			p.Video.Width,
+			p.Video.Height,
+			p.Video.KID,
+			p.Video.Offset,
+			p.Audio.Lang,
+			p.Audio.KID,
+			path.Dir(urlPath(p.Video.URL)),
+		)
 	}
 	return b.String()
 }

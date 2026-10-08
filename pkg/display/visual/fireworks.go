@@ -63,12 +63,25 @@ type fireworks struct {
 func (v *fireworks) stars(back *image.RGBA, r *rng) {
 	W, H, u := float64(v.st.w), float64(v.st.h), v.st.u
 	fx.LinearRect(back, back.Bounds(), 0, 0, 0, float32(H), []fx.Stop{
-		{At: 0, C: hex(0x010208, 1)}, {At: 0.55, C: hex(0x050a1a, 1)}, {At: 0.86, C: hex(0x0d1430, 1)}, {At: 1, C: hex(0x070a16, 1)},
+		{
+			At: 0,
+			C:  hex(0x010208, 1),
+		},
+		{At: 0.55, C: hex(0x050a1a, 1)},
+		{At: 0.86, C: hex(0x0d1430, 1)},
+		{At: 1, C: hex(0x070a16, 1)},
 	}, false)
 	for range 260 {
 		b := 0.15 + r.next()*r.next()*0.7
 		s := (0.5 + r.next()) * u
-		fx.Square(back, float32(r.next()*W), float32(r.next()*H*0.7), float32(s), color.NRGBA{220, 230, 255, uint8(b * 255)}, false)
+		fx.Square(
+			back,
+			float32(r.next()*W),
+			float32(r.next()*H*0.7),
+			float32(s),
+			color.NRGBA{220, 230, 255, uint8(b * 255)},
+			false,
+		)
 	}
 }
 
@@ -139,7 +152,18 @@ func (v *fireworks) launch(str float64) {
 	} else if p < 0.22 {
 		kind = 2
 	}
-	v.rockets = append(v.rockets, fwRocket{x: x, y: v.ground, vx: (v.r.next() - 0.5) * W * 0.05, vy: vy, str: str, kind: kind, ci: int(v.r.next() * 4)})
+	v.rockets = append(
+		v.rockets,
+		fwRocket{
+			x:    x,
+			y:    v.ground,
+			vx:   (v.r.next() - 0.5) * W * 0.05,
+			vy:   vy,
+			str:  str,
+			kind: kind,
+			ci:   int(v.r.next() * 4),
+		},
+	)
 }
 
 func (v *fireworks) burst(rk fwRocket, cols [4][3]float64, t float64) {
@@ -212,9 +236,35 @@ func (v *fireworks) advance(f frame) (cols [4][3]float64) {
 		rk.vy += gy * dt
 		rk.x += rk.vx * dt
 		rk.y += rk.vy * dt
-		v.marks = append(v.marks, fwMark{x0: px, y0: py, x: rk.x, y: rk.y, size: 1.6 * u, a: 0.6, c: [3]float64{255, 205, 140}, line: true})
+		v.marks = append(
+			v.marks,
+			fwMark{
+				x0:   px,
+				y0:   py,
+				x:    rk.x,
+				y:    rk.y,
+				size: 1.6 * u,
+				a:    0.6,
+				c:    [3]float64{255, 205, 140},
+				line: true,
+			},
+		)
 		if v.r.next() < 0.8 && len(v.sparks) < fwMax {
-			v.sparks = append(v.sparks, fwSpark{x: rk.x, y: rk.y, vx: (v.r.next() - 0.5) * 30 * u, vy: 40 * u, c: [3]float64{255, 220, 170}, t0: t, life: 0.35, drag: 3, grav: 0.2, s: 0.8})
+			v.sparks = append(
+				v.sparks,
+				fwSpark{
+					x:    rk.x,
+					y:    rk.y,
+					vx:   (v.r.next() - 0.5) * 30 * u,
+					vy:   40 * u,
+					c:    [3]float64{255, 220, 170},
+					t0:   t,
+					life: 0.35,
+					drag: 3,
+					grav: 0.2,
+					s:    0.8,
+				},
+			)
 		}
 		if rk.vy > -0.06*H {
 			v.burst(rk, cols, t)
@@ -252,7 +302,19 @@ func (v *fireworks) advance(f frame) (cols [4][3]float64) {
 		sz := p.s * (1.2 + 1.2*fade) * u
 		c := mixc(p.c, [3]float64{255, 255, 255}, float64(lvl)*0.18)
 		if math.Hypot(p.x-ox, p.y-oy) > sz {
-			v.marks = append(v.marks, fwMark{x0: ox, y0: oy, x: p.x, y: p.y, size: math.Min(1, sz), a: alv[lvl] * math.Min(1, sz), c: c, line: true})
+			v.marks = append(
+				v.marks,
+				fwMark{
+					x0:   ox,
+					y0:   oy,
+					x:    p.x,
+					y:    p.y,
+					size: math.Min(1, sz),
+					a:    alv[lvl] * math.Min(1, sz),
+					c:    c,
+					line: true,
+				},
+			)
 		}
 		v.marks = append(v.marks, fwMark{x: p.x, y: p.y, size: sz, a: alv[lvl], c: c})
 		live = append(live, p)
@@ -289,8 +351,18 @@ func (v *fireworks) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 
 	pts := make([]Point, 0, len(v.marks)*2)
 	add := func(x, y, size float64, c [3]float64, a float64) {
-		pts = append(pts, Point{X: float32(x), Y: float32(y), Size: float32(math.Max(size, 1)),
-			R: float32(c[0] / 255), G: float32(c[1] / 255), B: float32(c[2] / 255), A: float32(a), Feed: true})
+		pts = append(pts, Point{
+			X:    float32(x),
+			Y:    float32(y),
+			Size: float32(math.Max(size, 1)),
+			R: float32(
+				c[0] / 255,
+			),
+			G:    float32(c[1] / 255),
+			B:    float32(c[2] / 255),
+			A:    float32(a),
+			Feed: true,
+		})
 	}
 	for _, m := range v.marks {
 		if !m.line {
@@ -322,7 +394,13 @@ func (v *fireworks) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 		sky = math.Max(sky, fa*fl.a)
 		b := 1 + 6*i
 		vals[b], vals[b+1], vals[b+2] = float32(fl.x), float32(fl.y), float32(fl.a*fa)
-		vals[b+3], vals[b+4], vals[b+5] = float32(fl.c[0]/255), float32(fl.c[1]/255), float32(fl.c[2]/255)
+		vals[b+3], vals[b+4], vals[b+5] = float32(
+			fl.c[0]/255,
+		), float32(
+			fl.c[1]/255,
+		), float32(
+			fl.c[2]/255,
+		)
 	}
 	vals[19], vals[20] = float32(v.ground), float32(sky)
 	for k := range 3 {

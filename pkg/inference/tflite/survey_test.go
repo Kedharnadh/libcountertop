@@ -9,9 +9,6 @@ import (
 	"testing"
 )
 
-// TestSurveyModels reports what a directory of wake word models needs from this package: which
-// operators are missing, how many carry more than one subgraph, and what input shapes appear.
-// Point it somewhere else with SURVEY.
 func TestSurveyModels(t *testing.T) {
 	dir := os.Getenv("SURVEY")
 	if dir == "" {
@@ -74,7 +71,13 @@ func TestSurveyModels(t *testing.T) {
 		}
 	}
 
-	t.Logf("%d models: %d runnable as-is, %d with extra subgraphs, %d unparseable", total, runnable, multi, failed)
+	t.Logf(
+		"%d models: %d runnable as-is, %d with extra subgraphs, %d unparseable",
+		total,
+		runnable,
+		multi,
+		failed,
+	)
 	t.Logf("input shapes: %v", shapes)
 	if len(missing) > 0 {
 		t.Log("missing operators:")

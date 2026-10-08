@@ -8,13 +8,11 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 )
 
-// A triangle covers about half the square it fits in, and stays inside it.
 func TestFillPolygonTriangle(t *testing.T) {
 	img := NewImage(40, 40, black)
 
 	FillPolygon(img, []Point{{X: 0, Y: 39}, {X: 20, Y: 0}, {X: 39, Y: 39}}, white)
 
-	// Base 39 by height 39, so about 760 of the square's 1600.
 	n := drawn(img, 40, 40, black)
 	if n < 680 || n > 860 {
 		t.Errorf("a triangle in a 40x40 square filled %d pixels, want about 760", n)
@@ -27,7 +25,6 @@ func TestFillPolygonTriangle(t *testing.T) {
 	}
 }
 
-// A shape the wrong way round the screen must be clipped, not written past the buffer.
 func TestFillPolygonClips(t *testing.T) {
 	img := NewImage(20, 20, black)
 
@@ -38,7 +35,6 @@ func TestFillPolygonClips(t *testing.T) {
 	}
 }
 
-// Fewer than three points is not an area.
 func TestFillPolygonNeedsThreePoints(t *testing.T) {
 	img := NewImage(20, 20, black)
 
@@ -49,7 +45,6 @@ func TestFillPolygonNeedsThreePoints(t *testing.T) {
 	}
 }
 
-// counts how many pixels moved away from the ground they were drawn on.
 func drawn(img *Image, w, h int, ground theme.Color) int {
 	var n int
 	for y := range h {
@@ -72,7 +67,6 @@ func TestDrawIconPaints(t *testing.T) {
 	}
 }
 
-// Different icons have to look different, or naming one is pointless.
 func TestIconsDiffer(t *testing.T) {
 	up := NewImage(64, 64, black)
 	DrawIcon(up, icons.AVVolumeUp, Rect{W: 64, H: 64}, white, black)
@@ -90,7 +84,6 @@ func TestIconsDiffer(t *testing.T) {
 	t.Error("two different icons drew the same picture")
 }
 
-// The icon is painted in the color it is given, not the one baked into its own palette.
 func TestDrawIconUsesTheColorItIsGiven(t *testing.T) {
 	img := NewImage(64, 64, black)
 	want := theme.Color{R: 0x00, G: 0x80, B: 0xf0}
@@ -107,8 +100,6 @@ func TestDrawIconUsesTheColorItIsGiven(t *testing.T) {
 	t.Error("no pixel of the icon is the color it was asked for")
 }
 
-// Edges are mixed against what is behind them, since a surface takes no alpha. Anything the icon
-// touches has to sit between the ground and the color rather than overshoot either.
 func TestDrawIconBlendsAgainstTheGround(t *testing.T) {
 	img := NewImage(64, 64, black)
 	DrawIcon(img, icons.AVVolumeUp, Rect{W: 64, H: 64}, white, black)
@@ -123,8 +114,6 @@ func TestDrawIconBlendsAgainstTheGround(t *testing.T) {
 	}
 }
 
-// Scaled to whatever square it is given, since the same icon is wanted at a drawer tile's size and
-// at a volume column's.
 func TestDrawIconScales(t *testing.T) {
 	for _, size := range []int{16, 48, 200} {
 		img := NewImage(size, size, black)
@@ -136,13 +125,11 @@ func TestDrawIconScales(t *testing.T) {
 	}
 }
 
-// Fitted to the middle of a rectangle that is not square, rather than stretched to fill it.
 func TestDrawIconCentresInAWideRect(t *testing.T) {
 	img := NewImage(200, 60, black)
 
 	DrawIcon(img, icons.AVVolumeUp, Rect{W: 200, H: 60}, white, black)
 
-	// Nothing outside the middle square, which is 60 wide starting at 70.
 	for y := range 60 {
 		for x := range 200 {
 			if x >= 70 && x < 130 {
@@ -155,8 +142,6 @@ func TestDrawIconCentresInAWideRect(t *testing.T) {
 	}
 }
 
-// An icon larger than the surface is clipped rather than writing past it: the panel is a fixed
-// buffer and a write outside it is not something that shows up as a wrong pixel.
 func TestDrawIconClips(t *testing.T) {
 	img := NewImage(32, 32, black)
 
@@ -164,7 +149,6 @@ func TestDrawIconClips(t *testing.T) {
 	DrawIcon(img, icons.AVVolumeUp, Rect{X: 20, Y: 20, W: 120, H: 120}, white, black)
 }
 
-// Nothing to draw into is not a reason to fail.
 func TestDrawIconInNoSpace(t *testing.T) {
 	img := NewImage(32, 32, black)
 

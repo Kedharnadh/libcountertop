@@ -56,7 +56,9 @@ func TestAnIndexReferenceIsMarked(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 2 || !got[0].Index || got[0].Offset != 5000 || got[0].Size != 120 || got[1].Index || got[1].Offset != 5120 {
+	if len(got) != 2 || !got[0].Index || got[0].Offset != 5000 || got[0].Size != 120 ||
+		got[1].Index ||
+		got[1].Offset != 5120 {
 		t.Fatalf("got %+v", got)
 	}
 }

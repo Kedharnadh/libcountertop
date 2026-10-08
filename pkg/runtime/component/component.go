@@ -1,10 +1,10 @@
-// Package component collects ordered device components and their optional runtime capabilities.
 package component
 
 import (
 	"context"
 
 	esphome "github.com/ygelfand/go-esphome-device"
+
 	"github.com/ygelfand/libcountertop/pkg/runtime/service"
 	"github.com/ygelfand/libcountertop/pkg/runtime/startup"
 )

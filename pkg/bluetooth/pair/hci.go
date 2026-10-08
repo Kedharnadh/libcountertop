@@ -1,18 +1,3 @@
-// Package pair is bonding: letting a phone connect once and be remembered.
-//
-// Everything else in internal/lib/bt runs over L2CAP, which is data on an open link. This runs
-// underneath that, on HCI, because deciding whether a link may exist is the controller's business
-// and not the profile's. Nothing here touches the radio — events come in as bytes and commands go
-// out as bytes, the same shape as the layers above, so a device that cannot run a test is not
-// needed to test it.
-//
-// What a phone and a speaker actually do:
-//
-//	the phone connects        connection request   → accept, staying the peripheral
-//	is this one known?        link key request     → the stored key, or no and pair again
-//	how can you confirm?      io capability        → not at all, so just works
-//	is this the number?       user confirmation    → yes, nobody was asked
-//	keep this                 link key notification → saved, or it pairs again every boot
 package pair
 
 import (
@@ -22,7 +7,6 @@ import (
 	"strings"
 )
 
-// The events this answers. Everything else on the wire belongs to somebody else.
 const (
 	EventConnectionComplete    = 0x03
 	EventConnectionRequest     = 0x04
@@ -40,7 +24,6 @@ const (
 	EventSimplePairingComplete = 0x36
 )
 
-// The commands it sends back.
 const (
 	OpAcceptConnection   = 0x0409
 	OpRejectConnection   = 0x040a
@@ -55,16 +38,7 @@ const (
 	OpRemoteName         = 0x0419
 )
 
-// What this device can do about confirming a pairing.
-//
-// NoInputNoOutput is what a speaker declares and what gives Just Works: nobody is asked anything
-// and the link has no protection against someone in the middle. That is what every Bluetooth
-// speaker does and what a phone expects from one.
-//
-// DisplayYesNo is the interesting one here, because this device has a ten inch screen. Declaring it
-// gets numeric comparison — the same six digits on both ends, confirmed by a tap — and with it the
-// authentication that Just Works has none of. Nothing selects it yet; the field is where it would
-// go.
+// NoInputNoOutput gives Just Works; DisplayYesNo gives numeric comparison.
 const (
 	DisplayOnly     = 0x00
 	DisplayYesNo    = 0x01
@@ -72,9 +46,7 @@ const (
 	NoInputNoOutput = 0x03
 )
 
-// What the pairing has to achieve. The bonding part is the one that matters: without it the
-// controller generates no link key, nothing is saved, and the phone pairs again every single time
-// it connects — which looks to somebody in the room like the speaker forgetting them.
+// Without bonding the controller generates no link key.
 const (
 	NoBonding              = 0x00
 	NoBondingMITM          = 0x01
@@ -84,21 +56,18 @@ const (
 	GeneralBondingWithMITM = 0x05
 )
 
-// Link types a connection request can be for.
 const (
 	LinkSCO  = 0x00
 	LinkACL  = 0x01
 	LinkESCO = 0x02
 )
 
-// Why a connection was refused. Only the ones there is reason to send.
 const (
 	RejectLimitedResources = 0x0d
 	RejectSecurity         = 0x0e
 	RejectUnacceptableAddr = 0x0f
 )
 
-// The kinds of link key a notification can carry.
 const (
 	KeyCombination         = 0x00
 	KeyLocalUnit           = 0x01
@@ -111,14 +80,9 @@ const (
 	KeyAuthenticatedP256   = 0x08
 )
 
-// Addr is a Bluetooth device address.
-//
-// Held in the order it goes on the wire, which is backwards from how anyone writes one down. The
-// difference is invisible until a key is looked up under an address stored the other way round and
-// a phone that paired yesterday is a stranger today, so the reversal happens in one place: here.
+// Wire order: least significant byte first.
 type Addr [6]byte
 
-// ParseAddr reads an address out of the front of a buffer.
 func ParseAddr(buf []byte) (Addr, bool) {
 	var a Addr
 	if len(buf) < len(a) {
@@ -128,7 +92,6 @@ func ParseAddr(buf []byte) (Addr, bool) {
 	return a, true
 }
 
-// String writes it the way it is printed everywhere else, most significant byte first.
 func (a Addr) String() string {
 	var b strings.Builder
 	for i := len(a) - 1; i >= 0; i-- {
@@ -140,37 +103,29 @@ func (a Addr) String() string {
 	return b.String()
 }
 
-// Key is a link key: the shared secret that lets a phone reconnect without pairing again.
 type Key [16]byte
 
-// Event is one HCI event, after the transport has found its edges.
 type Event struct {
 	Code   byte
 	Params []byte
 }
 
-// Addr is the address an event is about, for the events that lead with one.
 func (e Event) Addr() (Addr, bool) { return ParseAddr(e.Params) }
 
-// Command is one HCI command to send. Framing it for the wire is the transport's job.
 type Command struct {
 	Opcode uint16
 	Params []byte
 }
 
-// String is the opcode and its parameters, for a log that has to be read later.
 func (c Command) String() string {
 	return fmt.Sprintf("%#04x %x", c.Opcode, c.Params)
 }
 
-// reply is a command whose whole payload is an address, which most of these are.
 func reply(opcode uint16, a Addr) Command {
 	return Command{Opcode: opcode, Params: append([]byte(nil), a[:]...)}
 }
 
-// Connected is which device a connection complete is about, and whether it connected.
-//
-// Its address is behind a status and a handle, where a connection request leads with one.
+// The address follows a status and a handle.
 func Connected(params []byte) (Addr, bool) {
 	const at = 1 + 2
 	if len(params) < at+6 || params[0] != 0 {
@@ -179,19 +134,13 @@ func Connected(params []byte) (Addr, bool) {
 	return ParseAddr(params[at:])
 }
 
-// RemoteName asks what a device calls itself.
-//
-// The rest of the parameters are how to find it if it is not already connected: a page scan
-// repetition mode, a reserved byte and a clock offset. Zeroes do for a device on the other end of a
-// live link, which is the only one this asks about.
+// Then page scan repetition mode, a reserved byte and a clock offset.
 func RemoteName(a Addr) Command {
 	params := append([]byte(nil), a[:]...)
 	return Command{Opcode: OpRemoteName, Params: append(params, 0x01, 0x00, 0x00, 0x00)}
 }
 
-// ParseRemoteName reads the answer: which device, and what it calls itself.
-//
-// The name is 248 bytes however long it is, padded with zeroes.
+// The name is 248 bytes, zero padded.
 func ParseRemoteName(params []byte) (Addr, string, error) {
 	const size = 1 + 6 + 248
 	if len(params) < 7 {
@@ -214,10 +163,7 @@ func ParseRemoteName(params []byte) (Addr, string, error) {
 	return a, string(bytes.TrimRight(name, "\x00")), nil
 }
 
-// Handle reads a connection handle out of an event that leads with a status and one.
-//
-// The top four bits are reserved and are not part of the handle. Leaving them in gives a number
-// that matches nothing, which shows up as a link that is up and cannot be written to.
+// The top four bits are reserved.
 func Handle(params []byte) (uint16, bool) {
 	if len(params) < 3 {
 		return 0, false

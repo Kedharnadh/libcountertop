@@ -8,18 +8,13 @@ import (
 	"rsc.io/qr"
 )
 
-// Code renders text as a QR square of about size pixels, on its own quiet background.
-//
-// The module count is whatever the text needs, so the drawn size is rounded down to a whole number
-// of pixels per module: a code whose modules are not all the same width is one a phone struggles to
-// read.
 func Code(text string, size int, dark, light color.Color) (*image.RGBA, error) {
 	c, err := qr.Encode(text, qr.M)
 	if err != nil {
 		return nil, err
 	}
 
-	// Four modules of quiet zone, which the spec asks for and scanners rely on.
+	// The QR spec requires a quiet zone of four modules.
 	const quiet = 4
 
 	modules := c.Size + 2*quiet

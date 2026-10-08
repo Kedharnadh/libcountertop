@@ -8,13 +8,6 @@ import (
 	"time"
 )
 
-// Events and audio share the line.
-//
-// A link carries both at once: a command's answer arrives between two packets of music. Reading for
-// one has to keep the other rather than drop it, and the reader that eventually asks has to get it
-// in the order it arrived.
-
-// data is an ACL packet on a handle, first fragment, carrying body.
 func data(h Handle, body ...byte) []byte {
 	out := []byte{typeACL, byte(h), 0x20, byte(len(body)), 0x00}
 	return append(out, body...)
@@ -34,7 +27,6 @@ func TestAudioArrivingWhileWaitingForAnEventIsKept(t *testing.T) {
 		t.Errorf("event %#02x, want 0x0e", got.Code)
 	}
 
-	// The audio that arrived first is still there.
 	a, err := p.readACL(soon)
 	if err != nil {
 		t.Fatalf("the audio read past while waiting for an event was lost: %v", err)
@@ -62,8 +54,6 @@ func TestAnEventArrivingWhileWaitingForAudioIsKept(t *testing.T) {
 	}
 }
 
-// In order, because the reassembler joins fragments by arrival: a continuation read before the
-// packet it continues is a message that never comes back together.
 func TestAudioKeepsItsOrder(t *testing.T) {
 	p, w := wired(t)
 
@@ -82,7 +72,6 @@ func TestAudioKeepsItsOrder(t *testing.T) {
 	}
 }
 
-// A line with no audio on it reports quiet rather than handing back an event.
 func TestAQuietLineForAudio(t *testing.T) {
 	p, w := wired(t)
 
@@ -92,13 +81,11 @@ func TestAQuietLineForAudio(t *testing.T) {
 		t.Errorf("gave %v, want quiet", err)
 	}
 
-	// And the event it stepped over is still there.
 	if _, err := p.Read(soon); err != nil {
 		t.Errorf("the event was not kept: %v", err)
 	}
 }
 
-// Audio split across reads, which is the ordinary case at 679 bytes a packet.
 func TestAnACLPacketSplitAcrossReads(t *testing.T) {
 	p, w := wired(t)
 

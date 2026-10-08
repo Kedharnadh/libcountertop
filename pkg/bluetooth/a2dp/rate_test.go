@@ -8,14 +8,6 @@ import (
 	fixtures "github.com/ygelfand/libcountertop/pkg/bluetooth/sbc/testdata"
 )
 
-// The card runs at one rate and everything handed to it has to arrive at that rate. A phone picks
-// 44.1 for SBC, and 44100 samples a second into a card clocked at 48000 is a semitone and a half
-// sharp with the queue starving besides.
-//
-// The frames are the ones internal/lib/bt/sbc checks its filterbank against, so this measures the
-// join rather than a reconstruction of it: real coded bytes in, what the card is handed out. sweep
-// is already at the card's rate and so covers the other branch, where nothing should be filtered.
-
 func TestThePlayPathFeedsTheCardAtItsOwnRate(t *testing.T) {
 	for _, name := range []string{"tone", "mono", "sweep"} {
 		t.Run(name, func(t *testing.T) {
@@ -24,7 +16,6 @@ func TestThePlayPathFeedsTheCardAtItsOwnRate(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// What the phone chose, read off the stream itself.
 			start, ok := sbc.Find(coded)
 			if !ok {
 				t.Fatal("no frame in the vector")
@@ -39,9 +30,6 @@ func TestThePlayPathFeedsTheCardAtItsOwnRate(t *testing.T) {
 			s.start("rate test")
 			s.resample = speaker.NewRational(chose, Rate, 2)
 
-			// The counters reset every time the stream reports itself, and it reports on the very
-			// first frame. That frame is also where the filterbank and the resampler fill, so it
-			// serves as the warm up and everything after it is what gets measured.
 			var in, frames int
 			for at := start; at < len(coded); {
 				skip, ok := sbc.Find(coded[at:])
@@ -75,7 +63,7 @@ func TestThePlayPathFeedsTheCardAtItsOwnRate(t *testing.T) {
 				t.Fatalf("%d of %d frames would not decode: %v", s.bad, s.frames, s.why)
 			}
 
-			// Whole samples do not divide 160:147, so the count wanders by one either way.
+			// 44100:48000 is 147:160, so whole-sample counts wander by one.
 			want := in * Rate / chose
 			if s.samples < want-2 || s.samples > want+2 {
 				t.Errorf("%d samples to the card from %d at %d, want %d",
@@ -85,7 +73,6 @@ func TestThePlayPathFeedsTheCardAtItsOwnRate(t *testing.T) {
 	}
 }
 
-// A stream the card can already play must pass through untouched rather than be filtered.
 func TestAStreamAtTheCardsRateIsUntouched(t *testing.T) {
 	r := speaker.NewRational(Rate, Rate, 2)
 

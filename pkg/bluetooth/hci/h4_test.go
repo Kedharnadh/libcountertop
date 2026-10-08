@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-// H4 framing: one byte saying what a packet is, then the packet.
 func TestAnEventIsReadOffTheFrontOfTheBuffer(t *testing.T) {
 	buf := []byte{typeEvent, 0x0e, 0x01, 0xaa}
 
@@ -27,7 +26,6 @@ func TestAnEventIsReadOffTheFrontOfTheBuffer(t *testing.T) {
 	}
 }
 
-// ACL is the other thing on the line, and it is read as itself rather than as a short event.
 func TestAnACLPacketIsReadAsData(t *testing.T) {
 	// Handle 1, first fragment, four bytes of payload carrying a two byte L2CAP header.
 	buf := []byte{typeACL, 0x01, 0x20, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00}
@@ -44,7 +42,6 @@ func TestAnACLPacketIsReadAsData(t *testing.T) {
 	}
 }
 
-// Anything that is neither is refused rather than read as a short one of either.
 func TestAPacketThatIsNeither(t *testing.T) {
 	if _, _, err := parsePacket([]byte{typeCommand, 0x03, 0x0c, 0x00}); err == nil {
 		t.Error("a command was read back as something the chip had sent")
@@ -64,7 +61,6 @@ func TestAPacketThatHasNotAllArrived(t *testing.T) {
 	}
 }
 
-// Several packets back to back, which is what a busy line hands over in one read.
 func TestPacketsBackToBack(t *testing.T) {
 	buf := []byte{
 		typeEvent, 0x0e, 0x01, 0xaa,
@@ -88,7 +84,6 @@ func TestPacketsBackToBack(t *testing.T) {
 	}
 }
 
-// resync is the last resort: it finds the start of the next event and drops what was in front.
 func TestResyncFindsTheNextEvent(t *testing.T) {
 	got := resync([]byte{0xaa, 0xbb, typeEvent, 0x01, 0x00})
 
@@ -97,15 +92,12 @@ func TestResyncFindsTheNextEvent(t *testing.T) {
 	}
 }
 
-// Nothing recognisable at all leaves nothing behind, rather than the same rubbish for ever.
 func TestResyncOnNothingRecognisable(t *testing.T) {
 	if got := resync([]byte{0xaa, 0xbb, 0xcc}); len(got) != 0 {
 		t.Errorf("left % x", got)
 	}
 }
 
-// An event that arrives while a reader is waiting for a different one is kept, since dropping it
-// loses whichever answer happened to land first.
 func TestAnEventNobodyAskedForIsKept(t *testing.T) {
 	var q pending
 
@@ -123,7 +115,6 @@ func TestAnEventNobodyAskedForIsKept(t *testing.T) {
 	}
 }
 
-// In order: a command status and the event that followed it are not interchangeable.
 func TestTheQueueKeepsItsOrder(t *testing.T) {
 	var q pending
 
@@ -138,8 +129,6 @@ func TestTheQueueKeepsItsOrder(t *testing.T) {
 	}
 }
 
-// An empty queue says so rather than handing back a zero event, which would read as a valid one
-// with code zero.
 func TestTakingFromAnEmptyQueue(t *testing.T) {
 	var q pending
 

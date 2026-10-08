@@ -1,11 +1,11 @@
 package dhcp
 
 import (
-	"github.com/insomniacslk/dhcp/dhcpv4"
 	"net"
+
+	"github.com/insomniacslk/dhcp/dhcpv4"
 )
 
-// Options supplies identity and saved-address policy; the client owns lease acquisition and renewal.
 type Options struct {
 	Interface string
 	Hostname  func() string
@@ -13,7 +13,6 @@ type Options struct {
 	Remember  func(net.IP)
 }
 
-// New creates a lease client. An empty interface selects wlan0.
 func New(options Options) *Client { return &Client{options: options} }
 func (c *Client) iface() string {
 	if c.options.Interface != "" {
@@ -41,9 +40,11 @@ func (c *Client) remember(ip net.IP) {
 	}
 }
 
-// RequestOptions carries the hostname, NTP request and optional remembered IPv4 address.
 func RequestOptions(hostname string, want net.IP) []dhcpv4.Modifier {
-	mods := []dhcpv4.Modifier{dhcpv4.WithOption(dhcpv4.OptHostName(hostname)), dhcpv4.WithRequestedOptions(dhcpv4.OptionNTPServers)}
+	mods := []dhcpv4.Modifier{
+		dhcpv4.WithOption(dhcpv4.OptHostName(hostname)),
+		dhcpv4.WithRequestedOptions(dhcpv4.OptionNTPServers),
+	}
 	if want.To4() != nil {
 		mods = append(mods, dhcpv4.WithOption(dhcpv4.OptRequestedIPAddress(want)))
 	}

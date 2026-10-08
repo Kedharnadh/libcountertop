@@ -12,15 +12,6 @@ import (
 	"time"
 )
 
-// The one reader, driven over a socketpair with no controller behind it.
-//
-// What this has to get right is that two readers no longer take packets out from under each other.
-// Before it, a scan and a link could not both run: the proxy had to be turned off to use the
-// speaker, because whichever loop read the line first swallowed the other's packets. So the tests
-// here are about coexistence, and about a command still finding its answer in a line full of
-// somebody else's traffic.
-
-// advert is an LE Meta advertising report, which is what a scan is for.
 func advert(address [6]byte, rssi int8) []byte {
 	body := meta(report(0x00, 0x01, address, []byte{0x02, 0x01, 0x06}, rssi))
 
@@ -28,20 +19,17 @@ func advert(address [6]byte, rssi int8) []byte {
 	return append(out, body...)
 }
 
-// classic is an event a link cares about and a scan does not.
 func classic(code byte, params ...byte) []byte {
 	out := []byte{typeEvent, code, byte(len(params))}
 	return append(out, params...)
 }
 
-// answerTo is the controller answering a command, with no parameters past the status.
 func answerTo(opcode uint16, status byte) []byte {
 	out := []byte{typeEvent, eventCommandComplete, 0x04, 0x01}
 	out = binary.LittleEndian.AppendUint16(out, opcode)
 	return append(out, status)
 }
 
-// reading starts a session over a socketpair and gives back the chip's end.
 func reading(t *testing.T) (*Session, *os.File) {
 	t.Helper()
 
@@ -53,8 +41,6 @@ func reading(t *testing.T) (*Session, *os.File) {
 	return Reader(ctx, p), chip
 }
 
-// The whole point: advertisements reach a scan while classic events reach a link, at the same time,
-// from one line.
 func TestAScanAndALinkBothGetTheirOwn(t *testing.T) {
 	s, chip := reading(t)
 
@@ -66,7 +52,6 @@ func TestAScanAndALinkBothGetTheirOwn(t *testing.T) {
 
 	want := [6]byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}
 
-	// Interleaved the way they actually arrive, rather than one kind and then the other.
 	for _, b := range [][]byte{
 		advert(want, -64),
 		classic(0x05, 0x00, 0x05, 0x00, 0x13),
@@ -78,7 +63,6 @@ func TestAScanAndALinkBothGetTheirOwn(t *testing.T) {
 		}
 	}
 
-	// The scan gets two advertisements and nothing else.
 	for i := range 2 {
 		g := within(t, reports)
 		if g.kind != typeEvent || g.event.Code != eventLEMeta {
@@ -86,7 +70,6 @@ func TestAScanAndALinkBothGetTheirOwn(t *testing.T) {
 		}
 	}
 
-	// The link gets the disconnection and the data, and neither advertisement.
 	first := within(t, events)
 	if first.kind != typeEvent || first.event.Code != 0x05 {
 		t.Fatalf("the link was handed %#02x first, want the disconnection", first.event.Code)
@@ -104,13 +87,9 @@ func TestAScanAndALinkBothGetTheirOwn(t *testing.T) {
 	nothingMore(t, events)
 }
 
-// A command's answer has to be found among whatever else is arriving. Taking whichever packet came
-// back next is what broke when a scan was running, because the next packet is almost always an
-// advertisement.
 func TestAnAnswerIsFoundAmongTheAdvertisements(t *testing.T) {
 	s, chip := reading(t)
 
-	// A scan running throughout, so the line is never quiet.
 	reports, stop := s.Reports()
 	defer stop()
 
@@ -123,7 +102,6 @@ func TestAnAnswerIsFoundAmongTheAdvertisements(t *testing.T) {
 		}
 	}()
 
-	// Answer the command when it turns up, the way a controller does.
 	go func() {
 		want, _ := command(hciReadAddress)
 		got := make([]byte, len(want))
@@ -151,13 +129,11 @@ func TestAnAnswerIsFoundAmongTheAdvertisements(t *testing.T) {
 
 	<-noise
 
-	// And the scan kept its advertisements through all of it.
 	if len(reports) == 0 {
 		t.Error("the scan saw nothing while the command was in flight")
 	}
 }
 
-// A command the controller refuses is an answer, not a silence.
 func TestARefusalIsAnAnswer(t *testing.T) {
 	s, chip := reading(t)
 
@@ -177,8 +153,6 @@ func TestARefusalIsAnAnswer(t *testing.T) {
 	}
 }
 
-// Two of the same command cannot be told apart from their answers, so the second is refused rather
-// than handed the first one's.
 func TestTheSameCommandTwiceAtOnceIsRefused(t *testing.T) {
 	s, _ := reading(t)
 
@@ -194,7 +168,6 @@ func TestTheSameCommandTwiceAtOnceIsRefused(t *testing.T) {
 	}()
 	<-started
 
-	// Give the first one time to register before the second tries.
 	time.Sleep(50 * time.Millisecond)
 
 	if _, err := s.Ask(cmd, 100*time.Millisecond); err == nil {
@@ -202,8 +175,6 @@ func TestTheSameCommandTwiceAtOnceIsRefused(t *testing.T) {
 	}
 }
 
-// Letting go means letting go: a taker that has stopped must not keep receiving, or a scan that
-// ended holds the line's packets forever.
 func TestLettingGoStopsTheDelivery(t *testing.T) {
 	s, chip := reading(t)
 
@@ -214,7 +185,6 @@ func TestLettingGoStopsTheDelivery(t *testing.T) {
 		t.Fatal("a released taker is still open")
 	}
 
-	// And the line carries on for everyone else.
 	events, release := s.Events()
 	defer release()
 
@@ -226,7 +196,6 @@ func TestLettingGoStopsTheDelivery(t *testing.T) {
 	}
 }
 
-// within takes one packet, or says the reader never delivered it.
 func within(t *testing.T, from <-chan packet) packet {
 	t.Helper()
 
@@ -242,7 +211,6 @@ func within(t *testing.T, from <-chan packet) packet {
 	return packet{}
 }
 
-// nothingMore says the taker is done: no other packet should reach it.
 func nothingMore(t *testing.T, from <-chan packet) {
 	t.Helper()
 

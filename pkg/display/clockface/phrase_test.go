@@ -26,7 +26,6 @@ func TestSay(t *testing.T) {
 		{6, 55, "five to seven"},
 		{6, 58, "seven o'clock"},
 
-		// The hour rolls over, and twelve is twelve rather than zero.
 		{11, 55, "five to twelve"},
 		{12, 0, "twelve o'clock"},
 		{23, 45, "quarter to twelve"},
@@ -43,8 +42,6 @@ func TestSay(t *testing.T) {
 	}
 }
 
-// Every minute of the day has to come out as something sayable, since the face has no other way to
-// show the time and a blank screen is indistinguishable from a device that has stopped.
 func TestEveryMinuteHasWords(t *testing.T) {
 	for hour := range 24 {
 		for minute := range 60 {
@@ -62,7 +59,6 @@ func TestEveryMinuteHasWords(t *testing.T) {
 	}
 }
 
-// Always two lines: a third would make every other phrase smaller to fit the worst one.
 func TestThePhraseIsAlwaysTwoLines(t *testing.T) {
 	for hour := range 24 {
 		for minute := range 60 {
@@ -73,8 +69,6 @@ func TestThePhraseIsAlwaysTwoLines(t *testing.T) {
 	}
 }
 
-// The phrase must never be more than three minutes from the truth, which is the most the rounding
-// to five can cost. A bug in the turn-around is what would break this, not the rounding itself.
 func TestThePhraseIsNeverFarFromTheTime(t *testing.T) {
 	for hour := range 24 {
 		for minute := range 60 {

@@ -7,8 +7,7 @@ import (
 	"github.com/Sendspin/sendspin-go/pkg/protocol"
 )
 
-// Decoded rather than built: absent and null are the same nil pointer in Go, and only the decoder
-// records which of the two arrived.
+// Absent and null decode to the same nil pointer in Go.
 func decode(t *testing.T, raw string) *protocol.MetadataState {
 	t.Helper()
 

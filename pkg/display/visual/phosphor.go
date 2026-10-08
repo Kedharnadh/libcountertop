@@ -61,10 +61,26 @@ func (v *phosphor) setup() {
 	housing := func(back *image.RGBA) {
 		be := softwarebackend.New(v.st.w, v.st.h)
 		img := be.Image
-		fx.LinearRect(img, img.Bounds(), 0, 0, 0, float32(H), []fx.Stop{{At: 0, C: hex(0x1b1d1f, 1)}, {At: 1, C: hex(0x0c0d0e, 1)}}, false)
+		fx.LinearRect(
+			img,
+			img.Bounds(),
+			0,
+			0,
+			0,
+			float32(H),
+			[]fx.Stop{{At: 0, C: hex(0x1b1d1f, 1)}, {At: 1, C: hex(0x0c0d0e, 1)}},
+			false,
+		)
 		r := seeded(2)
 		for range 1800 {
-			fx.Square(img, float32(r.next()*W), float32(r.next()*H), float32(math.Max(u, 0.6)), color.NRGBA{255, 255, 255, uint8(r.next() * 0.025 * 255)}, false)
+			fx.Square(
+				img,
+				float32(r.next()*W),
+				float32(r.next()*H),
+				float32(math.Max(u, 0.6)),
+				color.NRGBA{255, 255, 255, uint8(r.next() * 0.025 * 255)},
+				false,
+			)
 		}
 		cv := canvas.New(be)
 		cv.SetShadowColor(color.NRGBA{0, 0, 0, 230})
@@ -170,7 +186,11 @@ func (v *phosphor) beam(f frame) {
 			}
 		}
 		for i := range 160 {
-			v.xs[n], v.ys[n] = sx+float64(i)/159*sw, midY-math.Tanh(wv[min(trig+i, analysis.WavePoints-1)]*2.2)*sh*0.36
+			v.xs[n], v.ys[n] = sx+float64(
+				i,
+			)/159*sw, midY-math.Tanh(
+				wv[min(trig+i, analysis.WavePoints-1)]*2.2,
+			)*sh*0.36
 			n++
 		}
 	case responding:
@@ -208,9 +228,19 @@ func (v *phosphor) beam(f frame) {
 		if bk > 3 {
 			c = [3]float64{190, 255, 215}
 		}
-		v.beams = append(v.beams, phosphorBeam{v.xs[i-1], v.ys[i-1], v.xs[i], v.ys[i], (1.8 + float64(bk)*0.25) * u, math.Min(1, alphas[bk]*boost), c})
+		v.beams = append(
+			v.beams,
+			phosphorBeam{
+				v.xs[i-1],
+				v.ys[i-1],
+				v.xs[i],
+				v.ys[i],
+				(1.8 + float64(bk)*0.25) * u,
+				math.Min(1, alphas[bk]*boost),
+				c,
+			},
+		)
 	}
-
 }
 
 //go:embed phosphor.glsl
@@ -239,8 +269,22 @@ func (v *phosphor) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 	v.beam(f)
 	segs := make([]Segment, 0, len(v.beams))
 	for _, b := range v.beams {
-		segs = append(segs, Segment{X0: float32(b.x0), Y0: float32(b.y0), X1: float32(b.x1), Y1: float32(b.y1), Width: float32(b.width),
-			R: float32(b.c[0] / 255), G: float32(b.c[1] / 255), B: float32(b.c[2] / 255), A: float32(b.a)})
+		segs = append(
+			segs,
+			Segment{
+				X0:    float32(b.x0),
+				Y0:    float32(b.y0),
+				X1:    float32(b.x1),
+				Y1:    float32(b.y1),
+				Width: float32(b.width),
+				R: float32(
+					b.c[0] / 255,
+				),
+				G: float32(b.c[1] / 255),
+				B: float32(b.c[2] / 255),
+				A: float32(b.a),
+			},
+		)
 	}
 	if err := g.Lines(segs); err != nil {
 		return err
@@ -249,15 +293,58 @@ func (v *phosphor) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 	for j, on := range []bool{f.state == listening, f.state == responding} {
 		lx, rr := v.lamps[j], 4*u
 		if on {
-			pts = append(pts, Point{X: float32(lx), Y: float32(v.ly), Size: float32(rr * 8), R: 80.0 / 255, G: 1, B: 140.0 / 255, A: 0.8, Round: true, Light: true},
-				Point{X: float32(lx), Y: float32(v.ly), Size: float32(rr * 2), R: 170.0 / 255, G: 1, B: 200.0 / 255, A: 1, Round: true})
+			pts = append(
+				pts,
+				Point{
+					X:     float32(lx),
+					Y:     float32(v.ly),
+					Size:  float32(rr * 8),
+					R:     80.0 / 255,
+					G:     1,
+					B:     140.0 / 255,
+					A:     0.8,
+					Round: true,
+					Light: true,
+				},
+				Point{
+					X:     float32(lx),
+					Y:     float32(v.ly),
+					Size:  float32(rr * 2),
+					R:     170.0 / 255,
+					G:     1,
+					B:     200.0 / 255,
+					A:     1,
+					Round: true,
+				},
+			)
 		} else {
-			pts = append(pts, Point{X: float32(lx), Y: float32(v.ly), Size: float32(math.Max(rr*2, 3)), R: 40.0 / 255, G: 70.0 / 255, B: 50.0 / 255, A: 1, Disc: true, Over: true})
+			pts = append(
+				pts,
+				Point{
+					X:    float32(lx),
+					Y:    float32(v.ly),
+					Size: float32(math.Max(rr*2, 3)),
+					R:    40.0 / 255,
+					G:    70.0 / 255,
+					B:    50.0 / 255,
+					A:    1,
+					Disc: true,
+					Over: true,
+				},
+			)
 		}
 	}
 	if err := g.Points(pts); err != nil {
 		return err
 	}
-	vals := []float32{float32(math.Pow(0.7, f.dt*30)), float32(v.sx), float32(v.sy), float32(v.sw), float32(v.sh), float32(18 * u), float32(v.st.w)}
+	vals := []float32{
+		float32(math.Pow(0.7, f.dt*30)),
+		float32(v.sx),
+		float32(v.sy),
+		float32(v.sw),
+		float32(v.sh),
+		float32(18 * u),
+		float32(v.st.w),
+	}
 	return g.Values(vals, float32(1+0.5*f.level), 0.022, 2)
 }

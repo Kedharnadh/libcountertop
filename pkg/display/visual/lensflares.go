@@ -79,7 +79,15 @@ func (v *lensFlares) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 	vals := make([]float32, 26)
 	vals[0], vals[1], vals[2], vals[3] = float32(W), float32(s), float32(sx), float32(sy)
 	vals[4], vals[5] = float32(W/2), float32(H/2)
-	vals[6], vals[7], vals[8], vals[9] = float32(v.bright*(1+0.6*v.pulse)), float32(v.streak), float32(math.Cos(v.spin)), float32(math.Sin(v.spin))
+	vals[6], vals[7], vals[8], vals[9] = float32(
+		v.bright*(1+0.6*v.pulse),
+	), float32(
+		v.streak,
+	), float32(
+		math.Cos(v.spin),
+	), float32(
+		math.Sin(v.spin),
+	)
 	vals[21], vals[22] = float32(math.Cos(0.7*v.spin)), float32(math.Sin(0.7*v.spin))
 	vals[23], vals[24] = float32((W/2-sx)/s), float32((H/2-sy)/s)
 	vals[25] = float32(4 * v.st.u)

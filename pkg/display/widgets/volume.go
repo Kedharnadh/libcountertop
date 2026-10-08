@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
+
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 )
 
@@ -92,7 +93,17 @@ func (kit *Toolkit) VolumeCard(w *gogui.Window, options VolumeOptions) gogui.Vie
 				},
 			}),
 		}
-		return gogui.Column(gogui.ContainerCfg{ID: "volume-bar-" + choice.Key, Height: bodyHeight, Sizing: gogui.FitFixed, Padding: gogui.NoPadding, Spacing: gogui.SpacingMedium, HAlign: gogui.HAlignCenter, Content: capsule})
+		return gogui.Column(
+			gogui.ContainerCfg{
+				ID:      "volume-bar-" + choice.Key,
+				Height:  bodyHeight,
+				Sizing:  gogui.FitFixed,
+				Padding: gogui.NoPadding,
+				Spacing: gogui.SpacingMedium,
+				HAlign:  gogui.HAlignCenter,
+				Content: capsule,
+			},
+		)
 	}
 	control := bar(stream, true)
 	columns := []gogui.View{control}

@@ -4,10 +4,7 @@ import "math"
 
 const NameFan = "Fan"
 
-// The blade does not only modulate the level, it opens and closes the air's own filter as it passes.
-// That is the difference between a fan and noise with a wobble on it.
 const (
-	// Blades times revolutions a second, where a room fan on a middle setting sits.
 	fanBlade = 62.0
 
 	fanMotor = 120.0

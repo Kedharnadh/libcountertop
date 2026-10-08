@@ -61,7 +61,9 @@ func TestParseEvent(t *testing.T) {
 }
 
 func TestEventIs(t *testing.T) {
-	e, ok := ParseEvent("<3>CTRL-EVENT-STATE-CHANGE id=0 state=9 BSSID=f0:9f:c2:f5:50:5f SSID=attic\n")
+	e, ok := ParseEvent(
+		"<3>CTRL-EVENT-STATE-CHANGE id=0 state=9 BSSID=f0:9f:c2:f5:50:5f SSID=attic\n",
+	)
 	if !ok {
 		t.Fatal("parseEvent rejected a state change")
 	}
@@ -74,8 +76,6 @@ func TestEventIs(t *testing.T) {
 	}
 }
 
-// Everything settle used to ask STATUS for is already on the event. Asking made the supplicant
-// emit the event again, and the two processes chased each other at 150% of a CPU.
 func TestStateCarriesWhatStatusWouldHave(t *testing.T) {
 	tests := []struct {
 		name string
@@ -123,8 +123,6 @@ func TestSomethingElseIsNotAStateChange(t *testing.T) {
 	}
 }
 
-// A state change with a state nobody can parse is dropped rather than read as a disconnection,
-// which would take the network down over a message we did not understand.
 func TestAnUnreadableStateIsNotADisconnection(t *testing.T) {
 	if _, ok := ParseState("CTRL-EVENT-STATE-CHANGE id=0 state=banana SSID=attic"); ok {
 		t.Error("a state that is not a number was accepted")

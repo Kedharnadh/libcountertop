@@ -7,14 +7,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/sbc"
 )
 
-// The wiring, checked where it can be without a radio.
-//
-// What this package does is join parts that are each tested on their own, so what is worth testing
-// here is the joins: the shape audio comes out as, and that the three things a link asks of it
-// answer rather than panic before a stream has been agreed.
-
-// A phone sending mono has to come out of both speakers. Handing the card one channel's worth where
-// it expects two plays it at double speed out of one side.
 func TestMonoIsSentToBothEars(t *testing.T) {
 	got := interleave(sbc.Samples{{1, 2, 3}})
 
@@ -29,7 +21,6 @@ func TestMonoIsSentToBothEars(t *testing.T) {
 	}
 }
 
-// Stereo goes out left, right, left, right, which is what the card reads.
 func TestStereoIsInterleaved(t *testing.T) {
 	got := interleave(sbc.Samples{{1, 3, 5}, {2, 4, 6}})
 
@@ -53,8 +44,6 @@ func TestNoAudioIsNoSamples(t *testing.T) {
 	}
 }
 
-// Everything a link asks for arrives before a stream is agreed, and some of it arrives after one
-// has ended. None of it may panic on a sink that has not been built.
 func TestAskingBeforeAnythingIsAgreed(t *testing.T) {
 	var s Sink
 
@@ -74,18 +63,14 @@ func TestAskingBeforeAnythingIsAgreed(t *testing.T) {
 		t.Errorf("%d replies from a sink that is not up", len(out))
 	}
 
-	// And a link ending before one ever started.
 	s.Gone(1)
 }
 
-// The reader is shared, so a disconnection on any link arrives here. Only the one this sink is on
-// tears it down: the others belong to whatever else the radio is carrying.
 func TestAnotherLinkEndingIsNotOurs(t *testing.T) {
 	s := testSink()
 	s.start("test")
 
-	// Whatever it says: the handle is taken from data arriving, and this is data arriving.
-	s.Data(7, []byte{0x04, 0x00, 0x40, 0x00, 1, 2, 3, 4})
+	_, _ = s.Data(7, []byte{0x04, 0x00, 0x40, 0x00, 1, 2, 3, 4})
 
 	s.Gone(9)
 	if s.handle != 7 {
@@ -98,8 +83,6 @@ func TestAnotherLinkEndingIsNotOurs(t *testing.T) {
 	}
 }
 
-// A malformed PDU is reported rather than answered. The link stays up: one bad packet is a glitch,
-// and dropping the connection over it is how a stutter becomes a phone that stops playing.
 func TestAMalformedPDUIsRefusedNotAnswered(t *testing.T) {
 	s := testSink()
 	s.start("test")
@@ -116,12 +99,6 @@ func TestAMalformedPDUIsRefusedNotAnswered(t *testing.T) {
 	}
 }
 
-// The phone's volume slider has to reach the speaker.
-//
-// Everything underneath was already there: the remote control accepts SetAbsoluteVolume, answers it
-// and keeps the value, which is why this looked finished. What was missing is the one assignment
-// that connects it to anything, so moving the slider changed the number on the phone and nothing
-// here. internal/lib/bt/avrcp covers the protocol; this covers the join.
 func TestThePhonesVolumeIsWiredToTheSpeaker(t *testing.T) {
 	s := testSink()
 	s.start("volume test")
@@ -131,9 +108,6 @@ func TestThePhonesVolumeIsWiredToTheSpeaker(t *testing.T) {
 	}
 }
 
-// Roles are split on this channel and both halves have to be reachable: this device is the
-// controller for transport and metadata, and the target for volume. A sink that only built one of
-// them answers half the profile.
 func TestBothRemoteControlRolesAreBuilt(t *testing.T) {
 	s := testSink()
 	s.start("roles test")

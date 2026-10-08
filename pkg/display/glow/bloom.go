@@ -18,18 +18,20 @@ type octave struct {
 	px, tmp []int32
 }
 
-// Apply adds a blurred copy of img back onto it, radius as a fraction of the height, the way the
-// reference's Renderer.bloom does: 1/4 size first, then 1/8, each weaker.
 func (bl *Bloom) Apply(img *image.RGBA, amount, radius float32, passes int) {
 	bl.Glow(img, img, amount, radius, passes)
 }
 
-// Glow adds a blurred copy of src onto img, for a scene where only part of it gives off light.
 func (bl *Bloom) Glow(img, src *image.RGBA, amount, radius float32, passes int) {
 	bl.glowWith(img, src, amount, radius, passes, bl.addUp)
 }
 
-func (bl *Bloom) glowWith(img, src *image.RGBA, amount, radius float32, passes int, add func(*image.RGBA, *octave, int32)) {
+func (bl *Bloom) glowWith(
+	img, src *image.RGBA,
+	amount, radius float32,
+	passes int,
+	add func(*image.RGBA, *octave, int32),
+) {
 	b := img.Bounds()
 	W, H := b.Dx(), b.Dy()
 	passes = max(passes, 1)
@@ -114,20 +116,38 @@ func box(src, dst []int32, n, lines, r, step, line int) {
 		i := 0
 		for ; i < n && (i < r || i+r+1 > n-1); i++ {
 			d := dst[base+i*step : base+i*step+3 : base+i*step+3]
-			d[0], d[1], d[2] = int32(int64(s0)*inv>>24), int32(int64(s1)*inv>>24), int32(int64(s2)*inv>>24)
+			d[0], d[1], d[2] = int32(
+				int64(s0)*inv>>24,
+			), int32(
+				int64(s1)*inv>>24,
+			), int32(
+				int64(s2)*inv>>24,
+			)
 			a, b := base+min(i+r+1, n-1)*step, base+max(i-r, 0)*step
 			s0, s1, s2 = s0+src[a]-src[b], s1+src[a+1]-src[b+1], s2+src[a+2]-src[b+2]
 		}
 		for ; i+r+1 <= n-1; i++ {
 			d := dst[base+i*step : base+i*step+3 : base+i*step+3]
-			d[0], d[1], d[2] = int32(int64(s0)*inv>>24), int32(int64(s1)*inv>>24), int32(int64(s2)*inv>>24)
+			d[0], d[1], d[2] = int32(
+				int64(s0)*inv>>24,
+			), int32(
+				int64(s1)*inv>>24,
+			), int32(
+				int64(s2)*inv>>24,
+			)
 			a := src[base+(i+r+1)*step : base+(i+r+1)*step+3 : base+(i+r+1)*step+3]
 			b := src[base+(i-r)*step : base+(i-r)*step+3 : base+(i-r)*step+3]
 			s0, s1, s2 = s0+a[0]-b[0], s1+a[1]-b[1], s2+a[2]-b[2]
 		}
 		for ; i < n; i++ {
 			d := dst[base+i*step : base+i*step+3 : base+i*step+3]
-			d[0], d[1], d[2] = int32(int64(s0)*inv>>24), int32(int64(s1)*inv>>24), int32(int64(s2)*inv>>24)
+			d[0], d[1], d[2] = int32(
+				int64(s0)*inv>>24,
+			), int32(
+				int64(s1)*inv>>24,
+			), int32(
+				int64(s2)*inv>>24,
+			)
 			a, b := base+min(i+r+1, n-1)*step, base+max(i-r, 0)*step
 			s0, s1, s2 = s0+src[a]-src[b], s1+src[a+1]-src[b+1], s2+src[a+2]-src[b+2]
 		}

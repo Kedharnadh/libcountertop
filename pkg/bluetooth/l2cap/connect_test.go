@@ -2,7 +2,6 @@ package l2cap
 
 import "testing"
 
-// opening is the request a manager makes for a protocol, and the channel number it chose.
 func opening(t *testing.T, m *Manager, psm uint16) (Command, uint16) {
 	t.Helper()
 
@@ -21,7 +20,6 @@ func opening(t *testing.T, m *Manager, psm uint16) (Command, uint16) {
 	return c, req.SourceCID
 }
 
-// The whole of opening a channel from this end: ask, be accepted, both ends configure, open.
 func TestOpeningAChannelOutwards(t *testing.T) {
 	m := NewManager(895)
 
@@ -31,14 +29,12 @@ func TestOpeningAChannelOutwards(t *testing.T) {
 		t.Fatalf("the channel is %v before an answer, want connecting", got)
 	}
 
-	// They accept, naming their own number for it.
 	out := answer(t, m, Connected{
 		DestinationCID: 0x0071,
 		SourceCID:      ours,
 		Result:         ConnectSuccess,
 	}.Command(req.ID))
 
-	// Our own configuration follows the acceptance without being asked for.
 	asked := only(t, out)
 
 	cfg, err := ParseConfigure(asked)
@@ -57,7 +53,6 @@ func TestOpeningAChannelOutwards(t *testing.T) {
 		t.Errorf("their number came out as %#x, want %#x", ch.Remote, 0x0071)
 	}
 
-	// They configure us, and we accept.
 	answer(t, m, Configure{
 		DestinationCID: ours,
 		Options:        []Option{MTUOption(672)},
@@ -67,8 +62,6 @@ func TestOpeningAChannelOutwards(t *testing.T) {
 		t.Fatalf("one side configured and the channel is already %v", ch.State)
 	}
 
-	// They accept ours, answering on the identifier it was sent with. That is the last of the four
-	// and opens the channel.
 	answer(t, m, Configured{SourceCID: ours, Result: ConfigSuccess}.Command(asked.ID))
 
 	if ch.State != Open {
@@ -76,7 +69,6 @@ func TestOpeningAChannelOutwards(t *testing.T) {
 	}
 }
 
-// A refusal takes the channel away rather than leaving it half made.
 func TestARefusedChannelIsDropped(t *testing.T) {
 	m := NewManager(895)
 	req, ours := opening(t, m, PSMAVCTPBrowse)
@@ -94,7 +86,6 @@ func TestARefusedChannelIsDropped(t *testing.T) {
 	}
 }
 
-// Pending is the far end asking for time, not answering. The request still stands.
 func TestPendingLeavesTheRequestOutstanding(t *testing.T) {
 	m := NewManager(895)
 	req, ours := opening(t, m, PSMAVCTPBrowse)
@@ -110,7 +101,6 @@ func TestPendingLeavesTheRequestOutstanding(t *testing.T) {
 		t.Fatalf("pending left the channel %v, want still connecting", got)
 	}
 
-	// And the acceptance that follows on the same identifier still lands.
 	answer(t, m, Connected{
 		DestinationCID: 0x0071,
 		SourceCID:      ours,
@@ -122,7 +112,6 @@ func TestPendingLeavesTheRequestOutstanding(t *testing.T) {
 	}
 }
 
-// Asking twice for the same protocol is a caller that has lost track, not a second channel.
 func TestOpeningTheSameProtocolTwice(t *testing.T) {
 	m := NewManager(895)
 	opening(t, m, PSMAVCTPBrowse)
@@ -132,8 +121,6 @@ func TestOpeningTheSameProtocolTwice(t *testing.T) {
 	}
 }
 
-// An answer to a request nobody made is ignored rather than acted on: a stale response must not
-// open a channel or disturb one that is live.
 func TestAnAnswerToNothingIsIgnored(t *testing.T) {
 	m := NewManager(895)
 
@@ -151,8 +138,6 @@ func TestAnAnswerToNothingIsIgnored(t *testing.T) {
 	}
 }
 
-// Numbers are each end's own. An acceptance naming a channel we did not ask about is refused rather
-// than trusted, because acting on it would point our channel at somebody else's.
 func TestAnAcceptanceForTheWrongChannel(t *testing.T) {
 	m := NewManager(895)
 	req, ours := opening(t, m, PSMAVCTPBrowse)
@@ -168,8 +153,6 @@ func TestAnAcceptanceForTheWrongChannel(t *testing.T) {
 	}
 }
 
-// A mode this stack cannot speak is answered with the one it can: unacceptable parameters, naming
-// basic. An unknown-option answer leaves a peer that requires the mode with nothing to agree to.
 func TestAnUnspeakableModeIsAnsweredWithOneWeSpeak(t *testing.T) {
 	m := NewManager(895)
 	req, ours := opening(t, m, PSMAVCTPBrowse)
@@ -180,12 +163,14 @@ func TestAnUnspeakableModeIsAnsweredWithOneWeSpeak(t *testing.T) {
 		Result:         ConnectSuccess,
 	}.Command(req.ID)))
 
-	// They configure us, asking for retransmission as the profile tells them to.
 	out := answer(t, m, Configure{
 		DestinationCID: ours,
 		Options: []Option{
 			MTUOption(672),
-			{Type: OptionRetrans, Value: []byte{0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
+			{
+				Type:  OptionRetrans,
+				Value: []byte{0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+			},
 		},
 	}.Command(11))
 
@@ -217,7 +202,6 @@ func TestAnUnspeakableModeIsAnsweredWithOneWeSpeak(t *testing.T) {
 		t.Fatalf("a refused option left the channel %v", ch.State)
 	}
 
-	// They come back without it, which is what the refusal invites.
 	answer(t, m, Configure{
 		DestinationCID: ours,
 		Options:        []Option{MTUOption(672)},
@@ -230,8 +214,6 @@ func TestAnUnspeakableModeIsAnsweredWithOneWeSpeak(t *testing.T) {
 	}
 }
 
-// Opening outwards and answering inwards share the numbering, so neither may hand out one the
-// other is using.
 func TestBothDirectionsShareTheNumbering(t *testing.T) {
 	m := NewManager(895)
 	m.Serve(PSMAVDTP)

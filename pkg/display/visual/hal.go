@@ -49,11 +49,35 @@ func (v *hal) paintBack(back *image.RGBA) {
 	be := softwarebackend.New(v.st.w, v.st.h)
 	img := be.Image
 	fx.Clear(img, color.NRGBA{3, 3, 4, 255})
-	fx.Radial(img, float32(cx), float32(cy), 0, float32(H*1.1), []fx.Stop{{At: 0, C: color.NRGBA{46, 46, 52, 128}}, {At: 1, C: color.NRGBA{}}}, false)
+	fx.Radial(
+		img,
+		float32(cx),
+		float32(cy),
+		0,
+		float32(H*1.1),
+		[]fx.Stop{{At: 0, C: color.NRGBA{46, 46, 52, 128}}, {At: 1, C: color.NRGBA{}}},
+		false,
+	)
 	shadow(img, px, -30, pw, H+60, 0, 34*u, 0.9)
-	fx.LinearRect(img, image.Rect(int(px), 0, int(px+pw), v.st.h), float32(px), 0, float32(px+pw), 0, []fx.Stop{
-		{At: 0, C: hex(0x63686d, 1)}, {At: 0.16, C: hex(0xa2a7ab, 1)}, {At: 0.5, C: hex(0xc6c9cc, 1)}, {At: 0.84, C: hex(0x9ea3a7, 1)}, {At: 1, C: hex(0x5d6267, 1)},
-	}, false)
+	fx.LinearRect(
+		img,
+		image.Rect(int(px), 0, int(px+pw), v.st.h),
+		float32(px),
+		0,
+		float32(px+pw),
+		0,
+		[]fx.Stop{
+			{
+				At: 0,
+				C:  hex(0x63686d, 1),
+			},
+			{At: 0.16, C: hex(0xa2a7ab, 1)},
+			{At: 0.5, C: hex(0xc6c9cc, 1)},
+			{At: 0.84, C: hex(0x9ea3a7, 1)},
+			{At: 1, C: hex(0x5d6267, 1)},
+		},
+		false,
+	)
 	r := seeded(2001)
 	stroke := max(1, int(math.Round(0.6*u)))
 	for range 1100 {
@@ -70,7 +94,12 @@ func (v *hal) paintBack(back *image.RGBA) {
 		}
 	}
 	fx.LinearRect(img, image.Rect(int(px), 0, int(px+pw), v.st.h), 0, 0, 0, float32(H), []fx.Stop{
-		{At: 0, C: color.NRGBA{255, 255, 255, 26}}, {At: 0.5, C: color.NRGBA{}}, {At: 1, C: color.NRGBA{0, 0, 0, 102}},
+		{
+			At: 0,
+			C:  color.NRGBA{255, 255, 255, 26},
+		},
+		{At: 0.5, C: color.NRGBA{}},
+		{At: 1, C: color.NRGBA{0, 0, 0, 102}},
 	}, false)
 	fillRect(img, px, 0, math.Max(1, u), H, color.NRGBA{255, 255, 255, 82})
 	fillRect(img, px+pw-math.Max(1, 1.5*u), 0, math.Max(1, 1.5*u), H, color.NRGBA{0, 0, 0, 128})
@@ -86,18 +115,78 @@ func (v *hal) paintBack(back *image.RGBA) {
 	tx := int(cx) - (w1+w2)/2
 	ty := int(ny+nh*0.53) - th/2
 	surf := rgbaSurface{img}
-	ui.DrawText(surf, bold, tx, ty, theme.Color{R: 241, G: 241, B: 241}, theme.Color{R: 10, G: 11, B: 12}, "HAL")
-	ui.DrawText(surf, thin, tx+w1, ty, theme.Color{R: 241, G: 241, B: 241}, theme.Color{R: 10, G: 11, B: 12}, " 9000")
+	ui.DrawText(
+		surf,
+		bold,
+		tx,
+		ty,
+		theme.Color{R: 241, G: 241, B: 241},
+		theme.Color{R: 10, G: 11, B: 12},
+		"HAL",
+	)
+	ui.DrawText(
+		surf,
+		thin,
+		tx+w1,
+		ty,
+		theme.Color{R: 241, G: 241, B: 241},
+		theme.Color{R: 10, G: 11, B: 12},
+		" 9000",
+	)
 
 	shadow(img, cx-rc, cy-rc+4*u, 2*rc, 2*rc, rc, 14*u, 0.65)
 	conic(img, cx, cy, rc, -0.7, []fx.Stop{
-		{At: 0, C: hex(0xeceef0, 1)}, {At: 0.12, C: hex(0x8a8e93, 1)}, {At: 0.26, C: hex(0xf6f7f8, 1)}, {At: 0.4, C: hex(0x6a6e73, 1)},
-		{At: 0.55, C: hex(0xdadcdf, 1)}, {At: 0.7, C: hex(0x777b80, 1)}, {At: 0.86, C: hex(0xeff0f2, 1)}, {At: 1, C: hex(0xeceef0, 1)},
+		{
+			At: 0,
+			C:  hex(0xeceef0, 1),
+		},
+		{At: 0.12, C: hex(0x8a8e93, 1)},
+		{At: 0.26, C: hex(0xf6f7f8, 1)},
+		{At: 0.4, C: hex(0x6a6e73, 1)},
+		{
+			At: 0.55,
+			C:  hex(0xdadcdf, 1),
+		},
+		{At: 0.7, C: hex(0x777b80, 1)},
+		{At: 0.86, C: hex(0xeff0f2, 1)},
+		{At: 1, C: hex(0xeceef0, 1)},
 	})
-	fx.Ring(img, float32(cx), float32(cy), float32(rc*0.955), float32(math.Max(1, 1.3*u)), color.NRGBA{0, 0, 0, 89}, false)
-	fx.Ring(img, float32(cx), float32(cy), float32(rc-0.8*u), float32(math.Max(1, 0.8*u)), color.NRGBA{255, 255, 255, 89}, false)
-	fx.Radial(img, float32(cx), float32(cy), 0, float32(rb), []fx.Stop{{At: 0, C: hex(0x202023, 1)}, {At: 1, C: hex(0x040404, 1)}}, false)
-	fx.Radial(img, float32(cx), float32(cy), 0, float32(rg+1.5*u), []fx.Stop{{At: 0, C: hex(0, 1)}, {At: 1, C: hex(0, 1)}}, false)
+	fx.Ring(
+		img,
+		float32(cx),
+		float32(cy),
+		float32(rc*0.955),
+		float32(math.Max(1, 1.3*u)),
+		color.NRGBA{0, 0, 0, 89},
+		false,
+	)
+	fx.Ring(
+		img,
+		float32(cx),
+		float32(cy),
+		float32(rc-0.8*u),
+		float32(math.Max(1, 0.8*u)),
+		color.NRGBA{255, 255, 255, 89},
+		false,
+	)
+	fx.Radial(
+		img,
+		float32(cx),
+		float32(cy),
+		0,
+		float32(rb),
+		[]fx.Stop{{At: 0, C: hex(0x202023, 1)}, {At: 1, C: hex(0x040404, 1)}},
+		false,
+	)
+	fx.Radial(
+		img,
+		float32(cx),
+		float32(cy),
+		0,
+		float32(rg+1.5*u),
+		[]fx.Stop{{At: 0, C: hex(0, 1)}, {At: 1, C: hex(0, 1)}},
+		false,
+	)
 	copy(back.Pix, img.Pix)
 }
 
@@ -154,7 +243,8 @@ func (v *hal) paintGlass() *image.RGBA {
 }
 
 func (v *hal) glassAt() image.Rectangle {
-	return image.Rect(int(v.cx-v.rg-2), int(v.cy-v.rg-2), int(v.cx+v.rg+3), int(v.cy+v.rg+3)).Intersect(image.Rect(0, 0, v.st.w, v.st.h))
+	return image.Rect(int(v.cx-v.rg-2), int(v.cy-v.rg-2), int(v.cx+v.rg+3), int(v.cy+v.rg+3)).
+		Intersect(image.Rect(0, 0, v.st.w, v.st.h))
 }
 
 func conic(img *image.RGBA, cx, cy, r, start float64, stops []fx.Stop) {
@@ -234,8 +324,25 @@ func (v *hal) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 		cool = (0.08 + 0.3*f.level) * v.cool
 	}
 	ga := v.glassAt()
-	vals := []float32{float32(v.cx), float32(v.cy), float32(v.rg), float32(v.rc), float32(intensity),
-		float32(math.Max(0.5, math.Min(1.4, 0.72+0.5*intensity))), float32(clamp01(0.5 + 0.55*intensity)), float32(cool),
-		float32(v.st.u), float32(v.st.w), float32(ga.Min.X), float32(ga.Min.Y), float32(ga.Dx()), float32(ga.Dy())}
+	vals := []float32{
+		float32(v.cx),
+		float32(v.cy),
+		float32(v.rg),
+		float32(v.rc),
+		float32(intensity),
+		float32(
+			math.Max(0.5, math.Min(1.4, 0.72+0.5*intensity)),
+		),
+		float32(clamp01(0.5 + 0.55*intensity)),
+		float32(cool),
+		float32(
+			v.st.u,
+		),
+		float32(v.st.w),
+		float32(ga.Min.X),
+		float32(ga.Min.Y),
+		float32(ga.Dx()),
+		float32(ga.Dy()),
+	}
 	return g.Values(vals, float32(0.65+0.7*intensity), 0.03, 2)
 }

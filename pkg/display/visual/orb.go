@@ -103,7 +103,16 @@ func (v *orb) frame(f frame, W, H, u float64, portrait bool) (o orbFrame) {
 	v.rot += dt * (0.12 + 0.6*lv)
 	if f.onset && talk && len(v.rip) < 5 {
 		a, b := v.r.next()*2*math.Pi, math.Acos(v.r.next()*2-1)
-		v.rip = append(v.rip, ripple{math.Sin(b) * math.Cos(a), math.Cos(b), math.Sin(b) * math.Sin(a), t, 0.08 + 0.16*f.voice})
+		v.rip = append(
+			v.rip,
+			ripple{
+				math.Sin(b) * math.Cos(a),
+				math.Cos(b),
+				math.Sin(b) * math.Sin(a),
+				t,
+				0.08 + 0.16*f.voice,
+			},
+		)
 	}
 	live := v.rip[:0]
 	for _, q := range v.rip {
@@ -166,7 +175,10 @@ func (v *orb) frame(f frame, W, H, u float64, portrait bool) (o orbFrame) {
 			lvl = 1
 		}
 		sz := (1.3 + 1.5*(Z2*0.5+0.5)) * u * p
-		o.dots = append(o.dots, orbDot{v.sx[i], v.sy[i], sz, alphas[lvl], mixc(o.base, o.hot, float64(lvl)/5)})
+		o.dots = append(
+			o.dots,
+			orbDot{v.sx[i], v.sy[i], sz, alphas[lvl], mixc(o.base, o.hot, float64(lvl)/5)},
+		)
 	}
 	if lv > 0.08 {
 		o.web = math.Min(0.5, 0.08+0.45*lv)
@@ -220,16 +232,43 @@ func (v *orb) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 	o := v.frame(f, W, H, u, Portrait(in))
 	segs := make([]Segment, 0, len(o.lines))
 	for _, l := range o.lines {
-		segs = append(segs, Segment{X0: float32(l[0]), Y0: float32(l[1]), X1: float32(l[2]), Y1: float32(l[3]), Width: float32(math.Max(0.7*u, 1)),
-			R: float32(o.base[0] / 255), G: float32(o.base[1] / 255), B: float32(o.base[2] / 255), A: float32(o.web)})
+		segs = append(
+			segs,
+			Segment{
+				X0:    float32(l[0]),
+				Y0:    float32(l[1]),
+				X1:    float32(l[2]),
+				Y1:    float32(l[3]),
+				Width: float32(math.Max(0.7*u, 1)),
+				R: float32(
+					o.base[0] / 255,
+				),
+				G: float32(o.base[1] / 255),
+				B: float32(o.base[2] / 255),
+				A: float32(o.web),
+			},
+		)
 	}
 	if err := g.Lines(segs); err != nil {
 		return err
 	}
 	pts := make([]Point, 0, len(o.dots))
 	for _, d := range o.dots {
-		pts = append(pts, Point{X: float32(d.x), Y: float32(d.y), Size: float32(math.Max(d.size, 1)),
-			R: float32(d.c[0] / 255), G: float32(d.c[1] / 255), B: float32(d.c[2] / 255), A: float32(d.a), Light: true})
+		pts = append(
+			pts,
+			Point{
+				X:    float32(d.x),
+				Y:    float32(d.y),
+				Size: float32(math.Max(d.size, 1)),
+				R: float32(
+					d.c[0] / 255,
+				),
+				G:     float32(d.c[1] / 255),
+				B:     float32(d.c[2] / 255),
+				A:     float32(d.a),
+				Light: true,
+			},
+		)
 	}
 	if err := g.Points(pts); err != nil {
 		return err

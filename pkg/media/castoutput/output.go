@@ -26,14 +26,11 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
 
-// Queued caps how far decoding may run ahead of the speaker. The speaker's queue is the buffer; this
-// only keeps an hour-long stream from being decoded into memory whole.
 const Queued = time.Minute
 
 var _ playback.Output = (*Output)(nil)
 var _ pcm.Producer = (*Output)(nil)
 
-// Output plays one source at a time through the speaker and on the player card.
 type Output struct {
 	control sync.Mutex
 	options Options
@@ -397,7 +394,6 @@ func (o *Output) Handoff(src playback.Source) {
 	o.releaseLocked(src)
 }
 
-// release gives up the card and the speaker if src is what is playing, or whatever is when src is nil.
 func (o *Output) releaseLocked(src playback.Source) {
 	o.mu.Lock()
 	p := o.cur
@@ -644,7 +640,6 @@ func (o *Output) Behind(src playback.Source) time.Duration {
 	return time.Duration(frames) * time.Second / time.Duration(o.options.Rate)
 }
 
-// pump reads the source into the speaker until it ends or is replaced.
 func (o *Output) pump(ctx context.Context, p *playing) {
 	buf := make([]int16, o.options.Rate/50*o.options.Channels)
 	ahead := int(Queued * time.Duration(o.options.Rate) / time.Second)
@@ -698,7 +693,6 @@ func (o *Output) pump(ctx context.Context, p *playing) {
 	}
 }
 
-// finish lets what is queued play out, then gives everything back.
 func (o *Output) finish(ctx context.Context, p *playing) {
 	for ctx.Err() == nil && o.Behind(p.src) > 0 {
 		wait(ctx, 100*time.Millisecond)
@@ -727,7 +721,6 @@ func (o *Output) level() float32 {
 	return o.gain
 }
 
-// aside takes what is queued out of the speaker and keeps it for later.
 func (o *Output) aside() {
 	queued := o.q.Take()
 	o.mu.Lock()
@@ -737,7 +730,6 @@ func (o *Output) aside() {
 	o.mu.Unlock()
 }
 
-// resume puts back what was kept.
 func (o *Output) resume() {
 	o.mu.Lock()
 	var kept []int16
@@ -750,7 +742,6 @@ func (o *Output) resume() {
 	}
 }
 
-// Stand implements speaker.Producer: a voice turn or another source standing this one down.
 func (o *Output) Stand(down bool) {
 	o.feed.Lock()
 	defer o.feed.Unlock()
@@ -768,7 +759,6 @@ func (o *Output) Stand(down bool) {
 	}
 }
 
-// Duck implements speaker.Producer, setting the level for what is written next.
 func (o *Output) Duck(on bool) {
 	gain := float32(1)
 	if on {
@@ -779,7 +769,6 @@ func (o *Output) Duck(on bool) {
 	o.mu.Unlock()
 }
 
-// Requeue implements speaker.Producer, scaling what is already queued.
 func (o *Output) Requeue() {
 	gain := o.level()
 	if gain == 1 {
@@ -860,7 +849,6 @@ func (o *Output) fetchArt(p *playing, url string) {
 	o.options.Media().Changed()
 }
 
-// card is a playing source as the player card sees it.
 type card struct {
 	o *Output
 	p *playing

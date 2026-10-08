@@ -2,7 +2,6 @@ package schema
 
 import "encoding/json"
 
-// Network contains common connectivity settings.
 type Network struct {
 	Verify  bool   `json:"verify"`
 	Address string `json:"address,omitempty"`
@@ -10,7 +9,6 @@ type Network struct {
 
 func DefaultNetwork() Network { return Network{Verify: true} }
 
-// MigrateNetwork translates the former inverted TLS setting when no canonical setting exists.
 func MigrateNetwork(data []byte, network *Network) error {
 	var old struct {
 		Network struct {

@@ -23,8 +23,6 @@ func TestATransportMessageRoundTrips(t *testing.T) {
 	}
 }
 
-// Half an AV/C frame parses into a plausible command for the wrong thing, so a fragment has to be
-// refused rather than read short.
 func TestAFragmentIsNotReadAsAWholeMessage(t *testing.T) {
 	buf := []byte{0x00 | PacketStart<<2, 0x02, 0x11, 0x0e}
 
@@ -47,11 +45,9 @@ func TestATransportMessageTooShortToBeOne(t *testing.T) {
 	}
 }
 
-// A metadata response with a long title does not fit one packet.
 func TestAFragmentedMessageIsPutBackTogether(t *testing.T) {
 	var r Reassembler
 
-	// Start: label 3, two packets, the count byte, then the profile.
 	start := []byte{0x30 | PacketStart<<2, 0x02, 0x11, 0x0e, 0xaa, 0xbb}
 	if got, err := r.Push(start); err != nil || got != nil {
 		t.Fatalf("the start packet gave %v, %v", got, err)
@@ -63,7 +59,6 @@ func TestAFragmentedMessageIsPutBackTogether(t *testing.T) {
 		t.Fatalf("the end packet: %v", err)
 	}
 
-	// Rebuilt as a single packet, so it parses like one.
 	m, err := ParseTransport(got)
 	if err != nil {
 		t.Fatalf("the rebuilt message did not parse: %v", err)
@@ -89,7 +84,6 @@ func TestAWholeMessagePassesStraightThroughTheReassembler(t *testing.T) {
 	}
 }
 
-// A continuation for a run this side never saw the start of cannot be placed.
 func TestAContinuationWithNoStartIsRefused(t *testing.T) {
 	var r Reassembler
 
@@ -98,11 +92,12 @@ func TestAContinuationWithNoStartIsRefused(t *testing.T) {
 	}
 }
 
-// Two transactions interleaved. Joining one onto the other builds a message out of two answers.
 func TestAContinuationForAnotherTransactionIsRefused(t *testing.T) {
 	var r Reassembler
 
-	r.Push([]byte{0x30 | PacketStart<<2, 0x02, 0x11, 0x0e, 0xaa})
+	if _, err := r.Push([]byte{0x30 | PacketStart<<2, 0x02, 0x11, 0x0e, 0xaa}); err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := r.Push([]byte{0x40 | PacketEnd<<2, 0x11, 0x0e, 0xbb}); err == nil {
 		t.Error("a continuation for a different label was joined on")
@@ -112,8 +107,12 @@ func TestAContinuationForAnotherTransactionIsRefused(t *testing.T) {
 func TestARunThatEndsEarlyIsRefused(t *testing.T) {
 	var r Reassembler
 
-	r.Push([]byte{0x30 | PacketStart<<2, 0x04, 0x11, 0x0e, 0xaa})
-	r.Push([]byte{0x30 | PacketContinue<<2, 0x11, 0x0e, 0xbb})
+	if _, err := r.Push([]byte{0x30 | PacketStart<<2, 0x04, 0x11, 0x0e, 0xaa}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Push([]byte{0x30 | PacketContinue<<2, 0x11, 0x0e, 0xbb}); err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := r.Push([]byte{0x30 | PacketEnd<<2, 0x11, 0x0e, 0xcc}); err == nil {
 		t.Error("a run two packets short came back whole")
@@ -135,8 +134,6 @@ func TestAnAVCFrameRoundTrips(t *testing.T) {
 	}
 }
 
-// A press with no release leaves the phone holding the button down, which on a seek runs to the
-// end of the track.
 func TestAButtonCarriesItsPressAndItsRelease(t *testing.T) {
 	for _, released := range []bool{Pressed, Released} {
 		frame := PassThrough(OpNext, released)
@@ -154,7 +151,6 @@ func TestAButtonCarriesItsPressAndItsRelease(t *testing.T) {
 	}
 }
 
-// The operation data length is not optional; most targets refuse a frame without it.
 func TestAButtonCarriesItsOperandLength(t *testing.T) {
 	if got := PassThrough(OpPlay, Pressed); len(got.Operands) != 2 || got.Operands[1] != 0 {
 		t.Errorf("operands %v, want the button and a zero length", got.Operands)
@@ -181,8 +177,6 @@ func TestAPDURoundTrips(t *testing.T) {
 	}
 }
 
-// Somebody else's vendor extension is not an AVRCP pdu, and reading it as one gets a pdu id out of
-// whatever their encoding put in that byte.
 func TestAnotherCompanysExtensionIsRefused(t *testing.T) {
 	operands := []byte{0x00, 0x11, 0x22, PDUGetPlayStatus, 0x00, 0x00, 0x00}
 
@@ -191,7 +185,6 @@ func TestAnotherCompanysExtensionIsRefused(t *testing.T) {
 	}
 }
 
-// The length in the header is what says where the parameters end.
 func TestAPDUShorterThanItsLengthSays(t *testing.T) {
 	operands := []byte{0x00, 0x19, 0x58, PDUGetPlayStatus, 0x00, 0x00, 0x08, 0x01}
 
@@ -239,11 +232,6 @@ func TestReadingWhatIsPlaying(t *testing.T) {
 	}
 }
 
-// An attribute cut off part way through is dropped and the ones before it are kept.
-//
-// Refusing the whole response instead throws away good fields over a bad one, and the count cannot
-// be trusted to mean what it says: a phone was seen answering seven with nothing behind it. bluez
-// reads what is there for the same reason.
 func TestATruncatedAttributeIsDroppedNotTheWholeAnswer(t *testing.T) {
 	params := elementAttributes(
 		attribute(AttrTitle, "Sun Ra"),
@@ -263,7 +251,6 @@ func TestATruncatedAttributeIsDroppedNotTheWholeAnswer(t *testing.T) {
 	}
 }
 
-// A count larger than the attributes actually sent, which is what a phone does.
 func TestACountLargerThanWhatArrived(t *testing.T) {
 	params := elementAttributes(attribute(AttrTitle, "Sun Ra"))
 	params[0] = 4
@@ -277,7 +264,6 @@ func TestACountLargerThanWhatArrived(t *testing.T) {
 	}
 }
 
-// The case seen on the wire: a count and nothing behind it at all.
 func TestACountWithNothingBehindIt(t *testing.T) {
 	got, err := ParseElementAttributes([]byte{7})
 	if err != nil {
@@ -288,8 +274,6 @@ func TestACountWithNothingBehindIt(t *testing.T) {
 	}
 }
 
-// A phone sending "--" for a live stream is not malformed, and refusing the response over it would
-// lose the title too.
 func TestADurationThatIsNotANumberIsJustUnknown(t *testing.T) {
 	got, err := ParseElementAttributes(elementAttributes(
 		attribute(AttrTitle, "Some Station"),
@@ -306,7 +290,6 @@ func TestADurationThatIsNotANumberIsJustUnknown(t *testing.T) {
 	}
 }
 
-// A run of digits long enough to wrap would come back as a negative duration.
 func TestARidiculousDurationIsNotTakenSeriously(t *testing.T) {
 	got, _ := ParseElementAttributes(elementAttributes(
 		attribute(AttrDuration, "99999999999999999999"),
@@ -333,8 +316,6 @@ func TestReadingWhereTheTrackHasGotTo(t *testing.T) {
 	}
 }
 
-// 0xffffffff is the spec's "not known", which a stream sends. Forty-nine days on a progress bar is
-// worse than nothing.
 func TestAnUnknownLengthIsNotFortyNineDays(t *testing.T) {
 	params := binary.BigEndian.AppendUint32(nil, 0xffffffff)
 	params = binary.BigEndian.AppendUint32(params, 0xffffffff)
@@ -378,13 +359,17 @@ func TestReadingANotification(t *testing.T) {
 }
 
 func TestATruncatedNotification(t *testing.T) {
-	if _, err := ParseNotification([]byte{EventTrackChanged, 0x01}, false); !errors.Is(err, ErrShort) {
+	if _, err := ParseNotification(
+		[]byte{EventTrackChanged, 0x01},
+		false,
+	); !errors.Is(
+		err,
+		ErrShort,
+	) {
 		t.Errorf("gave %v, want a short read", err)
 	}
 }
 
-// Absolute volume is seven bits, not a hundred. The ends have to be exact or the slider cannot
-// reach silence or full.
 func TestVolumeConvertsAtBothEnds(t *testing.T) {
 	if got := Volume(0); got != 0 {
 		t.Errorf("zero percent is %d", got)
@@ -415,7 +400,6 @@ func TestVolumeRoundTripsWithinARoundingStep(t *testing.T) {
 	}
 }
 
-// pduOf reads the pdu out of a command a controller produced.
 func pduOf(t *testing.T, tr Transport) PDU {
 	t.Helper()
 
@@ -431,7 +415,6 @@ func pduOf(t *testing.T, tr Transport) PDU {
 	return p
 }
 
-// respond builds the answer to a command, on its own label.
 func respond(to Transport, code byte, p PDU) Transport {
 	return Transport{Label: to.Label, Type: MessageResponse, Payload: p.Frame(code).Marshal()}
 }
@@ -441,7 +424,6 @@ func capabilities(events ...byte) PDU {
 	return PDU{ID: PDUGetCapabilities, Params: params}
 }
 
-// Coming up: ask what the phone can report, then what is playing.
 func TestStartingUpAsksWhatThePhoneCanDo(t *testing.T) {
 	c := New()
 
@@ -462,7 +444,6 @@ func TestStartingUpAsksWhatThePhoneCanDo(t *testing.T) {
 		}
 	}
 
-	// Every one on its own label, or the answers cannot be told apart.
 	seen := map[byte]bool{}
 	for _, p := range out {
 		if seen[p.Label] {
@@ -472,13 +453,13 @@ func TestStartingUpAsksWhatThePhoneCanDo(t *testing.T) {
 	}
 }
 
-// Registering for an event a phone does not support is refused every time it is asked, so the
-// supported list is what decides.
 func TestOnlySupportedEventsAreRegisteredFor(t *testing.T) {
 	c := New()
 	out, _ := c.Start()
 
-	answers, err := c.Receive(respond(out[0], Stable, capabilities(EventPlaybackStatus, EventTrackChanged)))
+	answers, err := c.Receive(
+		respond(out[0], Stable, capabilities(EventPlaybackStatus, EventTrackChanged)),
+	)
 	if err != nil {
 		t.Fatalf("Receive: %v", err)
 	}
@@ -497,7 +478,6 @@ func TestOnlySupportedEventsAreRegisteredFor(t *testing.T) {
 	}
 }
 
-// Position is the only event where the interval means anything.
 func TestPositionIsRegisteredForWithAnInterval(t *testing.T) {
 	c := New()
 	out, _ := c.Start()
@@ -513,9 +493,6 @@ func TestPositionIsRegisteredForWithAnInterval(t *testing.T) {
 	}
 }
 
-// A registration is one-shot. The interim answer is the current value; the one after it is the
-// change, and after that the phone has forgotten — so it has to be made again or the screen
-// updates exactly once.
 func TestARegistrationIsRenewedAfterItFires(t *testing.T) {
 	c := New()
 
@@ -526,7 +503,6 @@ func TestARegistrationIsRenewedAfterItFires(t *testing.T) {
 	registrations, _ := c.Receive(respond(out[0], Stable, capabilities(EventPlaybackStatus)))
 	registration := registrations[0]
 
-	// Interim: what it is now. Nothing to renew yet.
 	interim := PDU{ID: PDURegisterNotification, Params: []byte{EventPlaybackStatus, StatusPaused}}
 	again, err := c.Receive(respond(registration, Interim, interim))
 	if err != nil {
@@ -539,14 +515,11 @@ func TestARegistrationIsRenewedAfterItFires(t *testing.T) {
 		t.Errorf("status is %#02x", c.State().Progress.Status)
 	}
 
-	// Changed: the registration is now spent.
 	changed := PDU{ID: PDURegisterNotification, Params: []byte{EventPlaybackStatus, StatusPlaying}}
 	again, err = c.Receive(respond(registration, Changed, changed))
 	if err != nil {
 		t.Fatalf("the changed answer: %v", err)
 	}
-	// Renewed, and asked what is playing: a source that reports the status and not the track gives
-	// no other sign that there is something new to read.
 	var renewed, attributes bool
 	for _, sent := range again {
 		switch p := pduOf(t, sent); p.ID {
@@ -558,7 +531,10 @@ func TestARegistrationIsRenewedAfterItFires(t *testing.T) {
 	}
 
 	if !renewed {
-		t.Errorf("%d commands after the notification fired, none renewing the registration", len(again))
+		t.Errorf(
+			"%d commands after the notification fired, none renewing the registration",
+			len(again),
+		)
 	}
 	if !attributes {
 		t.Error("playback started and nothing asked what is playing")
@@ -572,13 +548,15 @@ func TestARegistrationIsRenewedAfterItFires(t *testing.T) {
 	}
 }
 
-// A track change says only that it changed, not to what.
 func TestATrackChangeAsksWhatTheNewOneIs(t *testing.T) {
 	c := New()
 	out, _ := c.Start()
 	registrations, _ := c.Receive(respond(out[0], Stable, capabilities(EventTrackChanged)))
 
-	body := PDU{ID: PDURegisterNotification, Params: append([]byte{EventTrackChanged}, make([]byte, 8)...)}
+	body := PDU{
+		ID:     PDURegisterNotification,
+		Params: append([]byte{EventTrackChanged}, make([]byte, 8)...),
+	}
 	again, err := c.Receive(respond(registrations[0], Changed, body))
 	if err != nil {
 		t.Fatalf("Receive: %v", err)
@@ -595,7 +573,6 @@ func TestATrackChangeAsksWhatTheNewOneIs(t *testing.T) {
 	}
 }
 
-// Retrying a refused registration is how a phone gets asked forever about something it does not do.
 func TestARefusedRegistrationIsNotRetried(t *testing.T) {
 	c := New()
 	out, _ := c.Start()
@@ -610,44 +587,44 @@ func TestARefusedRegistrationIsNotRetried(t *testing.T) {
 		t.Errorf("a refused registration produced %d commands", len(again))
 	}
 
-	// And it is not offered again by a later round either.
 	more, _ := c.register(EventPosition)
 	if len(more) != 0 {
 		t.Error("a refused event was registered for again")
 	}
 }
 
-// A phone between tracks answers with everything blank. Taking it replaces the title on the screen
-// with nothing.
 func TestBlankMetadataDoesNotWipeTheScreen(t *testing.T) {
 	c := New()
 
 	out, _ := c.Start()
-	c.Receive(respond(out[1], Stable, PDU{
+	if _, err := c.Receive(respond(out[1], Stable, PDU{
 		ID:     PDUGetElementAttributes,
 		Params: elementAttributes(attribute(AttrTitle, "Sun Ra")),
-	}))
+	})); err != nil {
+		t.Fatal(err)
+	}
 
 	if c.State().Track.Title != "Sun Ra" {
 		t.Fatalf("the title did not arrive: %q", c.State().Track.Title)
 	}
 
 	refresh, _ := c.Refresh()
-	c.Receive(respond(refresh[0], Stable, PDU{
+	if _, err := c.Receive(respond(refresh[0], Stable, PDU{
 		ID:     PDUGetElementAttributes,
 		Params: elementAttributes(attribute(AttrTitle, ""), attribute(AttrArtist, "")),
-	}))
+	})); err != nil {
+		t.Fatal(err)
+	}
 
 	if got := c.State().Track.Title; got != "Sun Ra" {
 		t.Errorf("the title became %q, want the last one left up", got)
 	}
 }
 
-// The phone's own volume slider moving this device is what a phone expects of anything it plays to.
 func TestThePhoneCanSetTheVolume(t *testing.T) {
 	c := New()
 
-	var set int = -1
+	set := -1
 	c.Volume = func(percent int) { set = percent }
 
 	command := Transport{
@@ -674,7 +651,6 @@ func TestThePhoneCanSetTheVolume(t *testing.T) {
 	}
 }
 
-// A phone waiting on an answer retries until it gives up on the channel entirely.
 func TestACommandThisDoesNotImplementIsStillAnswered(t *testing.T) {
 	c := New()
 
@@ -701,8 +677,6 @@ func TestACommandThisDoesNotImplementIsStillAnswered(t *testing.T) {
 	}
 }
 
-// Reusing a label that is outstanding means the next answer cannot be matched to its question, so
-// running out is an error rather than handing one out twice.
 func TestLabelsAreNotReusedWhileOutstanding(t *testing.T) {
 	c := New()
 
@@ -723,7 +697,6 @@ func TestLabelsAreNotReusedWhileOutstanding(t *testing.T) {
 	}
 }
 
-// A label comes back into use once its answer has arrived.
 func TestALabelIsFreedByItsAnswer(t *testing.T) {
 	c := New()
 
@@ -750,8 +723,6 @@ func TestALabelIsFreedByItsAnswer(t *testing.T) {
 	}
 }
 
-// An answer to a question nobody asked is not an error — a label may have been given up on — but
-// there is nothing to do with it.
 func TestAnAnswerToNothing(t *testing.T) {
 	c := New()
 
@@ -793,7 +764,6 @@ func TestAButtonSendsBothHalves(t *testing.T) {
 	}
 }
 
-// A progress bar drawn from notifications alone steps once a second rather than sweeping.
 func TestElapsedCarriesThePositionForward(t *testing.T) {
 	s := State{Progress: Progress{
 		Length:   215 * time.Second,
@@ -805,13 +775,11 @@ func TestElapsedCarriesThePositionForward(t *testing.T) {
 		t.Errorf("elapsed %v", got)
 	}
 
-	// Never past the end, whatever the clock says.
 	if got := s.Elapsed(time.Hour); got != 215*time.Second {
 		t.Errorf("elapsed %v, want the length", got)
 	}
 }
 
-// A paused track does not advance, however long ago the position was heard.
 func TestElapsedStandsStillWhenPaused(t *testing.T) {
 	s := State{Progress: Progress{Position: 42 * time.Second, Status: StatusPaused}}
 
@@ -820,14 +788,15 @@ func TestElapsedStandsStillWhenPaused(t *testing.T) {
 	}
 }
 
-// A phone that goes away leaves nothing behind, or the next one inherits its track.
 func TestForgettingAPhone(t *testing.T) {
 	c := New()
 	out, _ := c.Start()
-	c.Receive(respond(out[1], Stable, PDU{
+	if _, err := c.Receive(respond(out[1], Stable, PDU{
 		ID:     PDUGetElementAttributes,
 		Params: elementAttributes(attribute(AttrTitle, "Sun Ra")),
-	}))
+	})); err != nil {
+		t.Fatal(err)
+	}
 
 	c.Forget()
 
@@ -835,14 +804,12 @@ func TestForgettingAPhone(t *testing.T) {
 		t.Errorf("state survived: %+v", got)
 	}
 
-	// And the registrations are gone, so the next phone is asked again.
 	again, _ := c.register(EventPlaybackStatus)
 	if len(again) != 1 {
 		t.Errorf("%d registrations after forgetting, want one", len(again))
 	}
 }
 
-// registers is the phone asking to be told when this device's volume moves.
 func registers(t *testing.T, c *Controller, label byte) {
 	t.Helper()
 
@@ -868,8 +835,6 @@ func registers(t *testing.T, c *Controller, label byte) {
 	}
 }
 
-// The other half of absolute volume: this device's own volume moving, which the phone asked to be
-// told about so its slider follows. Without it the phone shows one level and the room hears another.
 func TestAVolumeMovedHereIsSentToThePhone(t *testing.T) {
 	c := New()
 	registers(t, c, 9)
@@ -902,8 +867,6 @@ func TestAVolumeMovedHereIsSentToThePhone(t *testing.T) {
 	}
 }
 
-// A registration is spent once answered. Sending a second changed against it would be answering a
-// question the phone has not asked again.
 func TestTheRegistrationIsGoodForOneAnswer(t *testing.T) {
 	c := New()
 	registers(t, c, 3)
@@ -915,15 +878,12 @@ func TestTheRegistrationIsGoodForOneAnswer(t *testing.T) {
 		t.Errorf("%d messages for a second move on a spent registration, want none", len(out))
 	}
 
-	// Until it asks again.
 	registers(t, c, 4)
 	if out := c.Volumed(60); len(out) != 1 {
 		t.Errorf("%d messages after registering again, want one", len(out))
 	}
 }
 
-// Answering the phone's own command back at it is how two ends chase each other up and down the
-// scale: the phone sets 50, this device tells it 50, which it treats as a change, and so on.
 func TestTheVolumeThePhoneJustSetIsNotSentBack(t *testing.T) {
 	c := New()
 	registers(t, c, 2)
@@ -942,7 +902,6 @@ func TestTheVolumeThePhoneJustSetIsNotSentBack(t *testing.T) {
 	}
 }
 
-// Nobody asked, so there is nothing owed.
 func TestAVolumeMovedWithNoRegistrationSaysNothing(t *testing.T) {
 	c := New()
 
@@ -951,12 +910,6 @@ func TestAVolumeMovedWithNoRegistrationSaysNothing(t *testing.T) {
 	}
 }
 
-// A new stream is new content, and what the last one was showing does not describe it.
-//
-// The track survives a blank answer on purpose — a phone between tracks sends one, and dropping the
-// title each time makes the card flicker. Across a stream that reasoning inverts: an app that
-// publishes no metadata at all, as a video app does not, would otherwise leave the previous app's
-// song on the card while something else plays.
 func TestClearedForgetsTheTrackButNotTheLink(t *testing.T) {
 	c := New()
 
@@ -979,7 +932,6 @@ func TestClearedForgetsTheTrackButNotTheLink(t *testing.T) {
 		t.Errorf("the screen was told %q", said.Track.Title)
 	}
 
-	// The volume and the registration belong to the link, not to the track.
 	if got := c.State().Volume; got == 0 {
 		t.Error("clearing a track reset the volume")
 	}

@@ -1,4 +1,3 @@
-// Package advertise keeps network services published as addresses change.
 package advertise
 
 import (
@@ -12,7 +11,6 @@ import (
 
 const retry = 3 * time.Second
 
-// Advertise keeps something published on the device's addresses, publishing again whenever they change, until ctx ends.
 func Advertise(
 	ctx context.Context,
 	what string,
@@ -55,7 +53,6 @@ func Advertise(
 	}
 }
 
-// Strings is the addresses the way zeroconf takes them.
 func Strings(ips []net.IP) []string {
 	out := make([]string, 0, len(ips))
 	for _, ip := range ips {

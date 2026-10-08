@@ -48,7 +48,16 @@ func (c *Calls) offered(w http.ResponseWriter, r *http.Request) {
 	}
 	p, ok := c.options.Peers.Find(m.From)
 	if !ok {
-		p = discovery.Peer{ID: m.From, Name: m.Name, Model: m.Model, Board: m.Board, Caps: m.Caps, Addrs: []net.IP{net.ParseIP(host)}, Port: c.options.Port, Seen: time.Now()}
+		p = discovery.Peer{
+			ID:    m.From,
+			Name:  m.Name,
+			Model: m.Model,
+			Board: m.Board,
+			Caps:  m.Caps,
+			Addrs: []net.IP{net.ParseIP(host)},
+			Port:  c.options.Port,
+			Seen:  time.Now(),
+		}
 		if p.Name == "" {
 			p.Name = host
 		}
@@ -59,13 +68,33 @@ func (c *Calls) offered(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "busy", http.StatusConflict)
 		return
 	}
-	s := c.open(Call{ID: m.Call, Peer: p, State: Ringing, Since: time.Now(), Video: m.Video, CameraOff: m.Video && cfg.AutoAnswer && !cfg.AutoVideo}, net.JoinHostPort(host, strconv.Itoa(c.options.Port)))
+	s := c.open(
+		Call{
+			ID:        m.Call,
+			Peer:      p,
+			State:     Ringing,
+			Since:     time.Now(),
+			Video:     m.Video,
+			CameraOff: m.Video && cfg.AutoAnswer && !cfg.AutoVideo,
+		},
+		net.JoinHostPort(host, strconv.Itoa(c.options.Port)),
+	)
 	s.offer = m.SDP
 	s.remote = Size{Width: m.Width, Height: m.Height}
 	ringing, quiet := context.WithCancel(s.ctx)
 	s.quiet = quiet
 	c.mu.Unlock()
-	slog.Info("incoming call", "from", p.Name, "call", s.ID, "video", m.Video, "auto", cfg.AutoAnswer)
+	slog.Info(
+		"incoming call",
+		"from",
+		p.Name,
+		"call",
+		s.ID,
+		"video",
+		m.Video,
+		"auto",
+		cfg.AutoAnswer,
+	)
 	c.changed(s)
 	w.WriteHeader(http.StatusAccepted)
 	if cfg.AutoAnswer {
@@ -124,10 +153,10 @@ func (c *Calls) ended(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	reason := m.Reason
-	switch {
-	case reason == ReasonCancelled || reason == ReasonUnanswered:
+	switch reason {
+	case ReasonCancelled, ReasonUnanswered:
 		reason = ReasonHangup
-	case reason == "":
+	case "":
 		reason = ReasonHangup
 	}
 	slog.Info("call ended by peer", "peer", s.Peer.Name, "reason", m.Reason)
@@ -148,7 +177,12 @@ func post(ctx context.Context, addr, what string, m envelope) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+addr+"/call/"+what, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		"http://"+addr+"/call/"+what,
+		bytes.NewReader(body),
+	)
 	if err != nil {
 		return 0, err
 	}

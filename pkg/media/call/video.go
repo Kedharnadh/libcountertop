@@ -47,12 +47,29 @@ func arrange(vw, vh int, remote, own Size) Layout {
 			pic := display.Rect{W: vw, H: r.H}
 			panel := display.Rect{Y: r.H, W: vw, H: vh - r.H}
 			self := display.Rect{X: panel.W / 2, Y: panel.Y + m, W: panel.W/2 - m, H: panel.H / 2}
-			return Layout{Remote: pic, Picture: pic, Panel: panel, Side: true, Self: fitOwn(self, own, true)}
+			return Layout{
+				Remote:  pic,
+				Picture: pic,
+				Panel:   panel,
+				Side:    true,
+				Self:    fitOwn(self, own, true),
+			}
 		case vw > vh && vw-r.W >= int(float64(vw)*sideShare):
 			pic := display.Rect{W: r.W, H: vh}
 			panel := display.Rect{X: r.W, W: vw - r.W, H: vh}
-			self := display.Rect{X: panel.X + m, Y: panel.H / 5, W: panel.W - 2*m, H: panel.H * 2 / 5}
-			return Layout{Remote: pic, Picture: pic, Panel: panel, Side: true, Self: fitOwn(self, own, false)}
+			self := display.Rect{
+				X: panel.X + m,
+				Y: panel.H / 5,
+				W: panel.W - 2*m,
+				H: panel.H * 2 / 5,
+			}
+			return Layout{
+				Remote:  pic,
+				Picture: pic,
+				Panel:   panel,
+				Side:    true,
+				Self:    fitOwn(self, own, false),
+			}
 		}
 		return Layout{Remote: full, Picture: r, Panel: full, Self: corner(vw, vh)}
 	}
@@ -114,7 +131,13 @@ func (l *layer) stats() LayerStats {
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	return LayerStats{Open: l.open, Width: l.size.Width, Height: l.size.Height, Frames: l.frames, Failed: l.failed}
+	return LayerStats{
+		Open:   l.open,
+		Width:  l.size.Width,
+		Height: l.size.Height,
+		Frames: l.frames,
+		Failed: l.failed,
+	}
 }
 
 func (l *layer) Show(f rtc.Frame) {
@@ -131,20 +154,46 @@ func (l *layer) Show(f rtc.Frame) {
 		if !f.Key || l.size.Width == 0 {
 			return
 		}
-		c.VideoClose(l.id)
-		if err := c.VideoOpen(l.id, surface.AVC, l.size.Width, l.size.Height, l.z, 0, ""); err != nil {
-			slog.Warn("call video open", "layer", l.id, "width", l.size.Width, "height", l.size.Height, "err", err)
+		_ = c.VideoClose(l.id)
+		if err := c.VideoOpen(
+			l.id,
+			surface.AVC,
+			l.size.Width,
+			l.size.Height,
+			l.z,
+			0,
+			"",
+		); err != nil {
+			slog.Warn(
+				"call video open",
+				"layer",
+				l.id,
+				"width",
+				l.size.Width,
+				"height",
+				l.size.Height,
+				"err",
+				err,
+			)
 			l.failed = err
 			return
 		}
-		slog.Info("call video opened", "layer", l.id, "width", l.size.Width, "height", l.size.Height)
+		slog.Info(
+			"call video opened",
+			"layer",
+			l.id,
+			"width",
+			l.size.Width,
+			"height",
+			l.size.Height,
+		)
 		l.open, l.failed = true, nil
 	}
 	if err := feed(c, l.id, f); err != nil {
 		l.failed = err
 		if errors.Is(err, surface.Broken) {
 			slog.Warn("call video decoder broke, reopening", "layer", l.id)
-			c.VideoClose(l.id)
+			_ = c.VideoClose(l.id)
 			l.open, l.shown = false, false
 			if l.broken != nil {
 				go l.broken()
@@ -155,7 +204,9 @@ func (l *layer) Show(f rtc.Frame) {
 		return
 	}
 	l.frames++
-	c.VideoClock(l.id, f.PTS-videoLag, true)
+	if err := c.VideoClock(l.id, f.PTS-videoLag, true); err != nil {
+		slog.Debug("call video clock", "layer", l.id, "err", err)
+	}
 	if !l.shown {
 		l.shown = true
 		l.place(c)
@@ -174,7 +225,7 @@ func (l *layer) resize(sz Size) {
 	l.size = sz
 	if l.open {
 		if c := l.options.Display.Helper(); c != nil {
-			c.VideoClose(l.id)
+			_ = c.VideoClose(l.id)
 		}
 		l.open, l.shown = false, false
 	}
@@ -219,7 +270,7 @@ func (l *layer) close() {
 		return
 	}
 	if c := l.options.Display.Helper(); c != nil {
-		c.VideoClose(l.id)
+		_ = c.VideoClose(l.id)
 	}
 	l.open, l.shown = false, false
 }
@@ -265,10 +316,13 @@ type pictures struct {
 }
 
 func (c *Calls) newPictures(s *session, remote Size) *pictures {
-	return &pictures{options: c.options, remote: &layer{options: c.options, id: remoteLayer, z: remoteZ, size: remote,
-		box:    func(vw, vh int) display.Rect { return c.layout(vw, vh).Remote },
-		broken: func() { c.requestKey(s) },
-	}}
+	return &pictures{
+		options: c.options,
+		remote: &layer{options: c.options, id: remoteLayer, z: remoteZ, size: remote,
+			box:    func(vw, vh int) display.Rect { return c.layout(vw, vh).Remote },
+			broken: func() { c.requestKey(s) },
+		},
+	}
 }
 
 func (c *Calls) requestKey(s *session) {
@@ -280,11 +334,29 @@ func (c *Calls) requestKey(s *session) {
 	}
 }
 
-func (p *pictures) start(ctx context.Context, c *Calls, s *session, at int, own Size, visible bool) {
-	p.self = &layer{options: c.options, id: selfLayer, z: selfZ, size: own, hidden: !visible, box: func(vw, vh int) display.Rect { return c.layout(vw, vh).Self }}
+func (p *pictures) start(
+	ctx context.Context,
+	c *Calls,
+	s *session,
+	at int,
+	own Size,
+	visible bool,
+) {
+	p.self = &layer{
+		options: c.options,
+		id:      selfLayer,
+		z:       selfZ,
+		size:    own,
+		hidden:  !visible,
+		box:     func(vw, vh int) display.Rect { return c.layout(vw, vh).Self },
+	}
 	self := p.self
 	ctx, cancel := context.WithCancel(ctx)
-	frames, stop := camera{source: c.options.Camera, at: at, sized: func(sz Size) { c.ownSized(s, sz) }}.Frames()
+	frames, stop := camera{
+		source: c.options.Camera,
+		at:     at,
+		sized:  func(sz Size) { c.ownSized(s, sz) },
+	}.Frames()
 	p.stop = func() { cancel(); stop() }
 	p.workers.Add(2)
 	safe.Go("call self view", func() {

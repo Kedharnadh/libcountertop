@@ -16,7 +16,6 @@ import (
 	"time"
 )
 
-// Base is where the lounge lives.
 const Base = "https://www.youtube.com/api/lounge"
 
 // The themes a screen binds with: YouTube's own, YouTube Music's and YouTube TV's.
@@ -33,7 +32,6 @@ const (
 	ScreenClient       = "TVHTML5"
 )
 
-// ErrExpired is a lounge answer that means the token or the session has to be renewed.
 var ErrExpired = errors.New("lounge: the session has expired")
 
 var ErrQuiet = errors.New("lounge: the long poll went quiet")
@@ -41,7 +39,6 @@ var ErrQuiet = errors.New("lounge: the long poll went quiet")
 // closure-library's BrowserChannel expects server data within 45s.
 var Quiet = 45 * time.Second
 
-// Screen is this device as a lounge screen.
 type Screen struct {
 	ID     string
 	Device string
@@ -51,16 +48,19 @@ type Screen struct {
 	Model  string
 }
 
-// Token is what binding needs, and when it stops working.
 type Token struct {
 	Screen  string
 	Token   string
 	Expires time.Time
 }
 
-// NewScreenID asks YouTube for a screen id.
 func NewScreenID(ctx context.Context, c *http.Client) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, Base+"/pairing/generate_screen_id", nil)
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		Base+"/pairing/generate_screen_id",
+		nil,
+	)
 	if err != nil {
 		return "", err
 	}
@@ -75,11 +75,14 @@ func NewScreenID(ctx context.Context, c *http.Client) (string, error) {
 	return id, nil
 }
 
-// LoungeToken asks YouTube for the token a screen binds with.
 func LoungeToken(ctx context.Context, c *http.Client, screen string) (Token, error) {
 	form := url.Values{"screen_ids": {screen}}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, Base+"/pairing/get_lounge_token_batch",
-		strings.NewReader(form.Encode()))
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		Base+"/pairing/get_lounge_token_batch",
+		strings.NewReader(form.Encode()),
+	)
 	if err != nil {
 		return Token{}, err
 	}
@@ -103,10 +106,13 @@ func LoungeToken(ctx context.Context, c *http.Client, screen string) (Token, err
 		return Token{}, fmt.Errorf("lounge: no token for screen %s", screen)
 	}
 	s := got.Screens[0]
-	return Token{Screen: s.ScreenID, Token: s.LoungeToken, Expires: time.UnixMilli(s.Expiration)}, nil
+	return Token{
+		Screen:  s.ScreenID,
+		Token:   s.LoungeToken,
+		Expires: time.UnixMilli(s.Expiration),
+	}, nil
 }
 
-// Session is one bound lounge session.
 type Session struct {
 	screen Screen
 	token  Token
@@ -121,11 +127,21 @@ type Session struct {
 	ofs int
 }
 
-// Bind opens a session as the screen. short is for ordinary requests; long must not time out,
-// since it carries the long poll.
-func Bind(ctx context.Context, short, long *http.Client, screen Screen, token Token) (*Session, error) {
+func Bind(
+	ctx context.Context,
+	short, long *http.Client,
+	screen Screen,
+	token Token,
+) (*Session, error) {
 	n, _ := rand.Int(rand.Reader, big.NewInt(9000))
-	s := &Session{screen: screen, token: token, short: short, long: long, rid: 41000 + int(n.Int64()), aid: 3}
+	s := &Session{
+		screen: screen,
+		token:  token,
+		short:  short,
+		long:   long,
+		rid:    41000 + int(n.Int64()),
+		aid:    3,
+	}
 
 	q := s.common()
 	q.Set("deviceInfo", s.deviceInfo())
@@ -155,7 +171,6 @@ func Bind(ctx context.Context, short, long *http.Client, screen Screen, token To
 	return s, nil
 }
 
-// Poll holds the long poll open, handing each message over, until it ends or ctx does.
 func (s *Session) Poll(ctx context.Context, got func(Message)) error {
 	s.mu.Lock()
 	q := s.common()
@@ -202,7 +217,6 @@ func quiet(ctx context.Context, err error) error {
 	return err
 }
 
-// Send posts messages to the lounge.
 func (s *Session) Send(ctx context.Context, msgs ...Out) error {
 	if len(msgs) == 0 {
 		return nil
@@ -230,7 +244,6 @@ func (s *Session) Send(ctx context.Context, msgs ...Out) error {
 	return err
 }
 
-// take keeps what the session learns from messages: its ids and the highest array id seen.
 func (s *Session) take(msgs []Message) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -296,11 +309,10 @@ func do(c *http.Client, req *http.Request) ([]byte, error) {
 }
 
 func status(resp *http.Response) error {
-	switch {
-	case resp.StatusCode == http.StatusOK:
+	switch resp.StatusCode {
+	case http.StatusOK:
 		return nil
-	case resp.StatusCode == http.StatusBadRequest, resp.StatusCode == http.StatusUnauthorized,
-		resp.StatusCode == http.StatusNotFound, resp.StatusCode == http.StatusGone:
+	case http.StatusBadRequest, http.StatusUnauthorized, http.StatusNotFound, http.StatusGone:
 		return fmt.Errorf("%w: %s", ErrExpired, resp.Status)
 	default:
 		return fmt.Errorf("lounge: %s", resp.Status)

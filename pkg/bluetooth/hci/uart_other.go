@@ -7,11 +7,8 @@ import (
 	"time"
 )
 
-// The chip is on a tty on the device and nowhere else. The parsing and the segmenting are the part
-// worth having off it, and those build anywhere.
 var errDevice = errors.New("ble: the radio is only on the device")
 
-// Port is the chip's UART.
 type Port struct{}
 
 func Open(string) (*Port, error)     { return nil, errDevice }

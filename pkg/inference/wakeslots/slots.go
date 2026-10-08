@@ -1,4 +1,3 @@
-// Package wakeslots keeps positional assistant selections separate from advertised model IDs.
 package wakeslots
 
 import (
@@ -6,7 +5,6 @@ import (
 	"sync"
 )
 
-// Initial preserves saved positions and disabled slots. Only an unconfigured (nil) selection gets a default.
 func Initial(saved, installed []string, defaultID string, count int) []string {
 	out := make([]string, max(count, 0))
 	known := make(map[string]bool, len(installed))
@@ -56,6 +54,7 @@ func (s *Selection) Set(slots []string) {
 	defer s.mu.Unlock()
 	s.slots = slices.Clone(slots)
 }
+
 func (s *Selection) Get() []string { s.mu.RLock(); defer s.mu.RUnlock(); return slices.Clone(s.slots) }
 func (s *Selection) ID(slot int) (string, bool) {
 	s.mu.RLock()

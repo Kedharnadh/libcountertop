@@ -16,8 +16,6 @@ func leased() *Lease {
 	}
 }
 
-// Read back the way a server reads it, rather than by poking at the bytes: what matters is what a
-// receiver makes of it.
 func released(t *testing.T) *dhcpv4.DHCPv4 {
 	t.Helper()
 
@@ -41,8 +39,6 @@ func TestAReleaseSaysItIsOne(t *testing.T) {
 	}
 }
 
-// RFC 2131 table 5: the address being given back goes in ciaddr, because it is one the client is
-// using. This is the opposite of a decline and the difference that matters between them.
 func TestTheAddressIsInCiaddr(t *testing.T) {
 	msg := released(t)
 
@@ -51,16 +47,12 @@ func TestTheAddressIsInCiaddr(t *testing.T) {
 	}
 }
 
-// And table 5 again: the requested-address option MUST NOT be set. A server reading it would be
-// told about an address nobody asked for.
 func TestTheRequestedAddressOptionIsAbsent(t *testing.T) {
 	if got := released(t).RequestedIPAddress(); got != nil {
 		t.Errorf("the requested address option is set to %v", got)
 	}
 }
 
-// Required, not optional. A release names the server whose lease it is, so the other server on the
-// segment does not free an address it never owned.
 func TestTheServerIsNamed(t *testing.T) {
 	msg := released(t)
 
@@ -77,16 +69,12 @@ func TestTheHardwareAddressIsCarried(t *testing.T) {
 	}
 }
 
-// Nothing replies to a release, so asking to be broadcast at would be asking for an answer that is
-// never coming.
 func TestAReleaseDoesNotAskToBeBroadcastAt(t *testing.T) {
 	if released(t).IsBroadcast() {
 		t.Error("the release set the broadcast flag")
 	}
 }
 
-// A lease with no server is one from a server that did not name itself. There is nobody to address
-// the release to, and inventing a destination would send it to a host that never offered anything.
 func TestAReleaseWithNoServerIsRefused(t *testing.T) {
 	_, err := releaseMessage(net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0x00, 0x01},
 		net.IPv4(192, 168, 1, 40), nil)
@@ -105,15 +93,12 @@ func TestAReleaseOfSomethingThatIsNotIPv4IsRefused(t *testing.T) {
 	}
 }
 
-// Nothing to release is not a failure. A device that never got an address still stops.
 func TestReleasingNothingIsNotAnError(t *testing.T) {
 	if err := sendRelease("lo", nil); err != nil {
 		t.Errorf("releasing no lease reported %v", err)
 	}
 }
 
-// Stopping gives the lease back. Without this the server holds the address until it expires, which
-// on a restart means the device asks for an address the server still thinks it has.
 func TestStoppingReleasesTheLease(t *testing.T) {
 	was := releasing
 	defer func() { releasing = was }()
@@ -139,7 +124,6 @@ func TestStoppingReleasesTheLease(t *testing.T) {
 	}
 }
 
-// A device with no lease stops without sending anything.
 func TestStoppingWithoutALeaseReleasesNothing(t *testing.T) {
 	was := releasing
 	defer func() { releasing = was }()
@@ -160,8 +144,6 @@ func TestStoppingWithoutALeaseReleasesNothing(t *testing.T) {
 	}
 }
 
-// A release that cannot be sent must not stop the device from letting go of the address. There is
-// nothing to retry against and the address is being dropped either way.
 func TestAFailedReleaseStillStops(t *testing.T) {
 	was := releasing
 	defer func() { releasing = was }()

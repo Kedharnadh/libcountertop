@@ -19,9 +19,6 @@ func embeddingModel(t *testing.T) *Model {
 	return m
 }
 
-// The streaming path must agree with the windowed model exactly: same filters, same accumulation
-// order, only fewer rows recomputed. Anything else means the graph is not what NewStream checked
-// it for.
 func TestStreamMatchesWindowedModel(t *testing.T) {
 	m := embeddingModel(t)
 
@@ -32,7 +29,6 @@ func TestStreamMatchesWindowedModel(t *testing.T) {
 		steps  = 6
 	)
 
-	// A deterministic ramp with enough variation that a wrong row alignment cannot pass.
 	total := window + steps*stride
 	mels := make([]float32, total*bins)
 	for i := range mels {
@@ -52,7 +48,6 @@ func TestStreamMatchesWindowedModel(t *testing.T) {
 		t.Errorf("warmup = %d, want %d", s.Warmup(), window)
 	}
 
-	// Prime with the first window, then compare each subsequent step.
 	got, err := s.Write(mels[:window*bins])
 	if err != nil {
 		t.Fatal(err)
@@ -69,7 +64,13 @@ func TestStreamMatchesWindowedModel(t *testing.T) {
 	}
 }
 
-func compareToWindow(t *testing.T, in *Interpreter, mels []float32, offset, window, bins int, got []float32) {
+func compareToWindow(
+	t *testing.T,
+	in *Interpreter,
+	mels []float32,
+	offset, window, bins int,
+	got []float32,
+) {
 	t.Helper()
 
 	in.ResizeInput(0, []int{1, window, bins, 1})

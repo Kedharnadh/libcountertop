@@ -40,8 +40,6 @@ func TestMonitorSubscribesBeforeSnapshot(t *testing.T) {
 		if !c.attached {
 			t.Fatal("initial snapshot ran before subscribing")
 		}
-		// An association completes while the initial STATUS request is in flight.
-		// Only an attached listener receives this event.
 		c.frames = append(c.frames, "<3>CTRL-EVENT-CONNECTED - Connection completed")
 	}, func(e Event) {
 		got = e

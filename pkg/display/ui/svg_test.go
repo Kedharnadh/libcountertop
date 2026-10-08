@@ -7,21 +7,15 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 )
 
-// A stroked circle: a ring, not a disc. This is the shape the icon tool refuses, because IconVG
-// carries one channel of coverage and has nowhere to put a stroke — arcticons is drawn this way
-// throughout, so it is the whole reason for the second path.
 const ring = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
   <circle cx="12" cy="12" r="9" fill="none" stroke="black" stroke-width="2"/>
 </svg>`
 
-// A filled square, for the cases where coverage is all there is either way.
 const block = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
   <rect x="4" y="4" width="16" height="16" fill="black"/>
 </svg>`
 
 func TestTheTwoFormatsAreToldApartByTheirFirstBytes(t *testing.T) {
-	// The header an IconVG file opens with. The set lives in ui/mark, which imports this package,
-	// so the bytes are here rather than an icon from it.
 	if !IsVG(Icon{0x89, 'I', 'V', 'G', 0x02, 0x0a}) {
 		t.Error("an iconvg icon was not recognised as one")
 	}
@@ -33,8 +27,6 @@ func TestTheTwoFormatsAreToldApartByTheirFirstBytes(t *testing.T) {
 	}
 }
 
-// The ring has to be hollow. A renderer that filled it would still produce a plausible icon, which
-// is why this checks the middle rather than eyeballing the edges.
 func TestAStrokedIconKeepsItsHole(t *testing.T) {
 	const side = 48
 
@@ -45,8 +37,6 @@ func TestAStrokedIconKeepsItsHole(t *testing.T) {
 		t.Errorf("the centre of a stroked ring has %d coverage, want none", middle)
 	}
 
-	// The stroke itself, a little in from the edge. r=9 of 24 scaled to 48 puts it 18 out from the
-	// centre, so the row through the middle crosses it at x = 24-18 = 6.
 	var found bool
 	for x := 2; x < 12; x++ {
 		if m.Pix[side/2*m.Stride+x] > 0 {
@@ -59,7 +49,6 @@ func TestAStrokedIconKeepsItsHole(t *testing.T) {
 	}
 }
 
-// A filled shape covers its middle, which is the case that already worked and must keep working.
 func TestAFilledIconCoversItsMiddle(t *testing.T) {
 	const side = 48
 
@@ -69,8 +58,6 @@ func TestAFilledIconCoversItsMiddle(t *testing.T) {
 	}
 }
 
-// An icon that is neither format draws nothing rather than taking the screen down, the same way a
-// bad IconVG one does.
 func TestRubbishDrawsNothing(t *testing.T) {
 	const side = 16
 
@@ -85,8 +72,6 @@ func TestRubbishDrawsNothing(t *testing.T) {
 	}
 }
 
-// The mask is cached on the icon and the size together, so a second size is rasterized rather than
-// stretched from the first.
 func TestEachSizeIsItsOwn(t *testing.T) {
 	small := mask(Icon(block), 16, 16)
 	large := mask(Icon(block), 64, 64)
@@ -99,8 +84,6 @@ func TestEachSizeIsItsOwn(t *testing.T) {
 	}
 }
 
-// Two colors in one icon, which is the case a coverage mask cannot carry: a silhouette of a logo
-// is not a logo.
 const twoColor = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
   <rect x="0" y="0" width="12" height="24" fill="#ff0000"/>
   <rect x="12" y="0" width="12" height="24" fill="#0000ff"/>
@@ -123,8 +106,6 @@ func TestALogoKeepsItsColors(t *testing.T) {
 	}
 }
 
-// The coverage of the same icon is one channel, so both halves read as solid and the color is
-// gone. That is the whole difference between the two calls.
 func TestTheSameIconAsCoverageLosesThem(t *testing.T) {
 	const side = 24
 
@@ -137,8 +118,6 @@ func TestTheSameIconAsCoverageLosesThem(t *testing.T) {
 	}
 }
 
-// The two caches are counted against one budget, and dropping a size has to drop both or the
-// accounting drifts until nothing fits.
 func TestBothCachesAreEvictedTogether(t *testing.T) {
 	iconMu.Lock()
 	iconCache, colorCache, iconBytes = map[iconKey]*image.Alpha{}, map[iconKey]*image.RGBA{}, 0
@@ -154,7 +133,6 @@ func TestBothCachesAreEvictedTogether(t *testing.T) {
 		t.Fatal("nothing was counted")
 	}
 
-	// A different size, which is what makes the old one dead.
 	iconMu.Lock()
 	evict(iconKey{w: 64, h: 64})
 	after, alphas, colors := iconBytes, len(iconCache), len(colorCache)

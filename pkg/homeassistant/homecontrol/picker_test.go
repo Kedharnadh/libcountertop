@@ -14,7 +14,13 @@ import (
 )
 
 var house = []homeassistant.Entity{
-	{ID: "light.k1", Name: "Kitchen Center", AreaID: "kitchen", Area: "Kitchen", Labels: []string{"panel"}},
+	{
+		ID:     "light.k1",
+		Name:   "Kitchen Center",
+		AreaID: "kitchen",
+		Area:   "Kitchen",
+		Labels: []string{"panel"},
+	},
 	{ID: "light.k2", Name: "Kitchen Ring", AreaID: "kitchen", Area: "Kitchen"},
 	{ID: "light.l1", Name: "Loft Ring", AreaID: "loft", Area: "Loft"},
 	{ID: "light.x", Name: "Porch", State: "unavailable"},
@@ -60,7 +66,19 @@ func (f *fakeCache) wait(t *testing.T) {
 }
 
 func picker(f *fakeCache, pick *config.HomePick) *Picker {
-	e := New(Dependencies{Settings: &homeStore{value: config.Home{Enabled: true, Picks: map[string]config.HomePick{"lights": pick.Clone()}}}, Shell: shell.New(), Client: homeClient{}, States: homeStates{}})
+	e := New(
+		Dependencies{
+			Settings: &homeStore{
+				value: config.Home{
+					Enabled: true,
+					Picks:   map[string]config.HomePick{"lights": pick.Clone()},
+				},
+			},
+			Shell:  shell.New(),
+			Client: homeClient{},
+			States: homeStates{},
+		},
+	)
 	e.cache = f.c
 	p := e.NewPicker(e.selections[0])
 	p.save = func(next config.HomePick) { *pick = next.Clone() }
@@ -86,7 +104,10 @@ func TestIncludes(t *testing.T) {
 		{config.HomePick{Labels: []string{"panel"}}, []string{"light.k1"}},
 		{config.HomePick{Areas: []string{"kitchen"}}, []string{"light.k1", "light.k2"}},
 		{config.HomePick{Areas: []string{""}}, nil},
-		{config.HomePick{Entities: []string{"light.l1"}, Labels: []string{"panel"}}, []string{"light.k1", "light.l1"}},
+		{
+			config.HomePick{Entities: []string{"light.l1"}, Labels: []string{"panel"}},
+			[]string{"light.k1", "light.l1"},
+		},
 	}
 	for _, c := range cases {
 		var got []string
@@ -107,7 +128,12 @@ func TestAreasGroupAndCount(t *testing.T) {
 	p := picker(f, &pick)
 	_ = loaded(t, p, f)
 
-	rows := areaRows(house, config.HomePick{Areas: []string{"kitchen"}, Entities: []string{"light.l1"}}, "", map[string]bool{"loft": true})
+	rows := areaRows(
+		house,
+		config.HomePick{Areas: []string{"kitchen"}, Entities: []string{"light.l1"}},
+		"",
+		map[string]bool{"loft": true},
+	)
 	if len(rows) != 3 {
 		t.Fatalf("%d areas, want kitchen, loft and no area", len(rows))
 	}
@@ -144,7 +170,8 @@ func TestSearchNarrowsAndOpens(t *testing.T) {
 	}
 
 	labels := labelRows(tags, house, config.HomePick{Labels: []string{"spare"}}, "")
-	if len(labels) != 2 || labels[0].Count != 1 || labels[0].On || labels[1].Count != 0 || !labels[1].On {
+	if len(labels) != 2 || labels[0].Count != 1 || labels[0].On || labels[1].Count != 0 ||
+		!labels[1].On {
 		t.Errorf("labels %+v", labels)
 	}
 }

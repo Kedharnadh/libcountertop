@@ -17,14 +17,26 @@ func TestStateStaysFiniteUnderAdversarialInput(t *testing.T) {
 		mic, ref func(i int) int16
 	}{
 		{"silence", func(int) int16 { return 0 }, func(int) int16 { return 0 }},
-		{"loud mic, silent reference", func(i int) int16 { return int16(30000 * math.Sin(float64(i)/8)) }, func(int) int16 { return 0 }},
-		{"silent mic, loud reference", func(int) int16 { return 0 }, func(i int) int16 { return int16(30000 * math.Sin(float64(i)/8)) }},
+		{
+			"loud mic, silent reference",
+			func(i int) int16 { return int16(30000 * math.Sin(float64(i)/8)) },
+			func(int) int16 { return 0 },
+		},
+		{
+			"silent mic, loud reference",
+			func(int) int16 { return 0 },
+			func(i int) int16 { return int16(30000 * math.Sin(float64(i)/8)) },
+		},
 		{"full scale square", sq, sq},
 		{"dc at full scale", func(int) int16 { return 32767 }, func(int) int16 { return 32767 }},
 		{"alternating extremes", alt, alt},
 		{"one lsb", func(int) int16 { return 1 }, func(int) int16 { return 1 }},
 		{"loud reference, one lsb mic", func(int) int16 { return 1 }, sq},
-		{"reference uncorrelated with mic", func(i int) int16 { return int16(20000 * math.Sin(float64(i)/3)) }, func(i int) int16 { return int16(20000 * math.Sin(float64(i)/97)) }},
+		{
+			"reference uncorrelated with mic",
+			func(i int) int16 { return int16(20000 * math.Sin(float64(i)/3)) },
+			func(i int) int16 { return int16(20000 * math.Sin(float64(i)/97)) },
+		},
 	}
 
 	for _, p := range patterns {

@@ -1,4 +1,3 @@
-// Package proxy forwards BLE reports to Home Assistant with a supervised scanner lifecycle.
 package proxy
 
 import (
@@ -12,11 +11,12 @@ import (
 
 	esphome "github.com/ygelfand/go-esphome-device"
 	"github.com/ygelfand/go-esphome-device/api"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/hci"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
-	"google.golang.org/protobuf/proto"
 )
 
 const Features = esphome.BluetoothPassiveScan | esphome.BluetoothRawAdvertisements | esphome.BluetoothStateAndMode
@@ -51,8 +51,20 @@ type Proxy struct {
 }
 
 func New(options Dependencies) *Proxy {
-	b := &Proxy{options: options, proxy: &esphome.BluetoothProxy{}, wanted: make(chan struct{}, 1), reports: make(chan hci.Advertisement, queued)}
-	b.enable = &esphome.Switch{Base: esphome.Base{ObjectID: "bluetooth_proxy", Name: "Bluetooth proxy", Icon: "mdi:bluetooth", Category: esphome.CategoryConfig}}
+	b := &Proxy{
+		options: options,
+		proxy:   &esphome.BluetoothProxy{},
+		wanted:  make(chan struct{}, 1),
+		reports: make(chan hci.Advertisement, queued),
+	}
+	b.enable = &esphome.Switch{
+		Base: esphome.Base{
+			ObjectID: "bluetooth_proxy",
+			Name:     "Bluetooth proxy",
+			Icon:     "mdi:bluetooth",
+			Category: esphome.CategoryConfig,
+		},
+	}
 	b.enable.OnCommand = b.SetProxy
 	b.proxy.OnSubscribed = func(bool) { b.apply() }
 	b.proxy.OnMode = func(bool) { b.apply() }
@@ -271,7 +283,15 @@ func (b *Proxy) deliver(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case a := <-b.reports:
-			pending = append(pending, &api.BluetoothLERawAdvertisement{Address: a.Addr(), Rssi: int32(a.RSSI), AddressType: uint32(a.AddressType), Data: a.Data})
+			pending = append(
+				pending,
+				&api.BluetoothLERawAdvertisement{
+					Address:     a.Addr(),
+					Rssi:        int32(a.RSSI),
+					AddressType: uint32(a.AddressType),
+					Data:        a.Data,
+				},
+			)
 			if len(pending) == 1 {
 				flush.Reset(hold)
 			}

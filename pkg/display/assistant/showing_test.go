@@ -30,8 +30,6 @@ func TestTheReplyIsRevealedByCharacter(t *testing.T) {
 	}
 }
 
-// Cut on a rune boundary, or a multi-byte character is drawn as half of itself — which on this
-// panel is a replacement glyph in the middle of a sentence.
 func TestARevealNeverCutsARuneInHalf(t *testing.T) {
 	const text = "påslaget"
 
@@ -44,11 +42,3 @@ func TestARevealNeverCutsARuneInHalf(t *testing.T) {
 		}
 	}
 }
-
-// Every phase moves as time passes, at whatever the room is doing — including a silent one. This
-// is what says the device is listening rather than hung, and it is the whole of what somebody sees
-// before they start talking.
-//
-// The level is held the same across the two frames on purpose. Comparing a quiet frame against a
-// loud one proves only that the level changes the drawing, which it obviously does; it was written
-// that way first and passed while the wave stood still on the device.

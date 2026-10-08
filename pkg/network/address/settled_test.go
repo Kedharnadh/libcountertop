@@ -7,7 +7,6 @@ import (
 	"time"
 )
 
-// reads hands back a different answer each time it is asked, so a test can play out a boot.
 func reads(each ...[]string) func() []net.IP {
 	var at int
 	return func() []net.IP {
@@ -24,8 +23,6 @@ func reads(each ...[]string) func() []net.IP {
 
 const quick = time.Millisecond
 
-// The case this exists for: IPv6 arrives, DHCP answers a moment later, and what is advertised has
-// to be the pair rather than the first of them.
 func TestItWaitsForDHCPToAnswer(t *testing.T) {
 	read := reads(
 		[]string{"fd06::1"},
@@ -39,8 +36,6 @@ func TestItWaitsForDHCPToAnswer(t *testing.T) {
 	}
 }
 
-// A device whose addresses never moved should not be held up beyond the one interval it takes to
-// know that.
 func TestAStableDeviceSettlesAtOnce(t *testing.T) {
 	read := reads([]string{"10.0.0.5"})
 
@@ -55,8 +50,6 @@ func TestAStableDeviceSettlesAtOnce(t *testing.T) {
 	}
 }
 
-// Nothing is not an answer. A device with no address yet keeps waiting rather than advertising an
-// empty record.
 func TestNoAddressIsNotSettled(t *testing.T) {
 	read := reads(
 		nil,
@@ -71,7 +64,6 @@ func TestNoAddressIsNotSettled(t *testing.T) {
 	}
 }
 
-// Ending is a signal to stop, not to advertise nothing.
 func TestGivingUpReturnsNothing(t *testing.T) {
 	ctx, stop := context.WithCancel(context.Background())
 	stop()
@@ -81,7 +73,6 @@ func TestGivingUpReturnsNothing(t *testing.T) {
 	}
 }
 
-// An address that keeps moving is never settled, which is the point: it must not be published.
 func TestAChangingAddressIsNeverSettled(t *testing.T) {
 	var at int
 	read := func() []net.IP {

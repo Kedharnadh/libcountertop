@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/pion/webrtc/v4"
+
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/media/rtc"
 	discovery "github.com/ygelfand/libcountertop/pkg/network/peer"
@@ -107,7 +108,6 @@ type Profile struct{ ID string }
 
 func (*Profile) Covers() bool { return true }
 
-// New constructs the shared call controller using the device's service dependencies.
 func New(o Dependencies) *Calls {
 	ctx, stop := context.WithCancel(context.Background())
 	c := &Calls{options: o, ctx: ctx, stop: stop}
@@ -199,7 +199,23 @@ func (c *Calls) dial(s *session) {
 		return
 	}
 	me := c.options.Peers.Self()
-	status, err := post(s.ctx, s.addr, "offer", envelope{Call: s.ID, From: me.ID, Name: me.Name, Model: me.Model, Board: me.Board, Caps: me.Caps, SDP: sdp, Video: s.Video, Width: own.Width, Height: own.Height})
+	status, err := post(
+		s.ctx,
+		s.addr,
+		"offer",
+		envelope{
+			Call:   s.ID,
+			From:   me.ID,
+			Name:   me.Name,
+			Model:  me.Model,
+			Board:  me.Board,
+			Caps:   me.Caps,
+			SDP:    sdp,
+			Video:  s.Video,
+			Width:  own.Width,
+			Height: own.Height,
+		},
+	)
 	switch {
 	case err != nil:
 		c.fail(s, "offer", err)
@@ -258,7 +274,12 @@ func (c *Calls) answer(s *session) {
 		c.fail(s, "answer", err)
 		return
 	}
-	status, err := post(s.ctx, s.addr, "answer", envelope{Call: s.ID, SDP: sdp, Width: own.Width, Height: own.Height})
+	status, err := post(
+		s.ctx,
+		s.addr,
+		"answer",
+		envelope{Call: s.ID, SDP: sdp, Width: own.Width, Height: own.Height},
+	)
 	if err != nil || status != http.StatusOK {
 		c.fail(s, "answer", fmt.Errorf("status %d: %v", status, err))
 		return
@@ -341,7 +362,11 @@ func (c *Calls) apply(s *session) {
 }
 
 func (c *Calls) media(s *session) (rtc.Media, Size) {
-	m := rtc.Media{Audio: conversation{c.options.Sound}, Opened: func() { c.tell(s); c.tellSize(s) }, Received: c.received(s)}
+	m := rtc.Media{
+		Audio:    conversation{c.options.Sound},
+		Opened:   func() { c.tell(s); c.tellSize(s) },
+		Received: c.received(s),
+	}
 	c.mu.Lock()
 	video, remote, off := s.Video, s.remote, s.CameraOff
 	c.mu.Unlock()
@@ -460,7 +485,7 @@ func (c *Calls) finish(s *session, reason Reason) bool {
 	s.stop()
 	s.workerMu.Unlock()
 	if link != nil {
-		link.Close()
+		_ = link.Close()
 	}
 	s.workers.Wait()
 	pics.close()
@@ -515,7 +540,13 @@ func (s *session) worker(name string, run func()) {
 func (c *Calls) requestClose(s *session, r Reason) {
 	safe.Go("call completion", func() { c.close(s, r) })
 }
-func (c *Calls) requestEnd(s *session, r Reason) { safe.Go("call completion", func() { c.end(s, r) }) }
+
+func (c *Calls) requestEnd(
+	s *session,
+	r Reason,
+) {
+	safe.Go("call completion", func() { c.end(s, r) })
+}
 
 func (c *Calls) Run(ctx context.Context) error { <-ctx.Done(); c.Close(); return nil }
 func (c *Calls) Close() {

@@ -11,11 +11,12 @@ import (
 
 	esphome "github.com/ygelfand/go-esphome-device"
 	"github.com/ygelfand/go-esphome-device/api"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/ygelfand/libcountertop/pkg/hook"
 	"github.com/ygelfand/libcountertop/pkg/runtime/startup"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
-	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -54,10 +55,15 @@ type Controller struct {
 	born    time.Time
 }
 
-// New creates a controller whose pending requests and probes are owned until Close.
 func New(settings Settings) *Controller {
 	ctx, stop := context.WithCancel(context.Background())
-	return &Controller{settings: settings, ctx: ctx, stop: stop, waiting: map[uint32]chan reply{}, born: time.Now()}
+	return &Controller{
+		settings: settings,
+		ctx:      ctx,
+		stop:     stop,
+		waiting:  map[uint32]chan reply{},
+		born:     time.Now(),
+	}
 }
 func (h *Controller) Run(ctx context.Context) error { <-ctx.Done(); h.Close(); return nil }
 func (h *Controller) Close() {
@@ -340,5 +346,4 @@ func (h *Controller) call(
 	}
 }
 
-// Watch reports Home Assistant access changes until unsubscribed.
 func (h *Controller) Watch(changed func(Access)) func() { return h.Changed.Listen(changed) }

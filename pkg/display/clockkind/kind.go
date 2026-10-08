@@ -1,11 +1,9 @@
-// Package clockkind defines clock choices without importing a renderer.
 package clockkind
 
 import "github.com/ygelfand/libcountertop/pkg/say"
 
 type Kind string
 
-// Label resolves the clock choice in the active language.
 func (k Kind) Label() string {
 	if key := k.LabelKey(); key != "" {
 		return say.T(key)
@@ -30,7 +28,6 @@ func Kinds() []Kind {
 	return []Kind{Plain, Stack, Cards, Analog, AnalogSeconds, Segments, Words, Overlap}
 }
 
-// LabelKey returns the translation key of a known choice.
 func (k Kind) LabelKey() string {
 	if k == None {
 		return "face.none"

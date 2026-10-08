@@ -7,13 +7,6 @@ import (
 	"time"
 )
 
-// A service whose device is not there when the group starts.
-//
-// The sound card is why this exists: the daemon runs from post-fs-data and ueventd has not always made
-// /dev/snd/controlC0 by the time the microphones are acquired. Giving up there left the device with
-// no audio until something restarted the whole process, however long the service's restart policy
-// said to keep trying.
-
 func TestAServiceNotThereYetIsAskedForAgain(t *testing.T) {
 	svc := &fake{name: "microphones", startErr: errors.New("no such device")}
 
@@ -24,13 +17,11 @@ func TestAServiceNotThereYetIsAskedForAgain(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { done <- g.Run(ctx) }()
 
-	// It has to keep asking rather than give up on the first refusal.
 	waitFor(t, func() bool {
 		starts, _, _ := svc.counts()
 		return starts >= 3
 	})
 
-	// The device turns up.
 	svc.mu.Lock()
 	svc.startErr = nil
 	svc.mu.Unlock()
@@ -45,8 +36,6 @@ func TestAServiceNotThereYetIsAskedForAgain(t *testing.T) {
 	<-done
 }
 
-// A service that is not supervised keeps the old behaviour: asked for once, and the group carries
-// on without it. Something genuinely absent must not be retried forever.
 func TestAServiceWithNoRestartIsAskedForOnce(t *testing.T) {
 	svc := &fake{name: "camera", startErr: errors.New("no such device")}
 
@@ -71,7 +60,6 @@ func TestAServiceWithNoRestartIsAskedForOnce(t *testing.T) {
 	<-done
 }
 
-// A service the process cannot work without still brings the group down rather than being retried.
 func TestARequiredServiceStillGivesUp(t *testing.T) {
 	svc := &fake{name: "display", startErr: errors.New("no panel")}
 

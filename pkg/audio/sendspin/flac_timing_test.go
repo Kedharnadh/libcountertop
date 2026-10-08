@@ -18,8 +18,7 @@ const (
 	streamBlocks = 100
 )
 
-// encodedStream mirrors sendspin-go's encode.FLACEncoder, which cannot be imported: the Opus encoder
-// beside it binds libopus through cgo.
+// Mirrors sendspin-go's encode.FLACEncoder; that package binds libopus through cgo.
 func encodedStream(t *testing.T, block, blocks int) (header []byte, chunks [][]byte, want []int16) {
 	t.Helper()
 
@@ -51,7 +50,6 @@ func encodedStream(t *testing.T, block, blocks int) (header []byte, chunks [][]b
 		}
 		for i := range block {
 			for c := range Channels {
-				// No two blocks share audio, so a frame can be traced to the block it came from.
 				v := int32(((b*block+i)*37)%3001 - 1500 + c*7)
 				subs[c].Samples[i] = v
 				want = append(want, int16(v))
@@ -93,7 +91,6 @@ func blockAt(t *testing.T, want []int16, block int) map[[2]int16]int {
 	return at
 }
 
-// lagged runs the session's loop and reports how many chunks behind its own each frame came back.
 func lagged(t *testing.T, block int) (lags map[int]int, empty int) {
 	t.Helper()
 
@@ -126,8 +123,6 @@ func lagged(t *testing.T, block int) (lags map[int]int, empty int) {
 	return lags, empty
 }
 
-// A frame is written at the timestamp of the chunk that returned it, so a lag that varies puts one
-// frame where the last one's audio belongs: a hole, or an overwrite.
 func TestFLACLagDoesNotVary(t *testing.T) {
 	for _, block := range []int{480, 960, 1152, 2048, 4096} {
 		lags, empty := lagged(t, block)
@@ -140,8 +135,6 @@ func TestFLACLagDoesNotVary(t *testing.T) {
 	}
 }
 
-// decode waits for the parser to finish with the chunk, so a chunk hands back its own frame and the
-// audio is placed at that chunk's timestamp. Nothing is held back at either end of the stream.
 func TestFLACPlaysTheFrameTheChunkCarried(t *testing.T) {
 	header, chunks, want := encodedStream(t, chunkBlock, streamBlocks)
 
@@ -162,7 +155,6 @@ func TestFLACPlaysTheFrameTheChunkCarried(t *testing.T) {
 		}
 	}
 
-	// The first chunk's frame came back on that chunk, so audio starts at the anchor.
 	if o.base != 1000 {
 		t.Fatalf("audio starts at frame %d, want %d", o.base, 1000)
 	}
@@ -175,13 +167,9 @@ func TestFLACPlaysTheFrameTheChunkCarried(t *testing.T) {
 	}
 }
 
-// A track's worth of chunks. The write into the decoder's pipe is on the session goroutine, the one
-// that also reads the socket, so a parse that never returns takes the room with it.
 func TestFLACSurvivesALongStream(t *testing.T) {
-	const total = 20000 // ~6.5 minutes at 20 ms a chunk
+	const total = 20000
 
-	// FLAC frames are self-contained, so replaying them is a longer stream to the parser and spares
-	// the test encoding six minutes of audio.
 	header, chunks, _ := encodedStream(t, chunkBlock, streamBlocks)
 
 	d, err := newFLACDecoder(header)
@@ -208,7 +196,6 @@ func TestFLACSurvivesALongStream(t *testing.T) {
 		}
 	}()
 
-	// Stalled, not slow: the decoder is only failed when it stops taking chunks altogether.
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 
@@ -233,13 +220,18 @@ func TestFLACSurvivesALongStream(t *testing.T) {
 
 			stacks := make([]byte, 1<<16)
 			stacks = stacks[:runtime.Stack(stacks, true)]
-			t.Fatalf("the decoder took no chunk for %ds, stopped at %d of %d holding %d frames\n\n%s",
-				still, at, total, at-back.Load(), stacks)
+			t.Fatalf(
+				"the decoder took no chunk for %ds, stopped at %d of %d holding %d frames\n\n%s",
+				still,
+				at,
+				total,
+				at-back.Load(),
+				stacks,
+			)
 		}
 	}
 }
 
-// PCM decodes on the call that carried it, so it cannot be placed at another chunk's timestamp.
 func TestPCMRendersWhatWasEncoded(t *testing.T) {
 	_, _, want := encodedStream(t, chunkBlock, streamBlocks)
 

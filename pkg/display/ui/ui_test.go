@@ -28,8 +28,6 @@ func TestRectCenter(t *testing.T) {
 	}
 }
 
-// Contains is what a touch uses to find what it hit, so the edges have to be right: the top-left
-// is inside and the bottom-right is not.
 func TestRectContains(t *testing.T) {
 	r := Rect{X: 10, Y: 10, W: 20, H: 20}
 
@@ -74,9 +72,6 @@ func TestFillRect(t *testing.T) {
 	}
 }
 
-// FillRect writes one row and copies it into the rest, so a rectangle narrower than the image is
-// the case that catches a wrong offset: the copies would land shifted, or run past the right edge
-// onto the next row.
 func TestFillRectCopiesRowsToTheSamePlace(t *testing.T) {
 	img := NewImage(20, 20, black)
 	FillRect(img, Rect{X: 6, Y: 2, W: 7, H: 9}, white)
@@ -94,7 +89,6 @@ func TestFillRectCopiesRowsToTheSamePlace(t *testing.T) {
 	}
 }
 
-// A rectangle of one row copies nothing, which is the other side of the same code.
 func TestFillRectOfOneRow(t *testing.T) {
 	img := NewImage(8, 4, black)
 	FillRect(img, Rect{X: 1, Y: 2, W: 5, H: 1}, white)
@@ -113,7 +107,6 @@ func TestFillRectOfOneRow(t *testing.T) {
 	}
 }
 
-// An empty rectangle paints nothing rather than one stray row.
 func TestFillRectOfNothing(t *testing.T) {
 	for _, r := range []Rect{{}, {X: 2, Y: 2}, {X: 2, Y: 2, W: 4}, {X: 2, Y: 2, H: 4}, {X: 30, Y: 30, W: 4, H: 4}} {
 		img := NewImage(8, 4, black)
@@ -129,8 +122,6 @@ func TestFillRectOfNothing(t *testing.T) {
 	}
 }
 
-// Drawing off the edge must clip rather than wrap onto the next row, which is what an unclipped
-// write into a flat buffer does.
 func TestFillRectClips(t *testing.T) {
 	img := NewImage(10, 10, black)
 	FillRect(img, Rect{X: -5, Y: -5, W: 20, H: 20}, white)
@@ -157,7 +148,6 @@ func TestFill(t *testing.T) {
 	}
 }
 
-// A rounded rectangle keeps its edges and loses its corners, which is the whole point of it.
 func TestFillRounded(t *testing.T) {
 	img := NewImage(40, 40, black)
 	r := Rect{X: 5, Y: 5, W: 30, H: 30}
@@ -180,7 +170,6 @@ func TestFillRounded(t *testing.T) {
 	}
 }
 
-// A radius larger than the shape would otherwise fold the corners through each other.
 func TestFillRoundedClampsTheRadius(t *testing.T) {
 	img := NewImage(20, 20, black)
 	FillRounded(img, Rect{X: 2, Y: 2, W: 10, H: 10}, 100, white)
@@ -336,13 +325,11 @@ func TestDrawTextMarksThePage(t *testing.T) {
 		t.Fatal("drawing text left the image blank")
 	}
 
-	// Loosely bounded: enough to be lettering, not so much that it filled the page.
 	if lit > 200*80/2 {
 		t.Errorf("%d pixels were painted, which is more than lettering", lit)
 	}
 }
 
-// Text has to stay inside what it measured, or a layout built on Measure overlaps.
 func TestDrawTextStaysWithinItsMeasure(t *testing.T) {
 	f := MustLoad(Regular, 30)
 	const s = "Kitchen"
@@ -370,7 +357,6 @@ func TestDrawTextInCentres(t *testing.T) {
 
 	DrawTextIn(img, f, r, white, black, "ok")
 
-	// The painted pixels should straddle the middle rather than sitting against an edge.
 	minX, maxX := 1<<30, -1
 	for y := range 100 {
 		for x := range 200 {
@@ -412,7 +398,6 @@ func TestDrawTextRightIsFlushRight(t *testing.T) {
 	}
 }
 
-// Drawing off the edge of the panel must clip rather than wrap.
 func TestDrawTextClips(t *testing.T) {
 	f := MustLoad(Regular, 40)
 	img := NewImage(40, 40, black)

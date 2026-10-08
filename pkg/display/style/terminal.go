@@ -6,9 +6,15 @@ import (
 
 const Terminal = "terminal"
 
-var terminalStyle = Style{Name: Terminal, Palette: "Phosphor", Family: mono, Kit: terminal{}, Shape: func(c *gogui.ThemeCfg) {
-	c.Radius, c.RadiusSmall, c.RadiusMedium, c.RadiusLarge = 0, 0, 0, 0
-}}
+var terminalStyle = Style{
+	Name:    Terminal,
+	Palette: "Phosphor",
+	Family:  mono,
+	Kit:     terminal{},
+	Shape: func(c *gogui.ThemeCfg) {
+		c.Radius, c.RadiusSmall, c.RadiusMedium, c.RadiusLarge = 0, 0, 0, 0
+	},
+}
 
 type terminal struct{}
 
@@ -92,13 +98,19 @@ func blocks(vertical bool, marks []Span) func(gogui.SliderLookState) gogui.Slide
 		if vertical {
 			cfg.Sizing, cfg.Width, cfg.Height = gogui.FixedFill, thick, 0
 		}
-		return gogui.SliderParts{Track: gogui.DrawCanvas(cfg), Fill: placeholder(1, 1), Handle: placeholder(thick, thick)}
+		return gogui.SliderParts{
+			Track:  gogui.DrawCanvas(cfg),
+			Fill:   placeholder(1, 1),
+			Handle: placeholder(thick, thick),
+		}
 	}
 }
 
 func (terminal) Progress(cfg *gogui.ProgressBarCfg) {
 	t := gogui.CurrentTheme().Cfg
-	cfg.Radius, cfg.Color, cfg.ColorBar = gogui.NoRadius, t.ColorTextSecondary.WithOpacity(0.35), t.TextStyleDef.Color
+	cfg.Radius, cfg.Color, cfg.ColorBar = gogui.NoRadius, t.ColorTextSecondary.WithOpacity(
+		0.35,
+	), t.TextStyleDef.Color
 }
 
 func (terminal) Field(cfg *gogui.InputCfg) {
@@ -123,7 +135,11 @@ func (terminal) Row(cfg *gogui.ContainerCfg, state State) {
 	cfg.Radius = gogui.NoRadius
 	switch state {
 	case Chosen:
-		cfg.Color, cfg.ColorBorder, cfg.SizeBorder = t.TextStyleDef.Color.WithOpacity(0.12), t.TextStyleDef.Color, gogui.BorderPx(2)
+		cfg.Color, cfg.ColorBorder, cfg.SizeBorder = t.TextStyleDef.Color.WithOpacity(
+			0.12,
+		), t.TextStyleDef.Color, gogui.BorderPx(
+			2,
+		)
 	case Partial:
 		cfg.ColorBorder, cfg.SizeBorder = t.ColorTextSecondary, gogui.BorderPx(2)
 	}

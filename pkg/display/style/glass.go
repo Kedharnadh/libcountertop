@@ -6,9 +6,15 @@ import (
 
 const Glass = "glass"
 
-var glassStyle = Style{Name: Glass, Palette: "Midnight", Family: sans, Kit: glass{}, Shape: func(c *gogui.ThemeCfg) {
-	c.Radius, c.RadiusSmall, c.RadiusMedium, c.RadiusLarge = 14, 10, 14, 24
-}}
+var glassStyle = Style{
+	Name:    Glass,
+	Palette: "Midnight",
+	Family:  sans,
+	Kit:     glass{},
+	Shape: func(c *gogui.ThemeCfg) {
+		c.Radius, c.RadiusSmall, c.RadiusMedium, c.RadiusLarge = 14, 10, 14, 24
+	},
+}
 
 type glass struct{}
 
@@ -48,7 +54,11 @@ func (glass) Panel(cfg *gogui.ContainerCfg) {
 
 func (glass) Key(cfg *gogui.ContainerCfg, st *gogui.TextStyle, state State) {
 	t := gogui.CurrentTheme().Cfg
-	cfg.Color, cfg.Radius, st.Color = t.TextStyleDef.Color.WithOpacity(0.1), gogui.RadiusPx(cfg.Width/2), t.TextStyleDef.Color
+	cfg.Color, cfg.Radius, st.Color = t.TextStyleDef.Color.WithOpacity(
+		0.1,
+	), gogui.RadiusPx(
+		cfg.Width/2,
+	), t.TextStyleDef.Color
 	if state == Chosen {
 		cfg.Color, st.Color = t.TextStyleDef.Color.WithOpacity(0.9), t.ColorBackground
 	}
@@ -82,13 +92,21 @@ func frosted(vertical bool, marks []Span) func(gogui.SliderLookState) gogui.Slid
 		if vertical {
 			track.Sizing, track.Width, track.Height = gogui.FixedFill, thick, 0
 		}
-		return gogui.SliderParts{Track: gogui.DrawCanvas(track), Fill: placeholder(1, 1), Handle: placeholder(thick, thick)}
+		return gogui.SliderParts{
+			Track:  gogui.DrawCanvas(track),
+			Fill:   placeholder(1, 1),
+			Handle: placeholder(thick, thick),
+		}
 	}
 }
 
 func (glass) Progress(cfg *gogui.ProgressBarCfg) {
 	t := gogui.CurrentTheme().Cfg
-	cfg.Radius, cfg.Color, cfg.ColorBar = gogui.RadiusLarge, t.TextStyleDef.Color.WithOpacity(0.14), t.TextStyleDef.Color.WithOpacity(0.85)
+	cfg.Radius, cfg.Color, cfg.ColorBar = gogui.RadiusLarge, t.TextStyleDef.Color.WithOpacity(
+		0.14,
+	), t.TextStyleDef.Color.WithOpacity(
+		0.85,
+	)
 }
 
 func (glass) Field(cfg *gogui.InputCfg) {
@@ -97,7 +115,11 @@ func (glass) Field(cfg *gogui.InputCfg) {
 
 func (glass) Tab(cfg *gogui.ContainerCfg, st *gogui.TextStyle, state State) {
 	t := gogui.CurrentTheme().Cfg
-	cfg.Color, cfg.Radius, st.Color = t.TextStyleDef.Color.WithOpacity(0.08), gogui.RadiusPx(max(cfg.Height, Reach())/2), t.TextStyleDef.Color
+	cfg.Color, cfg.Radius, st.Color = t.TextStyleDef.Color.WithOpacity(
+		0.08,
+	), gogui.RadiusPx(
+		max(cfg.Height, Reach())/2,
+	), t.TextStyleDef.Color
 	if state == Chosen {
 		cfg.Color, st.Color = t.TextStyleDef.Color.WithOpacity(0.85), t.ColorBackground
 	}
@@ -118,7 +140,13 @@ func (glass) Row(cfg *gogui.ContainerCfg, state State) {
 	cfg.Radius = gogui.RadiusMedium
 	switch state {
 	case Chosen:
-		cfg.Color, cfg.ColorBorder, cfg.SizeBorder = t.TextStyleDef.Color.WithOpacity(0.1), t.TextStyleDef.Color.WithOpacity(0.25), gogui.BorderPx(1)
+		cfg.Color, cfg.ColorBorder, cfg.SizeBorder = t.TextStyleDef.Color.WithOpacity(
+			0.1,
+		), t.TextStyleDef.Color.WithOpacity(
+			0.25,
+		), gogui.BorderPx(
+			1,
+		)
 	case Partial:
 		cfg.ColorBorder, cfg.SizeBorder = t.TextStyleDef.Color.WithOpacity(0.18), gogui.BorderPx(1)
 	}

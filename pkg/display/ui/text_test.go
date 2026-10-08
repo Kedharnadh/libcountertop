@@ -7,12 +7,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 )
 
-// BenchmarkDrawText separates the two things drawing a string costs: turning outlines into
-// coverage, which the cache is there to avoid, and laying that coverage down, which it cannot.
-//
-// The cold case empties the cache first, so it pays what every frame used to pay. The changing
-// case is a value under a finger: the string is new each time and the glyphs are not, which is
-// where caching whole strings would miss and caching runes hits.
 func BenchmarkDrawText(b *testing.B) {
 	f := MustLoad(Regular, 28)
 	dst := NewImage(480, 64, theme.Color{})
@@ -46,7 +40,6 @@ func BenchmarkDrawText(b *testing.B) {
 		}
 	})
 
-	// Outside the clip: the whole string should cost a rectangle test.
 	b.Run("clipped away", func(b *testing.B) {
 		away := &clipped{Image: dst, to: Rect{X: 0, Y: 0, W: 1, H: 1}}
 		for b.Loop() {
@@ -55,7 +48,6 @@ func BenchmarkDrawText(b *testing.B) {
 	})
 }
 
-// clipped is a surface accepting paint in one rectangle, which is what a damaged frame looks like.
 type clipped struct {
 	*Image
 	to Rect
@@ -66,8 +58,6 @@ func (c *clipped) Clipped() Rect { return c.to }
 func TestGlyphCacheKeepsItsOwnCoverage(t *testing.T) {
 	f := MustLoad(Regular, 24)
 
-	// The face rasterizes into a buffer it reuses, so asking for a second rune must not change
-	// what the first one kept.
 	first := f.glyph('W')
 	before := append([]byte(nil), first.cover.Pix...)
 

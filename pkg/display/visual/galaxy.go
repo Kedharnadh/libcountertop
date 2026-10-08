@@ -29,8 +29,20 @@ type galaxy struct {
 }
 
 var (
-	galaxyPA = [5][3]float64{{255, 236, 210}, {160, 196, 255}, {110, 225, 255}, {255, 120, 200}, {150, 130, 255}}
-	galaxyPB = [5][3]float64{{255, 225, 235}, {255, 150, 210}, {220, 120, 255}, {255, 90, 160}, {255, 170, 120}}
+	galaxyPA = [5][3]float64{
+		{255, 236, 210},
+		{160, 196, 255},
+		{110, 225, 255},
+		{255, 120, 200},
+		{150, 130, 255},
+	}
+	galaxyPB = [5][3]float64{
+		{255, 225, 235},
+		{255, 150, 210},
+		{220, 120, 255},
+		{255, 90, 160},
+		{255, 170, 120},
+	}
 )
 
 const (
@@ -43,12 +55,14 @@ func newGalaxy() *galaxy {
 	r := seeded(77)
 	for i := range galaxyN {
 		k := r.next()
-		b, sz := 0.35+r.next()*0.65, 0.8+r.next()*r.next()*1.8
-		var rr, th, z float64
+		_, sz := 0.35+r.next()*0.65, 0.8+r.next()*r.next()*1.8
+		var rr, th, z, b float64
 		var c uint8
 		switch {
 		case k < 0.17:
-			rr, th, z, c, b = math.Abs(r.gauss())*0.09, r.next()*2*math.Pi, r.gauss()*0.05, 0, 0.6+r.next()*0.4
+			rr, th, z, c, b = math.Abs(
+				r.gauss(),
+			)*0.09, r.next()*2*math.Pi, r.gauss()*0.05, 0, 0.6+r.next()*0.4
 		case k < 0.8:
 			rr = math.Min(1.05, 0.07-math.Log(1-r.next()*0.97)*0.27)
 			arm := 0.0
@@ -114,9 +128,21 @@ func (v *galaxy) frame(f frame, W, H float64) (cx, cy, rg float64, cols [5][3]fl
 	return W / 2, H / 2, rg, cols
 }
 
-func (v *galaxy) stars(f frame, cx, cy, rg, u float64, emit func(x, y, sz float64, c uint8, lvl int)) {
+func (v *galaxy) stars(
+	f frame,
+	cx, cy, rg, u float64,
+	emit func(x, y, sz float64, c uint8, lvl int),
+) {
 	t, lv := f.t, f.level
-	cT, sT, cR, sR := math.Cos(galaxyTilt), math.Sin(galaxyTilt), math.Cos(galaxyRoll), math.Sin(galaxyRoll)
+	cT, sT, cR, sR := math.Cos(
+		galaxyTilt,
+	), math.Sin(
+		galaxyTilt,
+	), math.Cos(
+		galaxyRoll,
+	), math.Sin(
+		galaxyRoll,
+	)
 	tw := 0.06*math.Sin(t*0.6) + 0.05*lv
 	for i := range galaxyN {
 		rr := v.pr[i]
@@ -152,13 +178,28 @@ func (v *galaxy) backdrop(back *image.RGBA) {
 		x, y float64
 		c    [3]float64
 	}{{0.3, 0.3, [3]float64{40, 60, 140}}, {0.8, 0.75, [3]float64{110, 40, 120}}, {0.55, 0.15, [3]float64{30, 90, 130}}} {
-		fx.Radial(back, float32(n.x*W), float32(n.y*H), 0, float32(H*0.6), []fx.Stop{{At: 0, C: nrgba(n.c, 0.16)}, {At: 1, C: nrgba(n.c, 0)}}, false)
+		fx.Radial(
+			back,
+			float32(n.x*W),
+			float32(n.y*H),
+			0,
+			float32(H*0.6),
+			[]fx.Stop{{At: 0, C: nrgba(n.c, 0.16)}, {At: 1, C: nrgba(n.c, 0)}},
+			false,
+		)
 	}
 	r := seeded(4)
 	for range 420 {
 		b := 0.2 + r.next()*r.next()*0.8
 		sz := (0.5 + r.next()*1.1) * u
-		fx.Square(back, float32(r.next()*W), float32(r.next()*H), float32(math.Max(sz, 0.6)), nrgba([3]float64{220, 230, 255}, b), false)
+		fx.Square(
+			back,
+			float32(r.next()*W),
+			float32(r.next()*H),
+			float32(math.Max(sz, 0.6)),
+			nrgba([3]float64{220, 230, 255}, b),
+			false,
+		)
 	}
 }
 
@@ -191,8 +232,21 @@ func (v *galaxy) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 	pts := make([]Point, 0, galaxyN)
 	v.stars(f, cx, cy, rg, u, func(x, y, sz float64, c uint8, lvl int) {
 		k := cols[c]
-		pts = append(pts, Point{X: float32(x + sz/2), Y: float32(y + sz/2), Size: float32(math.Max(sz, 1)),
-			R: float32(k[0] / 255), G: float32(k[1] / 255), B: float32(k[2] / 255), A: float32(galaxyAlpha[lvl]), Feed: true})
+		pts = append(
+			pts,
+			Point{
+				X:    float32(x + sz/2),
+				Y:    float32(y + sz/2),
+				Size: float32(math.Max(sz, 1)),
+				R: float32(
+					k[0] / 255,
+				),
+				G:    float32(k[1] / 255),
+				B:    float32(k[2] / 255),
+				A:    float32(galaxyAlpha[lvl]),
+				Feed: true,
+			},
+		)
 	})
 	if err := g.Points(pts); err != nil {
 		return err

@@ -36,7 +36,9 @@ func TestSnapshotsAndCallerValuesAreDetached(t *testing.T) {
 func TestTypeErrorsReturnCompleteDefaultsAndPreserveOriginalFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "state")
 	raw := []byte(`{"enabled":true,"count":"invalid"}`)
-	os.WriteFile(path, raw, 0600)
+	if err := os.WriteFile(path, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
 	s, err := Load(path, config{Count: 7}, copyConfig)
 	if err == nil {
 		t.Fatal("want load error")
@@ -88,7 +90,6 @@ func TestFailedWriteDoesNotPublishTheChange(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "state")
 	s, _ := Load(path, config{Count: 7}, copyConfig)
-	// A directory at the destination prevents replacing it with a settings file.
 	if err := os.Mkdir(path, 0700); err != nil {
 		t.Fatal(err)
 	}

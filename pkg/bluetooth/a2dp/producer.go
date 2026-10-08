@@ -9,7 +9,6 @@ import (
 
 var _ pcm.Producer = (*Sink)(nil)
 
-// Stand implements speaker.Producer, pausing the phone rather than muting it.
 func (s *Sink) Stand(down bool) {
 	s.mu.Lock()
 	first := down && !s.down
@@ -27,7 +26,6 @@ func (s *Sink) Stand(down bool) {
 	s.press(avrcp.OpPause)
 }
 
-// Duck implements speaker.Producer, setting the level for what is written next.
 func (s *Sink) Duck(on bool) {
 	gain := float32(1)
 	if on {
@@ -39,7 +37,6 @@ func (s *Sink) Duck(on bool) {
 	s.mu.Unlock()
 }
 
-// Requeue implements speaker.Producer, scaling what is already queued.
 func (s *Sink) Requeue() {
 	s.mu.Lock()
 	gain := s.gain

@@ -68,7 +68,8 @@ func (v *lavaLamp) paint() *image.RGBA {
 			case fy >= top && fy <= bottom && math.Abs(fx-cx) <= v.halfWidth(fy):
 				hw := v.halfWidth(fy)
 				k := (fx - cx) / hw
-				hi := math.Exp(-math.Pow((k+0.55)/0.12, 2))*0.35 + math.Exp(-math.Pow((k-0.62)/0.06, 2))*0.12
+				d0, d1 := (k+0.55)/0.12, (k-0.62)/0.06
+				hi := math.Exp(-d0*d0)*0.35 + math.Exp(-d1*d1)*0.12
 				r, g, b = hi, hi, hi*1.05
 				a = clamp01((hw - math.Abs(fx-cx)) * 0.5)
 			case fy > bottom-lip && fy <= baseBot:
@@ -80,7 +81,8 @@ func (v *lavaLamp) paint() *image.RGBA {
 				}
 				if math.Abs(fx-cx) <= hw {
 					k := (fx - cx) / hw
-					m := (0.3 + 0.5*math.Exp(-math.Pow((k+0.4)/0.22, 2)) + 0.15*math.Exp(-math.Pow((k-0.55)/0.1, 2)) - 0.2*k*k) * shade
+					d0, d1 := (k+0.4)/0.22, (k-0.55)/0.1
+					m := (0.3 + 0.5*math.Exp(-d0*d0) + 0.15*math.Exp(-d1*d1) - 0.2*k*k) * shade
 					r, g, b = m*0.95, m*0.9, m*0.85
 				}
 			case fy >= capTop && fy < top:
@@ -88,12 +90,21 @@ func (v *lavaLamp) paint() *image.RGBA {
 				hw := neck * (0.55 + 0.45*t)
 				if math.Abs(fx-cx) <= hw {
 					k := (fx - cx) / hw
-					m := 0.3 + 0.5*math.Exp(-math.Pow((k+0.35)/0.25, 2)) - 0.18*k*k
+					d0 := (k + 0.35) / 0.25
+					m := 0.3 + 0.5*math.Exp(-d0*d0) - 0.18*k*k
 					r, g, b = m*0.95, m*0.9, m*0.85
 				}
 			}
 			o := img.PixOffset(x, y)
-			img.Pix[o], img.Pix[o+1], img.Pix[o+2], img.Pix[o+3] = uint8(255*math.Min(1, r)), uint8(255*math.Min(1, g)), uint8(255*math.Min(1, b)), uint8(255*a)
+			img.Pix[o], img.Pix[o+1], img.Pix[o+2], img.Pix[o+3] = uint8(
+				255*math.Min(1, r),
+			), uint8(
+				255*math.Min(1, g),
+			), uint8(
+				255*math.Min(1, b),
+			), uint8(
+				255*a,
+			)
 		}
 	}
 	return img
@@ -168,7 +179,17 @@ func (v *lavaLamp) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 	v.advance(f)
 	cx, top, bottom, _, _ := v.glass()
 	vals := make([]float32, 8+3*lavaBlobs)
-	vals[0], vals[1], vals[2], vals[3], vals[4] = float32(v.st.w), float32(top), float32(bottom), float32(v.glow), float32(cx)
+	vals[0], vals[1], vals[2], vals[3], vals[4] = float32(
+		v.st.w,
+	), float32(
+		top,
+	), float32(
+		bottom,
+	), float32(
+		v.glow,
+	), float32(
+		cx,
+	)
 	for i, b := range v.blobs {
 		o := 8 + 3*i
 		vals[o], vals[o+1], vals[o+2] = float32(cx+b.x), float32(b.y), float32(b.r*b.r)

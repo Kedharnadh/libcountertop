@@ -7,11 +7,6 @@ import (
 	"slices"
 )
 
-// A model on disk is a copy of something Home Assistant serves, so the ones no slot is listening for
-// are cache: deleting one costs a download the next time it is selected, and Home Assistant goes on
-// offering it in the meantime.
-
-// Cached is the models no slot is using, and the bytes they occupy.
 func Cached(dir string, inUse []string) ([]Model, int64) {
 	models, err := Installed(dir)
 	if err != nil {
@@ -30,8 +25,6 @@ func Cached(dir string, inUse []string) ([]Model, int64) {
 	return stale, bytes
 }
 
-// Purge deletes them, and reports how many went and how much that freed. A file that will not delete
-// is logged and skipped: the rest of the cache is still worth clearing.
 func Purge(dir string, inUse []string) (int, int64) {
 	stale, _ := Cached(dir, inUse)
 
@@ -50,7 +43,6 @@ func Purge(dir string, inUse []string) (int, int64) {
 	return gone, freed
 }
 
-// size is what a model occupies: the model itself and the manifest beside it.
 func size(dir string, m Model) int64 {
 	var total int64
 	for _, path := range files(dir, m) {
@@ -70,8 +62,6 @@ func remove(dir string, m Model) error {
 	return nil
 }
 
-// files is everything on disk that belongs to a model: the manifest is named for the id, and the
-// model is whatever the manifest named, which is usually but not always the same.
 func files(dir string, m Model) []string {
 	out := []string{m.Path, filepath.Join(dir, m.ID+".json")}
 	if named := modelPath(dir, m.ID); named != m.Path {

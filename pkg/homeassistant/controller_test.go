@@ -9,8 +9,9 @@ import (
 	"time"
 
 	"github.com/ygelfand/go-esphome-device/api"
-	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 type fake struct {
@@ -96,7 +97,7 @@ func TestRefusedFailsFastAndReprobes(t *testing.T) {
 func TestSendFailureDisconnects(t *testing.T) {
 	h, f := connected(nil)
 	f.fail = errors.New("closed")
-	var heard Access = Allowed
+	heard := Allowed
 	h.Changed.Listen(func(a Access) { heard = a })
 
 	if err := h.Call(context.Background(), "light.turn_on", nil); err == nil {

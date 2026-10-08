@@ -8,8 +8,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
-// Only the face with a second hand asks to be redrawn every second. A face that ticked by accident
-// would cost the panel a whole-screen composite a second for a picture that did not change.
 func TestOnlyTheSecondHandTicks(t *testing.T) {
 	for _, name := range Kinds() {
 		want := name == AnalogSeconds
@@ -20,8 +18,6 @@ func TestOnlyTheSecondHandTicks(t *testing.T) {
 	}
 }
 
-// The second is on every reading whether or not anything draws it, and out of String, so the
-// dashboard's own comparison does not see a change sixty times a minute.
 func TestTheSecondIsCarriedButNotSaid(t *testing.T) {
 	at := func(s int) time.Time {
 		return time.Date(2026, time.September, 20, 8, 2, s, 0, time.UTC)
@@ -37,8 +33,6 @@ func TestTheSecondIsCarriedButNotSaid(t *testing.T) {
 	}
 }
 
-// The second hand has to move with the second, which is the only thing that changes between those
-// two readings.
 func TestTheSecondHandMoves(t *testing.T) {
 	at := func(s int) time.Time {
 		return time.Date(2026, time.September, 20, 8, 2, s, 0, time.UTC)
@@ -66,7 +60,6 @@ func TestTheSecondHandMoves(t *testing.T) {
 		t.Error("the second hand is in the same place at :00 and :30")
 	}
 
-	// And the face without one does not move, however the second changes.
 	plainShot := func(s int) string {
 		img := ui.NewImage(box.W, box.H, palette.Background)
 		Of(Analog).Draw(img, box, Read(at(s), true), palette)

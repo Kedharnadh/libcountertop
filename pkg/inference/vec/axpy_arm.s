@@ -3,18 +3,7 @@
 #include "textflag.h"
 
 // func axpyVFP(dst, x *float32, n int, gain float32)
-//
-// dst[i] += gain*x[i], sixteen floats an iteration, in blocks of six, six and four.
-//
-// The target is a Cortex-A53, two-wide and in-order. Two things are being arranged. A block's loads
-// all go before any of its arithmetic and all of its stores after, so a value has the rest of the
-// block between being computed and being written — a multiply-accumulate has several cycles of
-// latency and a store that asks for the result too early pays all of it. And six pairs rather than
-// four, because twelve registers is what there is: the wider the block, the further apart those two
-// ends can be.
-//
-// The pointers move by hand: VLDR and VSTR have no post-indexed form, and MOVF.P assembles without the
-// writeback rather than refusing.
+// VLDR and VSTR have no post-indexed form; MOVF.P assembles without the writeback.
 TEXT ·axpyVFP(SB), NOSPLIT, $0-16
 	MOVW	dst+0(FP), R0
 	MOVW	x+4(FP), R1
@@ -72,7 +61,6 @@ sixteen:
 	MULAF	F0, F13, F12
 	MULAF	F0, F15, F14
 
-	// In the gap rather than beside the branch: the integer pipe is idle through the multiplies.
 	SUB	$16, R2
 
 	MOVF	F4, 24(R0)

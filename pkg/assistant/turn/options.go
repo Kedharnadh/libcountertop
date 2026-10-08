@@ -8,7 +8,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/inference/wake"
 )
 
-// Microphone supplies processed 16 kHz mono audio and its recent history.
 type Microphone interface {
 	Listen(string) (<-chan []int16, func())
 	Recent(time.Duration) []int16
@@ -45,7 +44,6 @@ type Recorder interface {
 	Seconds(string) float64
 }
 
-// Dependencies binds the conversation to audio hardware, saved settings, and presentation.
 type Dependencies struct {
 	Source             Microphone
 	Speaker            Speaker

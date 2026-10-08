@@ -2,14 +2,15 @@ package widgets
 
 import (
 	"fmt"
+	"slices"
+
 	gogui "github.com/go-gui-org/go-gui/gui"
+
 	"github.com/ygelfand/libcountertop/pkg/display/model"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
-	"slices"
 )
 
-// PageRenderer supplies the styled controls and platform preview for a page.
 type PageRenderer struct {
 	Row     func(string, string, model.Row, func(int), bool) gogui.View
 	Tile    func(*gogui.Window, string, string, model.Cell, func(int)) gogui.View
@@ -17,7 +18,6 @@ type PageRenderer struct {
 	Beside  func(*gogui.Window, gogui.View, gogui.View) gogui.View
 }
 
-// PageBody composes rows or tiles with an optional live preview.
 func PageBody(w *gogui.Window, p *shell.Page, render PageRenderer) gogui.View {
 	var views []gogui.View
 	switch {
@@ -41,9 +41,26 @@ func PageBody(w *gogui.Window, p *shell.Page, render PageRenderer) gogui.View {
 			}
 			tiles = append(tiles, render.Tile(w, fmt.Sprintf("tile-%d", i), p.Title, c, tap))
 		}
-		views = append(views, gogui.Row(gogui.ContainerCfg{Sizing: gogui.FillFit, Wrap: true, Spacing: gogui.SpacingMedium, Content: tiles}))
+		views = append(
+			views,
+			gogui.Row(
+				gogui.ContainerCfg{
+					Sizing:  gogui.FillFit,
+					Wrap:    true,
+					Spacing: gogui.SpacingMedium,
+					Content: tiles,
+				},
+			),
+		)
 	}
-	list := gogui.Column(gogui.ContainerCfg{Sizing: gogui.FillFit, Padding: gogui.NoPadding, Spacing: gogui.SpacingTight, Content: views})
+	list := gogui.Column(
+		gogui.ContainerCfg{
+			Sizing:  gogui.FillFit,
+			Padding: gogui.NoPadding,
+			Spacing: gogui.SpacingTight,
+			Content: views,
+		},
+	)
 	if p.Preview == nil {
 		return list
 	}

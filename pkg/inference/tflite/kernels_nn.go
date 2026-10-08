@@ -51,9 +51,6 @@ func conv2D(o *OpDesc, in, out []*Tensor) error {
 							continue
 						}
 
-						// With a single input channel the channel axis is a dead loop and the
-						// contiguous run is along the width instead, which is where the mel
-						// model's 512-tap filters live.
 						if ic == 1 && p.dilationW == 1 {
 							x0 := ox*p.strideW - padW
 							lo, hi := max(0, -x0), min(kw, iw-x0)
@@ -230,8 +227,6 @@ func batchMatMul(o *OpDesc, in, out []*Tensor) error {
 	return nil
 }
 
-// step advances an odometer over shape and returns the two source offsets that go with the new
-// position. Strides of zero are how a broadcast axis stays put.
 func step(idx, shape, as, bs []int, ao, bo int) (int, int) {
 	for d := len(shape) - 1; d >= 0; d-- {
 		idx[d]++

@@ -16,19 +16,16 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
 
-// Clock sync runs in bursts, matching the reference player. A round that spent longer in the network
-// says less about the offset, so the best of eight is used and the rest thrown away: measured on device,
-// single rounds let one at rtt=3.09 s into the filter.
+// Clock sync runs in bursts, matching the reference player.
 const (
 	syncEvery   = 10 * time.Second
 	syncBurst   = 8
 	syncTimeout = 500 * time.Millisecond
 )
 
-// protocolVersion: the library exports no constant and does not default it. Zero is refused.
+// sendspin-go exports no protocol version constant and does not default it; zero is refused.
 const protocolVersion = 1
 
-// session is one server's hold on this room. The server dials us, so there is no reconnect here.
 type Session struct {
 	client    *protocol.Client
 	clock     *ssync.ClockSync
@@ -36,24 +33,26 @@ type Session struct {
 	bg        Arbitration
 	callbacks Callbacks
 
-	// dec is non-nil exactly while a stream is running.
 	dec    decoder
 	chunks int
 
-	// lastTS is the newest chunk's timestamp, kept to measure what a new stream overlaps.
 	lastTS int64
 	opened bool
 	muted  bool
 
-	// mu guards commands, which the run loop writes and Home Assistant reads when it presses stop.
 	mu sync.Mutex
 
-	// commands is what the server said it would act on, from the controller role. Sending anything
-	// else is a message the server is free to ignore, so what is not in here is not sent.
 	commands []string
 }
 
-func newSession(conn *websocket.Conn, o *Output, bg Arbitration, name string, identity Identity, callbacks Callbacks) *Session {
+func newSession(
+	conn *websocket.Conn,
+	o *Output,
+	bg Arbitration,
+	name string,
+	identity Identity,
+	callbacks Callbacks,
+) *Session {
 	artworkSize := identity.ArtworkSize
 	if artworkSize <= 0 {
 		artworkSize = 512
@@ -64,7 +63,6 @@ func newSession(conn *websocket.Conn, o *Output, bg Arbitration, name string, id
 			Codec: f.Codec, Channels: f.Channels, SampleRate: f.SampleRate, BitDepth: f.BitDepth,
 		})
 	}
-	// The room's identity to the server, and what Music Assistant keys its stored player on.
 	mac := identity.ID
 
 	client := protocol.NewClientFromConn(protocol.Config{
@@ -74,7 +72,6 @@ func newSession(conn *websocket.Conn, o *Output, bg Arbitration, name string, id
 
 		SupportedRoles: []string{"player@v1", "metadata@v1", "controller@v1", "artwork@v1"},
 
-		// The factory mac: survives a reinstall, a rename and a new address.
 		ClientID: mac,
 		DeviceInfo: protocol.DeviceInfo{
 			ProductName:     identity.Model,
@@ -96,17 +93,20 @@ func newSession(conn *websocket.Conn, o *Output, bg Arbitration, name string, id
 		},
 	}, conn)
 
-	return &Session{client: client, clock: ssync.NewClockSync(), out: o, bg: bg, callbacks: callbacks}
+	return &Session{
+		client:    client,
+		clock:     ssync.NewClockSync(),
+		out:       o,
+		bg:        bg,
+		callbacks: callbacks,
+	}
 }
 
-// bufferCapacity caps how far ahead the server may send, which is the stall the room can ride out. The
-// spec counts bytes and carries one number for every format, so it is sized for the widest we offer:
-// every codec then gets the same cushion, bounded by the server's 30 s cap rather than by bytes.
+// The spec counts buffer capacity in bytes, one number for every format.
 const bufferSeconds = 30
 
 const bufferCapacity = bufferSeconds * Rate * Channels * Bits / 8
 
-// run drives the connection until it closes or ctx ends.
 func (s *Session) run(ctx context.Context) error {
 	defer s.finish()
 
@@ -121,7 +121,7 @@ func (s *Session) run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			s.client.SendGoodbye("user_request")
+			_ = s.client.SendGoodbye("user_request")
 			return nil
 
 		case <-s.client.Done():
@@ -133,14 +133,21 @@ func (s *Session) run(ctx context.Context) error {
 			}
 			s.began(start)
 
-		// Music Assistant ends the stream instead, but the spec has this for seeks and other servers
-		// may use it.
+		// Music Assistant ends the stream instead; the spec has this for seeks.
 		case <-s.client.StreamClear:
 			s.cleared()
 
 		case <-s.client.StreamEnd:
 			late, dropped := s.out.misses()
-			slog.Debug("sendspin stream end", "queued_ms", s.out.queuedMs(), "late", late, "dropped", dropped)
+			slog.Debug(
+				"sendspin stream end",
+				"queued_ms",
+				s.out.queuedMs(),
+				"late",
+				late,
+				"dropped",
+				dropped,
+			)
 			s.ended()
 
 		case chunk, ok := <-s.client.AudioChunks:
@@ -164,14 +171,12 @@ func (s *Session) run(ctx context.Context) error {
 	}
 }
 
-// began builds the decoder for the negotiated format and takes the speaker.
 func (s *Session) began(start protocol.StreamStart) {
 	if start.Player == nil {
 		return
 	}
 	p := start.Player
 
-	// FLAC arrives as bare frames; what makes them a stream is this.
 	header, err := base64.StdEncoding.DecodeString(p.CodecHeader)
 	if err != nil {
 		slog.Error("sendspin codec header", "codec", p.Codec, "err", err)
@@ -191,7 +196,9 @@ func (s *Session) began(start protocol.StreamStart) {
 
 	first := s.dec == nil
 	if !first {
-		s.dec.close()
+		if err := s.dec.close(); err != nil {
+			slog.Warn("sendspin decoder close", "err", err)
+		}
 	}
 	s.dec = dec
 	s.opened = true
@@ -200,10 +207,19 @@ func (s *Session) began(start protocol.StreamStart) {
 		s.bg.Took(s.out)
 		s.callbacks.state(statePlaying)
 	}
-	slog.Debug("sendspin stream", "codec", p.Codec, "rate", p.SampleRate, "ch", p.Channels, "bits", p.BitDepth)
+	slog.Debug(
+		"sendspin stream",
+		"codec",
+		p.Codec,
+		"rate",
+		p.SampleRate,
+		"ch",
+		p.Channels,
+		"bits",
+		p.BitDepth,
+	)
 }
 
-// cleared drops what has not been heard, both what is still coded and what is queued.
 func (s *Session) cleared() {
 	drained := 0
 	for {
@@ -218,8 +234,7 @@ func (s *Session) cleared() {
 	}
 }
 
-// grouped records what the group is doing. Stopping is stream/end's job, which the server sends on stop
-// as well as on skip and seek. Fields are deltas, so an absent state means unchanged.
+// Group update fields are deltas: an absent state means unchanged.
 func (s *Session) grouped(g protocol.GroupUpdate) {
 	if g.PlaybackState == nil {
 		return
@@ -228,8 +243,6 @@ func (s *Session) grouped(g protocol.GroupUpdate) {
 	s.callbacks.grouped(*g.PlaybackState)
 }
 
-// said takes what the server reports about itself: the track for the metadata role, and for the
-// controller role the commands it will act on.
 func (s *Session) said(st protocol.ServerStateMessage) {
 	if c := st.Controller; c != nil {
 		s.mu.Lock()
@@ -244,9 +257,6 @@ func (s *Session) said(st protocol.ServerStateMessage) {
 
 }
 
-// tell asks the server to do something. Only what it advertised is sent: the rest it is free to
-// ignore, and a command that was never going to land should say so here rather than look like it
-// worked.
 func (s *Session) tell(want ...string) bool {
 	s.mu.Lock()
 	can := s.commands
@@ -270,16 +280,14 @@ func (s *Session) tell(want ...string) bool {
 	return false
 }
 
-// ended drops what is held: the spec has stream/end stop output and clear buffers, and the server sends
-// it on stop, skip and seek. A track running into the next one keeps the stream and says nothing.
-//
-// The room stays the group's for all that. A pause is a stream that ended, and a group that is still
-// there to be told to play again.
+// The spec has stream/end stop output and clear buffers; servers send it on stop, skip and seek.
 func (s *Session) ended() {
 	if s.dec == nil {
 		return
 	}
-	s.dec.close()
+	if err := s.dec.close(); err != nil {
+		slog.Warn("sendspin decoder close", "err", err)
+	}
 	s.dec = nil
 	s.cleared()
 	s.out.close()
@@ -287,7 +295,6 @@ func (s *Session) ended() {
 	s.callbacks.state(stateJoined)
 }
 
-// heard plays a chunk as it arrives.
 func (s *Session) heard(chunk protocol.AudioChunk) {
 	if s.dec == nil {
 		return
@@ -298,14 +305,11 @@ func (s *Session) heard(chunk protocol.AudioChunk) {
 		slog.Warn("sendspin decode", "err", err)
 		return
 	}
-	// A frame can span chunks, and the one that did not finish it carries no audio of its own.
 	if len(pcm) == 0 {
 		return
 	}
 	s.out.write(chunk.Timestamp, pcm)
 
-	// A new stream's first chunk against the outgoing one's last says whether the server means it to
-	// follow on or to replace what is still queued. Both look the same at stream/end.
 	if s.opened {
 		s.opened = false
 		slog.Debug("sendspin stream first chunk",
@@ -316,8 +320,6 @@ func (s *Session) heard(chunk protocol.AudioChunk) {
 	}
 	s.lastTS = chunk.Timestamp
 
-	// lead_ms is when the server wanted this played, against now. We play on arrival instead, so it is
-	// also how far behind the intended point the room is running.
 	if s.chunks++; s.chunks%250 == 0 {
 		late, dropped := s.out.misses()
 		drift, corrected := s.out.drifting()
@@ -343,8 +345,6 @@ func (s *Session) told(cmd protocol.PlayerCommand) {
 	s.reported()
 }
 
-// reported echoes what took effect. The server has no other way to learn a command landed, and the
-// protocol carries no position, so this is the whole of what we say back.
 func (s *Session) reported() {
 	if err := s.client.SendState(protocol.PlayerState{
 		State:  "synchronized",
@@ -355,8 +355,6 @@ func (s *Session) reported() {
 	}
 }
 
-// synced keeps the clock filter fed. It owns TimeSyncResp: nothing else may read that channel, or the
-// burst would lose rounds to whoever got there first.
 func (s *Session) synced(ctx context.Context) {
 	ticker := time.NewTicker(syncEvery)
 	defer ticker.Stop()
@@ -374,7 +372,6 @@ func (s *Session) synced(ctx context.Context) {
 	}
 }
 
-// measure runs one burst and feeds the filter the round that spent least time in the network.
 func (s *Session) measure(ctx context.Context) {
 drain:
 	for {
@@ -416,7 +413,12 @@ drain:
 		slog.Debug("sendspin time sync", "err", "no reply in the burst")
 		return
 	}
-	s.clock.ProcessSyncResponse(best.ClientTransmitted, best.ServerReceived, best.ServerTransmitted, arrived)
+	s.clock.ProcessSyncResponse(
+		best.ClientTransmitted,
+		best.ServerReceived,
+		best.ServerTransmitted,
+		arrived,
+	)
 }
 
 func (s *Session) finish() {
@@ -426,8 +428,6 @@ func (s *Session) finish() {
 
 func micros() int64 { return time.Now().UnixMicro() }
 
-// Close ends the current connection, including after the device clock changes.
 func (s *Session) Close() { s.client.Close() }
 
-// Command sends only commands the server advertised; callers may invoke it off their control loop.
 func (s *Session) Command(want ...string) bool { return s.tell(want...) }

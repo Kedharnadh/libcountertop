@@ -33,19 +33,42 @@ func (p *CallPages) Calls() *shell.Page {
 			c := p.options.Settings.Read()
 			rows := []widget.Row{
 				{Label: say.T("call.incoming.allow"), Kind: widget.Toggle, On: c.Incoming},
-				{Label: say.T("call.auto"), Hint: say.T("call.auto.hint"), Kind: widget.Toggle, On: c.AutoAnswer},
+				{
+					Label: say.T("call.auto"),
+					Hint:  say.T("call.auto.hint"),
+					Kind:  widget.Toggle,
+					On:    c.AutoAnswer,
+				},
 			}
 			acts := []func(int){
 				func(int) { p.options.Controller.SetIncoming(!c.Incoming) },
 				func(int) { p.options.Controller.SetAutoAnswer(!c.AutoAnswer) },
 			}
 			if c.AutoAnswer {
-				rows = append(rows, widget.Row{Label: say.T("call.autovideo"), Kind: widget.Toggle, On: c.AutoVideo})
+				rows = append(
+					rows,
+					widget.Row{
+						Label: say.T("call.autovideo"),
+						Kind:  widget.Toggle,
+						On:    c.AutoVideo,
+					},
+				)
 				acts = append(acts, func(int) { p.options.Controller.SetAutoVideo(!c.AutoVideo) })
 			}
-			rows = append(rows, widget.Row{Label: say.T("call.pausewake"), Kind: widget.Toggle, On: c.PauseWake})
+			rows = append(
+				rows,
+				widget.Row{Label: say.T("call.pausewake"), Kind: widget.Toggle, On: c.PauseWake},
+			)
 			acts = append(acts, func(int) { p.options.Controller.SetPauseWake(!c.PauseWake) })
-			rows = append(rows, widget.Row{Label: say.T("call.stream"), Hint: say.T("call.stream.hint"), Kind: widget.Chevron, Value: c.Stream.Label()})
+			rows = append(
+				rows,
+				widget.Row{
+					Label: say.T("call.stream"),
+					Hint:  say.T("call.stream.hint"),
+					Kind:  widget.Chevron,
+					Value: c.Stream.Label(),
+				},
+			)
 			acts = append(acts, p.open(func() shell.View { return p.CallStream() }))
 			return rows, acts
 		},
@@ -59,7 +82,10 @@ func (p *CallPages) CallStream() *shell.Page {
 			var rows []widget.Row
 			var acts []func(int)
 			for _, v := range config.CallStreams() {
-				rows = append(rows, widget.Row{Label: v.Label(), Kind: widget.Plain, Chosen: v == now})
+				rows = append(
+					rows,
+					widget.Row{Label: v.Label(), Kind: widget.Plain, Chosen: v == now},
+				)
 				acts = append(acts, func(int) { p.options.Controller.SetStream(v) })
 			}
 			return rows, acts

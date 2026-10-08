@@ -2,6 +2,7 @@ package widgets
 
 import (
 	gogui "github.com/go-gui-org/go-gui/gui"
+
 	"github.com/ygelfand/libcountertop/pkg/display/interaction"
 	"github.com/ygelfand/libcountertop/pkg/display/model"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
@@ -10,7 +11,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
 
-// UI owns the common controls, editing, gestures and palette for one display.
 type UI struct {
 	settings storage.Section[schema.Screen]
 	Presses  *interaction.Presses
@@ -19,18 +19,18 @@ type UI struct {
 	Toolkit  Toolkit
 }
 
-// NewUI resolves saved presentation settings when drawing, never during construction.
 func NewUI(settings storage.Section[schema.Screen]) *UI {
 	u := &UI{settings: settings}
 	u.Reset()
-	u.Toolkit = Toolkit{Kit: u.Kit, Pressable: func(layout func(gogui.ContainerCfg) gogui.View, cfg gogui.ContainerCfg, do func(gogui.EventCtx)) gogui.View {
-		return u.Presses.Pressable(layout, cfg, do)
-	}}
+	u.Toolkit = Toolkit{
+		Kit: u.Kit,
+		Pressable: func(layout func(gogui.ContainerCfg) gogui.View, cfg gogui.ContainerCfg, do func(gogui.EventCtx)) gogui.View {
+			return u.Presses.Pressable(layout, cfg, do)
+		},
+	}
 	return u
 }
 
-// Reset clears editing and interaction state before a display session starts.
-// The UI's identity stays stable so existing renderers use the fresh state.
 func (u *UI) Reset() {
 	u.Presses = interaction.New()
 	u.Editor = NewEditor()

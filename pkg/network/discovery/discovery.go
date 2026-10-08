@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/libp2p/zeroconf/v2"
+
 	"github.com/ygelfand/libcountertop/pkg/hook"
 	mdns "github.com/ygelfand/libcountertop/pkg/network/advertise"
 	sharedpeer "github.com/ygelfand/libcountertop/pkg/network/peer"
@@ -41,7 +42,6 @@ func New(identity Identity) *Discovery {
 }
 func (d *Discovery) Name() string { return "discovery" }
 
-// Self describes this device using its current identity and addresses.
 func (d *Discovery) Self() Peer { return d.identity.Self() }
 
 func (d *Discovery) Peers() []Peer {
@@ -91,12 +91,31 @@ func (d *Discovery) Run(ctx context.Context) error {
 }
 
 func record(p Peer) []string {
-	return []string{"id=" + p.ID, "name=" + p.Name, "model=" + p.Model, "board=" + p.Board, "project=" + p.Project, "version=" + p.Version, "proto=" + proto, "caps=" + strings.Join(p.Caps, ",")}
+	return []string{
+		"id=" + p.ID,
+		"name=" + p.Name,
+		"model=" + p.Model,
+		"board=" + p.Board,
+		"project=" + p.Project,
+		"version=" + p.Version,
+		"proto=" + proto,
+		"caps=" + strings.Join(p.Caps, ","),
+	}
 }
 func (d *Discovery) advertise(ctx context.Context) {
 	mdns.Advertise(ctx, "countertop", func(ips []net.IP) (func(), error) {
 		p := d.Self()
-		srv, err := zeroconf.RegisterProxy(p.Name, service, domain, p.Port, p.Host, mdns.Strings(ips), record(p), nil, zeroconf.TTL(ttl))
+		srv, err := zeroconf.RegisterProxy(
+			p.Name,
+			service,
+			domain,
+			p.Port,
+			p.Host,
+			mdns.Strings(ips),
+			record(p),
+			nil,
+			zeroconf.TTL(ttl),
+		)
 		if err != nil {
 			return nil, err
 		}

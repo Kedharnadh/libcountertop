@@ -13,8 +13,6 @@ func TestCapabilitiesGoOutAndComeBack(t *testing.T) {
 		t.Fatalf("%d capabilities came back, want %d", len(got), len(want))
 	}
 
-	// Media transport is empty and still has to be there: without it a phone has nothing to send
-	// audio over, whatever the codec says.
 	if _, ok := Find(got, CatMediaTransport); !ok {
 		t.Error("the media transport capability was lost")
 	}
@@ -49,8 +47,6 @@ func TestTheSBCOfferGoesOutAndComesBack(t *testing.T) {
 	}
 }
 
-// The two packed bytes split into five fields, and getting a mask wrong silently moves an option
-// into the wrong one.
 func TestTheSBCFieldsUnpackWhereTheyShould(t *testing.T) {
 	s := SBC{
 		Rates:      Rate48000,
@@ -87,16 +83,12 @@ func TestWhatIsNotAnSBCCapability(t *testing.T) {
 		t.Error("a codec capability with no codec bytes was accepted")
 	}
 
-	// A codec that is not SBC. Nothing here decodes AAC or aptX and pretending otherwise would
-	// configure a stream this device cannot play.
 	aac := Capability{Category: CatMediaCodec, Data: []byte{MediaAudio << 4, 0x02, 0, 0, 0, 0}}
 	if _, err := ParseSBC(aac); err == nil {
 		t.Error("an AAC capability was read as SBC")
 	}
 }
 
-// An offer has several bits set per field; a configuration has exactly one. Acting on an offer as
-// though it were a choice is how a stream runs at the wrong rate.
 func TestAnOfferIsNotAChoice(t *testing.T) {
 	if SinkSBC().Chosen() {
 		t.Error("the sink's offer reported itself as a configuration")
@@ -115,7 +107,6 @@ func TestAnOfferIsNotAChoice(t *testing.T) {
 		t.Error("a configuration with one bit per field did not report itself as one")
 	}
 
-	// Two rates is not a choice, and neither is none.
 	two := picked
 	two.Rates = Rate44100 | Rate48000
 	if two.Chosen() {
@@ -129,8 +120,6 @@ func TestAnOfferIsNotAChoice(t *testing.T) {
 	}
 }
 
-// The refusal every stack sends is for a configuration naming something never offered, so this is
-// the check before accepting one.
 func TestAConfigurationHasToBeWithinWhatWasOffered(t *testing.T) {
 	offer := SinkSBC()
 
@@ -147,21 +136,18 @@ func TestAConfigurationHasToBeWithinWhatWasOffered(t *testing.T) {
 		t.Error("a configuration picked from the offer was rejected")
 	}
 
-	// A rate never offered.
 	fast := good
 	fast.Rates = Rate16000
 	if fast.Within(offer) {
 		t.Error("a rate that was never offered was accepted")
 	}
 
-	// A bitpool above the ceiling, which is what makes a stream exceed the bandwidth agreed.
 	greedy := good
 	greedy.MaxBitpool = 250
 	if greedy.Within(offer) {
 		t.Error("a bitpool above the offered ceiling was accepted")
 	}
 
-	// And below the floor.
 	thin := good
 	thin.MinBitpool = 1
 	if thin.Within(offer) {
@@ -185,13 +171,11 @@ func TestReadingTheRateAConfigurationPicked(t *testing.T) {
 		}
 	}
 
-	// Several bits set is an offer rather than a choice, and has no one rate to report.
 	if _, ok := (SBC{Rates: Rate44100 | Rate48000}).Rate(); ok {
 		t.Error("an offer of two rates reported a single one")
 	}
 }
 
-// What this device offers has to include what phones actually ask for, or nothing connects.
 func TestTheSinkOffersWhatAPhoneWillWant(t *testing.T) {
 	s := SinkSBC()
 
@@ -205,6 +189,9 @@ func TestTheSinkOffersWhatAPhoneWillWant(t *testing.T) {
 		t.Error("joint stereo is not offered, and it is what a phone picks when it can")
 	}
 	if s.MaxBitpool < 53 {
-		t.Errorf("the bitpool ceiling is %d, below the 53 that high quality sbc wants", s.MaxBitpool)
+		t.Errorf(
+			"the bitpool ceiling is %d, below the 53 that high quality sbc wants",
+			s.MaxBitpool,
+		)
 	}
 }

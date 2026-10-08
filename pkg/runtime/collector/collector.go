@@ -5,8 +5,12 @@ import (
 	"time"
 )
 
-// Run samples immediately, then after the current interval or an explicit wake.
-func Run(ctx context.Context, interval func() time.Duration, wake <-chan struct{}, sample func()) error {
+func Run(
+	ctx context.Context,
+	interval func() time.Duration,
+	wake <-chan struct{},
+	sample func(),
+) error {
 	for ctx.Err() == nil {
 		sample()
 		timer := time.NewTimer(max(interval(), time.Second))

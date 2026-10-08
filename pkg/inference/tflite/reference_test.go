@@ -10,8 +10,6 @@ import (
 	"testing"
 )
 
-// referenceSignal is the deterministic input the golden fixture was produced from: two tones and
-// a slow amplitude sweep, at the int16 magnitudes openWakeWord feeds the mel model.
 func referenceSignal(n int) []float32 {
 	out := make([]float32, n)
 	for i := range out {
@@ -50,9 +48,6 @@ func readGolden(t *testing.T, path string) []float32 {
 	return out
 }
 
-// TestMelMatchesReferenceRuntime compares our interpreter against TensorFlow Lite's own C runtime
-// on the same model file and the same input. The fixture was produced by the reference runtime, so
-// any disagreement here is a bug in this package rather than a question of calibration.
 func TestMelMatchesReferenceRuntime(t *testing.T) {
 	want := readGolden(t, "testdata/mel_reference.txt")
 
@@ -88,16 +83,19 @@ func TestMelMatchesReferenceRuntime(t *testing.T) {
 			worst, at = d, i
 		}
 	}
-	t.Logf("largest difference %.6g at index %d (ours %.6f, reference %.6f)", worst, at, got[at], want[at])
+	t.Logf(
+		"largest difference %.6g at index %d (ours %.6f, reference %.6f)",
+		worst,
+		at,
+		got[at],
+		want[at],
+	)
 
-	// The reference runs the same graph in float32, so only accumulation order should differ.
 	if worst > 0.01 {
 		t.Errorf("our mel output differs from the reference by %.6g", worst)
 	}
 }
 
-// referenceMelFrames is the deterministic stand-in for a window of transformed mel frames that the
-// embedding fixture was produced from.
 func referenceMelFrames(n int) []float32 {
 	out := make([]float32, n)
 	for i := range out {
@@ -141,14 +139,18 @@ func TestEmbeddingMatchesReferenceRuntime(t *testing.T) {
 			worst, at = d, i
 		}
 	}
-	t.Logf("largest difference %.6g at index %d (ours %.6f, reference %.6f)", worst, at, got[at], want[at])
+	t.Logf(
+		"largest difference %.6g at index %d (ours %.6f, reference %.6f)",
+		worst,
+		at,
+		got[at],
+		want[at],
+	)
 	if worst > 0.01 {
 		t.Errorf("our embedding output differs from the reference by %.6g", worst)
 	}
 }
 
-// referenceEmbeddings is the deterministic window of embeddings the classifier fixture was produced
-// from: 16 frames of 96, the shape an openWakeWord classifier takes.
 func referenceEmbeddings() []float32 {
 	out := make([]float32, 16*96)
 	for i := range out {
@@ -158,16 +160,12 @@ func referenceEmbeddings() []float32 {
 	return out
 }
 
-// TestClassifierMatchesReferenceRuntime checks the shape ops a wake word classifier needs against
-// TensorFlow Lite's own runtime. CLASSIFIER names the model the fixture was produced from.
 func TestClassifierMatchesReferenceRuntime(t *testing.T) {
 	model := os.Getenv("CLASSIFIER")
 	if model == "" {
 		t.Skip("set CLASSIFIER to a model testdata has a fixture for")
 	}
 
-	// The fixture is named after the model, so pointing this at one it was not produced from skips
-	// rather than comparing a score against another wake word's.
 	stem := strings.TrimSuffix(filepath.Base(model), ".tflite")
 	want := readGolden(t, filepath.Join("testdata", "classifier_"+stem+"_reference.txt"))
 

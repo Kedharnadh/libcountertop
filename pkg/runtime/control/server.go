@@ -1,4 +1,3 @@
-// Package control provides the local device harness transport and command tree.
 package control
 
 import (
@@ -6,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"strings"
@@ -16,7 +16,6 @@ import (
 
 type Dispatch func(context.Context, []string) (string, error)
 
-// Server owns a listener and the clients accepted during that listener's lifetime.
 type Server struct {
 	mu       sync.Mutex
 	workers  sync.WaitGroup
@@ -27,7 +26,11 @@ type Server struct {
 }
 
 func NewServer(address string, dispatch Dispatch) *Server {
-	return &Server{address: address, dispatch: dispatch, clients: make(map[net.Conn]context.CancelFunc)}
+	return &Server{
+		address:  address,
+		dispatch: dispatch,
+		clients:  make(map[net.Conn]context.CancelFunc),
+	}
 }
 
 func (s *Server) Start() error {
@@ -47,10 +50,8 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// Wait joins stopped clients and the accept loop. Call after Close without a concurrent Start.
 func (s *Server) Wait() { s.workers.Wait() }
 
-// Close revokes existing connections as well as releasing the listening address.
 func (s *Server) Close() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -99,7 +100,7 @@ func (s *Server) accept(l net.Listener) {
 	}
 }
 
-// Serve preserves partial output before a terminal error. Empty lines are harmless.
+// Framing: output lines start "|", error lines "!", and a bare ok or error ends the reply.
 func Serve(ctx context.Context, conn net.Conn, dispatch Dispatch) {
 	defer conn.Close()
 	in := bufio.NewScanner(conn)
@@ -114,24 +115,32 @@ func Serve(ctx context.Context, conn net.Conn, dispatch Dispatch) {
 		if err == nil && len(args) > 0 {
 			out, err = dispatch(ctx, args)
 		}
-		if out != "" {
-			if _, writeErr := fmt.Fprintln(conn, strings.TrimRight(out, "\n")); writeErr != nil {
-				return
-			}
-		}
-		if err != nil {
-			if _, writeErr := fmt.Fprintf(conn, "error: %v\n", err); writeErr != nil {
-				return
-			}
-			continue
-		}
-		if _, err := fmt.Fprintln(conn, "ok"); err != nil {
+		if reply(conn, out, err) != nil {
 			return
 		}
 	}
 	if err := in.Err(); err != nil && ctx.Err() == nil {
-		_, _ = fmt.Fprintf(conn, "error: reading command: %v\n", err)
+		_ = reply(conn, "", fmt.Errorf("reading command: %w", err))
 	}
+}
+
+func reply(w io.Writer, out string, failed error) error {
+	var b strings.Builder
+	if out = strings.TrimRight(out, "\n"); out != "" {
+		for line := range strings.SplitSeq(out, "\n") {
+			b.WriteString(markOutput + line + "\n")
+		}
+	}
+	if failed == nil {
+		b.WriteString(endOK + "\n")
+	} else {
+		for line := range strings.SplitSeq(failed.Error(), "\n") {
+			b.WriteString(markError + line + "\n")
+		}
+		b.WriteString(endError + "\n")
+	}
+	_, err := io.WriteString(w, b.String())
+	return err
 }
 
 func arguments(line string) ([]string, error) {

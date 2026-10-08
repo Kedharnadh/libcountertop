@@ -5,33 +5,22 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/ygelfand/libcountertop/pkg/bluetooth"
+	bt "github.com/ygelfand/libcountertop/pkg/bluetooth"
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/avrcp"
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/l2cap"
 	media "github.com/ygelfand/libcountertop/pkg/media/source"
 )
 
-// What is lined up behind the current track, off the browsing channel.
-//
-// Two messages: ask how many entries the now playing scope holds, then ask for them. The count comes
-// first because a phone refuses a range that runs past the end. The scope belongs to the addressed
-// player, so the channel is not pointed at one.
-
-// listing is how many entries are worth asking for.
 const listing = 50
 
-// labels keep the questions apart on the channel.
 const (
 	labelCount = iota
 	labelFolder
 	labelItem
 )
 
-// ahead is how many entries are asked about for their artwork. The answer is one round trip each
-// and the card shows a handful, so the rest can wait until they are nearer.
 const ahead = 6
 
-// open asks for the browsing channel, if it is not up already.
 func (s *Sink) open() {
 	if s.browsable() {
 		return
@@ -39,10 +28,8 @@ func (s *Sink) open() {
 	s.tell("opening the browsing channel", (*bt.Sink).OpenBrowsing)
 }
 
-// patience is how long a sequence has to finish before another may start.
 const patience = 5 * time.Second
 
-// list asks how long the list is, which is what the entries are then asked for by.
 func (s *Sink) list() {
 	if !s.browsable() {
 		return
@@ -66,7 +53,6 @@ func (s *Sink) list() {
 	})
 }
 
-// folder asks for the entries themselves. The range is inclusive at both ends.
 func (s *Sink) folder(n uint32) {
 	s.tell(fmt.Sprintf("asking for %d queued", n), func(sink *bt.Sink) ([]l2cap.Frame, error) {
 		return sink.Browse([]avrcp.Transport{
@@ -75,7 +61,6 @@ func (s *Sink) folder(n uint32) {
 	})
 }
 
-// listed takes one answer off the browsing channel and asks the next question.
 func (s *Sink) listed(b avrcp.Browse) {
 	switch b.ID {
 	case avrcp.BrowseTotalItems:
@@ -105,8 +90,6 @@ func (s *Sink) listed(b avrcp.Browse) {
 			return
 		}
 
-		// The listing carries the artwork only for what is playing, so the rest are asked about one
-		// at a time.
 		counter, _ := avrcp.Counter(b.Params)
 		s.walk(counter, items)
 
@@ -129,17 +112,12 @@ func (s *Sink) listed(b avrcp.Browse) {
 	}
 }
 
-// done ends the sequence, so the next track change starts another.
 func (s *Sink) done() {
 	s.mu.Lock()
 	s.asking = time.Time{}
 	s.mu.Unlock()
 }
 
-// holds keeps the list and tells the card there is something new to draw.
-//
-// The handles go with it. A uid is a position rather than a name — the same few come round as the
-// window moves — so one kept from an older listing names whatever is at that position now.
 func (s *Sink) holds(items []avrcp.Item) {
 	s.mu.Lock()
 	s.queue, s.handles = items, nil
@@ -148,7 +126,6 @@ func (s *Sink) holds(items []avrcp.Item) {
 	s.options.Media.Changed()
 }
 
-// browsable reports whether the browsing channel is up.
 func (s *Sink) browsable() bool {
 	s.mu.Lock()
 	sink := s.sink
@@ -157,10 +134,9 @@ func (s *Sink) browsable() bool {
 	return sink != nil && sink.Browsing()
 }
 
-// nothing is the uid a phone sends for a track change when it has stopped.
+// All ones is no track selected.
 const nothing = ^uint64(0)
 
-// queued is what follows the track that is playing, for the card.
 func (s *Sink) queued(state avrcp.State) []media.Track {
 	s.mu.Lock()
 	items := s.queue
@@ -184,9 +160,6 @@ func (s *Sink) queued(state avrcp.State) []media.Track {
 	return out
 }
 
-// after is the entries behind the one playing. The phone says which that is by uid where it keeps
-// a list of its own; where it does not, the title is what there is to match on. Matching nothing
-// leaves the whole list, which is a list the phone has not started yet.
 func after(items []avrcp.Item, state avrcp.State) []avrcp.Item {
 	known := state.UID != 0 && state.UID != nothing
 
@@ -201,10 +174,6 @@ func after(items []avrcp.Item, state avrcp.State) []avrcp.Item {
 	return items
 }
 
-// The artwork for what is lined up. A listing names the handle for the track that is playing and
-// nothing for the rest, so each entry is asked about by uid, in order, one answer at a time.
-
-// walk starts asking about the entries of a listing.
 func (s *Sink) walk(counter uint16, items []avrcp.Item) {
 	uids := make([]uint64, 0, ahead)
 	for _, it := range items {
@@ -231,14 +200,12 @@ func (s *Sink) walk(counter uint16, items []avrcp.Item) {
 	}
 }
 
-// describe asks the next entry what it is.
 func (s *Sink) describe() {
 	s.mu.Lock()
 	if len(s.asks) == 0 {
 		s.at = 0
 		got, asked, queued := s.got, s.asked, len(s.queue)
 
-		// A listing that arrived while this one was running goes now.
 		next, counter := s.later, s.waiting
 		s.later = nil
 
@@ -260,8 +227,6 @@ func (s *Sink) describe() {
 	s.at, s.asks, s.walked = uid, s.asks[1:], time.Now()
 	s.mu.Unlock()
 
-	// Every attribute rather than the artwork alone: a target that leaves one out of a list it was
-	// asked for by name gives no sign of having done so.
 	s.tell(fmt.Sprintf("asking about entry %d", uid), func(sink *bt.Sink) ([]l2cap.Frame, error) {
 		return sink.Browse([]avrcp.Transport{
 			avrcp.ItemAttributes(avrcp.ScopeNowPlaying, uid, counter).Request(labelItem),
@@ -269,7 +234,6 @@ func (s *Sink) describe() {
 	})
 }
 
-// attributed takes what one entry said about itself and asks about the next.
 func (s *Sink) attributed(b avrcp.Browse) {
 	s.mu.Lock()
 	uid := s.at

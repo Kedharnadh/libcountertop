@@ -1,4 +1,3 @@
-// Package immich reads pictures from an Immich server (api.immich.app).
 package immich
 
 import (
@@ -38,7 +37,11 @@ type Asset struct {
 }
 
 func New(base, key string) *Client {
-	return &Client{Base: strings.TrimRight(base, "/"), Key: key, HTTP: &http.Client{Timeout: 30 * time.Second}}
+	return &Client{
+		Base: strings.TrimRight(base, "/"),
+		Key:  key,
+		HTTP: &http.Client{Timeout: 30 * time.Second},
+	}
 }
 
 func (c *Client) Albums(ctx context.Context) ([]Album, error) {
@@ -64,7 +67,12 @@ func (c *Client) Random(ctx context.Context, albums, tags []string, n int) ([]As
 }
 
 func (c *Client) Preview(ctx context.Context, id string) ([]byte, error) {
-	req, err := c.request(ctx, http.MethodGet, "/api/assets/"+url.PathEscape(id)+"/thumbnail?size=preview", nil)
+	req, err := c.request(
+		ctx,
+		http.MethodGet,
+		"/api/assets/"+url.PathEscape(id)+"/thumbnail?size=preview",
+		nil,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -87,8 +95,10 @@ func (c *Client) Preview(ctx context.Context, id string) ([]byte, error) {
 	return b, nil
 }
 
-// Resolve turns album and tag names into ids; a tag matches its name or its full "parent/child" value.
-func (c *Client) Resolve(ctx context.Context, albumNames, tagNames []string) (albums, tags []string, err error) {
+func (c *Client) Resolve(
+	ctx context.Context,
+	albumNames, tagNames []string,
+) (albums, tags []string, err error) {
 	if len(albumNames) > 0 {
 		all, err := c.Albums(ctx)
 		if err != nil {
@@ -153,7 +163,13 @@ func (c *Client) call(ctx context.Context, method, path string, body, out any) e
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return fmt.Errorf("immich: %s %s: %s %s", method, path, resp.Status, strings.TrimSpace(string(msg)))
+		return fmt.Errorf(
+			"immich: %s %s: %s %s",
+			method,
+			path,
+			resp.Status,
+			strings.TrimSpace(string(msg)),
+		)
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 16<<20)).Decode(out); err != nil {
 		return fmt.Errorf("immich: %s %s: %w", method, path, err)
@@ -161,7 +177,11 @@ func (c *Client) call(ctx context.Context, method, path string, body, out any) e
 	return nil
 }
 
-func (c *Client) request(ctx context.Context, method, path string, body io.Reader) (*http.Request, error) {
+func (c *Client) request(
+	ctx context.Context,
+	method, path string,
+	body io.Reader,
+) (*http.Request, error) {
 	if c.Base == "" {
 		return nil, fmt.Errorf("immich: no server set")
 	}

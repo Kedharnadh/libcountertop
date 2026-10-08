@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-// leaseVia is a lease on the same subnet, reached through a given router.
 func leaseVia(router string) *Lease {
 	return &Lease{
 		Address: net.IPNet{IP: net.IPv4(10, 100, 101, 106), Mask: net.CIDRMask(24, 32)},
@@ -16,11 +15,9 @@ func leaseVia(router string) *Lease {
 	}
 }
 
-// spoken collects what netd was told, once per reply the fake was given.
 func spoken(t *testing.T, was, l *Lease, replies int) []string {
 	t.Helper()
 
-	// Numbered: cmd counts its commands and reads past any reply that is not the one it is owed.
 	ok := make([]string, replies)
 	for i := range ok {
 		ok[i] = fmt.Sprintf("200 %d ok\x00", i+1)
@@ -31,7 +28,6 @@ func spoken(t *testing.T, was, l *Lease, replies int) []string {
 		t.Fatalf("configure: %v", err)
 	}
 
-	// Every reply has been consumed by now, so exactly that many commands are waiting.
 	said := make([]string, 0, replies)
 	for range replies {
 		said = append(said, <-asked)
@@ -53,13 +49,20 @@ func TestConfigureTakesOutTheOldDefaultWhenTheRouterChanges(t *testing.T) {
 	}
 
 	if removed != 1 {
-		t.Errorf("the old default was removed %d times, want once:\n%s", removed, strings.Join(said, "\n"))
+		t.Errorf(
+			"the old default was removed %d times, want once:\n%s",
+			removed,
+			strings.Join(said, "\n"),
+		)
 	}
 	if added != 1 {
-		t.Errorf("the new default was added %d times, want once:\n%s", added, strings.Join(said, "\n"))
+		t.Errorf(
+			"the new default was added %d times, want once:\n%s",
+			added,
+			strings.Join(said, "\n"),
+		)
 	}
 
-	// Order matters: removing after adding would take the new route's place in the table.
 	for _, cmd := range said {
 		if strings.Contains(cmd, "route add") && strings.Contains(cmd, "0.0.0.0/0") {
 			t.Fatal("the default was added before the old one came out")

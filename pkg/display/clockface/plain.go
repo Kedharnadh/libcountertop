@@ -7,21 +7,13 @@ import (
 
 func init() { register(Plain, plain{}) }
 
-// plain is the time across the middle with the date under it, which is what the device has always
-// drawn.
 type plain struct{}
 
-// How much of the box the time takes.
-//
-// The time is bounded by both: a tall box would otherwise size it off the height and run it off the
-// sides, which is what portrait does to a clock sized on height alone.
 const (
 	timeHeightShare = 0.34
 	timeWidthShare  = 0.86
 )
 
-// The rest is sized against the time rather than the box, so the face keeps its proportions at any
-// size.
 const (
 	suffixOfTime = 0.24
 	dateOfTime   = 0.20
@@ -29,14 +21,12 @@ const (
 	suffixGap    = 0.35
 )
 
-// layout is where each part of the plain face goes.
 type layout struct {
 	Time   ui.Rect
 	Suffix ui.Rect
 	Date   ui.Rect
 }
 
-// fonts are the three sizes one reading is drawn in.
 type fonts struct {
 	Time   *ui.Font
 	Suffix *ui.Font
@@ -48,15 +38,21 @@ func (plain) Draw(s ui.Surface, in ui.Rect, r Reading, palette theme.Theme) {
 
 	ui.DrawText(s, f.Time, l.Time.X, l.Time.Y, palette.Text, palette.Background, r.Time)
 	if r.Suffix != "" {
-		ui.DrawText(s, f.Suffix, l.Suffix.X, l.Suffix.Y, palette.Muted, palette.Background, r.Suffix)
+		ui.DrawText(
+			s,
+			f.Suffix,
+			l.Suffix.X,
+			l.Suffix.Y,
+			palette.Muted,
+			palette.Background,
+			r.Suffix,
+		)
 	}
 	if r.Dated() {
 		ui.DrawText(s, f.Date, l.Date.X, l.Date.Y, palette.Muted, palette.Background, r.Date)
 	}
 }
 
-// arrange places the reading in a box, centered as a block rather than each line on its own: the date
-// sits under the time, and the two move together.
 func arrange(r Reading, in ui.Rect) (layout, fonts) {
 	maxH := int(float64(in.H) * timeHeightShare)
 	maxW := int(float64(in.W) * timeWidthShare)
@@ -79,7 +75,6 @@ func arrange(r Reading, in ui.Rect) (layout, fonts) {
 	if r.Suffix != "" {
 		suffixW, suffixH = f.Suffix.Measure(r.Suffix)
 
-		// The suffix sits beside the time, so the pair is centered together.
 		suffixW += int(float64(suffixH) * suffixGap)
 	}
 
@@ -96,7 +91,6 @@ func arrange(r Reading, in ui.Rect) (layout, fonts) {
 		Date: ui.Rect{X: in.X + (in.W-dateW)/2, Y: top + timeH + between, W: dateW, H: dateH},
 	}
 	if r.Suffix != "" {
-		// Sat on the time's baseline rather than its top, which is where an eye expects it.
 		l.Suffix = ui.Rect{
 			X: timeX + timeW + int(float64(suffixH)*suffixGap),
 			Y: top + f.Time.Ascent() - f.Suffix.Ascent(),

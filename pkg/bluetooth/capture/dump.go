@@ -10,13 +10,6 @@ import (
 	"time"
 )
 
-// Writing what came out of the decoder and what came out of the resampler, so a fault in the audio
-// can be looked at rather than argued about.
-//
-// Two files because the question is which half is at fault. The room already says the card and the
-// mixer are fine, since anything else playing through them sounds right.
-
-// Dump holds a capture's files and serializes decoder writes.
 type Dump struct {
 	mu                sync.Mutex
 	frames, pre, post *os.File
@@ -27,7 +20,6 @@ type Dump struct {
 
 func New(directory string) *Dump { return &Dump{directory: directory} }
 
-// Dump captures both ends of the chain for a while, and says where it put them.
 func (d *Dump) Start(within time.Duration) (string, error) {
 	if within <= 0 {
 		return "", fmt.Errorf("bluetooth capture duration must be positive")
@@ -65,7 +57,6 @@ func (d *Dump) Start(within time.Duration) (string, error) {
 		within, dumpFrames, dumpPre, dumpPost), nil
 }
 
-// frame takes one SBC frame exactly as it came off the link, before anything reads it.
 func (d *Dump) Frame(b []byte) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -77,10 +68,12 @@ func (d *Dump) Frame(b []byte) {
 		d.shut()
 		return
 	}
-	d.frames.Write(b)
+	if _, err := d.frames.Write(b); err != nil {
+		slog.Warn("bluetooth capture write failed", "err", err)
+		d.shut()
+	}
 }
 
-// write takes one buffer from each end. Nothing happens unless a capture is running.
 func (d *Dump) Write(pre, post []int16) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -93,11 +86,17 @@ func (d *Dump) Write(pre, post []int16) {
 		return
 	}
 
-	d.pre.Write(raw(pre))
-	d.post.Write(raw(post))
+	if _, err := d.pre.Write(raw(pre)); err != nil {
+		slog.Warn("bluetooth capture write failed", "err", err)
+		d.shut()
+		return
+	}
+	if _, err := d.post.Write(raw(post)); err != nil {
+		slog.Warn("bluetooth capture write failed", "err", err)
+		d.shut()
+	}
 }
 
-// shut closes what is open. The caller holds the lock.
 func (d *Dump) shut() {
 	if d.timer != nil {
 		d.timer.Stop()
@@ -117,7 +116,6 @@ func (d *Dump) shut() {
 		"frames", dumpFrames, "decoded", dumpPre, "resampled", dumpPost)
 }
 
-// raw is the samples as little endian bytes, which is what every tool that reads a pcm file wants.
 func raw(s []int16) []byte {
 	b := make([]byte, len(s)*2)
 	for i, v := range s {
@@ -127,5 +125,14 @@ func raw(s []int16) []byte {
 }
 
 func (d *Dump) paths() (string, string, string) {
-	return filepath.Join(d.directory, "bt-frames.sbc"), filepath.Join(d.directory, "bt-decoded.pcm"), filepath.Join(d.directory, "bt-resampled.pcm")
+	return filepath.Join(
+			d.directory,
+			"bt-frames.sbc",
+		), filepath.Join(
+			d.directory,
+			"bt-decoded.pcm",
+		), filepath.Join(
+			d.directory,
+			"bt-resampled.pcm",
+		)
 }

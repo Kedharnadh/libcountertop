@@ -1,4 +1,3 @@
-// Package dashboard coordinates dashboard tab sources and selection.
 package dashboard
 
 import (

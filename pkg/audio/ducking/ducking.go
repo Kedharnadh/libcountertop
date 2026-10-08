@@ -1,4 +1,3 @@
-// Package ducking converts a saved music attenuation into sample gain.
 package ducking
 
 import "math"

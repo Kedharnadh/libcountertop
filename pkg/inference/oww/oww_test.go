@@ -60,8 +60,6 @@ func TestEmbeddingModelShapes(t *testing.T) {
 	}
 }
 
-// Silence must run the whole pipeline without producing a detection for a loaded model, which is
-// also the cheapest check that every kernel the models need is wired up.
 func TestProcessSilence(t *testing.T) {
 	e, err := New()
 	if err != nil {

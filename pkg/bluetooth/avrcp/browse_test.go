@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-// A browsing pdu is an id, a big-endian length, and that many bytes.
 func TestParsingABrowsingPDU(t *testing.T) {
 	b, err := ParseBrowse([]byte{BrowseFolderItems, 0x00, 0x03, 0x00, 0x01, 0x02})
 	if err != nil {
@@ -19,7 +18,6 @@ func TestParsingABrowsingPDU(t *testing.T) {
 	}
 }
 
-// The length is big-endian. Read the other way round a three byte pdu claims 768.
 func TestTheLengthIsBigEndian(t *testing.T) {
 	params := make([]byte, 260)
 	whole := Browse{ID: BrowseFolderItems, Params: params}.Marshal()
@@ -37,8 +35,6 @@ func TestTheLengthIsBigEndian(t *testing.T) {
 	}
 }
 
-// A pdu claiming more than arrived is refused. Reading to the end of the buffer instead would hand
-// the layer above whatever followed.
 func TestAPDUThatClaimsMoreThanArrived(t *testing.T) {
 	if _, err := ParseBrowse([]byte{BrowseFolderItems, 0x00, 0x20, 0x01}); err == nil {
 		t.Error("a pdu claiming 32 bytes with one present was accepted")
@@ -51,7 +47,6 @@ func TestAPDUShorterThanItsHeader(t *testing.T) {
 	}
 }
 
-// Every request is answered, so a phone is never left waiting on the channel it opened.
 func TestEveryRequestIsAnswered(t *testing.T) {
 	for _, id := range []byte{
 		BrowseSetPlayer, BrowseFolderItems, BrowseChangePath,
@@ -86,7 +81,6 @@ func TestEveryRequestIsAnswered(t *testing.T) {
 	}
 }
 
-// A response is not answered. Answering one starts an exchange that never ends.
 func TestAResponseIsNotAnswered(t *testing.T) {
 	in := Transport{Label: 1, Type: MessageResponse, Payload: Browse{ID: BrowseReject}.Marshal()}
 
@@ -99,7 +93,6 @@ func TestAResponseIsNotAnswered(t *testing.T) {
 	}
 }
 
-// A pdu that does not parse is still answered, because the far end is waiting on the label.
 func TestAMalformedPDUIsStillAnswered(t *testing.T) {
 	in := Transport{Label: 5, Type: MessageCommand, Payload: []byte{BrowseFolderItems, 0x7f}}
 

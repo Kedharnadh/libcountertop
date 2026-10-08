@@ -9,8 +9,9 @@ import (
 	_ "image/png"
 	"math"
 
-	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	_ "golang.org/x/image/webp"
+
+	"github.com/ygelfand/libcountertop/pkg/display/theme"
 )
 
 const (
@@ -80,9 +81,15 @@ func bilinear(dst, src *image.RGBA) {
 			a, b := r0[i:i+3:i+3], r0[j:j+3:j+3]
 			c, d := r1[i:i+3:i+3], r1[j:j+3:j+3]
 			ix, iy := 256-wx, 256-wy
-			o[0] = uint8(((int32(a[0])*ix+int32(b[0])*wx)*iy + (int32(c[0])*ix+int32(d[0])*wx)*wy + 1<<15) >> 16)
-			o[1] = uint8(((int32(a[1])*ix+int32(b[1])*wx)*iy + (int32(c[1])*ix+int32(d[1])*wx)*wy + 1<<15) >> 16)
-			o[2] = uint8(((int32(a[2])*ix+int32(b[2])*wx)*iy + (int32(c[2])*ix+int32(d[2])*wx)*wy + 1<<15) >> 16)
+			o[0] = uint8(
+				((int32(a[0])*ix+int32(b[0])*wx)*iy + (int32(c[0])*ix+int32(d[0])*wx)*wy + 1<<15) >> 16,
+			)
+			o[1] = uint8(
+				((int32(a[1])*ix+int32(b[1])*wx)*iy + (int32(c[1])*ix+int32(d[1])*wx)*wy + 1<<15) >> 16,
+			)
+			o[2] = uint8(
+				((int32(a[2])*ix+int32(b[2])*wx)*iy + (int32(c[2])*ix+int32(d[2])*wx)*wy + 1<<15) >> 16,
+			)
 			o[3] = 0xff
 		}
 	}

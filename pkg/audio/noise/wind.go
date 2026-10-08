@@ -4,14 +4,10 @@ import "math"
 
 const NameWind = "Wind"
 
-// Wind is broadband with a moving emphasis, not a moving band: everything through one narrow
-// resonance is a whistle, however much the whistle wanders.
 const (
-	// windAir is where the bed is cut, and windBand how much of the emphasis is mixed back over it.
 	windAir  = 2200.0
 	windBand = 0.7
 
-	// Where the emphasis sits and how wide it is. Wide: a couple of hundred hertz, not a tone.
 	windLow, windHigh    = 300.0, 1400.0
 	windWander           = 4.0
 	windLoose, windTight = 0.0008, 0.002
@@ -39,9 +35,6 @@ var windSound = Sound{
 
 		return func(dst []float32) {
 			for i := range dst {
-				// The walks move every sample so they stay smooth; the filter is rebuilt at the control
-				// rate, since that is what costs a cosine and an exponential. The bed falls 3 dB an octave,
-				// so the emphasis is compensated for where it has wandered to.
 				f, r := center.next(g), ring.next(g)
 				if n%ctrl == 0 {
 					band = newReson(f, r, g.Rate)

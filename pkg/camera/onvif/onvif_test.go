@@ -47,7 +47,8 @@ func TestAProbeIsAnsweredWithTheDevice(t *testing.T) {
 	if env.Header.RelatesTo != p.MessageID {
 		t.Errorf("RelatesTo %q, want %q", env.Header.RelatesTo, p.MessageID)
 	}
-	if !strings.Contains(m.Types, "NetworkVideoTransmitter") || m.XAddrs != "http://10.0.0.5:8000/onvif/device_service" {
+	if !strings.Contains(m.Types, "NetworkVideoTransmitter") ||
+		m.XAddrs != "http://10.0.0.5:8000/onvif/device_service" {
 		t.Errorf("match %+v", m)
 	}
 	if !strings.Contains(m.Scopes, "name/Kitchen%20display") {
@@ -89,16 +90,44 @@ func TestServeForAClient(t *testing.T) {
 	if err != nil {
 		t.Skip("set COUNTERTOP_ONVIF_SERVE to a duration to serve on 127.0.0.1:8000")
 	}
-	s := &Service{Device: Device{Manufacturer: "Lenovo", Model: "SD-X701B", Firmware: "1.0", Serial: "HUA03RW0", Name: "display", MAC: "aa:bb:cc:dd:ee:ff", RTSPPort: 8554,
-		Profiles: func() []Profile {
-			return []Profile{{Token: "main", Name: "Main", Width: 2592, Height: 1944, FPS: 30, Bitrate: 6_000_000, Path: "main"},
-				{Token: "sub", Name: "Sub", Width: 1280, Height: 720, FPS: 10, Bitrate: 921_600, Path: "sub"}}
-		}}}
+	s := &Service{
+		Device: Device{
+			Manufacturer: "Lenovo",
+			Model:        "SD-X701B",
+			Firmware:     "1.0",
+			Serial:       "HUA03RW0",
+			Name:         "display",
+			MAC:          "aa:bb:cc:dd:ee:ff",
+			RTSPPort:     8554,
+			Profiles: func() []Profile {
+				return []Profile{
+					{
+						Token:   "main",
+						Name:    "Main",
+						Width:   2592,
+						Height:  1944,
+						FPS:     30,
+						Bitrate: 6_000_000,
+						Path:    "main",
+					},
+					{
+						Token:   "sub",
+						Name:    "Sub",
+						Width:   1280,
+						Height:  720,
+						FPS:     10,
+						Bitrate: 921_600,
+						Path:    "sub",
+					},
+				}
+			},
+		},
+	}
 	mux := http.NewServeMux()
 	mux.Handle(DevicePath, s)
 	mux.Handle(MediaPath, s)
 	srv := &http.Server{Addr: "127.0.0.1:8000", Handler: mux}
-	go srv.ListenAndServe()
+	go func() { _ = srv.ListenAndServe() }()
 	r := &Responder{UUID: NewUUID(), Name: "display", XAddr: func(ip net.IP) string {
 		return "http://" + ip.String() + ":8000" + DevicePath
 	}}
@@ -108,16 +137,42 @@ func TestServeForAClient(t *testing.T) {
 		defer r.Close()
 	}
 	time.Sleep(hold)
-	srv.Close()
+	_ = srv.Close()
 }
 
 func TestTheServicesDescribeTheCamera(t *testing.T) {
 	s := &Service{
-		Device: Device{Manufacturer: "Lenovo", Model: "SD-X701B", Firmware: "1.0", Serial: "HUA03RW0", Name: "display", MAC: "aa:bb:cc:dd:ee:ff", RTSPPort: 8554,
+		Device: Device{
+			Manufacturer: "Lenovo",
+			Model:        "SD-X701B",
+			Firmware:     "1.0",
+			Serial:       "HUA03RW0",
+			Name:         "display",
+			MAC:          "aa:bb:cc:dd:ee:ff",
+			RTSPPort:     8554,
 			Profiles: func() []Profile {
-				return []Profile{{Token: "main", Name: "Main", Width: 2592, Height: 1944, FPS: 30, Bitrate: 6_000_000, Path: "main"},
-					{Token: "sub", Name: "Sub", Width: 1280, Height: 720, FPS: 10, Bitrate: 921_600, Path: "sub"}}
-			}},
+				return []Profile{
+					{
+						Token:   "main",
+						Name:    "Main",
+						Width:   2592,
+						Height:  1944,
+						FPS:     30,
+						Bitrate: 6_000_000,
+						Path:    "main",
+					},
+					{
+						Token:   "sub",
+						Name:    "Sub",
+						Width:   1280,
+						Height:  720,
+						FPS:     10,
+						Bitrate: 921_600,
+						Path:    "sub",
+					},
+				}
+			},
+		},
 		Now: func() time.Time { return time.Date(2026, 9, 27, 13, 4, 5, 0, time.UTC) },
 	}
 	mux := http.NewServeMux()
@@ -158,7 +213,12 @@ func TestTheServicesDescribeTheCamera(t *testing.T) {
 	if code != 500 || !strings.Contains(body, "ActionNotSupported") {
 		t.Errorf("an unsupported action answered %d:\n%s", code, body)
 	}
-	if code, _ := soap(t, media, "trt:GetSnapshotUri", "<trt:ProfileToken>main</trt:ProfileToken>"); code != 500 {
+	if code, _ := soap(
+		t,
+		media,
+		"trt:GetSnapshotUri",
+		"<trt:ProfileToken>main</trt:ProfileToken>",
+	); code != 500 {
 		t.Errorf("a snapshot with no snapshot path answered %d", code)
 	}
 }

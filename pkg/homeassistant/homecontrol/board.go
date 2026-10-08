@@ -117,7 +117,10 @@ func (b *Board) Tiles(s Selection) ([]AreaTiles, bool) {
 			if !ok {
 				i = len(areas)
 				at[e.AreaID] = i
-				areas = append(areas, AreaTiles{ID: e.AreaID, Name: e.Area, Open: open[s.Key+"/"+e.AreaID]})
+				areas = append(
+					areas,
+					AreaTiles{ID: e.AreaID, Name: e.Area, Open: open[s.Key+"/"+e.AreaID]},
+				)
 			}
 			t := b.tile(e)
 			if t.On {
@@ -155,7 +158,10 @@ func split(areas []AreaTiles, from int) []AreaTiles {
 			if t.On {
 				on = 1
 			}
-			out = append(out, AreaTiles{ID: a.ID, Name: a.Name, Solo: true, On: on, Tiles: []Tile{t}})
+			out = append(
+				out,
+				AreaTiles{ID: a.ID, Name: a.Name, Solo: true, On: on, Tiles: []Tile{t}},
+			)
 		}
 	}
 	return out
@@ -166,7 +172,13 @@ func (b *Board) tile(e homeassistant.Entity) Tile {
 	if v, ok := b.value(e.ID, "").Get(); ok {
 		state = v
 	}
-	t := Tile{ID: e.ID, Name: e.Name, On: state == "on", Available: state != "unavailable", Level: -1}
+	t := Tile{
+		ID:        e.ID,
+		Name:      e.Name,
+		On:        state == "on",
+		Available: state != "unavailable",
+		Level:     -1,
+	}
 	if t.Name == "" {
 		t.Name = e.ID
 	}
@@ -276,8 +288,20 @@ func (b *Board) send(action string, ids []string) {
 			defer b.workers.Done()
 			ctx, cancel := context.WithTimeout(b.engine.ctx, callWait)
 			defer cancel()
-			if err := b.call(ctx, d+"."+action, map[string]string{"entity_id": strings.Join(ids, ",")}); err != nil {
-				slog.Warn("Home Assistant did not take the action", "action", d+"."+action, "entities", len(ids), "err", err)
+			if err := b.call(
+				ctx,
+				d+"."+action,
+				map[string]string{"entity_id": strings.Join(ids, ",")},
+			); err != nil {
+				slog.Warn(
+					"Home Assistant did not take the action",
+					"action",
+					d+"."+action,
+					"entities",
+					len(ids),
+					"err",
+					err,
+				)
 			}
 		}()
 	}

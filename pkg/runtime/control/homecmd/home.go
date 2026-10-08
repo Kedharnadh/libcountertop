@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
 	"github.com/ygelfand/libcountertop/pkg/homeassistant"
 	harness "github.com/ygelfand/libcountertop/pkg/runtime/control"
 )
@@ -67,7 +68,11 @@ func Commands(client Client) []*cobra.Command {
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), haWait)
 			defer cancel()
-			if err := client.Call(ctx, action, map[string]string{"entity_id": args[1]}); err != nil {
+			if err := client.Call(
+				ctx,
+				action,
+				map[string]string{"entity_id": args[1]},
+			); err != nil {
 				return "", err
 			}
 			return args[1] + " " + args[0], nil

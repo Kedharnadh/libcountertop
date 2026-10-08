@@ -12,7 +12,6 @@ func stereoHeader(t *testing.T, alloc, bitpool int) Header {
 	return h
 }
 
-// total is how many bits an allocation spends.
 func total(bits [][]int) int {
 	var n int
 	for _, ch := range bits {
@@ -23,14 +22,11 @@ func total(bits [][]int) int {
 	return n
 }
 
-// The pool is a budget and the allocation may not exceed it. Spending more means reading sample
-// bits past where the encoder wrote them, and every subsequent frame is misaligned.
 func TestTheAllocationNeverExceedsTheBitpool(t *testing.T) {
 	for _, alloc := range []int{Loudness, SNR} {
 		for _, bitpool := range []int{2, 10, 26, 53, 128, 250} {
 			h := stereoHeader(t, alloc, bitpool)
 
-			// A spread of scale factors rather than a flat one, so the allocation has to choose.
 			scale := make([]int, h.Subbands*h.Channels())
 			for i := range scale {
 				scale[i] = i % 12
@@ -45,7 +41,7 @@ func TestTheAllocationNeverExceedsTheBitpool(t *testing.T) {
 	}
 }
 
-// No subband may carry more than sixteen bits, which is the width the sample reader assumes.
+// At most sixteen bits per subband.
 func TestNoSubbandTakesMoreThanSixteenBits(t *testing.T) {
 	h := stereoHeader(t, SNR, 250)
 
@@ -66,13 +62,10 @@ func TestNoSubbandTakesMoreThanSixteenBits(t *testing.T) {
 	}
 }
 
-// Silence asks for nothing, and an allocation that spends the pool on it has none left for the
-// subbands that carry the signal.
 func TestSilentSubbandsGetNothingWhenOthersNeedIt(t *testing.T) {
 	h := stereoHeader(t, Loudness, 26)
 
 	scale := make([]int, h.Subbands*h.Channels())
-	// One loud subband per channel, the rest silent.
 	scale[0] = 12
 	scale[h.Subbands] = 12
 
@@ -91,8 +84,6 @@ func TestSilentSubbandsGetNothingWhenOthersNeedIt(t *testing.T) {
 	}
 }
 
-// Mono and dual channel get a pool each; stereo and joint share one. Treating them the same is a
-// stream that reads at half or twice the offsets it should.
 func TestDualChannelGetsAPoolEachAndStereoShares(t *testing.T) {
 	scale := make([]int, 16)
 	for i := range scale {
@@ -120,8 +111,6 @@ func TestDualChannelGetsAPoolEachAndStereoShares(t *testing.T) {
 	}
 }
 
-// Both ends run this arithmetic independently and have to agree exactly, so the same input must
-// always give the same output.
 func TestTheAllocationIsDeterministic(t *testing.T) {
 	h := stereoHeader(t, Loudness, 53)
 
@@ -141,12 +130,6 @@ func TestTheAllocationIsDeterministic(t *testing.T) {
 	}
 }
 
-// A pool larger than the signal asks for has to terminate.
-//
-// Silence at a large bitpool is the case that runs away: below a slice of -16 no subband qualifies
-// for anything, the count stops growing, and the loop looks for a level that will spend the pool
-// forever. Without the guard in share this does not fail, it hangs — so the test timing out is the
-// failure, which is why there is nothing cleverer here than calling it.
 func TestAPoolLargerThanTheSignalNeeds(t *testing.T) {
 	h := stereoHeader(t, SNR, 250)
 
@@ -157,8 +140,6 @@ func TestAPoolLargerThanTheSignalNeeds(t *testing.T) {
 	}
 }
 
-// The loudness tables are what make the allocation psychoacoustic rather than flat, so the two
-// methods have to actually differ.
 func TestLoudnessAndSNRAllocateDifferently(t *testing.T) {
 	scale := []int{8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8}
 
@@ -178,7 +159,6 @@ func TestLoudnessAndSNRAllocateDifferently(t *testing.T) {
 	}
 }
 
-// The tables are indexed by sampling rate, and using the wrong row spends bits in the wrong place.
 func TestTheLoudnessTableFollowsTheSamplingRate(t *testing.T) {
 	if offset(16000, 8, 0) == offset(44100, 8, 0) {
 		t.Error("16000 and 44100 share a loudness offset for subband 0, so the rate is ignored")
@@ -187,7 +167,6 @@ func TestTheLoudnessTableFollowsTheSamplingRate(t *testing.T) {
 		t.Error("four and eight subbands share an offset, so the table is not chosen by width")
 	}
 
-	// A rate the table does not know falls back rather than reading out of bounds.
 	if got := offset(96000, 8, 0); got != offset4[0][0] && got != offset8[0][0] {
 		t.Errorf("an unknown rate gave offset %d", got)
 	}

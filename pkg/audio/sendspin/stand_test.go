@@ -12,7 +12,6 @@ func TestSpeakerHandoffSilencesThisRoomAndRejoinsTheCurrentGroupFrame(t *testing
 			t.Fatal("held room remained audible", sample)
 		}
 	}
-	// The group and the output clock advance while another producer owns the speaker.
 	for _, sample := range rendered(o, 1048, 48) {
 		if sample != 0 {
 			t.Fatal("held room remained audible", sample)

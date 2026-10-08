@@ -31,4 +31,9 @@ func (w Words) ChimeLength(slot int) time.Duration {
 }
 func (w Words) Delivery(slot int) string { return string(w.Settings.Read().Slot(slot).Delivery) }
 func (w Words) Tones(slot int) bool      { return !w.Settings.Read().Slot(slot).Tone.Silent() }
-func (w Words) Chime(slot int)           { w.Speaker.Chime(tone.Wake(w.Settings.Read().Slot(slot).Tone)) }
+
+func (w Words) Chime(
+	slot int,
+) {
+	w.Speaker.Chime(tone.Wake(w.Settings.Read().Slot(slot).Tone))
+}

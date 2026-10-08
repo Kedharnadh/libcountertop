@@ -3,24 +3,8 @@
 #include "textflag.h"
 
 // func axpyNEON(dst, x *float32, n int, gain float32)
-//
-// dst[i] += gain*x[i], sixteen floats a block. The scale is not named g, which is the goroutine
-// register and will not parse as an argument.
-//
-// All eight loads of a block are issued before any of the arithmetic, and all four stores come after
-// all four multiply-accumulates, which leaves three instructions between a value being computed and
-// being stored. The target is a Cortex-A53 — two-wide and in-order, so that slack has to be arranged
-// rather than found.
-//
-// It is not pipelined across iterations the way the dot product is, which was measured rather than
-// assumed: doing that here is worth 3% at 512 floats and 7% at 1024, against 1.4x for the dot. The
-// difference is what each one waits on. The dot is latency bound, so covering a load with arithmetic is
-// the whole game. This is bandwidth bound — three memory operations per four floats against the dot's
-// two, running at about 6.6 GB/s of real traffic — and no amount of scheduling makes the memory system
-// faster. The pipelined version needed a second dst pointer and two drain paths to save 0.2% of a core,
-// so it went in the bin.
-//
-// R0 both reads and writes dst: the read leaves it where it is, the store advances it.
+// g is the goroutine register and will not parse as an argument name.
+// R0 both reads and writes dst; the store advances it.
 TEXT ·axpyNEON(SB), NOSPLIT, $0-28
 	MOVD	dst+0(FP), R0
 	MOVD	x+8(FP), R1

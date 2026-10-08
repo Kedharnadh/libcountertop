@@ -38,27 +38,74 @@ type pipStyle struct {
 
 var pipStyles = map[Kind]pipStyle{
 	PipBoy3: {
-		tint: [3]float64{0.62, 1, 0.36}, warp: 0.075, scan: 3, scanDeep: 0.32, roll: 1,
-		tabs: []string{"STATS", "ITEMS", "DATA"}, tab: 2,
-		subtabs: []string{"Local Map", "World Map", "Quests", "Misc", "Radio"}, subtab: 4,
-		stations: []string{"Microphone", "Assistant", "Wasteland Wireless", "Capital Beacon", "Vault Emergency Channel"},
+		tint:     [3]float64{0.62, 1, 0.36},
+		warp:     0.075,
+		scan:     3,
+		scanDeep: 0.32,
+		roll:     1,
+		tabs:     []string{"STATS", "ITEMS", "DATA"},
+		tab:      2,
+		subtabs:  []string{"Local Map", "World Map", "Quests", "Misc", "Radio"},
+		subtab:   4,
+		stations: []string{
+			"Microphone",
+			"Assistant",
+			"Wasteland Wireless",
+			"Capital Beacon",
+			"Vault Emergency Channel",
+		},
 	},
 	PipBoyNV: {
-		tint: [3]float64{1, 0.71, 0.26}, warp: 0.075, scan: 3, scanDeep: 0.3, roll: 1,
-		tabs: []string{"STATS", "ITEMS", "DATA"}, tab: 2,
-		subtabs: []string{"Local Map", "World Map", "Quests", "Misc", "Radio"}, subtab: 4,
-		stations: []string{"Microphone", "Assistant", "Desert Serenade", "Lucky Frequency", "Radio Neon Strip"},
+		tint:     [3]float64{1, 0.71, 0.26},
+		warp:     0.075,
+		scan:     3,
+		scanDeep: 0.3,
+		roll:     1,
+		tabs:     []string{"STATS", "ITEMS", "DATA"},
+		tab:      2,
+		subtabs:  []string{"Local Map", "World Map", "Quests", "Misc", "Radio"},
+		subtab:   4,
+		stations: []string{
+			"Microphone",
+			"Assistant",
+			"Desert Serenade",
+			"Lucky Frequency",
+			"Radio Neon Strip",
+		},
 	},
 	PipBoy4: {
-		tint: [3]float64{0.1, 1, 0.5}, warp: 0.03, scan: 4, scanDeep: 0.14, roll: 0.4,
-		tabs: []string{"STAT", "INV", "DATA", "MAP", "RADIO"}, tab: 4,
+		tint:     [3]float64{0.1, 1, 0.5},
+		warp:     0.03,
+		scan:     4,
+		scanDeep: 0.14,
+		roll:     0.4,
+		tabs:     []string{"STAT", "INV", "DATA", "MAP", "RADIO"},
+		tab:      4,
 		footer:   "10.23.2287          09:47 AM",
-		stations: []string{"Microphone", "Assistant", "Harbor Swing", "Old North Relay", "Distress Signal"},
+		stations: []string{
+			"Microphone",
+			"Assistant",
+			"Harbor Swing",
+			"Old North Relay",
+			"Distress Signal",
+		},
 	},
 	PipBoy76: {
-		tint: [3]float64{0.55, 1, 0.72}, warp: 0.05, scan: 3.5, scanDeep: 0.22, roll: 0.7,
-		tabs: []string{"STAT", "INV", "DATA", "MAP", "RADIO"}, tab: 4, status: true,
-		stations: []string{"Microphone", "Assistant", "Hollow Ridge Radio", "Mountain Relay", "Vault Call-In"},
+		tint:     [3]float64{0.55, 1, 0.72},
+		warp:     0.05,
+		scan:     3.5,
+		scanDeep: 0.22,
+		roll:     0.7,
+		tabs:     []string{"STAT", "INV", "DATA", "MAP", "RADIO"},
+		tab:      4,
+		status:   true,
+		stations: []string{
+			"Microphone",
+			"Assistant",
+			"Hollow Ridge Radio",
+			"Mountain Relay",
+			"Vault Call-In",
+		},
 	},
 }
 
@@ -135,7 +182,15 @@ func (v *pipboy) paint(highlight bool) *image.RGBA {
 			y := float64(l.Min.Y) + float64(i)*v.rowH
 			cv.SetFillStyle(white)
 			cv.FillRect(float64(l.Min.X), y+v.rowH*0.1, float64(l.Dx()), v.rowH*0.8)
-			text(name, float64(l.Min.X)+v.fs*0.6, y+v.rowH/2, bold, v.fs, 0, color.NRGBA{0, 0, 0, 255})
+			text(
+				name,
+				float64(l.Min.X)+v.fs*0.6,
+				y+v.rowH/2,
+				bold,
+				v.fs,
+				0,
+				color.NRGBA{0, 0, 0, 255},
+			)
 		}
 		img := be.Image
 		return crop(img, l)
@@ -180,7 +235,17 @@ func (v *pipboy) paint(highlight bool) *image.RGBA {
 			}
 			tw := text(name, cx, by+v.fs*0.2, mono, size, 0.5, c)
 			if i == sty.subtab {
-				line(white, cx-tw/2-v.fs*0.4, by-v.fs*0.6, cx-tw/2-v.fs*0.4, by+v.fs*0.9, cx+tw/2+v.fs*0.4, by+v.fs*0.9, cx+tw/2+v.fs*0.4, by-v.fs*0.6)
+				line(
+					white,
+					cx-tw/2-v.fs*0.4,
+					by-v.fs*0.6,
+					cx-tw/2-v.fs*0.4,
+					by+v.fs*0.9,
+					cx+tw/2+v.fs*0.4,
+					by+v.fs*0.9,
+					cx+tw/2+v.fs*0.4,
+					by-v.fs*0.6,
+				)
 			}
 		}
 	}
@@ -320,22 +385,60 @@ func (v *pipboy) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 	b := v.box
 	for i, s := range v.wave {
 		prev, next := v.wave[max(i-1, 0)], v.wave[min(i+1, pipSamples-1)]
-		slope := (next - prev) * float64(b.Dy()) / (float64(min(i+1, pipSamples-1)-max(i-1, 0)) / (pipSamples - 1) * float64(b.Dx()))
+		slope := (next - prev) * float64(
+			b.Dy(),
+		) / (float64(min(i+1, pipSamples-1)-max(i-1, 0)) / (pipSamples - 1) * float64(b.Dx()))
 		q, r := uint32(clamp01(s)*65535), uint32(clamp01(slope/pipSlope+0.5)*65535)
-		wave.Pix[i*4], wave.Pix[i*4+1], wave.Pix[i*4+2], wave.Pix[i*4+3] = uint8(q>>8), uint8(q), uint8(r>>8), uint8(r)
+		wave.Pix[i*4], wave.Pix[i*4+1], wave.Pix[i*4+2], wave.Pix[i*4+3] = uint8(
+			q>>8,
+		), uint8(
+			q,
+		), uint8(
+			r>>8,
+		), uint8(
+			r,
+		)
 	}
 	if err := g.Texture(1, wave); err != nil {
 		return err
 	}
 	sty := pipStyles[v.kind]
 	vals := make([]float32, 26)
-	vals[0], vals[1], vals[2], vals[3], vals[4], vals[5] = float32(v.st.w), float32(v.st.h), float32(sty.warp), float32(sty.scan*v.st.u), float32(sty.scanDeep), float32(f.t)
+	vals[0], vals[1], vals[2], vals[3], vals[4], vals[5] = float32(
+		v.st.w,
+	), float32(
+		v.st.h,
+	), float32(
+		sty.warp,
+	), float32(
+		sty.scan*v.st.u,
+	), float32(
+		sty.scanDeep,
+	), float32(
+		f.t,
+	)
 	vals[6], vals[7], vals[8] = float32(sty.tint[0]), float32(sty.tint[1]), float32(sty.tint[2])
 	vals[9] = float32(0.97 + 0.03*math.Sin(f.t*53) + 0.02*math.Sin(f.t*7.3))
 	l := v.list
-	vals[10], vals[11], vals[12], vals[13] = float32(b.Min.X), float32(b.Min.Y), float32(b.Dx()), float32(b.Dy())
+	vals[10], vals[11], vals[12], vals[13] = float32(
+		b.Min.X,
+	), float32(
+		b.Min.Y,
+	), float32(
+		b.Dx(),
+	), float32(
+		b.Dy(),
+	)
 	vals[15] = float32(math.Max(1.5, 2.6*v.st.u))
-	vals[16], vals[17], vals[18], vals[19] = float32(l.Min.X), float32(l.Min.Y), float32(l.Dx()), float32(l.Dy())
+	vals[16], vals[17], vals[18], vals[19] = float32(
+		l.Min.X,
+	), float32(
+		l.Min.Y,
+	), float32(
+		l.Dx(),
+	), float32(
+		l.Dy(),
+	)
 	vals[20], vals[21] = float32(v.rowH), float32(v.active)
 	vals[22], vals[23] = float32(v.st.u), float32(sty.roll)
 	vals[24], vals[25] = float32(v.st.h+l.Dy()), pipSlope

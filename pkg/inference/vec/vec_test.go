@@ -7,13 +7,7 @@ import (
 	"testing"
 )
 
-// lengths are what callers actually ask for, plus the lengths where an implementation that works on
-// whole blocks gets its arithmetic wrong. The tflite convolutions reduce over 32 and 64 input
-// channels, the mel filters are 512 taps, and the AEC filter is 512 or 1024.
-//
-// The rest walk the block sizes the kernels are written in. The ARM ones step sixteen at a time and
-// then eight, four and one, so what has to be covered is every remainder those tiers hand each
-// other: one short of a tier, one past it, and everything below the smallest.
+// The tflite convolutions reduce over 32 and 64 input channels, mel filters are 512 taps, the AEC filter 512 or 1024.
 var lengths = []int{
 	0, 1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 15, 16, 17, 19, 20, 28, 31, 32, 33, 47, 63, 64, 65, 96,
 	127, 512, 513, 1000, 1024,
@@ -28,13 +22,6 @@ func random(n int, seed uint64) []float32 {
 	return out
 }
 
-// The two implementations group their additions differently, so they are held to agreeing about the
-// value rather than about the bits.
-//
-// The error is measured against the size of the terms, not against the answer. A sum of random signed
-// products lands near zero however large the products were, and dividing by that says an implementation
-// is wildly wrong when what actually happened is that the terms canceled: the rounding error a
-// reordering causes is a property of what was added, not of what was left.
 func TestDotAgreesWithTheGoImplementation(t *testing.T) {
 	for _, n := range lengths {
 		a, b := random(n, uint64(n)), random(n, uint64(n)+1000)
@@ -51,8 +38,6 @@ func TestDotAgreesWithTheGoImplementation(t *testing.T) {
 	}
 }
 
-// Exact cases, where reordering cannot hide a wrong answer: powers of two are exact in float32, so the
-// sum is too, and every length has to land on it whatever block the implementation works in.
 func TestDotExactly(t *testing.T) {
 	for _, n := range lengths {
 		a, b := make([]float32, n), make([]float32, n)
@@ -70,15 +55,12 @@ func TestDotExactly(t *testing.T) {
 	}
 }
 
-// A dot product of nothing is zero, and neither implementation may read the slices to find that out.
 func TestDotOfEmptySlices(t *testing.T) {
 	if got := Dot(nil, nil); got != 0 {
 		t.Errorf("dot of nothing is %v", got)
 	}
 }
 
-// b shorter than a is a bug in the caller, and both implementations have to say so rather than reading
-// past the end of it.
 func TestDotPanicsOnAShortSecondSlice(t *testing.T) {
 	defer func() {
 		if recover() == nil {
@@ -107,8 +89,6 @@ func TestAXPYAgreesWithTheGoImplementation(t *testing.T) {
 	}
 }
 
-// Exact again: a gain of two and values that are powers of two cannot round, so every block boundary
-// and the scalar tail have to be exactly right rather than nearly.
 func TestAXPYExactly(t *testing.T) {
 	for _, n := range lengths {
 		x := make([]float32, n)
@@ -128,8 +108,6 @@ func TestAXPYExactly(t *testing.T) {
 	}
 }
 
-// The block structure makes running off the end easy to get wrong, and a store past the slice would
-// corrupt whatever the allocator put there rather than panicking.
 func TestAXPYStaysInBounds(t *testing.T) {
 	for _, n := range lengths {
 		if n == 0 {

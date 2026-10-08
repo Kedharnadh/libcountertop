@@ -64,7 +64,7 @@ func (v *View) shaded(n int, vis visual.Visual, area ui.Rect, source config.Sour
 
 func (v *View) unshade(n int) {
 	if g := v.gl[n]; g != nil {
-		g.layer.Close()
+		_ = g.layer.Close()
 		v.gl[n] = nil
 	}
 }
@@ -103,7 +103,13 @@ func (v *View) shade() {
 			continue
 		}
 		if g.fresh {
-			slog.Debug("idle: visual ready", "slot", n, "took", time.Since(now).Round(time.Millisecond))
+			slog.Debug(
+				"idle: visual ready",
+				"slot",
+				n,
+				"took",
+				time.Since(now).Round(time.Millisecond),
+			)
 		}
 		g.fresh = false
 	}

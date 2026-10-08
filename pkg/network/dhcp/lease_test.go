@@ -5,9 +5,6 @@ import (
 	"testing"
 )
 
-// A renewal usually comes back with the address the device already had, and that one must survive
-// the flush: deleting it takes every socket bound to it, so Home Assistant, the web server and
-// mDNS would all drop each time the lease came round.
 func TestKeepingTheAddressARenewalReturns(t *testing.T) {
 	have := net.IPv4(10, 100, 101, 106)
 
@@ -16,14 +13,12 @@ func TestKeepingTheAddressARenewalReturns(t *testing.T) {
 	}
 }
 
-// A lease onto a different address has to take the old one off, or the device answers on both.
 func TestKeepingDropsAnAddressTheLeaseDidNotReturn(t *testing.T) {
 	if keeping(net.IPv4(10, 100, 101, 5), 24, net.IPv4(10, 100, 101, 106), 24) {
 		t.Error("an address the lease did not return was kept")
 	}
 }
 
-// The same address on a different prefix is a different address as far as routing is concerned.
 func TestKeepingDropsADifferentPrefix(t *testing.T) {
 	have := net.IPv4(10, 100, 101, 106)
 
@@ -32,7 +27,6 @@ func TestKeepingDropsADifferentPrefix(t *testing.T) {
 	}
 }
 
-// Releasing keeps nothing: the device is letting the address go rather than renewing it.
 func TestKeepingNothingWhenThereIsNothingToKeep(t *testing.T) {
 	if keeping(net.IPv4(10, 100, 101, 106), 24, nil, 0) {
 		t.Error("an address was kept when the lease was being released")
@@ -42,8 +36,6 @@ func TestKeepingNothingWhenThereIsNothingToKeep(t *testing.T) {
 	}
 }
 
-// The kernel reports an address in whichever form it likes, and net.IP compares by value, so the
-// four byte and sixteen byte spellings of the same address have to match.
 func TestKeepingMatchesEitherSpelling(t *testing.T) {
 	four := net.IPv4(10, 100, 101, 106).To4()
 	sixteen := net.IPv4(10, 100, 101, 106).To16()

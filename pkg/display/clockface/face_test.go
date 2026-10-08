@@ -7,7 +7,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
-// The screen this device has, and the two rotations it can be at.
 var screens = []struct {
 	name string
 	w, h int
@@ -16,8 +15,6 @@ var screens = []struct {
 	{"portrait", 1200, 1920},
 }
 
-// A name in the settings with nothing to draw it is a device that comes back from an upgrade
-// showing a different clock than the one that was chosen, and nothing says why.
 func TestEveryOfferedFaceIsDrawable(t *testing.T) {
 	for _, name := range Kinds() {
 		if _, ok := registered[name]; !ok {
@@ -26,7 +23,6 @@ func TestEveryOfferedFaceIsDrawable(t *testing.T) {
 	}
 }
 
-// And the other way: a face nobody can pick is dead weight in the binary.
 func TestEveryDrawableFaceIsOffered(t *testing.T) {
 	for name := range registered {
 		var found bool
@@ -48,11 +44,6 @@ func TestAnUnknownNameFallsBackRatherThanPanicking(t *testing.T) {
 	}
 }
 
-// The contract every face is held to: paint inside the box, and paint something.
-//
-// The box is inset from the surface and the margin around it is filled with a color no theme uses,
-// so a face that measured the screen instead of the box it was given is caught by the margin
-// changing color.
 func TestEveryFaceStaysInTheBoxItIsGiven(t *testing.T) {
 	palette := theme.Default()
 	edge := theme.Color{R: 255, G: 0, B: 255}
@@ -63,8 +54,6 @@ func TestEveryFaceStaysInTheBoxItIsGiven(t *testing.T) {
 				t.Run(string(name)+" "+s.name, func(t *testing.T) {
 					img := ui.NewImage(s.w, s.h, edge)
 
-					// A quarter of the way in on every side, which is less than any face would
-					// choose for itself and so cannot be arrived at by accident.
 					in := ui.Rect{X: s.w / 8, Y: s.h / 8, W: s.w * 3 / 4, H: s.h * 3 / 4}
 					ui.FillRect(img, in, palette.Background)
 
@@ -95,8 +84,6 @@ func TestEveryFaceStaysInTheBoxItIsGiven(t *testing.T) {
 	}
 }
 
-// A face has to work where it is put, and the dashboard will be handing out corners once it hosts
-// more than the clock.
 func TestEveryFaceDrawsInACorner(t *testing.T) {
 	palette := theme.Default()
 

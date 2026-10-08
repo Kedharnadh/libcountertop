@@ -86,18 +86,67 @@ func (v *mother) setup() {
 	v.lamps = v.lamps[:0]
 
 	fx.Clear(img, hex(0x050607, 1))
-	fx.Radial(img, float32(W*0.3), float32(H*0.5), 0, float32(W*0.7), []fx.Stop{{At: 0, C: color.NRGBA{30, 60, 52, 89}}, {At: 1, C: color.NRGBA{}}}, false)
+	fx.Radial(
+		img,
+		float32(W*0.3),
+		float32(H*0.5),
+		0,
+		float32(W*0.7),
+		[]fx.Stop{{At: 0, C: color.NRGBA{30, 60, 52, 89}}, {At: 1, C: color.NRGBA{}}},
+		false,
+	)
 	shadow(img, cx0, cy0, cw, ch, 24*u, 22*u, 0.9)
 	rounded(img, cx0, cy0, cw, ch, 24*u, func(sub *image.RGBA, ox, oy float64) {
-		fx.LinearRect(img, sub.Bounds(), 0, float32(cy0), 0, float32(cy0+ch), []fx.Stop{{At: 0, C: hex(0x2a2c2b, 1)}, {At: 1, C: hex(0x121313, 1)}}, false)
+		fx.LinearRect(
+			img,
+			sub.Bounds(),
+			0,
+			float32(cy0),
+			0,
+			float32(cy0+ch),
+			[]fx.Stop{{At: 0, C: hex(0x2a2c2b, 1)}, {At: 1, C: hex(0x121313, 1)}},
+			false,
+		)
 	})
-	rounded(img, v.sx-5*u, v.sy-5*u, v.sw+10*u, v.sh+10*u, v.cr+5*u, func(sub *image.RGBA, ox, oy float64) {
-		fillRect(img, ox, oy, float64(sub.Bounds().Dx()), float64(sub.Bounds().Dy()), hex(0x020303, 1))
-	})
+	rounded(
+		img,
+		v.sx-5*u,
+		v.sy-5*u,
+		v.sw+10*u,
+		v.sh+10*u,
+		v.cr+5*u,
+		func(sub *image.RGBA, ox, oy float64) {
+			fillRect(
+				img,
+				ox,
+				oy,
+				float64(sub.Bounds().Dx()),
+				float64(sub.Bounds().Dy()),
+				hex(0x020303, 1),
+			)
+		},
+	)
 	rounded(img, v.sx, v.sy, v.sw, v.sh, v.cr, func(sub *image.RGBA, ox, oy float64) {
-		fx.Radial(sub, float32(v.sx+v.sw/2-ox), float32(v.sy+v.sh/2-oy), 0, float32(math.Hypot(v.sw, v.sh)/2+1), []fx.Stop{
-			{At: 0, C: hex(0x04120e, 1)}, {At: float32(0.75 * v.sw * 0.65 / (math.Hypot(v.sw, v.sh) / 2)), C: hex(0x020a08, 1)}, {At: float32(v.sw * 0.65 / (math.Hypot(v.sw, v.sh) / 2)), C: hex(0x010403, 1)}, {At: 1, C: hex(0x010403, 1)},
-		}, false)
+		fx.Radial(
+			sub,
+			float32(v.sx+v.sw/2-ox),
+			float32(v.sy+v.sh/2-oy),
+			0,
+			float32(math.Hypot(v.sw, v.sh)/2+1),
+			[]fx.Stop{
+				{
+					At: 0,
+					C:  hex(0x04120e, 1),
+				},
+				{
+					At: float32(0.75 * v.sw * 0.65 / (math.Hypot(v.sw, v.sh) / 2)),
+					C:  hex(0x020a08, 1),
+				},
+				{At: float32(v.sw * 0.65 / (math.Hypot(v.sw, v.sh) / 2)), C: hex(0x010403, 1)},
+				{At: 1, C: hex(0x010403, 1)},
+			},
+			false,
+		)
 	})
 	cv.SetTextBaseline(canvas.Middle)
 	cv.SetFont(bold, math.Max(10*u, 6))
@@ -112,7 +161,16 @@ func (v *mother) setup() {
 			px, py := lx0+float64(a)*(pw+gap), ly0+float64(b)*(ph+gap)
 			shadow(img, px, py, pw, ph, 5*u, 8*u, 0.8)
 			rounded(img, px, py, pw, ph, 5*u, func(sub *image.RGBA, ox, oy float64) {
-				fx.LinearRect(img, sub.Bounds(), 0, float32(py), 0, float32(py+ph), []fx.Stop{{At: 0, C: hex(0x1d1f20, 1)}, {At: 1, C: hex(0x111213, 1)}}, false)
+				fx.LinearRect(
+					img,
+					sub.Bounds(),
+					0,
+					float32(py),
+					0,
+					float32(py+ph),
+					[]fx.Stop{{At: 0, C: hex(0x1d1f20, 1)}, {At: 1, C: hex(0x111213, 1)}},
+					false,
+				)
 			})
 			cv.SetStrokeStyle(color.NRGBA{255, 255, 255, 13})
 			cv.SetLineWidth(math.Max(1, u))
@@ -133,12 +191,41 @@ func (v *mother) setup() {
 					} else if p >= 0.66 {
 						kind = 1
 					}
-					fx.Radial(img, float32(x), float32(y), 0, float32(v.lr*1.35), []fx.Stop{{At: 0, C: hex(0x070808, 1)}, {At: 1, C: hex(0x070808, 1)}}, false)
+					fx.Radial(
+						img,
+						float32(x),
+						float32(y),
+						0,
+						float32(v.lr*1.35),
+						[]fx.Stop{{At: 0, C: hex(0x070808, 1)}, {At: 1, C: hex(0x070808, 1)}},
+						false,
+					)
 					socket := []uint32{0x2c2a26, 0x2e2518, 0x2e1a17}[kind]
-					fx.Radial(img, float32(x), float32(y), 0, float32(v.lr), []fx.Stop{{At: 0, C: hex(socket, 1)}, {At: 1, C: hex(socket, 1)}}, false)
+					fx.Radial(
+						img,
+						float32(x),
+						float32(y),
+						0,
+						float32(v.lr),
+						[]fx.Stop{{At: 0, C: hex(socket, 1)}, {At: 1, C: hex(socket, 1)}},
+						false,
+					)
 					col := a*5 + i
-					v.lamps = append(v.lamps, lamp{x: x, y: y, kind: kind, on: r.next() < 0.3, rate: 0.35 + r.next()*1.5,
-						band: min(31, int(float64(col)/float64(pc*5-1)*30)), diag: float64(col) + float64(b*4+j)*0.7})
+					v.lamps = append(
+						v.lamps,
+						lamp{
+							x:    x,
+							y:    y,
+							kind: kind,
+							on:   r.next() < 0.3,
+							rate: 0.35 + r.next()*1.5,
+							band: min(
+								31,
+								int(float64(col)/float64(pc*5-1)*30),
+							),
+							diag: float64(col) + float64(b*4+j)*0.7,
+						},
+					)
 				}
 			}
 		}
@@ -171,8 +258,10 @@ func (v *mother) setup() {
 
 	bounds := img.Bounds()
 	ly := v.y0 + v.fs*1.6
-	v.line = image.Rect(int(v.sx), int(ly-v.fs*2.4), int(math.Ceil(v.sx+v.sw)), int(math.Ceil(ly+v.fs*2.4))).Intersect(bounds)
-	v.foot = image.Rect(int(v.sx), int(v.fy-v.amp*1.4), int(math.Ceil(v.sx+v.sw)), int(math.Ceil(v.fy+v.amp*1.4))).Intersect(bounds)
+	v.line = image.Rect(int(v.sx), int(ly-v.fs*2.4), int(math.Ceil(v.sx+v.sw)), int(math.Ceil(ly+v.fs*2.4))).
+		Intersect(bounds)
+	v.foot = image.Rect(int(v.sx), int(v.fy-v.amp*1.4), int(math.Ceil(v.sx+v.sw)), int(math.Ceil(v.fy+v.amp*1.4))).
+		Intersect(bounds)
 	v.trace = image.NewRGBA(v.foot)
 	v.w, v.h = v.st.w, v.st.h
 }
@@ -207,7 +296,15 @@ func (v *mother) glassOver() {
 			a := (ref + dark*(1-ref)) * k
 			c := ref * k
 			i := y*g.Stride + x*4
-			g.Pix[i], g.Pix[i+1], g.Pix[i+2], g.Pix[i+3] = uint8(c*255), uint8(c*255), uint8(c*255), uint8(a*255)
+			g.Pix[i], g.Pix[i+1], g.Pix[i+2], g.Pix[i+3] = uint8(
+				c*255,
+			), uint8(
+				c*255,
+			), uint8(
+				c*255,
+			), uint8(
+				a*255,
+			)
 		}
 	}
 }
@@ -255,7 +352,6 @@ func (v *mother) advance(f frame) {
 		}
 		l.flash = math.Max(0, l.flash-dt*3)
 	}
-
 }
 
 //go:embed mother.glsl
@@ -309,7 +405,17 @@ func (v *mother) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 	typed := max(0, min(int((t-v.typeT)*34), len(motherReady)))
 	cursor := typed < len(motherReady) || math.Mod(t*1.6, 1) < 0.55
 	vals := make([]float32, 24)
-	vals[0], vals[1], vals[2], vals[3], vals[4] = float32(v.sx), float32(v.sy), float32(v.sw), float32(v.sh), float32(v.cr)
+	vals[0], vals[1], vals[2], vals[3], vals[4] = float32(
+		v.sx,
+	), float32(
+		v.sy,
+	), float32(
+		v.sw,
+	), float32(
+		v.sh,
+	), float32(
+		v.cr,
+	)
 	vals[5] = float32(v.st.w)
 	vals[6], vals[7], vals[8] = float32(v.y0+v.fs*1.6), float32(v.fs), float32(v.x0)
 	vals[9], vals[10] = float32(float64(typed)*v.charW), float32(v.charW)
@@ -320,7 +426,15 @@ func (v *mother) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 		vals[11] = 1
 	}
 	vals[13] = float32(0.93 + 0.07*noise1(t*23))
-	vals[14], vals[15], vals[16], vals[17] = float32(v.x0), float32(v.sx+v.sw*0.93), float32(v.fy), float32(v.amp)
+	vals[14], vals[15], vals[16], vals[17] = float32(
+		v.x0,
+	), float32(
+		v.sx+v.sw*0.93,
+	), float32(
+		v.fy,
+	), float32(
+		v.amp,
+	)
 	vals[18] = float32(v.st.u)
 	for r := range 4 {
 		vals[20+r] = float32(math.Pow(0.55, float64(r)*dt*30))
@@ -346,8 +460,19 @@ func (v *mother) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 		}
 		c := mixc(hues[l.kind], tint, ta)
 		dot := func(size float64, c [3]float64, a float64, light bool) {
-			pts = append(pts, Point{X: float32(l.x), Y: float32(l.y), Size: float32(size),
-				R: float32(c[0] / 255), G: float32(c[1] / 255), B: float32(c[2] / 255), A: float32(a), Round: true, Light: light})
+			pts = append(pts, Point{
+				X:    float32(l.x),
+				Y:    float32(l.y),
+				Size: float32(size),
+				R: float32(
+					c[0] / 255,
+				),
+				G:     float32(c[1] / 255),
+				B:     float32(c[2] / 255),
+				A:     float32(a),
+				Round: true,
+				Light: light,
+			})
 		}
 		dot(v.lr*8, c, 0.25*k, false)
 		dot(v.lr*4.5, c, 0.8*k, true)

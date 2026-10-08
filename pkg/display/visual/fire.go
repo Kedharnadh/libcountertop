@@ -42,8 +42,10 @@ func (v *fire) advance(f frame) {
 			break
 		}
 		v.sparks = append(v.sparks, ember{
-			x: W * (0.05 + 0.9*v.r.next()), y: H * (0.9 + 0.08*v.r.next()),
-			vx: (v.r.next() - 0.5) * W * 0.08, vy: -H * (0.25 + 0.35*v.r.next()) * (0.8 + 0.6*v.heat),
+			x:    W * (0.05 + 0.9*v.r.next()),
+			y:    H * (0.9 + 0.08*v.r.next()),
+			vx:   (v.r.next() - 0.5) * W * 0.08,
+			vy:   -H * (0.25 + 0.35*v.r.next()) * (0.8 + 0.6*v.heat),
 			life: 1 + 1.6*v.r.next(),
 		})
 	}
@@ -80,12 +82,31 @@ func (v *fire) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 	v.pts = v.pts[:0]
 	for _, s := range v.sparks {
 		a := float32(1 - s.age/s.life)
-		v.pts = append(v.pts, Point{X: float32(s.x), Y: float32(s.y), Size: float32(math.Max(3, 4.5*u)), R: 1, G: 0.7 * a, B: 0.3 * a, A: a, Round: true, Light: true})
+		v.pts = append(
+			v.pts,
+			Point{
+				X:     float32(s.x),
+				Y:     float32(s.y),
+				Size:  float32(math.Max(3, 4.5*u)),
+				R:     1,
+				G:     0.7 * a,
+				B:     0.3 * a,
+				A:     a,
+				Round: true,
+				Light: true,
+			},
+		)
 	}
 	if err := g.Points(v.pts); err != nil {
 		return err
 	}
 	W, H := float64(v.st.w), float64(v.st.h)
-	vals := []float32{float32(W), float32(H), float32(math.Mod(f.t, 1000)), float32(v.heat + 0.35*v.kick), float32(u)}
+	vals := []float32{
+		float32(W),
+		float32(H),
+		float32(math.Mod(f.t, 1000)),
+		float32(v.heat + 0.35*v.kick),
+		float32(u),
+	}
 	return g.Values(vals, float32(0.5+0.4*v.heat), 0.02, 2)
 }

@@ -1,4 +1,3 @@
-// Package shell manages the shared transient screen stack and idle retention.
 package shell
 
 import (

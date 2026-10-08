@@ -2,7 +2,9 @@ package widgets
 
 import (
 	"fmt"
+
 	gogui "github.com/go-gui-org/go-gui/gui"
+
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )

@@ -26,7 +26,6 @@ const (
 	errorType = 1
 )
 
-// Hash is the digest a challenge asks the signature to be made over.
 type Hash int
 
 const (
@@ -41,27 +40,23 @@ func (h Hash) String() string {
 	return "sha1"
 }
 
-// The signature schemes a challenge can name.
 const (
 	PKCS1v15 = 1
 	PSS      = 2
 )
 
-// The errors an answer can carry instead of a response.
 const (
 	AuthInternal    = 0
 	AuthNoTLS       = 1
 	AuthNoAlgorithm = 2
 )
 
-// Challenge is a sender asking this device to prove it is a Chromecast.
 type Challenge struct {
 	Algorithm int
 	Nonce     []byte
 	Hash      Hash
 }
 
-// ParseChallenge reads a DeviceAuthMessage and takes the challenge out of it.
 func ParseChallenge(b []byte) (Challenge, error) {
 	body, ok, err := field(b, authChallenge)
 	if err != nil {
@@ -109,8 +104,6 @@ func ParseChallenge(b []byte) (Challenge, error) {
 	return c, nil
 }
 
-// Answer is the response to a challenge, signed with the device key over the peer certificate, with
-// the revocation list when there is one.
 func Answer(creds *Credentials, h Hash, crl []byte) []byte {
 	var r []byte
 	r = protowire.AppendTag(r, responseSignature, protowire.BytesType)
@@ -135,7 +128,6 @@ func Answer(creds *Credentials, h Hash, crl []byte) []byte {
 	return protowire.AppendBytes(out, r)
 }
 
-// Refuse is an answer that carries an error instead of a response.
 func Refuse(kind int) []byte {
 	var e []byte
 	e = protowire.AppendTag(e, errorType, protowire.VarintType)
@@ -146,7 +138,6 @@ func Refuse(kind int) []byte {
 	return protowire.AppendBytes(out, e)
 }
 
-// field finds one length-delimited field at the top level of a message.
 func field(b []byte, want protowire.Number) ([]byte, bool, error) {
 	for len(b) > 0 {
 		number, kind, n := protowire.ConsumeTag(b)

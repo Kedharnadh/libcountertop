@@ -3,12 +3,13 @@ package session
 import (
 	"errors"
 	"fmt"
-	"github.com/ygelfand/libcountertop/pkg/camera/helper"
 	"net"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/ygelfand/libcountertop/pkg/camera/helper"
 )
 
 type fakeTransport struct {
@@ -19,7 +20,11 @@ type fakeTransport struct {
 }
 
 func fakeStream() *fakeTransport {
-	return &fakeTransport{frames: make(chan helper.Frame, 128), closed: make(chan struct{}), asks: make(chan struct{}, 16)}
+	return &fakeTransport{
+		frames: make(chan helper.Frame, 128),
+		closed: make(chan struct{}),
+		asks:   make(chan struct{}, 16),
+	}
 }
 func (f *fakeTransport) Next(time.Duration) (helper.Frame, error) {
 	select {
@@ -32,7 +37,8 @@ func (f *fakeTransport) Next(time.Duration) (helper.Frame, error) {
 func (f *fakeTransport) AskStill() error        { f.asks <- struct{}{}; return nil }
 func (f *fakeTransport) AskKey() error          { return nil }
 func (f *fakeTransport) SetParams(string) error { return nil }
-func (f *fakeTransport) Close() error           { f.once.Do(func() { close(f.closed) }); return nil }
+
+func (f *fakeTransport) Close() error { f.once.Do(func() { close(f.closed) }); return nil }
 func newFakeHub(t *testing.T, linger time.Duration) (*Hub, **fakeTransport, *atomic.Int32) {
 	t.Helper()
 	var current *fakeTransport
@@ -106,7 +112,14 @@ func TestConfigurationReplacementAndMuteRetireTheCorrectSession(t *testing.T) {
 	var shape atomic.Int32
 	var muted atomic.Bool
 	var streams []*fakeTransport
-	h := New(Options{Snapshot: func() Snapshot { return Snapshot{Config: helper.Config{Width: 640}, Key: fmt.Sprint(shape.Load())} }, Muted: muted.Load, Open: func(helper.Config) (Transport, error) { f := fakeStream(); streams = append(streams, f); return f, nil }, Poll: time.Hour})
+	h := New(
+		Options{
+			Snapshot: func() Snapshot { return Snapshot{Config: helper.Config{Width: 640}, Key: fmt.Sprint(shape.Load())} },
+			Muted:    muted.Load,
+			Open:     func(helper.Config) (Transport, error) { f := fakeStream(); streams = append(streams, f); return f, nil },
+			Poll:     time.Hour,
+		},
+	)
 	defer h.Close()
 	first, _, err := h.Join(0)
 	if err != nil {

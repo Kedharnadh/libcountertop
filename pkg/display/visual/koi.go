@@ -65,7 +65,10 @@ func (v *koi) spawn() {
 		f.breed, f.seed = i%5, v.r.next()*50
 		f.phase = v.r.next() * 6
 		for k := range f.spine {
-			f.spine[k] = [2]float64{f.x - math.Cos(f.heading)*f.length*float64(k)/koiSpine, f.y - math.Sin(f.heading)*f.length*float64(k)/koiSpine}
+			f.spine[k] = [2]float64{
+				f.x - math.Cos(f.heading)*f.length*float64(k)/koiSpine,
+				f.y - math.Sin(f.heading)*f.length*float64(k)/koiSpine,
+			}
 		}
 	}
 	v.born = true
@@ -121,7 +124,12 @@ func (v *koi) advance(f frame) {
 		sp := s * 0.06 * k.speed * pace * (1 + 2.2*k.sprint)
 		k.phase += dt * (2.2 + 5*k.sprint) * pace
 		turn := koiTurn * (1 + 0.8*k.sprint)
-		k.heading += math.Max(-turn, math.Min(k.wander+steer, turn))*dt + math.Sin(k.phase)*0.012*(1+k.sprint)
+		k.heading += math.Max(
+			-turn,
+			math.Min(k.wander+steer, turn),
+		)*dt + math.Sin(
+			k.phase,
+		)*0.012*(1+k.sprint)
 		k.x += math.Cos(k.heading) * sp * dt
 		k.y += math.Sin(k.heading) * sp * dt
 		k.x, k.y = math.Max(W*0.02, math.Min(k.x, W*0.98)), math.Max(H*0.02, math.Min(k.y, H*0.98))
@@ -132,7 +140,10 @@ func (v *koi) advance(f frame) {
 			dx, dy := k.spine[j][0]-k.spine[j-1][0], k.spine[j][1]-k.spine[j-1][1]
 			a := math.Atan2(dy, dx)
 			a = ahead + math.Max(-koiBend, math.Min(math.Remainder(a-ahead, 2*math.Pi), koiBend))
-			k.spine[j] = [2]float64{k.spine[j-1][0] + math.Cos(a)*seg, k.spine[j-1][1] + math.Sin(a)*seg}
+			k.spine[j] = [2]float64{
+				k.spine[j-1][0] + math.Cos(a)*seg,
+				k.spine[j-1][1] + math.Sin(a)*seg,
+			}
 			ahead = a
 		}
 	}
@@ -154,7 +165,19 @@ func (v *koi) paintBed() *image.RGBA {
 				for oy := -1; oy <= 1; oy++ {
 					for ox := -1; ox <= 1; ox++ {
 						cx, cy := gx+ox, gy+oy
-						h1, h2, h3 := cellHash(cx, cy, salt), cellHash(cx+101, cy-37, salt), cellHash(cx-59, cy+83, salt)
+						h1, h2, h3 := cellHash(
+							cx,
+							cy,
+							salt,
+						), cellHash(
+							cx+101,
+							cy-37,
+							salt,
+						), cellHash(
+							cx-59,
+							cy+83,
+							salt,
+						)
 						px, py := (float64(cx)+0.15+0.7*h1)*cs, (float64(cy)+0.15+0.7*h2)*cs
 						rr := cs * (0.2 + 0.28*h3)
 						if h2 < 0.3 {
@@ -170,7 +193,10 @@ func (v *koi) paintBed() *image.RGBA {
 				r, g, b := 16+8*mud, 26+10*mud, 22+6*mud
 				if best < 1 {
 					nz := math.Sqrt(1 - best*best)
-					lit := 0.45 + 0.55*math.Max(0, (bnx*lx+bny*ly+nz*lz)/math.Sqrt(bnx*bnx+bny*bny+nz*nz))
+					lit := 0.45 + 0.55*math.Max(
+						0,
+						(bnx*lx+bny*ly+nz*lz)/math.Sqrt(bnx*bnx+bny*bny+nz*nz),
+					)
 					tone := (30 + 42*bk) * lit
 					edge := math.Min(1, (1-best)*cs*0.5)
 					r = r + (tone*1.02-r)*edge
@@ -178,14 +204,24 @@ func (v *koi) paintBed() *image.RGBA {
 					b = b + (tone*0.82-b)*edge
 				}
 				o := img.PixOffset(x, y)
-				img.Pix[o], img.Pix[o+1], img.Pix[o+2], img.Pix[o+3] = uint8(math.Min(255, r)), uint8(math.Min(255, g)), uint8(math.Min(255, b)), 255
+				img.Pix[o], img.Pix[o+1], img.Pix[o+2], img.Pix[o+3] = uint8(
+					math.Min(255, r),
+				), uint8(
+					math.Min(255, g),
+				), uint8(
+					math.Min(255, b),
+				), 255
 			}
 		}
 	})
 	return img
 }
 
-var koiPads = [3][4]float64{{0.2, 0.18, 0.075, 0.6}, {0.82, 0.3, 0.06, 2.4}, {0.72, 0.85, 0.085, 4.1}}
+var koiPads = [3][4]float64{
+	{0.2, 0.18, 0.075, 0.6},
+	{0.82, 0.3, 0.06, 2.4},
+	{0.72, 0.85, 0.085, 4.1},
+}
 
 func (v *koi) paintPads(bed *image.RGBA) *image.RGBA {
 	W, H := float64(v.st.w), float64(v.st.h)
@@ -211,7 +247,15 @@ func (v *koi) paintPads(bed *image.RGBA) *image.RGBA {
 				vein := 0.9 + 0.1*math.Cos(ang*14)
 				gr, gg, gb := (0.18+0.12*k)*vein, (0.42+0.13*k)*vein, (0.16+0.06*k)*vein
 				o := img.PixOffset(x, y)
-				img.Pix[o], img.Pix[o+1], img.Pix[o+2], img.Pix[o+3] = uint8(255*gr*cov), uint8(255*gg*cov), uint8(255*gb*cov), uint8(255*cov)
+				img.Pix[o], img.Pix[o+1], img.Pix[o+2], img.Pix[o+3] = uint8(
+					255*gr*cov,
+				), uint8(
+					255*gg*cov,
+				), uint8(
+					255*gb*cov,
+				), uint8(
+					255*cov,
+				)
 			}
 		}
 		sx, sy, sr := (cx+shx)*bs, (cy+shy)*bs, r*bs
@@ -220,7 +264,13 @@ func (v *koi) paintPads(bed *image.RGBA) *image.RGBA {
 			for x := max(int(sx-sr-2), 0); x < min(int(sx+sr+3), b.Dx()); x++ {
 				k := 1 - 0.35*clamp01(sr-math.Hypot(float64(x)+0.5-sx, float64(y)+0.5-sy)+0.5)
 				o := bed.PixOffset(x, y)
-				bed.Pix[o], bed.Pix[o+1], bed.Pix[o+2] = uint8(float64(bed.Pix[o])*k), uint8(float64(bed.Pix[o+1])*k), uint8(float64(bed.Pix[o+2])*k)
+				bed.Pix[o], bed.Pix[o+1], bed.Pix[o+2] = uint8(
+					float64(bed.Pix[o])*k,
+				), uint8(
+					float64(bed.Pix[o+1])*k,
+				), uint8(
+					float64(bed.Pix[o+2])*k,
+				)
 			}
 		}
 	}
@@ -259,12 +309,32 @@ func (v *koi) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 	s := math.Min(W, H)
 	vals := make([]float32, 26)
 	vals[0], vals[1] = float32(W), float32(H)
-	vals[2], vals[3] = float32(1/math.Max(1, math.Floor(W/2))), float32(1/math.Max(1, math.Floor(H/2)))
-	vals[4], vals[5], vals[6], vals[7] = float32(s*0.09), float32(f.t), float32(0.8+0.6*f.level), float32(2.5)
+	vals[2], vals[3] = float32(
+		1/math.Max(1, math.Floor(W/2)),
+	), float32(
+		1/math.Max(1, math.Floor(H/2)),
+	)
+	vals[4], vals[5], vals[6], vals[7] = float32(
+		s*0.09,
+	), float32(
+		f.t,
+	), float32(
+		0.8+0.6*f.level,
+	), float32(
+		2.5,
+	)
 	vals[8], vals[9] = float32(s*0.018), float32(s*0.03)
 	for i, d := range v.drops {
 		o := 10 + 4*i
-		vals[o], vals[o+1], vals[o+2], vals[o+3] = float32(d.x), float32(d.y), float32(d.r*H), float32(d.s)
+		vals[o], vals[o+1], vals[o+2], vals[o+3] = float32(
+			d.x,
+		), float32(
+			d.y,
+		), float32(
+			d.r*H,
+		), float32(
+			d.s,
+		)
 	}
 	v.pts = v.pts[:0]
 	shx, shy := float32(s*0.018), float32(s*0.03)
@@ -274,7 +344,10 @@ func (v *koi) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 		width := k.length * 0.15
 		var cum [koiSpine]float64
 		for j := 1; j < koiSpine; j++ {
-			cum[j] = cum[j-1] + math.Hypot(k.spine[j][0]-k.spine[j-1][0], k.spine[j][1]-k.spine[j-1][1])
+			cum[j] = cum[j-1] + math.Hypot(
+				k.spine[j][0]-k.spine[j-1][0],
+				k.spine[j][1]-k.spine[j-1][1],
+			)
 		}
 		at := func(t float64) (float64, float64, float64, float64) {
 			d := t * cum[koiSpine-1]
@@ -289,9 +362,30 @@ func (v *koi) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 		}
 		add := func(x, y, r float64, t, kind float32, dx, dy float64) {
 			head := float32(math.Atan2(dy, dx)/(2*math.Pi) + 0.5)
-			v.pts = append(v.pts, Point{X: float32(x), Y: float32(y), Size: float32(2*r + 2), R: t, G: tag, B: head, A: kind, Splat: true})
+			v.pts = append(
+				v.pts,
+				Point{
+					X:     float32(x),
+					Y:     float32(y),
+					Size:  float32(2*r + 2),
+					R:     t,
+					G:     tag,
+					B:     head,
+					A:     kind,
+					Splat: true,
+				},
+			)
 			if kind > 0.75 && int(t*(koiDiscs-1)+0.5)%3 == 0 {
-				v.pts = append(v.pts, Point{X: float32(x) + shx, Y: float32(y) + shy, Size: float32(2*r*1.35 + 2), A: 0, Splat: true})
+				v.pts = append(
+					v.pts,
+					Point{
+						X:     float32(x) + shx,
+						Y:     float32(y) + shy,
+						Size:  float32(2*r*1.35 + 2),
+						A:     0,
+						Splat: true,
+					},
+				)
 			}
 		}
 		for n := 0; n < koiDiscs; n++ {
@@ -323,7 +417,15 @@ func (v *koi) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 				spread := span * float64(m)
 				c, sn := math.Cos(spread), math.Sin(spread)
 				fx, fy := dx*c-dy*sn, dx*sn+dy*c
-				add(tx+fx*width*2.5*ft, ty+fy*width*2.5*ft, width*(0.26+0.28*ft), float32(ft), 0.5, fx, fy)
+				add(
+					tx+fx*width*2.5*ft,
+					ty+fy*width*2.5*ft,
+					width*(0.26+0.28*ft),
+					float32(ft),
+					0.5,
+					fx,
+					fy,
+				)
 			}
 		}
 	}

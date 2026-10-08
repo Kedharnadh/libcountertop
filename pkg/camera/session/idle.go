@@ -1,4 +1,3 @@
-// Package session provides idle camera-session retention without stale timer callbacks.
 package session
 
 import (
@@ -8,7 +7,6 @@ import (
 
 const Linger = 30 * time.Second
 
-// Idle is guarded by the owning session hub's mutex, including Cancel and Schedule calls.
 type Idle struct {
 	timer      *time.Timer
 	generation uint64

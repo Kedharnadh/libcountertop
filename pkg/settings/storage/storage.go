@@ -1,4 +1,3 @@
-// Package storage keeps typed settings snapshots and replaces their JSON file durably.
 package storage
 
 import (
@@ -21,13 +20,22 @@ type Store[T any] struct {
 	syncDir  func(string) error
 }
 
-// Load overlays a document on defaults. clone must detach its slices and maps.
-// Unreadable documents stay protected against replacement, and malformed documents yield complete defaults.
-func Load[T any](path string, defaults T, clone func(T) T, migrations ...func([]byte, *T) error) (*Store[T], error) {
+func Load[T any](
+	path string,
+	defaults T,
+	clone func(T) T,
+	migrations ...func([]byte, *T) error,
+) (*Store[T], error) {
 	if clone == nil {
 		clone = func(v T) T { return v }
 	}
-	s := &Store[T]{path: path, clone: clone, cfg: clone(defaults), readable: true, syncDir: syncDirectory}
+	s := &Store[T]{
+		path:     path,
+		clone:    clone,
+		cfg:      clone(defaults),
+		readable: true,
+		syncDir:  syncDirectory,
+	}
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return s, nil
@@ -53,7 +61,6 @@ func Load[T any](path string, defaults T, clone func(T) T, migrations ...func([]
 
 func (s *Store[T]) Get() T { s.mu.RLock(); defer s.mu.RUnlock(); return s.clone(s.cfg) }
 
-// Runtime changes process-only fields without writing the document.
 func (s *Store[T]) Runtime(change func(*T)) {
 	s.writes.Lock()
 	defer s.writes.Unlock()
@@ -63,9 +70,6 @@ func (s *Store[T]) Runtime(change func(*T)) {
 	s.cfg = s.clone(s.cfg)
 }
 
-// Update publishes a detached snapshot when the replacement becomes visible on disk.
-// Failures before rename leave both the current snapshot and file untouched. A directory
-// sync failure is reported after publishing, because rename has already changed the visible file.
 func (s *Store[T]) Update(change func(*T)) error {
 	s.writes.Lock()
 	defer s.writes.Unlock()

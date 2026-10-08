@@ -8,16 +8,17 @@ import (
 	esphome "github.com/ygelfand/go-esphome-device"
 )
 
-// installed writes a manifest for each id so the directory reads back as those models. No .tflite is
-// written: Installed lists what it finds by manifest and only parses a model when one is there, which is
-// enough for what these tests are about.
 func installed(t *testing.T, phrases map[string]string) *Library {
 	t.Helper()
 	dir := t.TempDir()
 
 	for id, phrase := range phrases {
 		body := `{"type":"openwakeword","wake_word":"` + phrase + `","model":"` + id + `.tflite"}`
-		if err := os.WriteFile(filepath.Join(dir, id+".tflite"), []byte("not a model"), 0o644); err != nil {
+		if err := os.WriteFile(
+			filepath.Join(dir, id+".tflite"),
+			[]byte("not a model"),
+			0o644,
+		); err != nil {
 			t.Fatal(err)
 		}
 		if err := os.WriteFile(filepath.Join(dir, id+".json"), []byte(body), 0o644); err != nil {
@@ -31,8 +32,6 @@ func offer(id, phrase string) esphome.ExternalWakeWord {
 	return esphome.ExternalWakeWord{ID: id, Phrase: phrase, URL: "http://ha/" + id + ".json"}
 }
 
-// The device advertises both sets, and a purge changes what it says at once. A stale answer here is what
-// makes Home Assistant offer models the device no longer has, and every selection of one then fails.
 func TestAdvertiseFollowsTheDisk(t *testing.T) {
 	l := installed(t, map[string]string{"ours": "Ours"})
 	l.Offered([]esphome.ExternalWakeWord{offer("theirs", "Theirs")})
@@ -52,8 +51,6 @@ func TestAdvertiseFollowsTheDisk(t *testing.T) {
 	}
 }
 
-// Home Assistant keys its selects by phrase, so a phrase is advertised once. Ours wins it, because it
-// needs no download.
 func TestAdvertiseShadowsRepeatedPhrases(t *testing.T) {
 	l := installed(t, map[string]string{"ours": "Computer"})
 	l.Offered([]esphome.ExternalWakeWord{
@@ -73,9 +70,6 @@ func TestAdvertiseShadowsRepeatedPhrases(t *testing.T) {
 	}
 }
 
-// Being shadowed only decides what Home Assistant is shown. The URL has to survive, because Home
-// Assistant selects by id and can ask for a word it was never shown — which is how one becomes
-// permanently unobtainable.
 func TestShadowedOffersKeepTheirURL(t *testing.T) {
 	l := installed(t, map[string]string{"ours": "Computer"})
 	l.Offered([]esphome.ExternalWakeWord{offer("theirs_computer", "Computer")})
@@ -88,7 +82,6 @@ func TestShadowedOffersKeepTheirURL(t *testing.T) {
 	}
 }
 
-// Two offers sharing a phrase resolve the same way every time, rather than by map order.
 func TestAdvertiseIsStableAcrossCalls(t *testing.T) {
 	l := installed(t, nil)
 	l.Offered([]esphome.ExternalWakeWord{

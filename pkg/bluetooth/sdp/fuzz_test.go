@@ -2,18 +2,13 @@ package sdp
 
 import "testing"
 
-// Data elements nest, and the parser recurses to follow them. A phone is not the only thing that
-// can open the discovery channel, so the depth has to come from the bytes rather than from trust.
-
 func FuzzParseElement(f *testing.F) {
 	raw, _ := Sequence(UUID16(UUIDAudioSink), Uint(0x0019), Text("Panel")).Marshal()
 	f.Add(raw)
 
-	// A sequence that says it holds far more than it does.
 	f.Add([]byte{0x35, 0xff, 0x01})
 	f.Add([]byte{})
 
-	// Nesting, which is where a recursive parser goes over the side.
 	deep := make([]byte, 0, 4096)
 	for range 2048 {
 		deep = append(deep, 0x35, 0x02)
@@ -29,9 +24,7 @@ func FuzzParseElement(f *testing.F) {
 			t.Fatalf("an element of %d bytes was taken out of %d", n, len(raw))
 		}
 
-		// Anything that parsed has to be writable again, since a record read off the wire is
-		// answered with parts of itself.
-		e.Marshal()
+		_, _ = e.Marshal()
 	})
 }
 
@@ -54,8 +47,6 @@ func FuzzParseSearchAttribute(f *testing.F) {
 			return
 		}
 
-		// Whatever came back is used to select attributes out of a record, so it has to be safe to
-		// ask it questions.
 		s.Wants([]uint32{UUIDAudioSink})
 		s.Selected(AudioSink(1, "Panel", 0x0019, FeatureSpeaker))
 	})

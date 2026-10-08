@@ -6,7 +6,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
 
-// Effects is optional hardware that displays the current voice turn.
 type Effects interface {
 	Begin()
 	End()
@@ -15,7 +14,6 @@ type Effects interface {
 	Elsewhere()
 }
 
-// Presentation publishes turn state and applies the saved effect policy.
 type Presentation struct {
 	Settings storage.Section[schema.Wake]
 	Shown    *hook.Hook[Showing]

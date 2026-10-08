@@ -1,6 +1,5 @@
 package source
 
-// Heading is the track title or its current playback state.
 func Heading(now Now) string {
 	if now.Title != "" {
 		return now.Title

@@ -46,7 +46,6 @@ const (
 	mdfVarBacktrack = 4
 )
 
-// MDF is speexdsp's multidelay block frequency-domain echo canceller.
 type MDF struct {
 	frame, n, m int
 	adapting    bool
@@ -83,7 +82,6 @@ type MDF struct {
 	sumD, sumE float64
 }
 
-// NewMDF builds one for frame samples at a time, a power of two, reaching taps samples of echo tail.
 func NewMDF(frame, taps, rate int) (*MDF, error) {
 	if frame < 2 || frame&(frame-1) != 0 {
 		return nil, fmt.Errorf("aec: frame must be a power of two, got %d", frame)
@@ -95,23 +93,45 @@ func NewMDF(frame, taps, rate int) (*MDF, error) {
 
 	n := 2 * frame
 	s := &MDF{
-		frame: frame, n: n, m: m, adapting: true,
-		tf: fft.New(n), buf: make([]complex64, n),
+		frame:    frame,
+		n:        n,
+		m:        m,
+		adapting: true,
+		tf:       fft.New(n),
+		buf:      make([]complex64, n),
 
 		specAverage: float32(frame) / float32(rate),
 		beta0:       2 * float32(frame) / float32(rate),
 		betaMax:     .5 * float32(frame) / float32(rate),
 		preemph:     .9,
 
-		e: make([]float32, n), x: make([]float32, n), y: make([]float32, n),
-		input: make([]float32, frame), wtmp: make([]float32, n),
-		yspec: make([]complex64, frame+1), espec: make([]complex64, frame+1), phi: make([]complex64, frame+1),
+		e:     make([]float32, n),
+		x:     make([]float32, n),
+		y:     make([]float32, n),
+		input: make([]float32, frame),
+		wtmp:  make([]float32, n),
+		yspec: make(
+			[]complex64,
+			frame+1,
+		),
+		espec: make([]complex64, frame+1),
+		phi:   make([]complex64, frame+1),
 
-		power: make([]float32, frame+1), power1: make([]float32, frame+1),
-		rf: make([]float32, frame+1), yf: make([]float32, frame+1), xf: make([]float32, frame+1),
-		eh: make([]float32, frame+1), yh: make([]float32, frame+1),
-		window: make([]float32, n), prop: make([]float32, m),
-		lastY: make([]float32, n), residY: make([]float32, n), residSpec: make([]complex64, frame+1),
+		power:  make([]float32, frame+1),
+		power1: make([]float32, frame+1),
+		rf:     make([]float32, frame+1),
+		yf:     make([]float32, frame+1),
+		xf:     make([]float32, frame+1),
+		eh:     make([]float32, frame+1),
+		yh:     make([]float32, frame+1),
+		window: make([]float32, n),
+		prop:   make([]float32, m),
+		lastY: make(
+			[]float32,
+			n,
+		),
+		residY:    make([]float32, n),
+		residSpec: make([]complex64, frame+1),
 	}
 	switch {
 	case rate < 12000:
@@ -149,7 +169,6 @@ func NewMDF(frame, taps, rate int) (*MDF, error) {
 	return s, nil
 }
 
-// Reset forgets the room.
 func (s *MDF) Reset() {
 	s.cancelCount, s.screwedUp, s.saturated = 0, 0, 0
 	for i := range s.m {
@@ -173,10 +192,8 @@ func (s *MDF) Reset() {
 	clear(s.lastY)
 }
 
-// SetAdapting stops or resumes learning while still cancelling with what it has.
 func (s *MDF) SetAdapting(on bool) { s.adapting = on }
 
-// ERLE is how much quieter the output is than the microphone, in dB, over roughly the last half second.
 func (s *MDF) ERLE() float64 {
 	if s.sumE <= 0 {
 		return 0
@@ -201,13 +218,16 @@ func (s *MDF) Residual(dst []float32) {
 	}
 }
 
-// Process cancels the echo of ref from mic. Both are a whole number of frames.
 func (s *MDF) Process(mic, ref []int16) ([]int16, error) {
 	if len(mic) != len(ref) {
 		return nil, ErrLength
 	}
 	if len(mic)%s.frame != 0 {
-		return nil, fmt.Errorf("aec: %d samples is not a whole number of %d sample frames", len(mic), s.frame)
+		return nil, fmt.Errorf(
+			"aec: %d samples is not a whole number of %d sample frames",
+			len(mic),
+			s.frame,
+		)
 	}
 	if cap(s.out) < len(mic) {
 		s.out = make([]int16, len(mic))

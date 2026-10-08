@@ -15,7 +15,12 @@ func TestGroupedPathsPassLiteralArguments(t *testing.T) {
 		var got []string
 		factory := func() *cobra.Command {
 			root := NewRoot()
-			root.AddCommand(Does(&cobra.Command{Use: "tap X Y", Args: cobra.ExactArgs(2)}, func(in []string) error { got = in; return nil }))
+			root.AddCommand(
+				Does(
+					&cobra.Command{Use: "tap X Y", Args: cobra.ExactArgs(2)},
+					func(in []string) error { got = in; return nil },
+				),
+			)
 			Organize(root)
 			return root
 		}
@@ -41,7 +46,14 @@ func TestWaitIsCanceled(t *testing.T) {
 		Organize(root)
 		return root
 	}
-	if _, err := Execute(ctx, factory, []string{"device", "wait", "60000"}); !errors.Is(err, context.Canceled) {
+	if _, err := Execute(
+		ctx,
+		factory,
+		[]string{"device", "wait", "60000"},
+	); !errors.Is(
+		err,
+		context.Canceled,
+	) {
 		t.Errorf("canceled wait returned %v", err)
 	}
 }
@@ -54,7 +66,13 @@ func TestOldCommandPathsAreRejected(t *testing.T) {
 			Does(&cobra.Command{Use: "tap X Y", Args: cobra.ExactArgs(2)}, noop),
 			Does(&cobra.Command{Use: "shot PATH", Args: cobra.ExactArgs(1)}, noop),
 			Does(&cobra.Command{Use: "settings [NAME [VALUE]]", Args: cobra.MaximumNArgs(2)}, noop),
-			Does(&cobra.Command{Use: "record [raw|echo] SECONDS [PATH]", Args: cobra.RangeArgs(1, 3)}, noop),
+			Does(
+				&cobra.Command{
+					Use:  "record [raw|echo] SECONDS [PATH]",
+					Args: cobra.RangeArgs(1, 3),
+				},
+				noop,
+			),
 			WaitCommand(),
 			BluetoothCommand(func([]string) (string, error) { return "", nil }),
 		)
@@ -82,7 +100,12 @@ func TestCallToggleRejectsUnknownValueBeforeAdapter(t *testing.T) {
 		Organize(root)
 		return root
 	}
-	if _, err := Execute(t.Context(), factory, []string{"call", "mute", "maybe"}); err == nil || called {
+	if _, err := Execute(
+		t.Context(),
+		factory,
+		[]string{"call", "mute", "maybe"},
+	); err == nil ||
+		called {
 		t.Errorf("invalid mute reached adapter=%t, error=%v", called, err)
 	}
 }
@@ -108,16 +131,28 @@ func TestRecordingModesUseOnePathAcrossAdapters(t *testing.T) {
 		var got []string
 		factory := func() *cobra.Command {
 			root := NewRoot()
-			record := &cobra.Command{Use: "record [raw|echo] SECONDS [PATH]", RunE: func(_ *cobra.Command, args []string) error { got = args; return nil }}
+			record := &cobra.Command{
+				Use:  "record [raw|echo] SECONDS [PATH]",
+				RunE: func(_ *cobra.Command, args []string) error { got = args; return nil },
+			}
 			root.AddCommand(record)
 			if separateEcho {
 				record.Use = "record SECONDS [PATH]"
-				root.AddCommand(&cobra.Command{Use: "echo SECONDS PATH", RunE: func(_ *cobra.Command, args []string) error { got = args; return nil }})
+				root.AddCommand(
+					&cobra.Command{
+						Use:  "echo SECONDS PATH",
+						RunE: func(_ *cobra.Command, args []string) error { got = args; return nil },
+					},
+				)
 			}
 			Organize(root)
 			return root
 		}
-		if _, err := Execute(t.Context(), factory, []string{"audio", "record", "echo", "2"}); err != nil {
+		if _, err := Execute(
+			t.Context(),
+			factory,
+			[]string{"audio", "record", "echo", "2"},
+		); err != nil {
 			t.Fatal(err)
 		}
 		want := []string{"echo", "2"}

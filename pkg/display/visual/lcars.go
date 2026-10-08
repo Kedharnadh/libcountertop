@@ -69,7 +69,15 @@ const (
 	leftMiddle
 )
 
-func lcarsText(cv *canvas.Canvas, f *canvas.Font, size float64, at lcarsAnchor, c color.NRGBA, s string, x, y float64) {
+func lcarsText(
+	cv *canvas.Canvas,
+	f *canvas.Font,
+	size float64,
+	at lcarsAnchor,
+	c color.NRGBA,
+	s string,
+	x, y float64,
+) {
 	cv.SetFont(f, math.Max(size, 1))
 	switch at {
 	case rightBottom:
@@ -151,7 +159,10 @@ func (v *lcars) setup() {
 					n := 0
 					for sy := range 4 {
 						for sx := range 4 {
-							if inside(float64(px)+(float64(sx)+0.5)/4, depth(float64(py)+(float64(sy)+0.5)/4)) {
+							if inside(
+								float64(px)+(float64(sx)+0.5)/4,
+								depth(float64(py)+(float64(sy)+0.5)/4),
+							) {
 								n++
 							}
 						}
@@ -170,7 +181,16 @@ func (v *lcars) setup() {
 		for _, b := range v.blocks {
 			fillRect(img, b.x, b.y, b.w, b.h, nrgba(b.c, 1))
 			label := fmt.Sprintf("%02d-%d", int(r.next()*90+10), 1000+int(r.next()*8999))
-			lcarsText(cv, f, math.Min(sw*0.13*1.3, b.h*0.4), rightBottom, color.NRGBA{0, 0, 0, 255}, label, b.x+b.w-b.w*0.06, b.y+b.h-b.h*0.08)
+			lcarsText(
+				cv,
+				f,
+				math.Min(sw*0.13*1.3, b.h*0.4),
+				rightBottom,
+				color.NRGBA{0, 0, 0, 255},
+				label,
+				b.x+b.w-b.w*0.06,
+				b.y+b.h-b.h*0.08,
+			)
 		}
 
 		title := "VOICE INTERFACE"
@@ -185,11 +205,26 @@ func (v *lcars) setup() {
 			var out []lcarsRect
 			for k, p := range parts {
 				w := tot * p
-				seg := lcarsRect{x: x, y: yy, w: w, h: hh, c: cs[k], capped: capRight && k == len(parts)-1}
+				seg := lcarsRect{
+					x:      x,
+					y:      yy,
+					w:      w,
+					h:      hh,
+					c:      cs[k],
+					capped: capRight && k == len(parts)-1,
+				}
 				out = append(out, seg)
 				if seg.capped {
 					fillRect(img, x, yy, w-hh/2, hh, nrgba(cs[k], 1))
-					fx.Radial(img, float32(x+w-hh/2), float32(yy+hh/2), 0, float32(hh/2), []fx.Stop{{At: 0, C: nrgba(cs[k], 1)}, {At: 1, C: nrgba(cs[k], 1)}}, false)
+					fx.Radial(
+						img,
+						float32(x+w-hh/2),
+						float32(yy+hh/2),
+						0,
+						float32(hh/2),
+						[]fx.Stop{{At: 0, C: nrgba(cs[k], 1)}, {At: 1, C: nrgba(cs[k], 1)}},
+						false,
+					)
 				} else {
 					fillRect(img, x, yy, w, hh, nrgba(cs[k], 1))
 				}
@@ -197,22 +232,46 @@ func (v *lcars) setup() {
 			}
 			return out
 		}
-		segs(xE+gapX, tx-tw-W*0.015, my, th, []float64{0.46, 0.2, 0.34}, [][3]float64{lcarsLav, lcarsSky, lcarsPeach}, false)
-		v.bottom = segs(xE+gapX, W-mx, H-my-th, th, []float64{0.16, 0.42, 0.26, 0.16}, [][3]float64{lcarsBlue, lcarsPeach, lcarsLav, lcarsOrange}, true)
+		segs(
+			xE+gapX,
+			tx-tw-W*0.015,
+			my,
+			th,
+			[]float64{0.46, 0.2, 0.34},
+			[][3]float64{lcarsLav, lcarsSky, lcarsPeach},
+			false,
+		)
+		v.bottom = segs(
+			xE+gapX,
+			W-mx,
+			H-my-th,
+			th,
+			[]float64{0.16, 0.42, 0.26, 0.16},
+			[][3]float64{lcarsBlue, lcarsPeach, lcarsLav, lcarsOrange},
+			true,
+		)
 
 		lcarsText(cv, f, th*0.56, leftMiddle, nrgba(lcarsOrange, 1), "VOICE ANALYSIS", v.vx0, v.vy0)
 		fillRect(img, v.vx0, v.vy0+th*0.5, v.vx1-v.vx0, math.Max(1, 1.5*u), nrgba(lcarsPeach, 0.9))
 		for i := range lcarsBars {
 			cx := float32(v.vx0 + v.pitch*(float64(i)+0.5))
-			fx.Polyline(img, []float32{cx, float32(v.top + v.pw/2), cx, float32(v.vy1 - v.pw/2)}, float32(v.pw), color.NRGBA{60, 48, 70, 115}, false)
+			fx.Polyline(
+				img,
+				[]float32{cx, float32(v.top + v.pw/2), cx, float32(v.vy1 - v.pw/2)},
+				float32(v.pw),
+				color.NRGBA{60, 48, 70, 115},
+				false,
+			)
 		}
 		copy(back.Pix, img.Pix)
 	}
 	v.paper = image.NewRGBA(image.Rect(0, 0, v.st.w, v.st.h))
 	frame(v.paper)
 	size := th * 0.56
-	v.labelAt = image.Rect(int(v.vx1-size*6)-1, int(v.vy0-th*0.38)-1, int(math.Ceil(v.vx1))+2, int(math.Ceil(v.vy0+th*0.38))+2).Intersect(v.paper.Bounds())
-	v.stripAt = image.Rect(int(xE), int(H-my-th)-1, int(math.Ceil(W-mx))+1, int(math.Ceil(H-my))+1).Intersect(v.paper.Bounds())
+	v.labelAt = image.Rect(int(v.vx1-size*6)-1, int(v.vy0-th*0.38)-1, int(math.Ceil(v.vx1))+2, int(math.Ceil(v.vy0+th*0.38))+2).
+		Intersect(v.paper.Bounds())
+	v.stripAt = image.Rect(int(xE), int(H-my-th)-1, int(math.Ceil(W-mx))+1, int(math.Ceil(H-my))+1).
+		Intersect(v.paper.Bounds())
 
 	tb := softwarebackend.New(v.st.w, v.st.h)
 	tb.Image = v.paper
@@ -237,7 +296,16 @@ func (v *lcars) readouts() {
 			inset = v.th * 0.7
 		}
 		s := fmt.Sprintf("%d-%d", int(v.r.next()*90+10), int(v.r.next()*9000+1000))
-		lcarsText(v.text, v.font, v.th*0.46*1.3, rightBottom, color.NRGBA{0, 0, 0, 255}, s, b.x+b.w-inset, b.y+b.h-v.th*0.1)
+		lcarsText(
+			v.text,
+			v.font,
+			v.th*0.46*1.3,
+			rightBottom,
+			color.NRGBA{0, 0, 0, 255},
+			s,
+			b.x+b.w-inset,
+			b.y+b.h-v.th*0.1,
+		)
 	}
 }
 
@@ -286,7 +354,9 @@ func (v *lcars) advance(f frame) (changed bool) {
 			b0 := int(bi)
 			fr := bi - float64(b0)
 			bv := f.bands[b0]*(1-fr) + f.bands[min(31, b0+1)]*fr
-			target = clamp01((bv - 0.28) / 0.72 * (0.9 + 0.3*float64(i)/(lcarsBars-1)) * (0.55 + 0.6*lv))
+			target = clamp01(
+				(bv - 0.28) / 0.72 * (0.9 + 0.3*float64(i)/(lcarsBars-1)) * (0.55 + 0.6*lv),
+			)
 		} else {
 			target = 0.05 + 0.05*noise1(float64(i)*0.8+t*1.2)
 		}
@@ -341,19 +411,55 @@ func (v *lcars) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 	for i := range lcarsBars {
 		vals[i] = float32(v.heights[i])
 	}
-	vals[28], vals[29], vals[30], vals[31], vals[32] = float32(v.vx0), float32(v.pitch), float32(v.pw), float32(v.top), float32(v.vy1)
+	vals[28], vals[29], vals[30], vals[31], vals[32] = float32(
+		v.vx0,
+	), float32(
+		v.pitch,
+	), float32(
+		v.pw,
+	), float32(
+		v.top,
+	), float32(
+		v.vy1,
+	)
 	for k := range 3 {
 		vals[33+k], vals[36+k] = float32(ca[k]/255), float32(cb[k]/255)
 	}
 	vals[39] = float32(a)
 	for k, b := range v.blocks {
 		if k < 5 {
-			vals[40+5*k], vals[41+5*k], vals[42+5*k], vals[43+5*k], vals[44+5*k] = float32(b.x), float32(b.y), float32(b.w), float32(b.h), float32(v.flash[k]*0.55)
+			vals[40+5*k], vals[41+5*k], vals[42+5*k], vals[43+5*k], vals[44+5*k] = float32(
+				b.x,
+			), float32(
+				b.y,
+			), float32(
+				b.w,
+			), float32(
+				b.h,
+			), float32(
+				v.flash[k]*0.55,
+			)
 		}
 	}
 	st, lb := v.stripAt, v.labelAt
-	vals[65], vals[66], vals[67], vals[68] = float32(st.Min.X), float32(st.Min.Y), float32(st.Dx()), float32(st.Dy())
-	vals[69], vals[70], vals[71], vals[72] = float32(lb.Min.X), float32(lb.Min.Y), float32(lb.Dx()), float32(lb.Dy())
+	vals[65], vals[66], vals[67], vals[68] = float32(
+		st.Min.X,
+	), float32(
+		st.Min.Y,
+	), float32(
+		st.Dx(),
+	), float32(
+		st.Dy(),
+	)
+	vals[69], vals[70], vals[71], vals[72] = float32(
+		lb.Min.X,
+	), float32(
+		lb.Min.Y,
+	), float32(
+		lb.Dx(),
+	), float32(
+		lb.Dy(),
+	)
 	vals[73] = float32(v.st.w)
 	return g.Values(vals, float32(0.12+0.2*lv), 0.012, 1)
 }

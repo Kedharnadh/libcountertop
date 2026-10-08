@@ -8,7 +8,6 @@ const (
 	cabinBody = 0.5
 )
 
-// Spaced unevenly: modes an octave apart would read as a chord.
 var cabinModes = []float32{88, 132, 197}
 
 var cabinSound = Sound{

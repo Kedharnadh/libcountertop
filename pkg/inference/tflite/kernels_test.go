@@ -55,8 +55,6 @@ func TestBroadcastShape(t *testing.T) {
 	}
 }
 
-// A layer norm's scale step broadcasts a per-row mean across the row, which is the shape the
-// classifier relies on.
 func TestElementwiseBroadcastsAcrossRows(t *testing.T) {
 	a := tf([]int{2, 3}, 1, 2, 3, 4, 5, 6)
 	b := tf([]int{2, 1}, 10, 20)
@@ -84,7 +82,11 @@ func TestReduceMeanKeepsDims(t *testing.T) {
 func TestReduceMaxDropsDims(t *testing.T) {
 	x := tf([]int{2, 2}, 1, 7, 5, 3)
 	y := out()
-	if err := kernels[OpReduceMax](&OpDesc{}, []*Tensor{x, ti([]int{1}, 1)}, []*Tensor{y}); err != nil {
+	if err := kernels[OpReduceMax](
+		&OpDesc{},
+		[]*Tensor{x, ti([]int{1}, 1)},
+		[]*Tensor{y},
+	); err != nil {
 		t.Fatal(err)
 	}
 	shape(t, "reduce_max", y.Shape, []int{2})
@@ -94,15 +96,17 @@ func TestReduceMaxDropsDims(t *testing.T) {
 func TestTransposeMovesAxes(t *testing.T) {
 	x := tf([]int{2, 3}, 1, 2, 3, 4, 5, 6)
 	y := out()
-	if err := kernels[OpTranspose](&OpDesc{}, []*Tensor{x, ti([]int{2}, 1, 0)}, []*Tensor{y}); err != nil {
+	if err := kernels[OpTranspose](
+		&OpDesc{},
+		[]*Tensor{x, ti([]int{2}, 1, 0)},
+		[]*Tensor{y},
+	); err != nil {
 		t.Fatal(err)
 	}
 	shape(t, "transpose", y.Shape, []int{3, 2})
 	f32(t, "transpose", y.F32, []float32{1, 4, 2, 5, 3, 6})
 }
 
-// The embedding model pads the frequency axis before its first convolution, so the pad has to
-// land inside the row rather than at the end of the buffer.
 func TestPadInsertsZerosPerAxis(t *testing.T) {
 	x := tf([]int{1, 2, 2, 1}, 1, 2, 3, 4)
 	pads := ti([]int{4, 2}, 0, 0, 0, 0, 1, 1, 0, 0)
@@ -115,7 +119,6 @@ func TestPadInsertsZerosPerAxis(t *testing.T) {
 }
 
 func TestConv2DValidPadding(t *testing.T) {
-	// One 2x2 filter summing a 3x3 input's windows, no bias.
 	x := tf([]int{1, 3, 3, 1}, 1, 2, 3, 4, 5, 6, 7, 8, 9)
 	w := tf([]int{1, 2, 2, 1}, 1, 1, 1, 1)
 	y := out()
@@ -133,13 +136,15 @@ func TestConv2DSamePaddingAndStride(t *testing.T) {
 	w := tf([]int{1, 2, 2, 1}, 1, 1, 1, 1)
 	y := out()
 
-	o := &OpDesc{Op: OpConv2D, conv: convParams{samePad: true, strideW: 2, strideH: 2, dilationW: 1, dilationH: 1}}
+	o := &OpDesc{
+		Op:   OpConv2D,
+		conv: convParams{samePad: true, strideW: 2, strideH: 2, dilationW: 1, dilationH: 1},
+	}
 	if err := kernels[OpConv2D](o, []*Tensor{x, w, nil}, []*Tensor{y}); err != nil {
 		t.Fatal(err)
 	}
 	shape(t, "conv", y.Shape, []int{1, 2, 2, 1})
-	// SAME with stride 2 puts no padding before the data and one row and column after, so the
-	// trailing windows are partly outside the input.
+	// SAME with stride 2 pads nothing before the data and one row and column after.
 	f32(t, "conv", y.F32, []float32{12, 9, 15, 9})
 }
 
@@ -180,7 +185,11 @@ func TestBatchMatMul(t *testing.T) {
 func TestReshapeInfersFreeDimension(t *testing.T) {
 	x := tf([]int{2, 3}, 1, 2, 3, 4, 5, 6)
 	y := out()
-	if err := kernels[OpReshape](&OpDesc{}, []*Tensor{x, ti([]int{2}, 3, -1)}, []*Tensor{y}); err != nil {
+	if err := kernels[OpReshape](
+		&OpDesc{},
+		[]*Tensor{x, ti([]int{2}, 3, -1)},
+		[]*Tensor{y},
+	); err != nil {
 		t.Fatal(err)
 	}
 	shape(t, "reshape", y.Shape, []int{3, 2})
@@ -196,7 +205,11 @@ func TestSqueezeAndExpandDims(t *testing.T) {
 	shape(t, "squeeze", y.Shape, []int{3})
 
 	z := out()
-	if err := kernels[OpExpandDims](&OpDesc{}, []*Tensor{y, ti([]int{1}, 0)}, []*Tensor{z}); err != nil {
+	if err := kernels[OpExpandDims](
+		&OpDesc{},
+		[]*Tensor{y, ti([]int{1}, 0)},
+		[]*Tensor{z},
+	); err != nil {
 		t.Fatal(err)
 	}
 	shape(t, "expand_dims", z.Shape, []int{1, 3})
@@ -216,7 +229,10 @@ func TestFusedReluClampsConvOutput(t *testing.T) {
 	x := tf([]int{1, 1, 1, 1}, -5)
 	w := tf([]int{1, 1, 1, 1}, 1)
 	y := out()
-	o := &OpDesc{Op: OpConv2D, conv: convParams{strideW: 1, strideH: 1, dilationW: 1, dilationH: 1, act: ActRelu}}
+	o := &OpDesc{
+		Op:   OpConv2D,
+		conv: convParams{strideW: 1, strideH: 1, dilationW: 1, dilationH: 1, act: ActRelu},
+	}
 	if err := kernels[OpConv2D](o, []*Tensor{x, w, nil}, []*Tensor{y}); err != nil {
 		t.Fatal(err)
 	}

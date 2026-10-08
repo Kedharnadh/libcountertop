@@ -1,8 +1,3 @@
-// Package detect listens for wake words in the microphone frames.
-//
-// The engine is the loop; around it sits what the user chose, which the engine does not know: which
-// words go in which slot, how sensitive each one is, and what to tell Home Assistant about the ones
-// that would not load.
 package detect
 
 import (
@@ -17,29 +12,15 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
 
-// Hold is how long scoring continues after a detection fires, to record the peak the utterance
-// reached. Feedback happens at once; this only decides what gets logged.
 const Hold = 300 * time.Millisecond
 
-// Refractory is how long detection pauses after a hit, so one utterance reports once rather than
-// once per frame. Keep it short: anything longer swallows a genuine second attempt, which looks
-// exactly like a failure to detect.
 const Refractory = 800 * time.Millisecond
 
-// NearMiss is the peak score worth reporting for an utterance that never fired, and NearMissSettle
-// how long after that peak to wait before deciding it is not going to. The sliding average ramps
-// through the low scores on its way to a real detection, so reporting as soon as the threshold is
-// crossed reports successes, not failures.
 const (
 	NearMiss       = 0.5
 	NearMissSettle = 700 * time.Millisecond
 )
 
-// Engine feeds microphone frames to the wake words of one backend.
-//
-// Slots are Home Assistant's: it offers a fixed number of wake word choices, each paired with its
-// own pipeline, and a detection has to say which one fired so the right pipeline runs. A slot with
-// no model is off, and all slots off is detection off — there is nothing else to switch.
 type Engine struct {
 	source    Source
 	callbacks sync.WaitGroup
@@ -47,45 +28,26 @@ type Engine struct {
 
 	mu sync.Mutex
 
-	// backends is one engine per kind of model in use, built when a slot first wants it and dropped
-	// when the last slot using it goes. Both can be up at once, a slot each, and each costs a front
-	// end per frame — so which are running follows what is loaded rather than a setting.
 	backends map[wake.Kind]backend
 
-	// spent is how long each kind of model has taken since the last report, which is what says where
-	// a frame's thirty milliseconds go.
 	spent map[wake.Kind]time.Duration
 	slots []slot
 
-	// Threshold is asked for every score, so a change in Home Assistant takes effect at once. It is
-	// per slot because the models disagree on scale.
 	Threshold func(slot int) float64
 
-	// OnDetect runs on a detection, off the audio path.
 	OnDetect func(slot int)
 
-	// OnReady runs once per slot, the first time its model produces a score. That is the first moment
-	// the wake word could be detected at all: these are streaming models with a window to fill, and
-	// openWakeWord gives nothing until it has about two seconds of audio. Loading is not hearing, and
-	// this is the difference.
 	OnReady func(slot int)
 
-	// Load puts the wake words in once the engine is up. It runs on every start, including a restart,
-	// because an engine that came back empty would leave the device deaf while claiming otherwise.
-	// Which words those are depends on what the user last chose, which is not this package's business.
 	Load func() error
 
 	Paused func() bool
 }
 
-// slot is one wake word and how its scores are being read. The tracking is per slot: two wake words
-// listening to the same audio peak at different moments, and one firing must not silence the other.
 type slot struct {
 	model  wake.Model
 	loaded bool
 
-	// scored is whether this slot has seen a score yet, which is what makes it able to detect anything.
-	// It goes back to false with the slot, so a wake word that is swapped out has to warm up again.
 	scored bool
 
 	quiet      time.Time
@@ -93,14 +55,11 @@ type slot struct {
 	peakAt     time.Time
 	suppressed int
 
-	// While holding, a detection has already fired and scoring continues only to find the peak the
-	// utterance reached, so hits and misses are both reported as peaks.
 	holding  bool
 	holdEnds time.Time
 	crossing float64
 }
 
-// New describes an engine. Nothing is built until Start.
 func New(slots int, source Source) *Engine {
 	return &Engine{
 		backends: map[wake.Kind]backend{},
@@ -112,8 +71,6 @@ func New(slots int, source Source) *Engine {
 
 func (e *Engine) Name() string { return "wake" }
 
-// Start empties the engine and loads the wake words. A restart comes back through here, so a detector
-// that broke is rebuilt from scratch rather than resumed from whatever state it died in.
 func (e *Engine) Start(context.Context) error {
 	e.mu.Lock()
 	e.reset()
@@ -126,7 +83,6 @@ func (e *Engine) Start(context.Context) error {
 	return e.Load()
 }
 
-// Close drops the engines and everything loaded in them.
 func (e *Engine) Close() error {
 	e.mu.Lock()
 	e.closed = true
@@ -136,7 +92,6 @@ func (e *Engine) Close() error {
 	return nil
 }
 
-// reset closes every engine and empties every slot. Held with mu.
 func (e *Engine) reset() {
 	for k, b := range e.backends {
 		b.close()
@@ -147,10 +102,8 @@ func (e *Engine) reset() {
 	}
 }
 
-// build makes an engine of one kind. A test replaces it with one that needs no model files.
 var build = newBackend
 
-// engineFor is the backend that runs a kind of model, built the first time one is wanted.
 func (e *Engine) engineFor(k wake.Kind) (backend, error) {
 	if b, ok := e.backends[k]; ok {
 		return b, nil
@@ -163,7 +116,6 @@ func (e *Engine) engineFor(k wake.Kind) (backend, error) {
 	return b, nil
 }
 
-// Use loads a wake word into a slot, in whichever engine runs that model.
 func (e *Engine) Use(n int, m wake.Model) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -192,7 +144,6 @@ func (e *Engine) Use(n int, m wake.Model) error {
 	return nil
 }
 
-// Clear switches a slot off.
 func (e *Engine) Clear(n int) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -209,10 +160,6 @@ func (e *Engine) Clear(n int) {
 	e.drop(old)
 }
 
-// drop lets go of what a slot was using: the model, unless another slot still wants it, and then the
-// engine itself, unless another slot still needs that. An engine with nothing loaded would go on
-// costing a front end for every frame. Called with the slot table already updated, so what it asks
-// about the other slots is the truth. Held with mu.
 func (e *Engine) drop(was slot) {
 	if !was.loaded {
 		return
@@ -231,7 +178,6 @@ func (e *Engine) drop(was slot) {
 	}
 }
 
-// uses reports whether a slot is listening for a model. Held with mu.
 func (e *Engine) uses(id string) bool {
 	for _, s := range e.slots {
 		if s.loaded && s.model.ID == id {
@@ -241,7 +187,6 @@ func (e *Engine) uses(id string) bool {
 	return false
 }
 
-// runs reports whether a slot needs an engine. Held with mu.
 func (e *Engine) runs(k wake.Kind) bool {
 	for _, s := range e.slots {
 		if s.loaded && s.model.Kind == k {
@@ -251,7 +196,6 @@ func (e *Engine) runs(k wake.Kind) bool {
 	return false
 }
 
-// Loaded reports the wake word in a slot, and whether the slot is on.
 func (e *Engine) Loaded(n int) (wake.Model, bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -262,8 +206,6 @@ func (e *Engine) Loaded(n int) (wake.Model, bool) {
 	return e.slots[n].model, e.slots[n].loaded
 }
 
-// Ready reports whether a slot has scored, and so whether its wake word can be heard yet. A slot with
-// nothing loaded is never ready.
 func (e *Engine) Ready(n int) bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -274,7 +216,6 @@ func (e *Engine) Ready(n int) bool {
 	return e.slots[n].scored
 }
 
-// Listening reports whether any slot has a wake word.
 func (e *Engine) Listening() bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -287,8 +228,6 @@ func (e *Engine) Listening() bool {
 	return false
 }
 
-// Run scores frames until ctx is cancelled. The microphones going away is reported rather than
-// returned quietly: detection stopping is the device going deaf, which should not be silent.
 func (e *Engine) Run(ctx context.Context) error {
 	if e.source == nil {
 		return errors.New("wake: no microphone source")
@@ -296,8 +235,6 @@ func (e *Engine) Run(ctx context.Context) error {
 	frames, unlisten := e.source.Listen("wake")
 	defer unlisten()
 
-	// The microphones produce fifty frames a second. Counting what arrives against what scoring costs
-	// says whether frames are being lost because this loop is slow or because it never sees them.
 	var (
 		took, worst time.Duration
 		got         int
@@ -345,9 +282,6 @@ func (e *Engine) Run(ctx context.Context) error {
 	}
 }
 
-// score feeds one frame and acts on what came back. The lock is held across the whole of it: an
-// engine is shared with whatever Use installs next, and it is not safe to swap a wake word out from
-// under an inference.
 func (e *Engine) score(frame []int16) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -355,12 +289,7 @@ func (e *Engine) score(frame []int16) {
 		return
 	}
 
-	// Always feed. These are streaming models: a gap in the input is a gap in their history, and the
-	// next utterance gets scored from a cold state. The refractory below suppresses reporting, not
-	// audio. An engine only exists while a slot needs it, so nothing loaded feeds nothing.
-	// Only what came back fresh is kept, so a slot whose engine has not scored this frame finds
-	// nothing rather than reading a stale number. openWakeWord scores every 80 ms, so for it most
-	// frames only advance the front end.
+	// openWakeWord scores every 80 ms.
 	heard := make(map[wake.Kind]map[string]float64, len(e.backends))
 	for k, b := range e.backends {
 		began := time.Now()
@@ -393,7 +322,6 @@ func (e *Engine) score(frame []int16) {
 	}
 }
 
-// judge turns one slot's score into a detection, a near miss, or nothing. Held with mu.
 func (e *Engine) judge(n int, s *slot, score float64, now time.Time) {
 	cutoff := wake.DefaultThreshold
 	if e.Threshold != nil {
@@ -428,7 +356,6 @@ func (e *Engine) judge(n int, s *slot, score float64, now time.Time) {
 		if score > s.peak {
 			s.peak, s.peakAt = score, now
 		}
-		// The utterance peaked and fell away without firing.
 		if s.peak >= NearMiss && now.Sub(s.peakAt) > NearMissSettle {
 			slog.Debug("wake near miss", "slot", n+1, "id", s.model.ID, "peak", s.peak,
 				"cutoff", cutoff, "dropped", e.Dropped())
@@ -437,7 +364,6 @@ func (e *Engine) judge(n int, s *slot, score float64, now time.Time) {
 		return
 	}
 
-	// Feedback fires now; the peak is only for the log, and the slot settles when the hold ends.
 	s.holding, s.holdEnds = true, now.Add(Hold)
 	s.crossing, s.peak = score, score
 
@@ -446,7 +372,6 @@ func (e *Engine) judge(n int, s *slot, score float64, now time.Time) {
 	}
 }
 
-// Source supplies owned microphone frames and reports capture loss.
 type Source interface {
 	Listen(string) (<-chan []int16, func())
 	Dropped() uint64

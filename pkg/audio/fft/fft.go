@@ -1,5 +1,3 @@
-// Package fft is an in-place radix-2 transform of one fixed size, with its twiddles and bit-reversal
-// built once.
 package fft
 
 import "math"
@@ -7,7 +5,7 @@ import "math"
 type FFT struct {
 	n       int
 	rev     []int
-	twiddle []complex64 // e^-2πik/n for k < n/2
+	twiddle []complex64
 }
 
 func New(n int) *FFT {
@@ -35,7 +33,6 @@ func New(n int) *FFT {
 	return f
 }
 
-// Forward transforms x in place.
 func (f *FFT) Forward(x []complex64) {
 	for i, r := range f.rev {
 		if i < r {
@@ -57,7 +54,6 @@ func (f *FFT) Forward(x []complex64) {
 	}
 }
 
-// Inverse transforms x in place, scaled so that Inverse(Forward(x)) is x.
 func (f *FFT) Inverse(x []complex64) {
 	for i := range x {
 		x[i] = Conj(x[i])

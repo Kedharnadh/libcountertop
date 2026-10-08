@@ -9,13 +9,8 @@ import (
 	"time"
 )
 
-// The connection layer, over net.Pipe: a real full duplex connection with no socket and no network,
-// so the routing that decides which sender hears what can be driven here rather than on a device
-// with two phones in the room.
-
 const patience = 2 * time.Second
 
-// sender is one end of a pipe, framed, with the deadlines a test needs.
 type sender struct {
 	t    *testing.T
 	conn net.Conn
@@ -25,13 +20,14 @@ type sender struct {
 func (s *sender) send(m Message) {
 	s.t.Helper()
 
-	s.conn.SetWriteDeadline(time.Now().Add(patience))
+	if err := s.conn.SetWriteDeadline(time.Now().Add(patience)); err != nil {
+		s.t.Fatal(err)
+	}
 	if _, err := s.conn.Write(Frame(m)); err != nil {
 		s.t.Fatalf("writing: %v", err)
 	}
 }
 
-// next reads one message, waiting for it.
 func (s *sender) next() (Message, error) {
 	buf := make([]byte, readChunk)
 
@@ -45,7 +41,9 @@ func (s *sender) next() (Message, error) {
 			return Message{}, err
 		}
 
-		s.conn.SetReadDeadline(time.Now().Add(patience))
+		if err := s.conn.SetReadDeadline(time.Now().Add(patience)); err != nil {
+			return Message{}, err
+		}
 		n, err := s.conn.Read(buf)
 		if n > 0 {
 			s.held = append(s.held, buf[:n]...)
@@ -57,7 +55,6 @@ func (s *sender) next() (Message, error) {
 	}
 }
 
-// expect reads one message and fails if it does not arrive.
 func (s *sender) expect() Message {
 	s.t.Helper()
 
@@ -68,19 +65,17 @@ func (s *sender) expect() Message {
 	return m
 }
 
-// dial attaches a sender to a service and starts serving it.
 func dial(t *testing.T, s *Service) *sender {
 	t.Helper()
 
 	ours, theirs := net.Pipe()
 	t.Cleanup(func() { ours.Close(); theirs.Close() })
 
-	go s.Serve(NewConn(theirs))
+	go func() { _ = s.Serve(NewConn(theirs)) }()
 
 	return &sender{t: t, conn: ours}
 }
 
-// A whole conversation over a connection rather than through Receive directly.
 func TestAConversationOverAConnection(t *testing.T) {
 	s := NewService(NewReceiver("Kitchen"))
 	s.Receiver.Player = &player{}
@@ -107,8 +102,6 @@ func TestAConversationOverAConnection(t *testing.T) {
 	}
 }
 
-// Two senders on two connections. A status meant for one must not go down the other's socket,
-// where it is a message about a session that endpoint has never heard of.
 func TestAChangeReachesTheOtherSendersOwnConnection(t *testing.T) {
 	s := NewService(NewReceiver("Kitchen"))
 	s.Receiver.Player = &player{}
@@ -119,7 +112,6 @@ func TestAChangeReachesTheOtherSendersOwnConnection(t *testing.T) {
 	kitchen.send(from("sender-kitchen", NSConnection, Connect()))
 	hall.send(from("sender-hall", NSConnection, Connect()))
 
-	// Both connections have to be known before the change, or there is nobody to broadcast to.
 	waitFor(t, s, 2)
 
 	kitchen.send(from("sender-kitchen", NSReceiver,
@@ -142,8 +134,6 @@ func TestAChangeReachesTheOtherSendersOwnConnection(t *testing.T) {
 	}
 }
 
-// waitFor blocks until the service holds a number of connections, so a test does not race the
-// goroutine that learns them.
 func waitFor(t *testing.T, s *Service, n int) {
 	t.Helper()
 
@@ -157,8 +147,6 @@ func waitFor(t *testing.T, s *Service, n int) {
 	t.Fatalf("only %d of %d connections were learned", s.Senders(), n)
 }
 
-// A sender that pulled the plug has to leave the receiver's list, or every change afterwards builds
-// a broadcast to somebody who is not there.
 func TestASenderThatWentAwayIsForgotten(t *testing.T) {
 	s := NewService(NewReceiver("Kitchen"))
 
@@ -179,7 +167,6 @@ func TestASenderThatWentAwayIsForgotten(t *testing.T) {
 		t.Fatalf("%d connections after one closed", got)
 	}
 
-	// The remaining one still works, and gets only its own answer.
 	kitchen.send(from("sender-kitchen", NSReceiver, `{"type":"GET_STATUS","requestId":1}`))
 
 	got := kitchen.expect()
@@ -188,7 +175,6 @@ func TestASenderThatWentAwayIsForgotten(t *testing.T) {
 	}
 }
 
-// Several messages arriving in one write, which is what a sender that pipelines gives.
 func TestSeveralMessagesInOneWrite(t *testing.T) {
 	s := NewService(NewReceiver("Kitchen"))
 	phone := dial(t, s)
@@ -198,7 +184,9 @@ func TestSeveralMessagesInOneWrite(t *testing.T) {
 	buf = append(buf, Frame(from(SenderID, NSHeartbeat, Ping()))...)
 	buf = append(buf, Frame(from(SenderID, NSHeartbeat, Ping()))...)
 
-	phone.conn.SetWriteDeadline(time.Now().Add(patience))
+	if err := phone.conn.SetWriteDeadline(time.Now().Add(patience)); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := phone.conn.Write(buf); err != nil {
 		t.Fatalf("writing: %v", err)
 	}
@@ -211,7 +199,6 @@ func TestSeveralMessagesInOneWrite(t *testing.T) {
 	}
 }
 
-// A message split across writes, which TCP does whether or not it is convenient.
 func TestAMessageSplitAcrossWrites(t *testing.T) {
 	s := NewService(NewReceiver("Kitchen"))
 	phone := dial(t, s)
@@ -219,11 +206,11 @@ func TestAMessageSplitAcrossWrites(t *testing.T) {
 	framed := Frame(from(SenderID, NSHeartbeat, Ping()))
 
 	go func() {
-		phone.conn.SetWriteDeadline(time.Now().Add(patience))
-		phone.conn.Write(framed[:3])
+		_ = phone.conn.SetWriteDeadline(time.Now().Add(patience))
+		_, _ = phone.conn.Write(framed[:3])
 		time.Sleep(10 * time.Millisecond)
-		phone.conn.SetWriteDeadline(time.Now().Add(patience))
-		phone.conn.Write(framed[3:])
+		_ = phone.conn.SetWriteDeadline(time.Now().Add(patience))
+		_, _ = phone.conn.Write(framed[3:])
 	}()
 
 	if h, _ := Kind(phone.expect().Payload); h.Type != TypePong {
@@ -231,8 +218,6 @@ func TestAMessageSplitAcrossWrites(t *testing.T) {
 	}
 }
 
-// A sender's bad payload is its bug. Dropping the connection over it turns that into a device that
-// cannot be cast to.
 func TestABadPayloadIsReportedAndTheConnectionKept(t *testing.T) {
 	s := NewService(NewReceiver("Kitchen"))
 
@@ -245,7 +230,6 @@ func TestABadPayloadIsReportedAndTheConnectionKept(t *testing.T) {
 	phone.send(from(SenderID, NSReceiver, `not json`))
 	phone.send(from(SenderID, NSHeartbeat, Ping()))
 
-	// The connection survived, so the ping after the rubbish is still answered.
 	if h, _ := Kind(phone.expect().Payload); h.Type != TypePong {
 		t.Error("the connection did not survive a bad payload")
 	}
@@ -257,8 +241,6 @@ func TestABadPayloadIsReportedAndTheConnectionKept(t *testing.T) {
 	}
 }
 
-// A length that was wrong once puts every byte after it in the wrong place, so there is nothing to
-// carry on from.
 func TestAnUnframeableStreamEndsTheConnection(t *testing.T) {
 	s := NewService(NewReceiver("Kitchen"))
 
@@ -268,9 +250,12 @@ func TestAnUnframeableStreamEndsTheConnection(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { done <- s.Serve(NewConn(theirs)) }()
 
-	// A length inside the cap, then bytes that are not a message.
-	ours.SetWriteDeadline(time.Now().Add(patience))
-	ours.Write([]byte{0x00, 0x00, 0x00, 0x04, 0xff, 0xff, 0xff, 0xff})
+	if err := ours.SetWriteDeadline(time.Now().Add(patience)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ours.Write([]byte{0x00, 0x00, 0x00, 0x04, 0xff, 0xff, 0xff, 0xff}); err != nil {
+		t.Fatal(err)
+	}
 
 	select {
 	case err := <-done:
@@ -282,7 +267,6 @@ func TestAnUnframeableStreamEndsTheConnection(t *testing.T) {
 	}
 }
 
-// A connection that ends normally is not an error to report.
 func TestAClosedConnectionIsNotAFault(t *testing.T) {
 	s := NewService(NewReceiver("Kitchen"))
 
@@ -304,7 +288,6 @@ func TestAClosedConnectionIsNotAFault(t *testing.T) {
 	}
 }
 
-// The end of a track is something nothing asked for, and it has to reach every connection.
 func TestFinishingReachesEveryConnection(t *testing.T) {
 	s := NewService(NewReceiver("Kitchen"))
 	s.Receiver.Player = &player{}
@@ -344,16 +327,12 @@ func TestFinishingReachesEveryConnection(t *testing.T) {
 	}
 }
 
-// A sender that has stopped reading must not hold up the device. Its queue fills, and then it is
-// dropped rather than blocking whatever was telling it something.
 func TestASenderThatStopsReadingIsDroppedRatherThanBlocking(t *testing.T) {
 	ours, theirs := net.Pipe()
 	t.Cleanup(func() { ours.Close(); theirs.Close() })
 
 	c := NewConn(theirs)
 
-	// Nothing ever reads ours, so the writer blocks on the first message and the queue fills
-	// behind it.
 	done := make(chan error, 1)
 	go func() {
 		for range outbound * 4 {
@@ -380,8 +359,6 @@ func TestASenderThatStopsReadingIsDroppedRatherThanBlocking(t *testing.T) {
 	}
 }
 
-// The scenario the queue is for: the audio path says a track finished, and must not wait on a
-// socket to say so.
 func TestFinishingDoesNotWaitOnTheSocket(t *testing.T) {
 	s := NewService(NewReceiver("Kitchen"))
 	s.Receiver.Player = &player{}
@@ -400,7 +377,6 @@ func TestFinishingDoesNotWaitOnTheSocket(t *testing.T) {
 	kitchen.expect()
 	kitchen.expect()
 
-	// Nothing is reading now. Finishing has to return anyway.
 	done := make(chan struct{})
 	go func() { s.Finished(); close(done) }()
 
@@ -410,15 +386,12 @@ func TestFinishingDoesNotWaitOnTheSocket(t *testing.T) {
 		t.Fatal("finishing waited for the socket, which on the device is the audio path waiting")
 	}
 
-	// And the message is still delivered once the sender reads again.
 	got := mediaStatus(t, kitchen.expect().Payload)
 	if len(got) != 1 || got[0].IdleReason != IdleFinished {
 		t.Errorf("the status came back %+v", got)
 	}
 }
 
-// A message for a sender nobody is holding is dropped rather than reported: one that went away
-// while a broadcast was being built is ordinary, not a fault.
 func TestSendingToNobody(t *testing.T) {
 	s := NewService(NewReceiver("Kitchen"))
 

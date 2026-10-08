@@ -16,13 +16,11 @@ import (
 
 const idle = 60 * time.Second
 
-// Server answers RTSP for the streams it has been handed, by path.
 type Identity struct{ Name, CNAMEPrefix string }
 
 type Server struct {
 	identity Identity
-	// Wait is how long DESCRIBE waits for a stream's first parameter sets.
-	Wait time.Duration
+	Wait     time.Duration
 
 	mu      sync.Mutex
 	streams map[string]*Stream
@@ -34,10 +32,14 @@ type Server struct {
 func NewServer() *Server { return NewServerWithIdentity(Identity{"Countertop", "countertop-"}) }
 
 func NewServerWithIdentity(identity Identity) *Server {
-	return &Server{identity: identity, Wait: 5 * time.Second, streams: map[string]*Stream{}, conns: map[*conn]bool{}}
+	return &Server{
+		identity: identity,
+		Wait:     5 * time.Second,
+		streams:  map[string]*Stream{},
+		conns:    map[*conn]bool{},
+	}
 }
 
-// Handle serves st at rtsp://host/path.
 func (s *Server) Handle(path string, st *Stream) {
 	s.mu.Lock()
 	s.streams[strings.Trim(path, "/")] = st
@@ -50,7 +52,6 @@ func (s *Server) stream(path string) *Stream {
 	return s.streams[path]
 }
 
-// Serve accepts on ln until Close.
 func (s *Server) Serve(ln net.Listener) error {
 	s.mu.Lock()
 	if s.closed {
@@ -78,7 +79,6 @@ func (s *Server) Serve(ln net.Listener) error {
 	}
 }
 
-// Close stops listening and ends every session.
 func (s *Server) Close() error {
 	s.mu.Lock()
 	s.closed = true
@@ -89,7 +89,7 @@ func (s *Server) Close() error {
 	}
 	s.mu.Unlock()
 	for _, ln := range lns {
-		ln.Close()
+		_ = ln.Close()
 	}
 	for _, c := range conns {
 		c.c.Close()
@@ -112,7 +112,9 @@ type conn struct {
 func (c *conn) interleaved(channel byte, p []byte) error {
 	c.wmu.Lock()
 	defer c.wmu.Unlock()
-	c.c.SetWriteDeadline(time.Now().Add(5 * time.Second))
+	if err := c.c.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		return err
+	}
 	_, err := c.c.Write(frame(channel, p))
 	return err
 }
@@ -130,9 +132,9 @@ func (c *conn) serve() {
 	r := bufio.NewReader(c.c)
 	for {
 		if c.ses != nil && c.ses.tcp != nil {
-			c.c.SetReadDeadline(time.Time{})
+			_ = c.c.SetReadDeadline(time.Time{})
 		} else {
-			c.c.SetReadDeadline(time.Now().Add(idle))
+			_ = c.c.SetReadDeadline(time.Now().Add(idle))
 		}
 		b, err := r.Peek(1)
 		if err != nil {
@@ -212,7 +214,9 @@ func (c *conn) reply(req *request, status int, headers []string, body string) er
 	b.WriteString("\r\n" + body)
 	c.wmu.Lock()
 	defer c.wmu.Unlock()
-	c.c.SetWriteDeadline(time.Now().Add(5 * time.Second))
+	if err := c.c.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		return err
+	}
 	_, err := io.WriteString(c.c, b.String())
 	return err
 }
@@ -234,7 +238,9 @@ func streamPath(raw string) string {
 func (c *conn) handle(req *request) (int, []string, string) {
 	switch req.method {
 	case "OPTIONS":
-		return 200, []string{"Public: OPTIONS, DESCRIBE, SETUP, PLAY, TEARDOWN, GET_PARAMETER, SET_PARAMETER"}, ""
+		return 200, []string{
+			"Public: OPTIONS, DESCRIBE, SETUP, PLAY, TEARDOWN, GET_PARAMETER, SET_PARAMETER",
+		}, ""
 	case "DESCRIBE":
 		st := c.srv.stream(streamPath(req.url))
 		if st == nil {
@@ -246,7 +252,10 @@ func (c *conn) handle(req *request) (int, []string, string) {
 		if !ok {
 			return 503, nil, ""
 		}
-		return 200, []string{"Content-Type: application/sdp", "Content-Base: " + strings.TrimSuffix(req.url, "/") + "/"}, sdp
+		return 200, []string{
+			"Content-Type: application/sdp",
+			"Content-Base: " + strings.TrimSuffix(req.url, "/") + "/",
+		}, sdp
 	case "SETUP":
 		return c.setup(req)
 	case "PLAY":
@@ -259,7 +268,12 @@ func (c *conn) handle(req *request) (int, []string, string) {
 		return 200, []string{
 			"Session: " + c.ses.id,
 			"Range: npt=0.000-",
-			fmt.Sprintf("RTP-Info: url=%s/trackID=0;seq=%d;rtptime=%d", strings.TrimSuffix(req.url, "/"), seq, ts),
+			fmt.Sprintf(
+				"RTP-Info: url=%s/trackID=0;seq=%d;rtptime=%d",
+				strings.TrimSuffix(req.url, "/"),
+				seq,
+				ts,
+			),
 		}, ""
 	case "TEARDOWN":
 		if c.ses != nil {
@@ -307,7 +321,15 @@ func (c *conn) setup(req *request) (int, []string, string) {
 		}
 		s.tcp, s.channel = c, byte(lo)
 		c.ses = s
-		return 200, []string{sid, fmt.Sprintf("Transport: RTP/AVP/TCP;unicast;interleaved=%d-%d;ssrc=%08X", lo, lo+1, s.pz.ssrc)}, ""
+		return 200, []string{
+			sid,
+			fmt.Sprintf(
+				"Transport: RTP/AVP/TCP;unicast;interleaved=%d-%d;ssrc=%08X",
+				lo,
+				lo+1,
+				s.pz.ssrc,
+			),
+		}, ""
 	}
 
 	ports := param(tr, "client_port")
@@ -328,8 +350,11 @@ func (c *conn) setup(req *request) (int, []string, string) {
 	s.udp, s.rtcp, s.peer = rtp, rtcp, peer
 	c.ses = s
 	lp := rtp.LocalAddr().(*net.UDPAddr).Port
-	return 200, []string{sid, fmt.Sprintf("Transport: RTP/AVP;unicast;client_port=%d-%d;server_port=%d-%d;ssrc=%08X",
-		port, port+1, lp, lp+1, s.pz.ssrc)}, ""
+	return 200, []string{
+		sid,
+		fmt.Sprintf("Transport: RTP/AVP;unicast;client_port=%d-%d;server_port=%d-%d;ssrc=%08X",
+			port, port+1, lp, lp+1, s.pz.ssrc),
+	}, ""
 }
 
 func param(transport, name string) string {
@@ -353,7 +378,7 @@ func udpPair() (*net.UDPConn, *net.UDPConn, error) {
 				return rtp, rtcp, nil
 			}
 		}
-		rtp.Close()
+		_ = rtp.Close()
 	}
 	return nil, nil, errors.New("rtsp: no even/odd UDP port pair free")
 }

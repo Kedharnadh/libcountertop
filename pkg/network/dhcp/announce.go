@@ -5,21 +5,14 @@ import (
 	"net"
 )
 
-// broadcast is who an announcement is addressed to: everything on the segment.
 var broadcast = net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 
-// The sizes of what an announcement is made of.
 const (
 	ethHeader  = 14
 	arpPayload = 28
 )
 
-// arpAnnounce builds the frame: an ARP request in which the device is both the sender and the
-// thing being asked about.
-//
-// Asking about itself is what makes it an announcement rather than a question. A host that hears
-// one records the sender, and nobody answers, because the only machine that could is the one that
-// asked.
+// RFC 5227 2.3: an announcement is an ARP request naming the host as sender and target.
 func arpAnnounce(mac net.HardwareAddr, ip net.IP) []byte {
 	ip = ip.To4()
 	if ip == nil || len(mac) != 6 {
@@ -41,8 +34,7 @@ func arpAnnounce(mac net.HardwareAddr, ip net.IP) []byte {
 
 	copy(arp[8:14], mac) // sender hardware address
 	copy(arp[14:18], ip) // sender protocol address
-	copy(arp[24:28], ip) // target protocol address, the same
+	copy(arp[24:28], ip) // target protocol address
 
-	// The target hardware address stays zero: it is the thing an answer would carry.
 	return frame
 }

@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-// txt reads the records into a map, which is how a resolver hands them over.
 func txt(t *testing.T, d Device) map[string]string {
 	t.Helper()
 
@@ -25,8 +24,6 @@ func txt(t *testing.T, d Device) map[string]string {
 	return out
 }
 
-// A sender reads these before it connects at all, so a record that is missing is a device that is
-// discovered and then not offered.
 func TestTheRecordSaysEverythingASenderReads(t *testing.T) {
 	d := Identify("00:f4:8d:47:69:21", "Kitchen", "Lenovo Smart Display 10")
 
@@ -48,8 +45,6 @@ func TestTheRecordSaysEverythingASenderReads(t *testing.T) {
 	}
 }
 
-// A sender remembers the id. One that changes is a new device in the cast menu every reboot, and
-// the old ones never go away.
 func TestTheIdIsStableForAnAddress(t *testing.T) {
 	first := Identify("00:f4:8d:47:69:21", "Kitchen", "Model")
 	again := Identify("00:F4:8D:47:69:21", "Renamed", "Other")
@@ -75,8 +70,6 @@ func TestTheIdIsThirtyTwoHexCharacters(t *testing.T) {
 	}
 }
 
-// Hashing the address alone would give the same number for everything derived from it, and a
-// device whose cloud id equals its device id is one a sender can be confused by.
 func TestTheDerivedIdentifiersAreNotEachOther(t *testing.T) {
 	d := Identify("00:f4:8d:47:69:21", "Kitchen", "Model")
 	got := txt(t, d)
@@ -89,7 +82,6 @@ func TestTheDerivedIdentifiersAreNotEachOther(t *testing.T) {
 	}
 }
 
-// st is what a sender shows as the device being busy.
 func TestTheRecordSaysWhetherSomethingIsRunning(t *testing.T) {
 	d := Identify("00:f4:8d:47:69:21", "Kitchen", "Model")
 
@@ -109,8 +101,6 @@ func TestTheRecordSaysWhetherSomethingIsRunning(t *testing.T) {
 	}
 }
 
-// The instance is the id and not the name: a friendly name may be anything somebody typed, and two
-// services with one instance name is a pair of devices that take turns existing.
 func TestTheInstanceNameIsTheId(t *testing.T) {
 	d := Identify("00:f4:8d:47:69:21", "Kitchen Speaker!", "Model")
 
@@ -146,11 +136,6 @@ func TestWhatWouldNotBeOffered(t *testing.T) {
 	}
 }
 
-// The whole thing over real TLS on a real socket: a sender connects, talks, and is answered.
-//
-// Not a network test in any way that matters — it is a loopback listener on a port the kernel
-// chose — but it is the one check that the certificate, the handshake, the framing and the state
-// machine work together rather than each on its own.
 func TestASenderConnectsOverTLSAndIsAnswered(t *testing.T) {
 	creds := issued(t)
 
@@ -158,7 +143,7 @@ func TestASenderConnectsOverTLSAndIsAnswered(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listening: %v", err)
 	}
-	t.Cleanup(func() { listener.Close() })
+	t.Cleanup(func() { _ = listener.Close() })
 
 	s := NewService(NewReceiver("Kitchen"))
 	s.Receiver.Player = &player{}
@@ -169,16 +154,15 @@ func TestASenderConnectsOverTLSAndIsAnswered(t *testing.T) {
 			if err != nil {
 				return
 			}
-			go s.Serve(NewConn(c))
+			go func() { _ = s.Serve(NewConn(c)) }()
 		}
 	}()
 
-	// A sender does not verify the certificate, because there is nothing for it to verify against.
 	conn, err := tls.Dial("tcp", listener.Addr().String(), &tls.Config{InsecureSkipVerify: true})
 	if err != nil {
 		t.Fatalf("connecting: %v", err)
 	}
-	t.Cleanup(func() { conn.Close() })
+	t.Cleanup(func() { _ = conn.Close() })
 
 	phone := &sender{t: t, conn: conn}
 
@@ -194,7 +178,6 @@ func TestASenderConnectsOverTLSAndIsAnswered(t *testing.T) {
 		t.Errorf("came back %+v", h)
 	}
 
-	// And something bigger than one read, so the framing is exercised over a real socket.
 	phone.send(from(SenderID, NSReceiver,
 		`{"type":"LAUNCH","requestId":2,"appId":"`+DefaultMediaReceiver+`"}`))
 
@@ -216,8 +199,6 @@ func TestASenderConnectsOverTLSAndIsAnswered(t *testing.T) {
 	}
 }
 
-// A sender that cannot negotiate is a device that appears in the list and then fails to connect,
-// with nothing on either side saying why.
 func TestOlderSendersCanStillNegotiate(t *testing.T) {
 	creds := issued(t)
 
@@ -225,10 +206,9 @@ func TestOlderSendersCanStillNegotiate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listening: %v", err)
 	}
-	t.Cleanup(func() { listener.Close() })
+	t.Cleanup(func() { _ = listener.Close() })
 
-	// The handshake is lazy: an accepted connection does nothing until it is read or written, so
-	// the server has to be told to do it or the client sees the socket close instead.
+	// crypto/tls handshakes lazily, on the first read or write.
 	go func() {
 		c, err := listener.Accept()
 		if err != nil {
@@ -237,7 +217,7 @@ func TestOlderSendersCanStillNegotiate(t *testing.T) {
 		defer c.Close()
 
 		if tc, ok := c.(*tls.Conn); ok {
-			tc.Handshake()
+			_ = tc.Handshake()
 		}
 	}()
 
@@ -248,17 +228,15 @@ func TestOlderSendersCanStillNegotiate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("a sender limited to tls 1.2 could not connect: %v", err)
 	}
-	conn.Close()
+	_ = conn.Close()
 }
 
-// Asking a phone for a client certificate gets a handshake most of them abandon.
 func TestNoClientCertificateIsAskedFor(t *testing.T) {
 	if got := TLS(func() *Credentials { return nil }).ClientAuth; got != tls.NoClientCert {
 		t.Errorf("the server asks for %v", got)
 	}
 }
 
-// The port is what senders connect to, and a few have it built in.
 func TestThePortIsTheOneSendersUse(t *testing.T) {
 	if Port != 8009 {
 		t.Errorf("the port is %d", Port)
@@ -268,8 +246,6 @@ func TestThePortIsTheOneSendersUse(t *testing.T) {
 	}
 }
 
-// A record value with no equals sign in it is not a record, and a value containing one is still
-// only split at the first.
 func TestARecordValueMayContainAnEqualsSign(t *testing.T) {
 	d := Identify("00:f4:8d:47:69:21", "Kitchen", "Model")
 	d.Status = "playing a=b"

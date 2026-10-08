@@ -1,4 +1,3 @@
-// Package startup coordinates the display boot reveal and progress handover.
 package startup
 
 import (
@@ -21,8 +20,6 @@ type Moment struct {
 	Trace, Header, Ready float64
 }
 
-// NetworkAddress reports lease readiness only while its Wi-Fi link is associated.
-// A retained lease remains available to the DHCP lifecycle during a brief disconnect.
 func NetworkAddress(link Progress, address string) Progress {
 	if !link.Done {
 		if link.Failed {
@@ -52,8 +49,6 @@ func Summary(p []Progress) string {
 	return b.String()
 }
 
-// Controller advances the reveal from elapsed time and current component readiness.
-// Skip dismisses optional waiting; Ready must still permit handover.
 type Controller struct {
 	Moment
 	last, listed, done, finishing, stepped time.Duration
@@ -98,7 +93,9 @@ func (c *Controller) Tick(at time.Duration, p []Progress, ready, skip bool) {
 	} else if c.done == 0 {
 		c.done = at
 	}
-	if c.finishing == 0 && c.listed != 0 && c.done != 0 && at-c.done >= 500*time.Millisecond && (!c.waited || at-c.listed >= 3*time.Second) && (Settled(p) || skip) {
+	if c.finishing == 0 && c.listed != 0 && c.done != 0 && at-c.done >= 500*time.Millisecond &&
+		(!c.waited || at-c.listed >= 3*time.Second) &&
+		(Settled(p) || skip) {
 		c.finishing = at
 	}
 	if c.finishing != 0 && c.Trace >= 1 {
@@ -115,7 +112,6 @@ type Hooks struct {
 	Changed        func(string)
 }
 
-// Run owns the boot clock. Animate reports whether the reveal layer remains usable.
 func Run(ctx context.Context, h Hooks) bool {
 	began := time.Now()
 	ticker := time.NewTicker(Frame)
@@ -147,14 +143,27 @@ func Run(ctx context.Context, h Hooks) bool {
 	}
 }
 
-// Settled reports whether the component no longer delays boot.
 func (p Progress) Settled() bool { return p.Done || p.Failed }
 
-// Display returns an ordered copy with consistent names for equivalent board components.
-// Components absent on a board are omitted by its registry rather than shown as pretend work.
 func Display(progress []Progress) []Progress {
 	out := slices.Clone(progress)
-	order := map[string]int{"display": 1, "touch": 2, "touchscreen": 2, "buttons": 3, "speaker": 4, "amplifier": 5, "capture": 6, "microphones": 6, "wifi": 7, "dhcp": 8, "bluetooth": 9, "drm": 10, "chromecast": 11, "api": 12, "homeassistant": 13}
+	order := map[string]int{
+		"display":       1,
+		"touch":         2,
+		"touchscreen":   2,
+		"buttons":       3,
+		"speaker":       4,
+		"amplifier":     5,
+		"capture":       6,
+		"microphones":   6,
+		"wifi":          7,
+		"dhcp":          8,
+		"bluetooth":     9,
+		"drm":           10,
+		"chromecast":    11,
+		"api":           12,
+		"homeassistant": 13,
+	}
 	slices.SortStableFunc(out, func(a, b Progress) int {
 		ai, ok := order[a.Name]
 		if !ok {
@@ -166,7 +175,23 @@ func Display(progress []Progress) []Progress {
 		}
 		return ai - bi
 	})
-	names := map[string]string{"display": "Display", "touch": "Touchscreen", "touchscreen": "Touchscreen", "buttons": "Buttons", "speaker": "Speaker", "amplifier": "Amplifier", "capture": "Microphones", "microphones": "Microphones", "wifi": "Wi-Fi", "dhcp": "Network address", "bluetooth": "Bluetooth", "drm": "Protected media", "chromecast": "Chromecast", "api": "Home Assistant API", "homeassistant": "Home Assistant"}
+	names := map[string]string{
+		"display":       "Display",
+		"touch":         "Touchscreen",
+		"touchscreen":   "Touchscreen",
+		"buttons":       "Buttons",
+		"speaker":       "Speaker",
+		"amplifier":     "Amplifier",
+		"capture":       "Microphones",
+		"microphones":   "Microphones",
+		"wifi":          "Wi-Fi",
+		"dhcp":          "Network address",
+		"bluetooth":     "Bluetooth",
+		"drm":           "Protected media",
+		"chromecast":    "Chromecast",
+		"api":           "Home Assistant API",
+		"homeassistant": "Home Assistant",
+	}
 	for i := range out {
 		if name, ok := names[out[i].Name]; ok {
 			out[i].Name = name

@@ -1,4 +1,3 @@
-// Package model defines the data consumed by display widgets.
 package model
 
 import (
@@ -38,7 +37,6 @@ type Row struct {
 	Save func(string)
 }
 
-// Cell carries a selectable preview and common appearance settings.
 type Cell struct {
 	Label  string
 	Chosen bool

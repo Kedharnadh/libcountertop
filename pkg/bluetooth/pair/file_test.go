@@ -12,7 +12,6 @@ func bonds(t *testing.T) string {
 	return filepath.Join(t.TempDir(), "bonds")
 }
 
-// A device nobody has paired with yet has no file, which is not a fault.
 func TestNoFileYet(t *testing.T) {
 	f, err := Open(bonds(t))
 	if err != nil {
@@ -23,7 +22,6 @@ func TestNoFileYet(t *testing.T) {
 	}
 }
 
-// The whole point: a key saved is a key that is still there after a reboot.
 func TestAKeySurvivesBeingReopened(t *testing.T) {
 	path := bonds(t)
 	key := Key{0: 0x01, 7: 0x80, 15: 0xff}
@@ -50,8 +48,6 @@ func TestAKeySurvivesBeingReopened(t *testing.T) {
 	}
 }
 
-// An address is held backwards from how it is written. Writing it one way and reading it the other
-// makes a phone that paired yesterday a stranger today, which is the bug this is here to catch.
 func TestTheAddressRoundTripsThroughTheFile(t *testing.T) {
 	path := bonds(t)
 
@@ -78,8 +74,12 @@ func TestForgettingRemovesItFromTheFile(t *testing.T) {
 	path := bonds(t)
 
 	f, _ := Open(path)
-	f.Save(device, Key{0: 1})
-	f.Save(Addr{0x09}, Key{0: 2})
+	if err := f.Save(device, Key{0: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Save(Addr{0x09}, Key{0: 2}); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := f.Forget(device); err != nil {
 		t.Fatalf("Forget: %v", err)
@@ -97,8 +97,6 @@ func TestForgettingRemovesItFromTheFile(t *testing.T) {
 	}
 }
 
-// A file that could not be read is not overwritten. Replacing it with an empty one turns a bad
-// read into every phone in the house pairing again.
 func TestAFileThatDoesNotParseIsNotOverwritten(t *testing.T) {
 	path := bonds(t)
 	if err := os.WriteFile(path, []byte("this is not a bond\n"), 0o600); err != nil {
@@ -130,7 +128,9 @@ func TestWhatTheFileWillNotAccept(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := bonds(t)
-			os.WriteFile(path, []byte(tc.body), 0o600)
+			if err := os.WriteFile(path, []byte(tc.body), 0o600); err != nil {
+				t.Fatal(err)
+			}
 
 			if _, err := Open(path); err == nil {
 				t.Errorf("%q was accepted", tc.body)
@@ -139,12 +139,12 @@ func TestWhatTheFileWillNotAccept(t *testing.T) {
 	}
 }
 
-// Blank lines and comments so somebody can annotate one by hand during a bad evening without the
-// device refusing to read it afterwards.
 func TestCommentsAndBlankLinesAreSkipped(t *testing.T) {
 	path := bonds(t)
 	body := "# the phone in the kitchen\n\n66:55:44:33:22:11 " + strings.Repeat("ab", 16) + "\n\n"
-	os.WriteFile(path, []byte(body), 0o600)
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
 
 	f, err := Open(path)
 	if err != nil {
@@ -155,12 +155,13 @@ func TestCommentsAndBlankLinesAreSkipped(t *testing.T) {
 	}
 }
 
-// A link key is what lets something claim to be a phone this device trusts.
 func TestTheFileIsNotReadableByAnythingElse(t *testing.T) {
 	path := bonds(t)
 
 	f, _ := Open(path)
-	f.Save(device, Key{0: 1})
+	if err := f.Save(device, Key{0: 1}); err != nil {
+		t.Fatal(err)
+	}
 
 	info, err := os.Stat(path)
 	if err != nil {
@@ -176,7 +177,9 @@ func TestSavingTheSameKeyTwiceIsNotAWrite(t *testing.T) {
 	key := Key{0: 0x11}
 
 	f, _ := Open(path)
-	f.Save(device, key)
+	if err := f.Save(device, key); err != nil {
+		t.Fatal(err)
+	}
 
 	before, err := os.Stat(path)
 	if err != nil {
@@ -193,13 +196,16 @@ func TestSavingTheSameKeyTwiceIsNotAWrite(t *testing.T) {
 	}
 }
 
-// A phone that re-pairs sends a new key, and the new one is the one that works.
 func TestRepairingReplacesTheKey(t *testing.T) {
 	path := bonds(t)
 
 	f, _ := Open(path)
-	f.Save(device, Key{0: 0x01})
-	f.Save(device, Key{0: 0x02})
+	if err := f.Save(device, Key{0: 0x01}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Save(device, Key{0: 0x02}); err != nil {
+		t.Fatal(err)
+	}
 
 	again, _ := Open(path)
 	got, _ := again.Key(device)
@@ -210,8 +216,12 @@ func TestRepairingReplacesTheKey(t *testing.T) {
 
 func TestBondedComesBackInAStableOrder(t *testing.T) {
 	f, _ := Open(bonds(t))
-	f.Save(device, Key{})
-	f.Save(Addr{0x01}, Key{})
+	if err := f.Save(device, Key{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Save(Addr{0x01}, Key{}); err != nil {
+		t.Fatal(err)
+	}
 
 	got := f.Bonded()
 	if len(got) != 2 {
@@ -222,8 +232,6 @@ func TestBondedComesBackInAStableOrder(t *testing.T) {
 	}
 }
 
-// The file backs the same interface the manager takes, which is the only thing that makes it
-// useful.
 func TestAFileIsAStore(t *testing.T) {
 	f, _ := Open(bonds(t))
 	m := New(f)

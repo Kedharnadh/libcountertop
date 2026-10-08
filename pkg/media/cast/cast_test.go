@@ -8,7 +8,6 @@ import (
 	"testing"
 )
 
-// same compares two messages, which the type itself cannot do because it carries a byte slice.
 func same(a, b Message) bool {
 	return a.Source == b.Source &&
 		a.Destination == b.Destination &&
@@ -17,9 +16,6 @@ func same(a, b Message) bool {
 		bytes.Equal(a.Binary, b.Binary)
 }
 
-// The encoding is written by hand rather than generated, so the first thing it owes is a check
-// against bytes somebody else would produce. This is a CONNECT from sender-0 to receiver-0, field
-// by field, worked out from cast_channel.proto rather than from this package.
 func TestAMessageEncodesToTheBytesTheSchemaSays(t *testing.T) {
 	m := Message{
 		Source:      "sender-0",
@@ -62,8 +58,6 @@ func TestAMessageRoundTrips(t *testing.T) {
 	}
 }
 
-// The payload type has to say binary when the binary field is set, or a sender reads the empty
-// string field as the payload and finds nothing in it.
 func TestABinaryPayloadSaysItIsBinary(t *testing.T) {
 	m := Message{Namespace: NSDeviceAuth, Binary: []byte{0x01, 0x02}}
 
@@ -81,8 +75,6 @@ func TestABinaryPayloadSaysItIsBinary(t *testing.T) {
 	}
 }
 
-// The string field goes out even when empty. It is required in the schema, and a sender built
-// against a strict parser refuses a message that leaves it out.
 func TestTheStringPayloadIsAlwaysWritten(t *testing.T) {
 	raw := Message{Source: "a", Destination: "b", Namespace: "c"}.Marshal()
 
@@ -91,12 +83,10 @@ func TestTheStringPayloadIsAlwaysWritten(t *testing.T) {
 	}
 }
 
-// The schema has grown before, and a receiver that refuses a message for carrying something it does
-// not know about is one that stops working when the sender is updated.
 func TestAnUnknownFieldIsSkipped(t *testing.T) {
 	raw := Message{Source: "a", Namespace: "n", Payload: "{}"}.Marshal()
 
-	// Field 15, varint, which this does not know about.
+	// Field 15, varint.
 	raw = append(raw, 0x78, 0x2a)
 
 	got, err := Unmarshal(raw)
@@ -116,13 +106,21 @@ func TestATruncatedMessageIsRefused(t *testing.T) {
 	}
 }
 
-// Big-endian, where everything else in this tree that counts bytes is little. Getting it the usual
-// way round gives a length of two billion and a reader that waits for the rest for ever.
 func TestTheLengthPrefixIsBigEndian(t *testing.T) {
 	framed := Frame(Message{Source: "a", Destination: "b", Namespace: "c", Payload: "{}"})
 
 	body := framed[4:]
-	if got := int(framed[0])<<24 | int(framed[1])<<16 | int(framed[2])<<8 | int(framed[3]); got != len(body) {
+	if got := int(
+		framed[0],
+	)<<24 | int(
+		framed[1],
+	)<<16 | int(
+		framed[2],
+	)<<8 | int(
+		framed[3],
+	); got != len(
+		body,
+	) {
 		t.Errorf("the prefix says %d and the body is %d", got, len(body))
 	}
 	if framed[0] != 0 || framed[1] != 0 {
@@ -131,7 +129,12 @@ func TestTheLengthPrefixIsBigEndian(t *testing.T) {
 }
 
 func TestAFramedMessageRoundTrips(t *testing.T) {
-	want := Message{Source: "sender-0", Destination: "receiver-0", Namespace: NSHeartbeat, Payload: Ping()}
+	want := Message{
+		Source:      "sender-0",
+		Destination: "receiver-0",
+		Namespace:   NSHeartbeat,
+		Payload:     Ping(),
+	}
 
 	got, n, err := Next(Frame(want))
 	if err != nil {
@@ -145,7 +148,6 @@ func TestAFramedMessageRoundTrips(t *testing.T) {
 	}
 }
 
-// Two in one read, which is what a sender that pipelines gives.
 func TestTwoMessagesInOneBuffer(t *testing.T) {
 	buf := append(
 		Frame(Message{Namespace: NSHeartbeat, Payload: Ping()}),
@@ -169,7 +171,6 @@ func TestTwoMessagesInOneBuffer(t *testing.T) {
 	}
 }
 
-// Half a message is the ordinary state of a stream being read, not a fault.
 func TestAMessageThatHasNotAllArrived(t *testing.T) {
 	framed := Frame(Message{Namespace: NSReceiver, Payload: `{"type":"GET_STATUS"}`})
 
@@ -180,8 +181,6 @@ func TestAMessageThatHasNotAllArrived(t *testing.T) {
 	}
 }
 
-// The length arrives before the bytes do, so a wrong one otherwise asks this process to allocate
-// whatever it says.
 func TestARidiculousLengthIsRefused(t *testing.T) {
 	buf := []byte{0xff, 0xff, 0xff, 0xff}
 
@@ -200,7 +199,6 @@ func TestReadingTheTypeOutOfAPayload(t *testing.T) {
 	}
 }
 
-// A payload with no type is not something to guess about.
 func TestAPayloadWithNoType(t *testing.T) {
 	for _, p := range []string{`{}`, `{"requestId":3}`, `not json`, ``} {
 		if _, err := Kind(p); err == nil {
@@ -209,7 +207,6 @@ func TestAPayloadWithNoType(t *testing.T) {
 	}
 }
 
-// A request answered with the wrong id, or none, is a sender that waits out its timeout.
 func TestAnAnswerCarriesTheRequestItAnswers(t *testing.T) {
 	h, err := Kind(Status(42, ReceiverStatus{}))
 	if err != nil {
@@ -229,8 +226,6 @@ func TestAnUnsolicitedStatusCarriesAZeroRequestID(t *testing.T) {
 	}
 }
 
-// The status goes under a key of its own rather than beside the header, which is what a sender
-// reads it out of.
 func TestAStatusIsNestedUnderItsOwnKey(t *testing.T) {
 	level := 0.5
 	raw := Status(1, ReceiverStatus{
@@ -263,16 +258,12 @@ func TestAStatusIsNestedUnderItsOwnKey(t *testing.T) {
 	}
 }
 
-// Nothing running is an empty list, which a sender reads as the device being free. A null there is
-// read by some senders as an error instead.
 func TestNothingRunningLeavesTheApplicationsOut(t *testing.T) {
 	if got := Status(1, ReceiverStatus{}); strings.Contains(got, "applications") {
 		t.Errorf("came back %q", got)
 	}
 }
 
-// The cheapest message here and the one that must never be missed: a sender that does not get a
-// pong inside its own timeout drops the connection.
 func TestAPongIsAPong(t *testing.T) {
 	h, err := Kind(Pong())
 	if err != nil {
@@ -299,8 +290,6 @@ func TestALaunchNamingNothing(t *testing.T) {
 	}
 }
 
-// Level and Muted are pointers so a request carrying only one does not read as setting the other to
-// zero — the difference between muting a speaker and turning it all the way down.
 func TestAMuteDoesNotReadAsSilence(t *testing.T) {
 	got, err := ParseSetVolume(`{"type":"SET_VOLUME","requestId":4,"volume":{"muted":true}}`)
 	if err != nil {
@@ -333,8 +322,6 @@ func TestAVolumeThatSetsNothing(t *testing.T) {
 	}
 }
 
-// Out of range is refused rather than clamped: a sender asking for 11 has misunderstood the scale,
-// and doing something sensible with it hides that.
 func TestAVolumeOutsideItsRange(t *testing.T) {
 	for _, p := range []string{
 		`{"type":"SET_VOLUME","volume":{"level":1.5}}`,
@@ -346,8 +333,6 @@ func TestAVolumeOutsideItsRange(t *testing.T) {
 	}
 }
 
-// A sender waiting on a reply holds the connection and eventually drops the whole thing, which
-// reads in the room as the device refusing to be cast to at all.
 func TestARefusalCarriesItsReasonAndItsRequest(t *testing.T) {
 	var got struct {
 		Header
@@ -369,7 +354,6 @@ func TestARefusalCarriesItsReasonAndItsRequest(t *testing.T) {
 	}
 }
 
-// Everything this package produces has to be a payload something can read the type out of.
 func TestEveryPayloadThisBuildsHasAType(t *testing.T) {
 	for _, p := range []string{
 		Connect(),

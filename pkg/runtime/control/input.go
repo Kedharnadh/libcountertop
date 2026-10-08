@@ -33,7 +33,6 @@ type InputOptions struct {
 	Steps              int
 }
 
-// Input serializes synthetic gestures and releases a held contact even when canceled.
 type Input struct {
 	options InputOptions
 	gate    chan struct{}
@@ -97,7 +96,7 @@ func coordinates(args []string, count int) ([]int, error) {
 
 func (s *Input) gesture(ctx context.Context, x, y int, move func(func(int, int)) error) error {
 	return s.locked(ctx, func() error {
-		s.id-- // Kernel tracking IDs are nonnegative; synthetic IDs occupy a separate range.
+		s.id-- // Kernel tracking IDs are nonnegative.
 		id := s.id
 		s.options.Deliver(Contact{ID: id, X: x, Y: y, Phase: TouchDown, At: time.Now()})
 		defer func() { s.options.Deliver(Contact{ID: id, X: x, Y: y, Phase: TouchUp, At: time.Now()}) }()
@@ -111,84 +110,117 @@ func (s *Input) gesture(ctx context.Context, x, y int, move func(func(int, int))
 func (s *Input) Commands() []*cobra.Command {
 	var commands []*cobra.Command
 	if s.options.Deliver != nil {
-		commands = append(commands,
-			&cobra.Command{Use: "tap X Y", Short: "Touch once and release", Args: cobra.ExactArgs(2), RunE: func(cmd *cobra.Command, args []string) error {
-				at, err := coordinates(args, 2)
-				if err != nil {
-					return err
-				}
-				return s.gesture(cmd.Context(), at[0], at[1], func(func(int, int)) error { return delay(cmd.Context(), s.options.Tap) })
-			}},
-			&cobra.Command{Use: "hold X Y MILLISECONDS", Short: "Hold a contact and release", Args: cobra.ExactArgs(3), RunE: func(cmd *cobra.Command, args []string) error {
-				at, err := coordinates(args, 2)
-				if err != nil {
-					return err
-				}
-				ms, err := strconv.Atoi(args[2])
-				if err != nil || ms < 0 || ms > 60000 {
-					return fmt.Errorf("hold must be 0 to 60000 milliseconds")
-				}
-				return s.gesture(cmd.Context(), at[0], at[1], func(move func(int, int)) error {
-					for left := time.Duration(ms) * time.Millisecond; left > 0; left -= s.options.Step {
-						if err := delay(cmd.Context(), min(left, s.options.Step)); err != nil {
-							return err
-						}
-						move(at[0], at[1])
+		commands = append(
+			commands,
+			&cobra.Command{
+				Use:   "tap X Y",
+				Short: "Touch once and release",
+				Args:  cobra.ExactArgs(2),
+				RunE: func(cmd *cobra.Command, args []string) error {
+					at, err := coordinates(args, 2)
+					if err != nil {
+						return err
 					}
-					return nil
-				})
-			}},
-			&cobra.Command{Use: "swipe X1 Y1 X2 Y2 [STEPS]", Short: "Drag between viewed coordinates", Args: cobra.RangeArgs(4, 5), RunE: func(cmd *cobra.Command, args []string) error {
-				at, err := coordinates(args, 4)
-				if err != nil {
-					return err
-				}
-				steps := s.options.Steps
-				if len(args) == 5 {
-					steps, err = strconv.Atoi(args[4])
-				}
-				if err != nil || steps < 1 || steps > int(time.Minute/s.options.Step) {
-					return fmt.Errorf("steps must produce a swipe of at most one minute")
-				}
-				return s.gesture(cmd.Context(), at[0], at[1], func(move func(int, int)) error {
-					for i := 1; i <= steps; i++ {
-						if err := delay(cmd.Context(), s.options.Step); err != nil {
-							return err
-						}
-						move(at[0]+(at[2]-at[0])*i/steps, at[1]+(at[3]-at[1])*i/steps)
+					return s.gesture(
+						cmd.Context(),
+						at[0],
+						at[1],
+						func(func(int, int)) error { return delay(cmd.Context(), s.options.Tap) },
+					)
+				},
+			},
+			&cobra.Command{
+				Use:   "hold X Y MILLISECONDS",
+				Short: "Hold a contact and release",
+				Args:  cobra.ExactArgs(3),
+				RunE: func(cmd *cobra.Command, args []string) error {
+					at, err := coordinates(args, 2)
+					if err != nil {
+						return err
 					}
-					return nil
-				})
-			}},
+					ms, err := strconv.Atoi(args[2])
+					if err != nil || ms < 0 || ms > 60000 {
+						return fmt.Errorf("hold must be 0 to 60000 milliseconds")
+					}
+					return s.gesture(cmd.Context(), at[0], at[1], func(move func(int, int)) error {
+						for left := time.Duration(ms) * time.Millisecond; left > 0; left -= s.options.Step {
+							if err := delay(cmd.Context(), min(left, s.options.Step)); err != nil {
+								return err
+							}
+							move(at[0], at[1])
+						}
+						return nil
+					})
+				},
+			},
+			&cobra.Command{
+				Use:   "swipe X1 Y1 X2 Y2 [STEPS]",
+				Short: "Drag between viewed coordinates",
+				Args:  cobra.RangeArgs(4, 5),
+				RunE: func(cmd *cobra.Command, args []string) error {
+					at, err := coordinates(args, 4)
+					if err != nil {
+						return err
+					}
+					steps := s.options.Steps
+					if len(args) == 5 {
+						steps, err = strconv.Atoi(args[4])
+					}
+					if err != nil || steps < 1 || steps > int(time.Minute/s.options.Step) {
+						return fmt.Errorf("steps must produce a swipe of at most one minute")
+					}
+					return s.gesture(cmd.Context(), at[0], at[1], func(move func(int, int)) error {
+						for i := 1; i <= steps; i++ {
+							if err := delay(cmd.Context(), s.options.Step); err != nil {
+								return err
+							}
+							move(at[0]+(at[2]-at[0])*i/steps, at[1]+(at[3]-at[1])*i/steps)
+						}
+						return nil
+					})
+				},
+			},
 		)
 	}
 	if s.options.Press != nil {
-		commands = append(commands, &cobra.Command{Use: "button " + strings.Join(s.options.Buttons, "|") + " [TIMES]", Short: "Press a hardware button", Args: cobra.RangeArgs(1, 2), RunE: func(cmd *cobra.Command, args []string) error {
-			if !slices.Contains(s.options.Buttons, args[0]) {
-				return fmt.Errorf("no button %q, want %s", args[0], strings.Join(s.options.Buttons, ", "))
-			}
-			times := 1
-			var err error
-			if len(args) == 2 {
-				times, err = strconv.Atoi(args[1])
-			}
-			if err != nil || times < 1 || times > 500 {
-				return fmt.Errorf("times must be 1 to 500")
-			}
-			return s.locked(cmd.Context(), func() error {
-				for i := range times {
-					if i > 0 {
-						if err := delay(cmd.Context(), s.options.Between); err != nil {
-							return err
+		commands = append(
+			commands,
+			&cobra.Command{
+				Use:   "button " + strings.Join(s.options.Buttons, "|") + " [TIMES]",
+				Short: "Press a hardware button",
+				Args:  cobra.RangeArgs(1, 2),
+				RunE: func(cmd *cobra.Command, args []string) error {
+					if !slices.Contains(s.options.Buttons, args[0]) {
+						return fmt.Errorf(
+							"no button %q, want %s",
+							args[0],
+							strings.Join(s.options.Buttons, ", "),
+						)
+					}
+					times := 1
+					var err error
+					if len(args) == 2 {
+						times, err = strconv.Atoi(args[1])
+					}
+					if err != nil || times < 1 || times > 500 {
+						return fmt.Errorf("times must be 1 to 500")
+					}
+					return s.locked(cmd.Context(), func() error {
+						for i := range times {
+							if i > 0 {
+								if err := delay(cmd.Context(), s.options.Between); err != nil {
+									return err
+								}
+							}
+							if err := s.options.Press(args[0]); err != nil {
+								return err
+							}
 						}
-					}
-					if err := s.options.Press(args[0]); err != nil {
-						return err
-					}
-				}
-				return nil
-			})
-		}})
+						return nil
+					})
+				},
+			},
+		)
 	}
 	return commands
 }

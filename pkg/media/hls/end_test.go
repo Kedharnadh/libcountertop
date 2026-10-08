@@ -18,7 +18,12 @@ import (
 func packedSegment(t *testing.T, pts uint64) []byte {
 	t.Helper()
 	adts, err := mpeg4audio.ADTSPackets{
-		{Type: mpeg4audio.ObjectTypeAACLC, SampleRate: 48000, ChannelConfig: 2, AU: []byte{0x21, 0x10, 0x04, 0x60, 0x8c, 0x1c}},
+		{
+			Type:          mpeg4audio.ObjectTypeAACLC,
+			SampleRate:    48000,
+			ChannelConfig: 2,
+			AU:            []byte{0x21, 0x10, 0x04, 0x60, 0x8c, 0x1c},
+		},
 	}.Marshal()
 	if err != nil {
 		t.Fatal(err)
@@ -45,14 +50,16 @@ type fakeLive struct {
 func (f *fakeLive) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/audio.m3u8" {
 		var b strings.Builder
-		b.WriteString("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:1\n#EXT-X-MEDIA-SEQUENCE:0\n")
+		b.WriteString(
+			"#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:1\n#EXT-X-MEDIA-SEQUENCE:0\n",
+		)
 		for i := range f.segments {
 			fmt.Fprintf(&b, "#EXTINF:1.0,\n/sq/%d/seg.ts\n", i)
 		}
 		if f.ended {
 			b.WriteString("#EXT-X-ENDLIST\n")
 		}
-		w.Write([]byte(b.String()))
+		_, _ = w.Write([]byte(b.String()))
 		return
 	}
 	var n int
@@ -63,7 +70,7 @@ func (f *fakeLive) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	f.fetched = append(f.fetched, n)
 	f.mu.Unlock()
-	w.Write(packedSegment(f.t, uint64(n)*tsClock))
+	_, _ = w.Write(packedSegment(f.t, uint64(n)*tsClock))
 }
 
 func followed(t *testing.T, f *fakeLive, within time.Duration) error {
@@ -76,7 +83,13 @@ func followed(t *testing.T, f *fakeLive, within time.Duration) error {
 	t.Cleanup(srv.Close)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	s := &Stream{cancel: cancel, done: make(chan struct{}), sized: make(chan struct{}), anchored: make(chan struct{}), frames: make(chan Frame, 1)}
+	s := &Stream{
+		cancel:   cancel,
+		done:     make(chan struct{}),
+		sized:    make(chan struct{}),
+		anchored: make(chan struct{}),
+		frames:   make(chan Frame, 1),
+	}
 	s.room = sync.NewCond(&s.mu)
 
 	got := make(chan error, 1)

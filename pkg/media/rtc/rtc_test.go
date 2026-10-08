@@ -425,7 +425,8 @@ func TestPictureLossAsksTheCameraForAKeyframe(t *testing.T) {
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) && ssrc == 0 {
 		for _, r := range b.pc.GetReceivers() {
-			if tr := r.Track(); tr != nil && tr.Kind() == webrtc.RTPCodecTypeVideo && len(screen.frames()) > 0 {
+			if tr := r.Track(); tr != nil && tr.Kind() == webrtc.RTPCodecTypeVideo &&
+				len(screen.frames()) > 0 {
 				ssrc = uint32(tr.SSRC())
 			}
 		}
@@ -435,7 +436,9 @@ func TestPictureLossAsksTheCameraForAKeyframe(t *testing.T) {
 		t.Fatal("no video arrived")
 	}
 	for range 20 {
-		if err := b.pc.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: ssrc}}); err != nil {
+		if err := b.pc.WriteRTCP(
+			[]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: ssrc}},
+		); err != nil {
 			t.Fatal(err)
 		}
 		time.Sleep(50 * time.Millisecond)

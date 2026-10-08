@@ -8,11 +8,17 @@ func (c *Client) hungUp() bool {
 		return false
 	}
 	gone := false
-	raw.Control(func(fd uintptr) {
+	if err := raw.Control(func(fd uintptr) {
 		p := []unix.PollFd{{Fd: int32(fd), Events: unix.POLLRDHUP}}
-		if n, _ := unix.Poll(p, 0); n > 0 && p[0].Revents&(unix.POLLRDHUP|unix.POLLHUP|unix.POLLERR) != 0 {
+		if n, _ := unix.Poll(
+			p,
+			0,
+		); n > 0 &&
+			p[0].Revents&(unix.POLLRDHUP|unix.POLLHUP|unix.POLLERR) != 0 {
 			gone = true
 		}
-	})
+	}); err != nil {
+		return false
+	}
 	return gone
 }

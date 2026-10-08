@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// published records what reached the network, standing in for the registration so the refreshing
-// can be checked without putting anything on a network.
 type published struct {
 	mu    sync.Mutex
 	sets  [][]string
@@ -54,8 +52,6 @@ func advertising(t *testing.T) (*Advertiser, *published) {
 	return Announcing(on, d), on
 }
 
-// Every refresh is a multicast announcement to the whole network, and the status changes on every
-// track, pause and seek. Announcing each one is a device that talks more than it plays.
 func TestNothingIsAnnouncedUnlessTheRecordChanged(t *testing.T) {
 	a, on := advertising(t)
 
@@ -66,7 +62,6 @@ func TestNothingIsAnnouncedUnlessTheRecordChanged(t *testing.T) {
 		t.Errorf("%d announcements for no change", got)
 	}
 
-	// The same status set twice is one announcement.
 	if !a.Playing(true, "Sun Ra") {
 		t.Error("a change was not announced")
 	}
@@ -78,7 +73,6 @@ func TestNothingIsAnnouncedUnlessTheRecordChanged(t *testing.T) {
 	}
 }
 
-// st and rs are what a sender shows as the device being busy and what it is doing.
 func TestWhatPlayingPutsInTheRecord(t *testing.T) {
 	a, on := advertising(t)
 
@@ -103,8 +97,6 @@ func TestWhatPlayingPutsInTheRecord(t *testing.T) {
 	}
 }
 
-// The identity does not move when the status does. A sender remembers the id, and one that changed
-// would be a new device in the cast menu every track.
 func TestTheIdentityDoesNotMoveWithTheStatus(t *testing.T) {
 	a, on := advertising(t)
 	was := a.Device().ID
@@ -119,7 +111,6 @@ func TestTheIdentityDoesNotMoveWithTheStatus(t *testing.T) {
 	}
 }
 
-// Renaming the device is a change like any other, and has to reach the network.
 func TestRenamingIsAnnounced(t *testing.T) {
 	a, on := advertising(t)
 
@@ -134,8 +125,6 @@ func TestRenamingIsAnnounced(t *testing.T) {
 	}
 }
 
-// An unannounced departure leaves the record in every resolver's cache until it expires, and a
-// device in the cast menu that does not answer is worse than one that is not there.
 func TestClosingTakesTheServiceOff(t *testing.T) {
 	a, on := advertising(t)
 
@@ -144,16 +133,12 @@ func TestClosingTakesTheServiceOff(t *testing.T) {
 		t.Errorf("shut down %d times", on.downs)
 	}
 
-	// And twice is not twice: a component stopped and then stopped again must not panic on a
-	// registration that is already gone.
 	a.Close()
 	if on.downs != 1 {
 		t.Errorf("shut down %d times after closing twice", on.downs)
 	}
 }
 
-// What is playing changes on the audio path and the name changes in the settings, and neither
-// knows about the other.
 func TestTheAdvertiserTakesChangesFromEverywhereAtOnce(t *testing.T) {
 	a, _ := advertising(t)
 
@@ -177,15 +162,11 @@ func TestTheAdvertiserTakesChangesFromEverywhereAtOnce(t *testing.T) {
 	}
 	wg.Wait()
 
-	// Nothing to assert about the final state — the point is that it is reached without a race and
-	// without a panic, which is what -race and this test together say.
 	if a.Device().ID == "" {
 		t.Error("the device lost its identity")
 	}
 }
 
-// A record a sender quietly ignores is worse than an error: the device is on the network and not
-// in the menu, and nothing says why.
 func TestAdvertisingRefusesADeviceThatWouldNotBeOffered(t *testing.T) {
 	if _, err := NewAdvertiser(Device{Name: "Kitchen"}, Port); err == nil {
 		t.Error("a device with no id was advertised")

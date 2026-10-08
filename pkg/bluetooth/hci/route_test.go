@@ -9,14 +9,6 @@ import (
 	"time"
 )
 
-// Reading, driven through a real read rather than through its parts.
-//
-// parsePacket and pending are each checked on their own, and the loop that joins them is where a
-// mistake would actually live: an event dropped between being parsed and being put aside, or a
-// packet that arrived in two pieces read as one short one. A pipe is a real *os.File with a working
-// deadline, which is all the read loop touches, so the whole thing runs without hardware.
-
-// wired is a port reading from a pipe, and the end to write packets into.
 func wired(t *testing.T) (*Port, *os.File) {
 	t.Helper()
 
@@ -31,7 +23,6 @@ func wired(t *testing.T) (*Port, *os.File) {
 
 const soon = 2 * time.Second
 
-// A UART splits packets where it likes, so half of one is the ordinary case rather than a fault.
 func TestAPacketSplitAcrossReads(t *testing.T) {
 	p, w := wired(t)
 
@@ -50,7 +41,6 @@ func TestAPacketSplitAcrossReads(t *testing.T) {
 	}
 }
 
-// Everything on the line is taken in one go, and comes back in the order it arrived.
 func TestQueuedEventsKeepTheirOrder(t *testing.T) {
 	p, w := wired(t)
 
@@ -71,7 +61,6 @@ func TestQueuedEventsKeepTheirOrder(t *testing.T) {
 	}
 }
 
-// A line with nothing on it reports quiet rather than hanging.
 func TestAQuietLine(t *testing.T) {
 	p, _ := wired(t)
 
@@ -80,7 +69,6 @@ func TestAQuietLine(t *testing.T) {
 	}
 }
 
-// Rubbish in front of a packet is stepped over rather than taking the packet with it.
 func TestReadingPastRubbishOnTheLine(t *testing.T) {
 	p, w := wired(t)
 

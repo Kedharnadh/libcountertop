@@ -114,7 +114,13 @@ func (v *fireflies) paint() *image.RGBA {
 					continue
 				}
 				o := img.PixOffset(xx, yy)
-				img.Pix[o], img.Pix[o+1], img.Pix[o+2] = uint8(255*shade*0.6), uint8(255*shade*1.2), uint8(255*shade)
+				img.Pix[o], img.Pix[o+1], img.Pix[o+2] = uint8(
+					255*shade*0.6,
+				), uint8(
+					255*shade*1.2,
+				), uint8(
+					255*shade,
+				)
 			}
 		}
 	}
@@ -222,15 +228,53 @@ func (v *fireflies) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 			continue
 		}
 		near := 0.5 + 1.1*fl.z
-		v.pts = append(v.pts,
-			Point{X: float32(fl.x), Y: float32(fl.y), Size: float32(56 * u * near), R: 0.55, G: 0.85, B: 0.2, A: float32(0.18 * b), Round: true, Light: true},
-			Point{X: float32(fl.x), Y: float32(fl.y), Size: float32(16 * u * near), R: 0.8, G: 1, B: 0.35, A: float32(0.6 * b), Round: true, Light: true},
-			Point{X: float32(fl.x), Y: float32(fl.y), Size: float32(6 * u * near), R: 1, G: 1, B: 0.7, A: float32(math.Min(1, b)), Round: true})
+		v.pts = append(
+			v.pts,
+			Point{
+				X:     float32(fl.x),
+				Y:     float32(fl.y),
+				Size:  float32(56 * u * near),
+				R:     0.55,
+				G:     0.85,
+				B:     0.2,
+				A:     float32(0.18 * b),
+				Round: true,
+				Light: true,
+			},
+			Point{
+				X:     float32(fl.x),
+				Y:     float32(fl.y),
+				Size:  float32(16 * u * near),
+				R:     0.8,
+				G:     1,
+				B:     0.35,
+				A:     float32(0.6 * b),
+				Round: true,
+				Light: true,
+			},
+			Point{
+				X:     float32(fl.x),
+				Y:     float32(fl.y),
+				Size:  float32(6 * u * near),
+				R:     1,
+				G:     1,
+				B:     0.7,
+				A:     float32(math.Min(1, b)),
+				Round: true,
+			},
+		)
 	}
 	if err := g.Points(v.pts); err != nil {
 		return err
 	}
 	ph := func(k float64) float32 { return float32(math.Mod(f.t*k, 1)) }
-	vals := []float32{float32(v.st.w), float32(v.st.h), ph(0.013), ph(0.009), float32(v.gain), float32(v.horizon() / float64(v.st.h))}
+	vals := []float32{
+		float32(v.st.w),
+		float32(v.st.h),
+		ph(0.013),
+		ph(0.009),
+		float32(v.gain),
+		float32(v.horizon() / float64(v.st.h)),
+	}
 	return g.Values(vals, 0.55, 0.03, 2)
 }

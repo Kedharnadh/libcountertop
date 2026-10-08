@@ -6,9 +6,15 @@ import (
 
 const Neon = "neon"
 
-var neonStyle = Style{Name: Neon, Palette: "Synthwave", Family: sans, Kit: neon{}, Shape: func(c *gogui.ThemeCfg) {
-	c.Radius, c.RadiusSmall, c.RadiusMedium, c.RadiusLarge = 12, 8, 12, 18
-}}
+var neonStyle = Style{
+	Name:    Neon,
+	Palette: "Synthwave",
+	Family:  sans,
+	Kit:     neon{},
+	Shape: func(c *gogui.ThemeCfg) {
+		c.Radius, c.RadiusSmall, c.RadiusMedium, c.RadiusLarge = 12, 8, 12, 18
+	},
+}
 
 type neon struct{}
 
@@ -56,7 +62,14 @@ func (neon) Seek(marks []Span) func(gogui.SliderLookState) gogui.SliderParts {
 				x := func(f float32) float32 { return half + run*f }
 				dc.Line(x(0), mid, x(1), mid, dim, 2)
 				for _, m := range marks {
-					dc.Line(x(m.From), mid, x(max(m.To, m.From+0.002)), mid, m.Color.WithOpacity(0.3), 10)
+					dc.Line(
+						x(m.From),
+						mid,
+						x(max(m.To, m.From+0.002)),
+						mid,
+						m.Color.WithOpacity(0.3),
+						10,
+					)
 					dc.Line(x(m.From), mid, x(max(m.To, m.From+0.002)), mid, m.Color, 3)
 				}
 				head := x(s.Pct)
@@ -83,13 +96,21 @@ func (neon) Seek(marks []Span) func(gogui.SliderLookState) gogui.SliderParts {
 func (neon) Panel(cfg *gogui.ContainerCfg) {
 	t := gogui.CurrentTheme().Cfg
 	cfg.Color, cfg.Radius = t.ColorBackground, gogui.RadiusLarge
-	cfg.ColorBorder, cfg.SizeBorder, cfg.Shadow = t.ColorAccent, gogui.BorderPx(2), glow(t.ColorAccent)
+	cfg.ColorBorder, cfg.SizeBorder, cfg.Shadow = t.ColorAccent, gogui.BorderPx(
+		2,
+	), glow(
+		t.ColorAccent,
+	)
 }
 
 func (neon) Key(cfg *gogui.ContainerCfg, st *gogui.TextStyle, state State) {
 	t := gogui.CurrentTheme().Cfg
 	cfg.Color, cfg.Radius, st.Color = t.ColorBackground, gogui.RadiusMedium, t.ColorAccent
-	cfg.ColorBorder, cfg.SizeBorder, cfg.Shadow = t.ColorAccent, gogui.BorderPx(2), glow(t.ColorAccent)
+	cfg.ColorBorder, cfg.SizeBorder, cfg.Shadow = t.ColorAccent, gogui.BorderPx(
+		2,
+	), glow(
+		t.ColorAccent,
+	)
 	if state == Chosen {
 		cfg.Color, st.Color = t.ColorAccent, t.ColorBackground
 	}
@@ -127,7 +148,13 @@ func equalizer(vertical bool) func(gogui.SliderLookState) gogui.SliderParts {
 					if vertical {
 						y := long - float32(i+1)*step + (step-bar)/2
 						if f <= filled {
-							dc.FilledRect((across-size)/2-3, y-3, size+6, bar+6, lit.WithOpacity(0.25))
+							dc.FilledRect(
+								(across-size)/2-3,
+								y-3,
+								size+6,
+								bar+6,
+								lit.WithOpacity(0.25),
+							)
 						}
 						dc.FilledRect((across-size)/2, y, size, bar, c)
 						continue
@@ -143,26 +170,42 @@ func equalizer(vertical bool) func(gogui.SliderLookState) gogui.SliderParts {
 		if vertical {
 			cfg.Sizing, cfg.Width, cfg.Height = gogui.FixedFill, thick, 0
 		}
-		return gogui.SliderParts{Track: gogui.DrawCanvas(cfg), Fill: placeholder(1, 1), Handle: placeholder(thick*0.5, thick*0.5)}
+		return gogui.SliderParts{
+			Track:  gogui.DrawCanvas(cfg),
+			Fill:   placeholder(1, 1),
+			Handle: placeholder(thick*0.5, thick*0.5),
+		}
 	}
 }
 
 func (neon) Progress(cfg *gogui.ProgressBarCfg) {
 	t := gogui.CurrentTheme().Cfg
-	cfg.Radius, cfg.Color, cfg.ColorBar = gogui.RadiusLarge, t.ColorTextSecondary.WithOpacity(0.2), t.ColorAccent
+	cfg.Radius, cfg.Color, cfg.ColorBar = gogui.RadiusLarge, t.ColorTextSecondary.WithOpacity(
+		0.2,
+	), t.ColorAccent
 }
 
 func (neon) Field(cfg *gogui.InputCfg) {
 	cfg.Radius, cfg.SizeBorder = gogui.RadiusMedium, gogui.BorderPx(2)
 }
 
-func (k neon) Tab(cfg *gogui.ContainerCfg, st *gogui.TextStyle, state State) { k.Key(cfg, st, state) }
+func (k neon) Tab(
+	cfg *gogui.ContainerCfg,
+	st *gogui.TextStyle,
+	state State,
+) {
+	k.Key(cfg, st, state)
+}
 
 func (neon) Tile(cfg *gogui.ContainerCfg, state State) {
 	t := gogui.CurrentTheme().Cfg
 	cfg.ColorBorder, cfg.SizeBorder = t.ColorAccent.WithOpacity(0.45), gogui.BorderPx(1)
 	if state == Chosen {
-		cfg.ColorBorder, cfg.SizeBorder, cfg.Shadow = t.ColorAccent, gogui.BorderPx(2), glow(t.ColorAccent)
+		cfg.ColorBorder, cfg.SizeBorder, cfg.Shadow = t.ColorAccent, gogui.BorderPx(
+			2,
+		), glow(
+			t.ColorAccent,
+		)
 	}
 }
 
@@ -171,7 +214,11 @@ func (neon) Row(cfg *gogui.ContainerCfg, state State) {
 	cfg.Color = gogui.Color{}
 	switch state {
 	case Chosen:
-		cfg.ColorBorder, cfg.SizeBorder, cfg.Shadow = t.ColorAccent, gogui.BorderPx(2), glow(t.ColorAccent)
+		cfg.ColorBorder, cfg.SizeBorder, cfg.Shadow = t.ColorAccent, gogui.BorderPx(
+			2,
+		), glow(
+			t.ColorAccent,
+		)
 	case Partial:
 		cfg.ColorBorder, cfg.SizeBorder = t.ColorAccent.WithOpacity(0.5), gogui.BorderPx(1)
 	}

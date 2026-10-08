@@ -73,13 +73,23 @@ func Radial(img *image.RGBA, cx, cy, r0, r1 float32, stops []Stop, additive bool
 
 const squares = 4096
 
-func radialAdd(img *image.RGBA, cx, cy, r1 float32, sq []color.NRGBA, scale, edge float32, y0, y1, x0, x1 int) {
+func radialAdd(
+	img *image.RGBA,
+	cx, cy, r1 float32,
+	sq []color.NRGBA,
+	scale, edge float32,
+	y0, y1, x0, x1 int,
+) {
 	n := len(sq)
 	pre := make([][3]uint8, n)
 	last := -1
 	for k, c := range sq {
 		a := uint32(c.A)
-		pre[k] = [3]uint8{uint8(div255(uint32(c.R) * a)), uint8(div255(uint32(c.G) * a)), uint8(div255(uint32(c.B) * a))}
+		pre[k] = [3]uint8{
+			uint8(div255(uint32(c.R) * a)),
+			uint8(div255(uint32(c.G) * a)),
+			uint8(div255(uint32(c.B) * a)),
+		}
 		if c.A > 0 {
 			last = k
 		}
@@ -111,7 +121,11 @@ func radialAdd(img *image.RGBA, cx, cy, r1 float32, sq []color.NRGBA, scale, edg
 					c := sq[k]
 					c.A = uint8(float32(c.A) * min(r1-float32(math.Sqrt(float64(d2))), 1))
 					a := uint32(c.A)
-					p = [3]uint8{uint8(div255(uint32(c.R) * a)), uint8(div255(uint32(c.G) * a)), uint8(div255(uint32(c.B) * a))}
+					p = [3]uint8{
+						uint8(div255(uint32(c.R) * a)),
+						uint8(div255(uint32(c.G) * a)),
+						uint8(div255(uint32(c.B) * a)),
+					}
 				}
 				d := row[x*4 : x*4+3 : x*4+3]
 				d[0] = sat8(uint32(d[0]) + uint32(p[0]))
@@ -122,7 +136,6 @@ func radialAdd(img *image.RGBA, cx, cy, r1 float32, sq []color.NRGBA, scale, edg
 	})
 }
 
-// RadialSquashed is Radial with the vertical axis scaled by sy, an ellipse sy times as tall as wide.
 func RadialSquashed(img *image.RGBA, cx, cy, r, sy float32, stops []Stop, additive bool) {
 	b := img.Bounds()
 	if r <= 0 || sy <= 0 || len(stops) == 0 {
@@ -142,7 +155,11 @@ func RadialSquashed(img *image.RGBA, cx, cy, r, sy float32, stops []Stop, additi
 				if q >= 1 {
 					continue
 				}
-				put(row[x*4:x*4+3:x*4+3], lut[clampi(int(float32(math.Sqrt(float64(q)))*255), 0, 255)], additive)
+				put(
+					row[x*4:x*4+3:x*4+3],
+					lut[clampi(int(float32(math.Sqrt(float64(q)))*255), 0, 255)],
+					additive,
+				)
 			}
 		}
 	})
@@ -167,8 +184,13 @@ func Linear(img *image.RGBA, x0, y0, x1, y1 float32, stops []Stop, additive bool
 	})
 }
 
-// LinearRect fills r with a gradient running from (x0, y0) to (x1, y1).
-func LinearRect(img *image.RGBA, r image.Rectangle, x0, y0, x1, y1 float32, stops []Stop, additive bool) {
+func LinearRect(
+	img *image.RGBA,
+	r image.Rectangle,
+	x0, y0, x1, y1 float32,
+	stops []Stop,
+	additive bool,
+) {
 	r = r.Intersect(img.Bounds())
 	dx, dy := x1-x0, y1-y0
 	n := dx*dx + dy*dy
@@ -189,7 +211,6 @@ func LinearRect(img *image.RGBA, r image.Rectangle, x0, y0, x1, y1 float32, stop
 	})
 }
 
-// Ramp is a colour ramp sampled at 128 steps, bottom (0) to top (127).
 type Ramp [128]color.NRGBA
 
 func NewRamp(stops []Stop) Ramp {
@@ -200,13 +221,10 @@ func NewRamp(stops []Stop) Ramp {
 	return r
 }
 
-// VStrip stretches the ramp over the column band [x, x+w) from top down h pixels, top of the ramp
-// at the top, scaled by alpha.
 func VStrip(img *image.RGBA, x, w int, top, h, alpha float32, r *Ramp, additive bool) {
 	VBand(img, x, w, top, top+h, top, h, alpha, r, additive)
 }
 
-// VBand is VStrip painting only the rows from lo to hi.
 func VBand(img *image.RGBA, x, w int, lo, hi, top, h, alpha float32, r *Ramp, additive bool) {
 	b := img.Bounds()
 	if h <= 0 {
@@ -252,7 +270,6 @@ func fill(row []uint8, x0, x1 int, c color.NRGBA, additive bool) {
 	}
 }
 
-// Span blends c across row y from x0 up to x1.
 func Span(img *image.RGBA, y, x0, x1 int, c color.NRGBA, additive bool) {
 	b := img.Bounds()
 	if y < 0 || y >= b.Dy() {
@@ -282,7 +299,12 @@ func sample(stops []Stop, t float32) color.NRGBA {
 				k = (t - a.At) / (b.At - a.At)
 			}
 			mix := func(p, q uint8) uint8 { return uint8(float32(p) + (float32(q)-float32(p))*k + 0.5) }
-			return color.NRGBA{mix(a.C.R, b.C.R), mix(a.C.G, b.C.G), mix(a.C.B, b.C.B), mix(a.C.A, b.C.A)}
+			return color.NRGBA{
+				mix(a.C.R, b.C.R),
+				mix(a.C.G, b.C.G),
+				mix(a.C.B, b.C.B),
+				mix(a.C.A, b.C.A),
+			}
 		}
 	}
 	return stops[len(stops)-1].C
@@ -304,10 +326,9 @@ func put(d []uint8, c color.NRGBA, additive bool) {
 	d[2] = uint8(div255(uint32(d[2])*(255-a) + uint32(c.B)*a))
 }
 
-// div255 is x/255 for x up to 255*255, without a division: GOARM=7 has none in hardware.
+// GOARM=7 has no hardware integer division.
 func div255(x uint32) uint32 { return (x + 1 + (x >> 8)) >> 8 }
 
-// Add lays src onto dst additively; the reference's "lighter" composite.
 func Add(dst, src *image.RGBA, amount float32) {
 	b := dst.Bounds().Intersect(src.Bounds())
 	k := uint32(max(amount, 0) * 256)
@@ -331,7 +352,6 @@ func sat8(v uint32) uint8 {
 
 func clampi(v, lo, hi int) int { return max(lo, min(v, hi)) }
 
-// Blit copies img into box on s, each pixel scale times across and down.
 func Blit(s ui.Surface, img *image.RGBA, box ui.Rect, scale int) {
 	ui.DrawRGBA(s, box.X, box.Y, img, scale, box)
 }

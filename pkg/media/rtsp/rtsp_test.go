@@ -104,14 +104,23 @@ func dial(t *testing.T, addr, path string) *client {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { c.Close() })
-	c.SetDeadline(time.Now().Add(5 * time.Second))
+	if err := c.SetDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
 	return &client{t: t, c: c, r: bufio.NewReader(c), url: "rtsp://" + addr + "/" + path}
 }
 
 func (cl *client) do(method, url string, headers ...string) (int, map[string]string, string) {
 	cl.t.Helper()
 	cl.cseq++
-	fmt.Fprintf(cl.c, "%s %s RTSP/1.0\r\nCSeq: %d\r\n%s\r\n", method, url, cl.cseq, joinHeaders(headers))
+	fmt.Fprintf(
+		cl.c,
+		"%s %s RTSP/1.0\r\nCSeq: %d\r\n%s\r\n",
+		method,
+		url,
+		cl.cseq,
+		joinHeaders(headers),
+	)
 	line, err := cl.r.ReadString('\n')
 	if err != nil {
 		cl.t.Fatal(err)
@@ -134,7 +143,9 @@ func (cl *client) do(method, url string, headers ...string) (int, map[string]str
 	body := ""
 	if n, _ := strconv.Atoi(h["content-length"]); n > 0 {
 		b := make([]byte, n)
-		io.ReadFull(cl.r, b)
+		if _, err := io.ReadFull(cl.r, b); err != nil {
+			cl.t.Fatal(err)
+		}
 		body = string(b)
 	}
 	return code, h, body
@@ -159,8 +170,8 @@ func serveWaiting(t *testing.T, wait time.Duration) (*Server, *Stream, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	go srv.Serve(ln)
-	t.Cleanup(func() { srv.Close() })
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Close() })
 	return srv, st, ln.Addr().String()
 }
 
@@ -197,7 +208,11 @@ func TestInterleavedPlayStartsAtAKeyframe(t *testing.T) {
 	cl := dial(t, addr, "main")
 	cl.do("OPTIONS", cl.url)
 	cl.do("DESCRIBE", cl.url)
-	code, h, _ := cl.do("SETUP", cl.url+"/trackID=0", "Transport: RTP/AVP/TCP;unicast;interleaved=0-1")
+	code, h, _ := cl.do(
+		"SETUP",
+		cl.url+"/trackID=0",
+		"Transport: RTP/AVP/TCP;unicast;interleaved=0-1",
+	)
 	if code != 200 || !strings.Contains(h["transport"], "interleaved=0-1") {
 		t.Fatalf("SETUP: %d %v", code, h)
 	}
@@ -224,11 +239,14 @@ func TestInterleavedPlayStartsAtAKeyframe(t *testing.T) {
 			t.Fatalf("frame header %x", hdr)
 		}
 		p := make([]byte, binary.BigEndian.Uint16(hdr[2:]))
-		io.ReadFull(cl.r, p)
+		if _, err := io.ReadFull(cl.r, p); err != nil {
+			t.Fatal(err)
+		}
 		pkts = append(pkts, p)
 	}
 	nalus := depacketize(t, pkts)
-	if len(nalus) != 3 || !bytes.Equal(nalus[0], sps) || !bytes.Equal(nalus[1], pps) || !bytes.Equal(nalus[2], idr) {
+	if len(nalus) != 3 || !bytes.Equal(nalus[0], sps) || !bytes.Equal(nalus[1], pps) ||
+		!bytes.Equal(nalus[2], idr) {
 		t.Fatalf("first access unit played: %d NALUs", len(nalus))
 	}
 
@@ -254,7 +272,9 @@ func TestASenderReportFollowsTheFirstAccessUnit(t *testing.T) {
 			t.Fatal(err)
 		}
 		p := make([]byte, binary.BigEndian.Uint16(hdr[2:]))
-		io.ReadFull(cl.r, p)
+		if _, err := io.ReadFull(cl.r, p); err != nil {
+			t.Fatal(err)
+		}
 		if hdr[1] == 2 {
 			packets++
 			octets += uint32(len(p) - headerLen)
@@ -284,7 +304,8 @@ func TestASenderReportFollowsTheFirstAccessUnit(t *testing.T) {
 			t.Errorf("report counts %d octets, %d arrived", got, octets)
 		}
 		sdes := p[28:]
-		if len(sdes)%4 != 0 || sdes[1] != rtcpSDES || int(binary.BigEndian.Uint16(sdes[2:])+1)*4 != len(sdes) {
+		if len(sdes)%4 != 0 || sdes[1] != rtcpSDES ||
+			int(binary.BigEndian.Uint16(sdes[2:])+1)*4 != len(sdes) {
 			t.Fatalf("SDES %x", sdes)
 		}
 		if sdes[8] != 1 || !strings.HasPrefix(string(sdes[10:10+int(sdes[9])]), "countertop-") {
@@ -305,7 +326,11 @@ func TestUDPPlaySendsToTheClientPort(t *testing.T) {
 	port := rx.LocalAddr().(*net.UDPAddr).Port
 
 	cl := dial(t, addr, "main")
-	code, h, _ := cl.do("SETUP", cl.url+"/trackID=0", fmt.Sprintf("Transport: RTP/AVP;unicast;client_port=%d-%d", port, port+1))
+	code, h, _ := cl.do(
+		"SETUP",
+		cl.url+"/trackID=0",
+		fmt.Sprintf("Transport: RTP/AVP;unicast;client_port=%d-%d", port, port+1),
+	)
 	if code != 200 || !strings.Contains(h["transport"], "server_port=") {
 		t.Fatalf("SETUP: %d %v", code, h)
 	}
@@ -314,7 +339,9 @@ func TestUDPPlaySendsToTheClientPort(t *testing.T) {
 	waitViewers(t, st, 1)
 
 	st.Write(annexB(slice(nalIDR, 200)), 40*time.Millisecond)
-	rx.SetReadDeadline(time.Now().Add(3 * time.Second))
+	if err := rx.SetReadDeadline(time.Now().Add(3 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
 	buf := make([]byte, 2000)
 	n, _, err := rx.ReadFromUDP(buf)
 	if err != nil {
@@ -342,7 +369,7 @@ func TestAskingForAStreamCallsForItsSource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	go srv.Serve(ln)
+	go func() { _ = srv.Serve(ln) }()
 	defer srv.Close()
 
 	cl := dial(t, ln.Addr().String(), "main")

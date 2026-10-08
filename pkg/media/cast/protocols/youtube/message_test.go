@@ -28,7 +28,8 @@ func TestABindAnswerYieldsItsSession(t *testing.T) {
 	if msgs[1].Name != "S" || msgs[1].String() != "gsid-123" {
 		t.Errorf("the gsessionid reads %q", msgs[1].String())
 	}
-	if msgs[2].AID != 2 || msgs[2].Name != "loungeStatus" || string(msgs[2].Payload) != `{"devices":"[]"}` {
+	if msgs[2].AID != 2 || msgs[2].Name != "loungeStatus" ||
+		string(msgs[2].Payload) != `{"devices":"[]"}` {
 		t.Errorf("the third message is %+v", msgs[2])
 	}
 }
@@ -42,7 +43,8 @@ func TestAMessageWithNoPayloadParses(t *testing.T) {
 
 func TestAPayloadHoldingBracketsSurvives(t *testing.T) {
 	msgs := parse(t, "60\n[[7,[\"setPlaylist\",{\"videoId\":\"abc\",\"title\":\"a ]] b\"}]]]\n")
-	if len(msgs) != 1 || msgs[0].Name != "setPlaylist" || string(msgs[0].Payload) != `{"videoId":"abc","title":"a ]] b"}` {
+	if len(msgs) != 1 || msgs[0].Name != "setPlaylist" ||
+		string(msgs[0].Payload) != `{"videoId":"abc","title":"a ]] b"}` {
 		t.Errorf("parsed %+v", msgs)
 	}
 }
@@ -57,11 +59,15 @@ func TestNonASCIIDoesNotDependOnTheLengthUnit(t *testing.T) {
 func TestAChunkArrivingInPiecesIsOneChunk(t *testing.T) {
 	body := "30\n[[1,[\"noop\"]],[2,[\"play\"]]]\n25\n[[3,[\"pause\",{\"a\":1}]]]\n"
 	var chunks [][]Message
-	err := Frames(iotest.OneByteReader(strings.NewReader(body)), func(m []Message) { chunks = append(chunks, m) })
+	err := Frames(
+		iotest.OneByteReader(strings.NewReader(body)),
+		func(m []Message) { chunks = append(chunks, m) },
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(chunks) != 2 || len(chunks[0]) != 2 || chunks[0][1].Name != "play" || chunks[1][0].Name != "pause" {
+	if len(chunks) != 2 || len(chunks[0]) != 2 || chunks[0][1].Name != "play" ||
+		chunks[1][0].Name != "pause" {
 		t.Errorf("chunks %+v", chunks)
 	}
 }

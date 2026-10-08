@@ -1,4 +1,3 @@
-// Package interaction shares press feedback and release/drag behavior for go-gui controls.
 package interaction
 
 import (
@@ -16,7 +15,6 @@ const (
 	rippleTick = 16 * time.Millisecond
 )
 
-// Presses belongs to one window; its methods run on that window's UI command loop.
 type Presses struct {
 	armed   string
 	pending func(gogui.EventCtx)
@@ -117,7 +115,11 @@ func Disc(cx, cy, radius float32) []float32 {
 	return points
 }
 
-func (p *Presses) Pressable(layout func(gogui.ContainerCfg) gogui.View, cfg gogui.ContainerCfg, do func(gogui.EventCtx)) gogui.View {
+func (p *Presses) Pressable(
+	layout func(gogui.ContainerCfg) gogui.View,
+	cfg gogui.ContainerCfg,
+	do func(gogui.EventCtx),
+) gogui.View {
 	id := cfg.ID
 	if do == nil || cfg.Disabled {
 		return layout(cfg)
@@ -133,10 +135,20 @@ func (p *Presses) Pressable(layout func(gogui.ContainerCfg) gogui.View, cfg gogu
 		p.waveGen++
 		gen := p.waveGen
 		s := e.Layout.Shape
-		p.wave = ripple{id: id, x: e.Event.MouseX - s.X, y: e.Event.MouseY - s.Y, w: s.Width, h: s.Height, gen: gen}
+		p.wave = ripple{
+			id:  id,
+			x:   e.Event.MouseX - s.X,
+			y:   e.Event.MouseY - s.Y,
+			w:   s.Width,
+			h:   s.Height,
+			gen: gen,
+		}
 		p.pending = do
 		w := e.Window
-		time.AfterFunc(tapDelay, func() { w.QueueCommand(func(w *gogui.Window) { p.light(w, gen) }) })
+		time.AfterFunc(
+			tapDelay,
+			func() { w.QueueCommand(func(w *gogui.Window) { p.light(w, gen) }) },
+		)
 		e.Consume()
 	}
 	fire := func(e gogui.EventCtx) {
@@ -196,7 +208,13 @@ func Tapped(tap func(int), level int) func(gogui.EventCtx) {
 	return func(gogui.EventCtx) { tap(level) }
 }
 
-func (p *Presses) Button(id string, glyph string, st gogui.TextStyle, fill gogui.Color, do func(gogui.EventCtx)) gogui.View {
+func (p *Presses) Button(
+	id string,
+	glyph string,
+	st gogui.TextStyle,
+	fill gogui.Color,
+	do func(gogui.EventCtx),
+) gogui.View {
 	side := st.Size * 2
 	return p.Pressable(gogui.Row, gogui.ContainerCfg{
 		ID:      id,

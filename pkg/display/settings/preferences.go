@@ -21,15 +21,34 @@ type Preferences struct {
 }
 
 func (p Preferences) Basic(size string) BasicState {
-	return BasicState{Screen: p.Screen.Read(), Clock: p.Clock.Read(), Idle: p.Idle.Read(), Visual: p.Visual.Read(), PosterLabel: PosterSays(p.Poster.Read()), UISize: size}
+	return BasicState{
+		Screen:      p.Screen.Read(),
+		Clock:       p.Clock.Read(),
+		Idle:        p.Idle.Read(),
+		Visual:      p.Visual.Read(),
+		PosterLabel: PosterSays(p.Poster.Read()),
+		UISize:      size,
+	}
 }
 func (p Preferences) ClockState() ClockState {
 	return ClockState{Screen: p.Screen.Read(), Clock: p.Clock.Read()}
 }
 func (p Preferences) IdleState() IdleState {
-	return IdleState{Screen: p.Screen.Read(), Clock: p.Clock.Read(), Idle: p.Idle.Read(), Visual: p.Visual.Read(), Weather: p.Weather.Read()}
+	return IdleState{
+		Screen:  p.Screen.Read(),
+		Clock:   p.Clock.Read(),
+		Idle:    p.Idle.Read(),
+		Visual:  p.Visual.Read(),
+		Weather: p.Weather.Read(),
+	}
 }
-func saveScreen(section storage.Section[config.Screen], stack *shell.Shell, name string, change func(*config.Screen)) {
+
+func saveScreen(
+	section storage.Section[config.Screen],
+	stack *shell.Shell,
+	name string,
+	change func(*config.Screen),
+) {
 	if err := section.Update(change); err != nil {
 		slog.Error("saving a setting failed", "setting", name, "err", err)
 	}

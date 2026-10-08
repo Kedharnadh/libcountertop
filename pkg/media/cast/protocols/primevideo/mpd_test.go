@@ -33,18 +33,27 @@ const listManifest = `<?xml version="1.0"?>
 </MPD>`
 
 func TestTheTallestVideoAndTheMainAudioInTheLanguageArePicked(t *testing.T) {
-	parts, err := Pick([]byte(listManifest), "https://cdn.example/path/manifest.mpd?token=x", 1080, "en-US")
+	parts, err := Pick(
+		[]byte(listManifest),
+		"https://cdn.example/path/manifest.mpd?token=x",
+		1080,
+		"en-US",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(parts) != 2 || parts[0].ID != "intro" || parts[0].Duration != 6*time.Second || parts[1].Start != 6*time.Second {
+	if len(parts) != 2 || parts[0].ID != "intro" || parts[0].Duration != 6*time.Second ||
+		parts[1].Start != 6*time.Second {
 		t.Fatalf("parts %+v", parts)
 	}
-	if parts[0].Video.URL != "https://cdn.example/intro/v.mp4" || parts[0].Video.KID != "AAAA" || parts[0].Video.Index != [2]int64{1000, 1055} {
+	if parts[0].Video.URL != "https://cdn.example/intro/v.mp4" || parts[0].Video.KID != "AAAA" ||
+		parts[0].Video.Index != [2]int64{1000, 1055} {
 		t.Fatalf("intro %+v", parts[0].Video)
 	}
 	v, a := parts[1].Video, parts[1].Audio
-	if v.URL != "https://cdn.example/path/v_2.mp4" || v.Height != 800 || v.Init != [2]int64{0, 1099} || len(v.Frags) != 2 {
+	if v.URL != "https://cdn.example/path/v_2.mp4" || v.Height != 800 ||
+		v.Init != [2]int64{0, 1099} ||
+		len(v.Frags) != 2 {
 		t.Fatalf("video %+v", v)
 	}
 	if f := v.Frags[1]; f.Offset != 5100 || f.Size != 4000 || f.At != 2*time.Second {

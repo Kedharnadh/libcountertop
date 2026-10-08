@@ -33,7 +33,9 @@ func (v *digitalVU) advance(f frame) {
 			bi := float64(i) / (dvuN - 1) * 30
 			b0 := int(bi)
 			bv := f.bands[b0]*(1-(bi-float64(b0))) + f.bands[min(analysis.Bands-1, b0+1)]*(bi-float64(b0))
-			target = clamp01((bv - 0.28) / 0.72 * (0.9 + 0.35*float64(i)/(dvuN-1)) * (0.55 + 0.55*f.level))
+			target = clamp01(
+				(bv - 0.28) / 0.72 * (0.9 + 0.35*float64(i)/(dvuN-1)) * (0.55 + 0.55*f.level),
+			)
 		}
 		if target > v.h[i] {
 			v.h[i] += (target - v.h[i]) * (1 - math.Pow(0.2, dt*30))
@@ -46,7 +48,6 @@ func (v *digitalVU) advance(f frame) {
 			v.pk[i] = math.Max(v.h[i], v.pk[i]-dt*0.5)
 		}
 	}
-
 }
 
 //go:embed digitalvu.glsl
@@ -71,7 +72,25 @@ func (v *digitalVU) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 	for i := range dvuN {
 		vals[i], vals[32+i] = float32(v.h[i]), float32(v.pk[i])
 	}
-	vals[64], vals[65], vals[66], vals[67] = float32((W-areaW)/2), float32(areaW/dvuN), float32(base), float32(segH)
-	vals[68], vals[69], vals[70], vals[71], vals[72] = float32(top), float32(math.Max(4*u, segH*0.9)), float32(W), float32(H), float32(u)
+	vals[64], vals[65], vals[66], vals[67] = float32(
+		(W-areaW)/2,
+	), float32(
+		areaW/dvuN,
+	), float32(
+		base,
+	), float32(
+		segH,
+	)
+	vals[68], vals[69], vals[70], vals[71], vals[72] = float32(
+		top,
+	), float32(
+		math.Max(4*u, segH*0.9),
+	), float32(
+		W,
+	), float32(
+		H,
+	), float32(
+		u,
+	)
 	return g.Values(vals, float32(0.32+0.3*f.level), 0.012, 2)
 }

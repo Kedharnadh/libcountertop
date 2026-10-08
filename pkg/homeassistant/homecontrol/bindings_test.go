@@ -79,10 +79,21 @@ func (homeClient) Watch(func(ha.Access)) func()                             { re
 
 type homeStates struct{}
 
-func (homeStates) Follow(e, a string) *states.Value { return &states.Value{Entity: e, Attribute: a} }
+func (homeStates) Follow(
+	e, a string,
+) *states.Value {
+	return &states.Value{Entity: e, Attribute: a}
+}
 
 func testEngine() *Engine {
-	e := New(Dependencies{Settings: &testHome, Shell: shell.New(), Client: homeClient{}, States: homeStates{}})
+	e := New(
+		Dependencies{
+			Settings: &testHome,
+			Shell:    shell.New(),
+			Client:   homeClient{},
+			States:   homeStates{},
+		},
+	)
 	activeEngine = e
 	return e
 }

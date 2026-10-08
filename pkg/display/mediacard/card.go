@@ -1,4 +1,3 @@
-// Package mediacard owns the playback card's visibility and idle lifecycle.
 package mediacard
 
 import (
@@ -30,7 +29,8 @@ type Dependencies struct {
 func New(o Dependencies) *Card { return &Card{options: o, page: &Screen{}} }
 func (c *Card) Page() *Screen  { return c.page }
 func (c *Card) Began(s Source) { c.mu.Lock(); c.begun = s; c.mu.Unlock() }
-func (c *Card) Close()         { c.mu.Lock(); h := c.held; c.held = nil; c.mu.Unlock(); h.Release() }
+
+func (c *Card) Close() { c.mu.Lock(); h := c.held; c.held = nil; c.mu.Unlock(); h.Release() }
 
 type Screen struct {
 	mu    sync.Mutex
@@ -56,8 +56,6 @@ const (
 	gap  = 5 * time.Second
 )
 
-// Card is what is playing on the screen: it opens when something starts and goes once things have
-// been quiet a while.
 type Card struct {
 	options Dependencies
 	page    *Screen
@@ -149,7 +147,6 @@ func (c *Card) Follow() {
 	}
 }
 
-// Open shows the player for whatever is playing: the source's own if it has one, the card if not.
 func (c *Card) Open() { c.open() }
 
 func (c *Card) open() {

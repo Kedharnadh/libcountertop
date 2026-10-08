@@ -10,24 +10,17 @@ import (
 	"time"
 )
 
-// answers is how long the chip is given to say anything. One number everywhere: it answers in
-// microseconds or not at all, and a longer wait has never once been the fix.
 const answers = 2 * time.Second
 
-// switched is the pause after the rate change, from the kernel's qca_set_baudrate.
+// From the kernel's qca_set_baudrate.
 const switched = 300 * time.Millisecond
 
-// Listen stops the bring-up after the reset so the caller can read the line raw.
-
-// Version is what the chip says it is, which is the first thing it says at all.
 type Version struct {
 	ProductID uint32
 	Patch     uint16
 	ROM       uint16
 	SOC       uint32
 
-	// Raw is the block as it arrived. Kept because the layout is the vendor's and this is how it
-	// was worked out: reading it the wrong way round gives numbers that look plausible.
 	Raw []byte
 }
 
@@ -36,10 +29,6 @@ func (v Version) String() string {
 		v.ProductID, v.Patch, v.ROM, v.SOC, v.Raw)
 }
 
-// BringUp powers the radio, downloads its firmware and leaves it speaking HCI.
-//
-// A chip with half a patch answers nothing and looks like a chip that is not there, so every step
-// names itself when it fails.
 func BringUp(options BringUpOptions) (*Port, Version, error) {
 	var none Version
 
@@ -49,7 +38,7 @@ func BringUp(options BringUpOptions) (*Port, Version, error) {
 			return nil, none, err
 		}
 		if err := Reset(p); err != nil {
-			p.Close()
+			_ = p.Close()
 			return nil, none, err
 		}
 		return p, none, nil
@@ -68,13 +57,12 @@ func BringUp(options BringUpOptions) (*Port, Version, error) {
 
 	v, err := start(p, options)
 	if err != nil {
-		p.Close()
+		_ = p.Close()
 		return nil, none, err
 	}
 	return p, v, nil
 }
 
-// start is the exchange, once the chip is powered and the line is open.
 func start(p *Port, options BringUpOptions) (Version, error) {
 	var none Version
 
@@ -92,7 +80,6 @@ func start(p *Port, options BringUpOptions) (Version, error) {
 		return none, err
 	}
 
-	// Nothing acknowledges the rate change, so asking again is what says it took.
 	if _, err := Ask(p); err != nil {
 		return none, fmt.Errorf("the chip stopped answering after the rate change: %w", err)
 	}
@@ -132,8 +119,6 @@ func start(p *Port, options BringUpOptions) (Version, error) {
 		return v, nil
 	}
 
-	// The loader's version command is gone with the loader. A patched chip is an ordinary
-	// controller, so an ordinary answer here is the bring-up proving itself.
 	local, err := ReadLocal(p)
 	if err != nil {
 		return none, fmt.Errorf("the controller did not come back after the reset: %w", err)
@@ -147,7 +132,6 @@ func start(p *Port, options BringUpOptions) (Version, error) {
 	return v, nil
 }
 
-// Local is what the controller says about itself once it is running the firmware.
 type Local struct {
 	HCIVersion    byte
 	HCIRevision   uint16
@@ -161,7 +145,6 @@ func (l Local) String() string {
 		l.HCIVersion, l.HCIRevision, l.LMPVersion, l.LMPSubversion, l.Manufacturer)
 }
 
-// ReadLocal asks the controller what it is, the ordinary way.
 func ReadLocal(p *Port) (Local, error) {
 	cmd, err := command(hciReadLocalVersion)
 	if err != nil {
@@ -188,28 +171,18 @@ func ReadLocal(p *Port) (Local, error) {
 	}, nil
 }
 
-// Features is what the controller says it can do, as the eight LMP feature bytes.
-//
-// Worth asking once because it decides what is worth building on top: whether this is a listening
-// device or one that can also be connected to.
 type Features [8]byte
 
-// Classic reports BR/EDR support, which is everything that is not Low Energy — a speaker, a
-// headset, a phone connecting to play something.
 func (f Features) Classic() bool { return f[4]&0x20 == 0 }
 
-// LE reports Low Energy support, which is what a proxy scans with.
 func (f Features) LE() bool { return f[4]&0x40 != 0 }
 
-// EDR reports enhanced data rate, the 2 and 3 Mbps basic-rate modes. Audio over a link without it
-// is the marginal case rather than the comfortable one.
 func (f Features) EDR() bool { return f[3]&0x80 != 0 }
 
 func (f Features) String() string {
 	return fmt.Sprintf("classic %v, le %v, edr %v  [% x]", f.Classic(), f.LE(), f.EDR(), f[:])
 }
 
-// ReadFeatures asks the controller what it supports.
 func ReadFeatures(p *Port) (Features, error) {
 	var none Features
 
@@ -231,8 +204,6 @@ func ReadFeatures(p *Port) (Features, error) {
 	return Features(said[:8]), nil
 }
 
-// Reset restarts the controller on what was just downloaded. Until this the patch is bytes in the
-// chip's memory rather than the firmware it is running.
 func Reset(p *Port) error {
 	cmd, err := command(hciReset)
 	if err != nil {
@@ -245,14 +216,11 @@ func Reset(p *Port) error {
 		return fmt.Errorf("resetting: %w", err)
 	}
 
-	// Reading rather than sleeping. The firmware announces itself the moment it is running — this
-	// is where the sleep protocol starts — and hearing that is what the pause is for.
+	// The patched firmware announces itself as soon as it runs.
 	p.Settle(switched)
 	return nil
 }
 
-// waitReturn reads past whatever else is on the line for an opcode's command complete. What it
-// skipped goes in the error: a silent line and a line full of other answers are different faults.
 func waitReturn(p *Port, opcode uint16, within time.Duration) ([]byte, error) {
 	deadline := time.Now().Add(within)
 
@@ -279,7 +247,6 @@ func waitReturn(p *Port, opcode uint16, within time.Duration) ([]byte, error) {
 	}
 }
 
-// Ask reads the chip's version, which is also how to find out whether it is listening at all.
 func Ask(p *Port) (Version, error) {
 	cmd, err := version()
 	if err != nil {
@@ -298,8 +265,6 @@ func Ask(p *Port) (Version, error) {
 		return Version{}, fmt.Errorf("ble: a version of %d bytes", len(said))
 	}
 
-	// Four byte product, all little endian: read this way the rom matches the patch file, which
-	// is what says the layout and the firmware are both right for this chip.
 	return Version{
 		ProductID: binary.LittleEndian.Uint32(said[0:]),
 		Patch:     binary.LittleEndian.Uint16(said[4:]),
@@ -309,8 +274,7 @@ func Ask(p *Port) (Version, error) {
 	}, nil
 }
 
-// waitFor reads past whatever else is on the line for a vendor event. The chip leads with a
-// command complete and puts the answer behind it, and volunteers events of its own.
+// The chip sends a command complete before the vendor event, and events of its own.
 func waitFor(p *Port, want byte, within time.Duration) ([]byte, error) {
 	deadline := time.Now().Add(within)
 
@@ -331,12 +295,7 @@ func waitFor(p *Port, want byte, within time.Duration) ([]byte, error) {
 	}
 }
 
-// Fast raises the line to 3 Mbps, where the download happens.
-//
-// Not an optimisation: at the reset rate the chip's buffer fills and it stops taking bytes at
-// segment 18 of 128. Nothing answers this command, so the next thing said at the new rate is the
-// only proof. Flow control off across the change, and the command fully out before the local end
-// moves — a write returns when the kernel has it, not the wire.
+// The chip does not answer the baud rate command.
 func Fast(p *Port) error {
 	cmd, err := command(baudOpcode, baud3M)
 	if err != nil {
@@ -360,8 +319,6 @@ func Fast(p *Port) error {
 	return p.Flow(true)
 }
 
-// Send pushes a blob one segment at a time. Whether each is answered is the blob's to say; a
-// silent download is paced by flow control.
 func Send(p *Port, b Blob) error {
 	segments := b.Segments()
 	acked := b.Acked()
@@ -376,9 +333,7 @@ func Send(p *Port, b Blob) error {
 			return fmt.Errorf("segment %d of %d: %w", i+1, len(segments), err)
 		}
 
-		// A silent blob is never answered, its last segment included: download 0x03 tells the chip
-		// to skip both the vendor event and the completion for the whole download. Waiting on the
-		// end of it is a two second stall and then a failure with the patch already delivered.
+		// Download mode 0x03 suppresses the vendor event and the completion for every segment.
 		if !acked {
 			continue
 		}
@@ -387,19 +342,14 @@ func Send(p *Port, b Blob) error {
 		}
 	}
 
-	// Nothing was read for a silent blob, so anything the chip has to say about it is still coming
-	// while the next one is already going out, where it is read as that one's first answer and
-	// blamed on it. Taken here it is only logged, and the next blob starts on an empty line.
 	if !acked {
 		quiet(p)
 	}
 	return nil
 }
 
-// trailing is how long a silent download is given to say anything before the next one starts.
 var trailing = 300 * time.Millisecond
 
-// quiet reads whatever is left on the line, so it cannot be mistaken for the next answer.
 func quiet(p *Port) {
 	for {
 		e, err := p.Read(trailing)

@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// searchRequest builds what a phone sends when it is looking for an audio sink.
 func searchRequest(t *testing.T, pattern []Element, attrs []Element, max uint16) []byte {
 	t.Helper()
 
@@ -50,11 +49,13 @@ func TestAPDUThatHasNotAllArrived(t *testing.T) {
 	}
 }
 
-// The request a phone actually sends: find an audio sink, give me everything about it.
 func TestReadingTheRequestAPhoneSends(t *testing.T) {
-	params := searchRequest(t,
+	params := searchRequest(
+		t,
 		[]Element{UUID16(UUIDAudioSink)},
-		[]Element{AttrRange{First: 0x0000, Last: 0xffff}.Element()}, // the range 0x0000 to 0xffff, packed as one four byte value
+		[]Element{
+			AttrRange{First: 0x0000, Last: 0xffff}.Element(),
+		}, // the range 0x0000 to 0xffff, packed as one four byte value
 		672,
 	)
 
@@ -80,12 +81,14 @@ func TestReadingTheRequestAPhoneSends(t *testing.T) {
 	}
 }
 
-// Two bytes is one attribute, four is a range. Reading a range as a single identifier means
-// answering with one attribute where the phone asked for all of them.
 func TestASingleAttributeAndARange(t *testing.T) {
-	params := searchRequest(t,
+	params := searchRequest(
+		t,
 		[]Element{UUID16(UUIDAudioSink)},
-		[]Element{AttrRange{First: AttrName, Last: AttrName}.Element(), AttrRange{First: 0x0004, Last: 0x0009}.Element()},
+		[]Element{
+			AttrRange{First: AttrName, Last: AttrName}.Element(),
+			AttrRange{First: 0x0004, Last: 0x0009}.Element(),
+		},
 		672,
 	)
 
@@ -104,8 +107,6 @@ func TestASingleAttributeAndARange(t *testing.T) {
 	}
 }
 
-// All of the pattern has to match, not any of it. Answering a search for two classes with something
-// that is only one of them is how a device appears and then cannot be used.
 func TestASearchWantsEveryClassItNamed(t *testing.T) {
 	both := Search{Pattern: []uint32{UUIDAudioSink, UUIDA2DP}}
 
@@ -141,8 +142,6 @@ func TestOnlyTheAttributesAskedForComeBack(t *testing.T) {
 	}
 }
 
-// The answer wraps every matching record's attribute list in one more sequence. Leaving that outer
-// sequence off is what produces a phone that sees the device and finds no services on it.
 func TestTheAnswerWrapsEveryRecordInOneSequence(t *testing.T) {
 	r := AudioSink(1, "Panel", UUIDAVDTP, FeatureSpeaker)
 
@@ -180,7 +179,6 @@ func TestTheAnswerWrapsEveryRecordInOneSequence(t *testing.T) {
 		t.Fatalf("%d records came back, want one", len(outer.Children))
 	}
 
-	// And the record inside it is still readable as one.
 	inner := outer.Children[0]
 	if len(inner.Children) != len(r)*2 {
 		t.Errorf("the record has %d children, want %d", len(inner.Children), len(r)*2)

@@ -5,17 +5,7 @@ import (
 	"fmt"
 )
 
-// Asking rather than answering.
-//
-// Everything else here serves a phone looking this device up. This is the other direction: finding
-// out what the phone offers, which is how a controller learns the channel cover art is served on.
-// That number is allocated when the far end's service starts, so it has to be asked for rather
-// than assumed.
-
-// Request writes a search as the message that asks it.
-//
-// The mirror of ParseSearchAttribute, and the same trap: the two sequences are data elements and
-// the cap between them is not.
+// The two sequences are data elements; the byte cap between them is not.
 func (s Search) Request(transaction uint16) (PDU, error) {
 	pattern := make([]Element, 0, len(s.Pattern))
 	for _, u := range s.Pattern {
@@ -46,19 +36,14 @@ func (s Search) Request(transaction uint16) (PDU, error) {
 	params = binary.BigEndian.AppendUint16(params, s.MaxBytes)
 	params = append(params, attributes...)
 
-	// The continuation is a length and that many bytes. Zero on a first ask, and whatever the far
-	// end handed back when there is more to come.
+	// The continuation is a length and that many bytes.
 	params = append(params, byte(len(s.Continuation)))
 	params = append(params, s.Continuation...)
 
 	return PDU{ID: PDUSearchAttributeRequest, Transaction: transaction, Params: params}, nil
 }
 
-// ParseSearchAttributeResponse reads the answer, as the records it carries and whatever is left.
-//
-// A non-empty continuation means the far end had more than fitted and is holding the rest: ask
-// again with it echoed back. Treating a partial answer as the whole one is how a record that runs
-// long reads as a device missing half its services.
+// A non-empty continuation is echoed back to get the rest.
 func ParseSearchAttributeResponse(params []byte) (records []Record, more []byte, err error) {
 	if len(params) < 3 {
 		return nil, nil, ErrShort
@@ -79,8 +64,7 @@ func ParseSearchAttributeResponse(params []byte) (records []Record, more []byte,
 		more = rest[1 : 1+size]
 	}
 
-	// An empty body with a continuation is legal: the far end split the answer somewhere that left
-	// nothing for this packet.
+	// An empty body with a continuation is legal.
 	if n == 0 {
 		return nil, more, nil
 	}
@@ -104,10 +88,7 @@ func ParseSearchAttributeResponse(params []byte) (records []Record, more []byte,
 	return records, more, nil
 }
 
-// record reads one attribute list back into a Record.
-//
-// A record on the wire is one flat sequence of alternating identifiers and values, so an odd number
-// of children is a truncated list rather than a record with a field missing.
+// A record is one flat sequence of alternating identifiers and values.
 func record(e Element) (Record, error) {
 	if e.Type != TypeSequence {
 		return nil, fmt.Errorf("sdp: a record is %#02x rather than a sequence", e.Type)
@@ -128,10 +109,6 @@ func record(e Element) (Record, error) {
 	return out, nil
 }
 
-// Classes is what a record says it is, from the service class list alone.
-//
-// Not Record.UUIDs, which collects every identifier at any depth so that a search matches the way
-// the specification says it must. For reading a record back, only the class list says what it is.
 func Classes(r Record) []uint32 {
 	list, ok := r.Attribute(AttrServiceClasses)
 	if !ok {
@@ -147,11 +124,7 @@ func Classes(r Record) []uint32 {
 	return out
 }
 
-// MorePSM is the channel a protocol is served on, read out of a record's additional protocol
-// descriptor lists.
-//
-// Cover art and browsing both live there rather than in the main list, each as a list of its own.
-// under names the protocol to look for inside a list — OBEX for cover art, AVCTP for browsing.
+// Cover art and browsing PSMs are in the additional protocol descriptor lists.
 func MorePSM(r Record, under uint32) (uint16, bool) {
 	lists, ok := r.Attribute(AttrMoreProtocols)
 	if !ok {
@@ -169,7 +142,6 @@ func MorePSM(r Record, under uint32) (uint16, bool) {
 	return 0, false
 }
 
-// carries reports whether one protocol descriptor list names this protocol anywhere in it.
 func carries(list Element, uuid uint32) bool {
 	for _, layer := range list.Children {
 		for _, field := range layer.Children {

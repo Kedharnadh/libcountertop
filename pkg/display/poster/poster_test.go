@@ -23,7 +23,9 @@ func jpegOf(w, h int, c color.RGBA) []byte {
 		img.Pix[i], img.Pix[i+1], img.Pix[i+2], img.Pix[i+3] = c.R, c.G, c.B, 255
 	}
 	var buf bytes.Buffer
-	jpeg.Encode(&buf, img, &jpeg.Options{Quality: 95})
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 95}); err != nil {
+		panic(err)
+	}
 	return buf.Bytes()
 }
 
@@ -132,7 +134,19 @@ func scrimEveryPixel(img *image.RGBA, box image.Rectangle, bg theme.Color) {
 				k = int32(strength*t*t*(3-2*t)*256 + 0.5)
 			}
 			i := img.PixOffset(x, y)
-			img.Pix[i], img.Pix[i+1], img.Pix[i+2] = mix(img.Pix[i], bg.R, k), mix(img.Pix[i+1], bg.G, k), mix(img.Pix[i+2], bg.B, k)
+			img.Pix[i], img.Pix[i+1], img.Pix[i+2] = mix(
+				img.Pix[i],
+				bg.R,
+				k,
+			), mix(
+				img.Pix[i+1],
+				bg.G,
+				k,
+			), mix(
+				img.Pix[i+2],
+				bg.B,
+				k,
+			)
 		}
 	}
 }
@@ -160,7 +174,11 @@ func stripesRGBA(w, h int) *image.RGBA {
 }
 
 func TestAPickAvoidsTheLastPictureAndVideos(t *testing.T) {
-	found := []immich.Asset{{ID: "v", Type: "VIDEO"}, {ID: "a", Type: "IMAGE"}, {ID: "b", Type: "IMAGE"}}
+	found := []immich.Asset{
+		{ID: "v", Type: "VIDEO"},
+		{ID: "a", Type: "IMAGE"},
+		{ID: "b", Type: "IMAGE"},
+	}
 	if got := pick(found, "a"); got != "b" {
 		t.Errorf("picked %q after a", got)
 	}
@@ -201,7 +219,10 @@ func BenchmarkCompose(b *testing.B) {
 	}
 }
 
-func testPoster(t *testing.T, fetch func(context.Context, config.Poster) (string, []byte, error)) *Poster {
+func testPoster(
+	t *testing.T,
+	fetch func(context.Context, config.Poster) (string, []byte, error),
+) *Poster {
 	posterConfig = config.DefaultPoster()
 	p := New(testOptions())
 	p.mu.Lock()
@@ -230,17 +251,27 @@ func TestTheScheduleFetchesWhenDueAndBacksOffAfterAFailure(t *testing.T) {
 	if calls != 0 {
 		t.Fatalf("fetched %d times while off", calls)
 	}
-	posterWriter{}.Enabled(true)
+	if err := (posterWriter{}).Enabled(true); err != nil {
+		t.Fatal(err)
+	}
 	p.step(ctx, t0, false, false)
 	if calls != 0 {
 		t.Fatalf("fetched %d times with no server", calls)
 	}
-	posterWriter{}.Server("http://immich")
+	if err := (posterWriter{}).Server("http://immich"); err != nil {
+		t.Fatal(err)
+	}
 	p.step(ctx, t0, false, false)
 	if calls != 1 || posterConfig.Last != "id1" {
 		t.Fatalf("first step: %d calls, last %q", calls, posterConfig.Last)
 	}
-	if img, key := p.Backdrop(40, 60, image.Rect(10, 10, 30, 30), theme.Color{}); img == nil || key == "" {
+	if img, key := p.Backdrop(
+		40,
+		60,
+		image.Rect(10, 10, 30, 30),
+		theme.Color{},
+	); img == nil ||
+		key == "" {
 		t.Fatal("no backdrop after a fetch")
 	}
 	p.step(ctx, t0.Add(59*time.Minute), false, false)
@@ -272,7 +303,9 @@ func TestTheScheduleFetchesWhenDueAndBacksOffAfterAFailure(t *testing.T) {
 	}
 
 	fail = false
-	posterWriter{}.Every(config.PosterWake)
+	if err := (posterWriter{}).Every(config.PosterWake); err != nil {
+		t.Fatal(err)
+	}
 	p.step(ctx, t1.Add(time.Hour), true, false)
 	n := calls
 	p.step(ctx, t1.Add(30*time.Hour), false, false)
@@ -284,7 +317,9 @@ func TestTheScheduleFetchesWhenDueAndBacksOffAfterAFailure(t *testing.T) {
 		t.Fatalf("on-wake did not fetch on a wake")
 	}
 
-	posterWriter{}.Enabled(false)
+	if err := (posterWriter{}).Enabled(false); err != nil {
+		t.Fatal(err)
+	}
 	p.step(ctx, t1.Add(31*time.Hour), false, false)
 	if img, _ := p.Backdrop(40, 60, image.Rectangle{}, theme.Color{}); img != nil {
 		t.Error("turning it off left the picture up")

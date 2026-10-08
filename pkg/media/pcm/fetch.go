@@ -11,15 +11,10 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/fetch"
 )
 
-// Tail is the silence added after speech, in milliseconds. Speech from a text to speech engine stops
-// on its last sound with no silence after it, and the interpolating resampler needs a few samples
-// beyond the end to run out. Without a tail the final word sounds cut off.
 const Tail = 250
 
 const fetchTimeout = 30 * time.Second
 
-// Fetch downloads audio Home Assistant is serving and decodes it. The request carries the context,
-// so silencing a sound abandons the download rather than leaving it to arrive and be thrown away.
 func Fetch(ctx context.Context, url string) ([]int16, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -43,11 +38,7 @@ func Fetch(ctx context.Context, url string) ([]int16, error) {
 	return Samples(body)
 }
 
-// samplesOf takes 16-bit samples out of a RIFF/WAVE body, walking the chunks rather than assuming a
-// 44-byte header: a converted file can carry extra chunks before the data.
-//
-// Sizes are handled as uint64. A 32-bit int cannot hold a large RIFF size, and a chunk claiming one
-// turns negative, which slips past a bounds check and panics on the slice.
+// A converted WAV can carry extra chunks before data, and a RIFF size can overflow a 32-bit int.
 func Samples(body []byte) ([]int16, error) {
 	if len(body) < 12 || string(body[0:4]) != "RIFF" || string(body[8:12]) != "WAVE" {
 		return nil, fmt.Errorf("not a WAVE file: %d bytes", len(body))

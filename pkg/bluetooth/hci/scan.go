@@ -6,27 +6,23 @@ import (
 	"fmt"
 )
 
-// The LE commands a scanner sends.
 const (
 	hciLEScanParams = 0x200b
 	hciLEScanEnable = 0x200c
 )
 
-// What an LE Meta event can be. Only one of them is a scanner's business.
 const (
 	eventLEMeta = 0x3e
 
 	leAdvertisingReport = 0x02
 )
 
-// How much of the time the radio listens, in units of 0.625ms: 18.75ms out of every 200ms. Wifi is
-// on the same chip and antenna, and a window equal to the interval never gives it back.
+// 0.625 ms units: 18.75 ms every 200 ms.
 const (
 	scanInterval = 320
 	scanWindow   = 30
 )
 
-// Advertisement is one LE advertising report.
 type Advertisement struct {
 	Address     [6]byte
 	AddressType byte
@@ -34,7 +30,6 @@ type Advertisement struct {
 	Data        []byte
 }
 
-// Addr is the address as a big-endian integer, which is how Home Assistant wants it.
 func (a Advertisement) Addr() uint64 {
 	var v uint64
 	for _, b := range a.Address {
@@ -43,11 +38,7 @@ func (a Advertisement) Addr() uint64 {
 	return v
 }
 
-// Scan turns on LE scanning and calls found for every advertisement until the context ends. Active
-// asks for scan responses, which transmits rather than only listening.
 func Scan(ctx context.Context, s *Session, active bool, found func(Advertisement)) error {
-	// Registered before the scan is turned on, or the first advertisements arrive with nowhere to
-	// go and the beacons that report slowest are the ones missed.
 	got, done := s.Reports()
 	defer done()
 
@@ -55,7 +46,6 @@ func Scan(ctx context.Context, s *Session, active bool, found func(Advertisement
 		return err
 	}
 
-	// Even on the way out of an error: a controller left scanning keeps the antenna busy.
 	defer scanning(s, active, false)
 
 	for {
@@ -71,7 +61,6 @@ func Scan(ctx context.Context, s *Session, active bool, found func(Advertisement
 	}
 }
 
-// scanning turns the scan on or off.
 func scanning(s *Session, active, on bool) error {
 	if on {
 		params := make([]byte, 7)
@@ -86,8 +75,6 @@ func scanning(s *Session, active, on bool) error {
 		}
 	}
 
-	// Enable, and whether to filter duplicates. Kept: how often a beacon repeats is Home
-	// Assistant's to judge.
 	enable := byte(0x00)
 	if on {
 		enable = 0x01
@@ -98,10 +85,7 @@ func scanning(s *Session, active, on bool) error {
 	return nil
 }
 
-// reports walks an LE Meta event: event type, address type, address, data length, data, RSSI.
-//
-// A malformed one is dropped rather than guessed at: this is the only place on the device parsing
-// something a stranger in the street can send.
+// Event type, address type, address, data length, data, RSSI.
 func reports(p []byte, found func(Advertisement)) {
 	if len(p) < 2 || p[0] != leAdvertisingReport {
 		return
@@ -121,8 +105,7 @@ func reports(p []byte, found func(Advertisement)) {
 
 		a := Advertisement{AddressType: p[at+1], RSSI: int8(p[end])}
 
-		// HCI carries the address least significant octet first; Address is the MAC as written,
-		// which is the order a resolvable private address must be in to match an identity key.
+		// HCI carries the address least significant octet first.
 		for i := range a.Address {
 			a.Address[i] = p[at+7-i]
 		}

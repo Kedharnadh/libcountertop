@@ -5,11 +5,6 @@ import (
 	"fmt"
 )
 
-// Configuration is the round of options two ends trade after a channel opens and before anything is
-// sent on it. For A2DP the one that matters is the MTU: a phone announces how large a packet it
-// will send, and an audio packet larger than what was agreed is a stream that stops.
-
-// The options worth knowing. Anything else is either refused or ignored depending on its hint bit.
 const (
 	OptionMTU     = 0x01
 	OptionFlush   = 0x02
@@ -17,19 +12,15 @@ const (
 	OptionRetrans = 0x04
 )
 
-// OptionHint is set on an option the sender is only suggesting. One with it set may be skipped
-// where one without it has to be answered — refusing a hint is how a configuration round never
-// finishes.
+// A hinted option may be skipped; any other must be answered.
 const OptionHint = 0x80
 
-// Option is one configuration option, with the hint bit already taken off the type.
 type Option struct {
 	Type  byte
 	Hint  bool
 	Value []byte
 }
 
-// MTU reads an MTU option's value.
 func (o Option) MTU() (uint16, bool) {
 	if o.Type != OptionMTU || len(o.Value) < 2 {
 		return 0, false
@@ -37,7 +28,6 @@ func (o Option) MTU() (uint16, bool) {
 	return binary.LittleEndian.Uint16(o.Value), true
 }
 
-// Marshal writes one option.
 func (o Option) Marshal() []byte {
 	t := o.Type
 	if o.Hint {
@@ -51,7 +41,6 @@ func (o Option) Marshal() []byte {
 	return out
 }
 
-// MTUOption is the one option this stack sends.
 func MTUOption(mtu uint16) Option {
 	v := make([]byte, 2)
 	binary.LittleEndian.PutUint16(v, mtu)
@@ -59,13 +48,15 @@ func MTUOption(mtu uint16) Option {
 	return Option{Type: OptionMTU, Value: v}
 }
 
-// ParseOptions reads a run of options.
 func ParseOptions(buf []byte) ([]Option, error) {
 	var out []Option
 
 	for len(buf) > 0 {
 		if len(buf) < 2 {
-			return nil, fmt.Errorf("l2cap: %d bytes left over, less than an option header", len(buf))
+			return nil, fmt.Errorf(
+				"l2cap: %d bytes left over, less than an option header",
+				len(buf),
+			)
 		}
 
 		n := int(buf[1])
@@ -83,24 +74,18 @@ func ParseOptions(buf []byte) ([]Option, error) {
 	return out, nil
 }
 
-// ConfigFlagContinues says more options are coming in another command, because they did not fit in
-// one. A response to a continued request has to carry the flag back or the far end waits forever.
+// A response to a continued request must carry the flag back.
 const ConfigFlagContinues = 0x0001
 
-// Configure is a far end saying how it wants a channel to behave.
 type Configure struct {
 	DestinationCID uint16
 	Flags          uint16
 	Options        []Option
 }
 
-// Continues reports whether more options are coming.
 func (c Configure) Continues() bool { return c.Flags&ConfigFlagContinues != 0 }
 
-// MTU is the largest packet the far end says it will send, and whether it said.
-//
-// Absent means the default rather than nothing: a channel with no MTU option agreed carries 672
-// bytes, and treating silence as zero would close a channel that is working.
+// Absent means the 672-byte default.
 func (c Configure) MTU() uint16 {
 	for _, o := range c.Options {
 		if mtu, ok := o.MTU(); ok {
@@ -110,10 +95,6 @@ func (c Configure) MTU() uint16 {
 	return MTUDefault
 }
 
-// Unknown is the options that have to be answered and cannot be, which is what a configuration
-// response full of unknown options carries back.
-//
-// Hints are left out on purpose: the whole point of the bit is that skipping one is allowed.
 func (c Configure) Unknown() []byte {
 	var out []byte
 	for _, o := range c.Options {
@@ -121,9 +102,6 @@ func (c Configure) Unknown() []byte {
 		case o.Hint:
 		case o.Type == OptionMTU, o.Type == OptionFlush, o.Type == OptionQoS:
 
-		// Retransmission is known, and answered with a counter-proposal rather than with
-		// puzzlement. Calling an option we understand unknown tells a far end that needs it there
-		// is nothing to negotiate.
 		case o.Type == OptionRetrans:
 
 		default:
@@ -133,7 +111,6 @@ func (c Configure) Unknown() []byte {
 	return out
 }
 
-// How a channel carries what is sent on it.
 const (
 	ModeBasic   = 0x00
 	ModeRetrans = 0x01
@@ -142,11 +119,10 @@ const (
 	ModeStream  = 0x04
 )
 
-// retransFields is the option's width: a mode, a window, a transmit count, two timers and a size.
+// A mode, a window, a transmit count, two timers and a size.
 const retransFields = 9
 
-// Mode is the one a configuration asks for, and whether it asked at all. Silence means basic, which
-// is what a channel is until something says otherwise.
+// Absent means basic mode.
 func (c Configure) Mode() (mode byte, asked bool) {
 	for _, o := range c.Options {
 		if o.Type == OptionRetrans && len(o.Value) >= 1 {
@@ -156,11 +132,6 @@ func (c Configure) Mode() (mode byte, asked bool) {
 	return ModeBasic, false
 }
 
-// BasicMode is the counter-proposal to a mode this stack does not speak.
-//
-// The other fields are a window, a transmit count, two timers and a packet size, and none of them
-// mean anything in basic mode — but the option is a fixed width, so they are sent as zeros rather
-// than left out.
 func BasicMode() Option {
 	return Option{Type: OptionRetrans, Value: make([]byte, retransFields)}
 }
@@ -193,7 +164,6 @@ func (c Configure) Command(id byte) Command {
 	return Command{Code: CodeConfigRequest, ID: id, Data: data}
 }
 
-// How a configuration round was answered.
 const (
 	ConfigSuccess      = 0x0000
 	ConfigUnacceptable = 0x0001
@@ -202,7 +172,6 @@ const (
 	ConfigPending      = 0x0004
 )
 
-// Configured answers a configuration request.
 type Configured struct {
 	SourceCID uint16
 	Flags     uint16

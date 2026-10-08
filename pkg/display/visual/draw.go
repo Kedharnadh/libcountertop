@@ -6,6 +6,7 @@ import (
 	"math"
 
 	"github.com/tfriedel6/canvas"
+
 	fx "github.com/ygelfand/libcountertop/pkg/display/glow"
 )
 
@@ -38,13 +39,17 @@ func roundRect(c *canvas.Canvas, x, y, w, h, r float64) {
 }
 
 func rounded(img *image.RGBA, x, y, w, h, r float64, draw func(sub *image.RGBA, ox, oy float64)) {
-	rect := image.Rect(int(x), int(y), int(math.Ceil(x+w)), int(math.Ceil(y+h))).Intersect(img.Bounds())
+	rect := image.Rect(int(x), int(y), int(math.Ceil(x+w)), int(math.Ceil(y+h))).
+		Intersect(img.Bounds())
 	if rect.Empty() {
 		return
 	}
 	saved := make([]uint8, rect.Dx()*rect.Dy()*4)
 	for j := range rect.Dy() {
-		copy(saved[j*rect.Dx()*4:(j+1)*rect.Dx()*4], img.Pix[(rect.Min.Y+j)*img.Stride+rect.Min.X*4:])
+		copy(
+			saved[j*rect.Dx()*4:(j+1)*rect.Dx()*4],
+			img.Pix[(rect.Min.Y+j)*img.Stride+rect.Min.X*4:],
+		)
 	}
 	draw(img.SubImage(rect).(*image.RGBA), float64(rect.Min.X), float64(rect.Min.Y))
 	edge := int(math.Ceil(r)) + 2
@@ -99,7 +104,6 @@ func hex(v uint32, a float64) color.NRGBA {
 	return color.NRGBA{uint8(v >> 16), uint8(v >> 8), uint8(v), uint8(clamp01(a) * 255)}
 }
 
-// shadow darkens around a rounded rectangle the way a canvas shadowBlur of blur does.
 func shadow(img *image.RGBA, x, y, w, h, r, blur, a float64) {
 	b := img.Bounds()
 	cx, cy, hw, hh := x+w/2, y+h/2, w/2-r, h/2-r
@@ -125,14 +129,25 @@ func shadow(img *image.RGBA, x, y, w, h, r, blur, a float64) {
 					continue
 				}
 				p := row[px*4 : px*4+3 : px*4+3]
-				p[0], p[1], p[2] = uint8(float64(p[0])*(1-k)), uint8(float64(p[1])*(1-k)), uint8(float64(p[2])*(1-k))
+				p[0], p[1], p[2] = uint8(
+					float64(p[0])*(1-k),
+				), uint8(
+					float64(p[1])*(1-k),
+				), uint8(
+					float64(p[2])*(1-k),
+				)
 			}
 		}
 	})
 }
 
 func nrgba(c [3]float64, a float64) color.NRGBA {
-	return color.NRGBA{uint8(clamp01(c[0]/255) * 255), uint8(clamp01(c[1]/255) * 255), uint8(clamp01(c[2]/255) * 255), uint8(clamp01(a) * 255)}
+	return color.NRGBA{
+		uint8(clamp01(c[0]/255) * 255),
+		uint8(clamp01(c[1]/255) * 255),
+		uint8(clamp01(c[2]/255) * 255),
+		uint8(clamp01(a) * 255),
+	}
 }
 
 func mixc(a, b [3]float64, t float64) [3]float64 {

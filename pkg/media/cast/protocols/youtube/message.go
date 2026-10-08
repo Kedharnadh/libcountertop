@@ -10,7 +10,6 @@ import (
 	"strings"
 )
 
-// Message is one lounge event: its array id, its name and its payload.
 type Message struct {
 	AID     int
 	Name    string
@@ -77,32 +76,27 @@ func messages(chunk json.RawMessage) ([]Message, error) {
 	return out, nil
 }
 
-// String reads a payload that is a plain string.
 func (m Message) String() string {
 	var s string
-	json.Unmarshal(m.Payload, &s)
+	_ = json.Unmarshal(m.Payload, &s)
 	return s
 }
 
-// First reads the first element of a payload that is an array of strings, which is how the
-// session id arrives.
 func (m Message) First() string {
 	var parts []json.RawMessage
 	if json.Unmarshal(m.Payload, &parts) != nil || len(parts) == 0 {
 		return m.String()
 	}
 	var s string
-	json.Unmarshal(parts[0], &s)
+	_ = json.Unmarshal(parts[0], &s)
 	return s
 }
 
-// Out is a message a screen sends.
 type Out struct {
 	Name   string
 	Fields map[string]string
 }
 
-// form is messages as a bind POST carries them, numbered from ofs.
 func form(ofs int, msgs []Out) url.Values {
 	v := url.Values{}
 	v.Set("count", fmt.Sprint(len(msgs)))

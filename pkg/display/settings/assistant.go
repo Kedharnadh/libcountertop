@@ -24,7 +24,11 @@ type AssistantDependencies struct {
 }
 type AssistantPages struct{ options AssistantDependencies }
 
-func NewAssistantPages(o AssistantDependencies) *AssistantPages { return &AssistantPages{options: o} }
+func NewAssistantPages(
+	o AssistantDependencies,
+) *AssistantPages {
+	return &AssistantPages{options: o}
+}
 func (p *AssistantPages) open(makePage func() shell.View) func(int) {
 	return func(int) { p.options.Shell.Push(makePage()) }
 }
@@ -83,16 +87,30 @@ func (p *AssistantPages) Slot(slot int) *shell.Page {
 			saved := p.options.Preferences.Wake.Read().Slot(slot)
 
 			return []widget.Row{
-					// First, because it is the one row that does something rather than setting
-					// something: a way to talk to this assistant without saying its word.
 					{Label: say.T("assistants.talk"), Hint: say.T("assistants.talk.hint")},
 
-					{Label: say.T("assistants.threshold"), Kind: widget.Slider, Level: Sensitivity(saved.Threshold),
-						Hint: say.T("assistants.threshold.hint")},
+					{
+						Label: say.T("assistants.threshold"),
+						Kind:  widget.Slider,
+						Level: Sensitivity(saved.Threshold),
+						Hint:  say.T("assistants.threshold.hint"),
+					},
 
-					{Label: say.T("assistants.tone"), Kind: widget.Chevron, Value: saved.Tone.Label()},
-					{Label: say.T("assistants.reply"), Kind: widget.Chevron, Value: saved.Delivery.Label()},
-					{Label: say.T("look.title"), Kind: widget.Chevron, Value: saved.Look.Place.Label()},
+					{
+						Label: say.T("assistants.tone"),
+						Kind:  widget.Chevron,
+						Value: saved.Tone.Label(),
+					},
+					{
+						Label: say.T("assistants.reply"),
+						Kind:  widget.Chevron,
+						Value: saved.Delivery.Label(),
+					},
+					{
+						Label: say.T("look.title"),
+						Kind:  widget.Chevron,
+						Value: saved.Look.Place.Label(),
+					},
 				}, []func(int){
 					func(int) { p.options.Requested.Emit(slot) },
 					p.Threshold(slot),
@@ -111,13 +129,15 @@ func Sensitivity(v float64) int {
 func (p *AssistantPages) Threshold(slot int) func(int) {
 	return func(level int) {
 		v := float64(LeastSure+MostSure-min(max(level, LeastSure), MostSure)) / 100
-		if err := p.options.Preferences.Word(slot, func(w *config.WakeWord) { w.Threshold = v }); err != nil {
+		if err := p.options.Preferences.Word(
+			slot,
+			func(w *config.WakeWord) { w.Threshold = v },
+		); err != nil {
 			slog.Error("saving the wake threshold failed", "slot", slot+1, "err", err)
 		}
 	}
 }
 
-// Phrases describes the configured assistants in slot order.
 func (p *AssistantPages) Phrases() string {
 	var names []string
 	for slot := range p.options.Slots {
@@ -152,7 +172,10 @@ func (p *AssistantPages) Tone(slot int) *shell.Page {
 
 func (p *AssistantPages) UseTone(slot int, c config.Chime) func(int) {
 	return func(int) {
-		if err := p.options.Preferences.Word(slot, func(w *config.WakeWord) { w.Tone = c }); err != nil {
+		if err := p.options.Preferences.Word(
+			slot,
+			func(w *config.WakeWord) { w.Tone = c },
+		); err != nil {
 			slog.Error("saving the wake tone failed", "slot", slot+1, "err", err)
 			return
 		}
@@ -190,7 +213,10 @@ func Delivering(d config.Delivery) string {
 
 func (p *AssistantPages) UseDelivery(slot int, d config.Delivery) func(int) {
 	return func(int) {
-		if err := p.options.Preferences.Word(slot, func(w *config.WakeWord) { w.Delivery = d }); err != nil {
+		if err := p.options.Preferences.Word(
+			slot,
+			func(w *config.WakeWord) { w.Delivery = d },
+		); err != nil {
 			slog.Error("saving the reply delivery failed", "slot", slot+1, "err", err)
 		}
 	}

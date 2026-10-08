@@ -6,8 +6,6 @@ import (
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
-// Every chime the settings offer has to be one the speaker knows, or picking it leaves a device that
-// silently stopped acknowledging anything.
 func TestEveryOfferedChimeHasNotes(t *testing.T) {
 	for _, c := range config.Chimes() {
 		notes := Wake(c)
@@ -27,7 +25,6 @@ func TestEveryOfferedChimeHasNotes(t *testing.T) {
 	}
 }
 
-// Told apart by shape, so two of them are not the same sound under two names.
 func TestTheChimesAreDistinguishable(t *testing.T) {
 	seen := map[string]config.Chime{}
 
@@ -47,8 +44,6 @@ func TestTheChimesAreDistinguishable(t *testing.T) {
 	}
 }
 
-// A name from a newer build, or a hand-edited state file, reaches here as a chime with no entry.
-// Nothing to play is the right answer: the alternative is a map lookup panicking on the audio path.
 func TestAnUnknownChimePlaysNothing(t *testing.T) {
 	if notes := Wake(config.Chime("harpsichord")); notes != nil {
 		t.Errorf("an unknown chime sounds %v", notes)

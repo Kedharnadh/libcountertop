@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// blob builds a TLV of a type and a length, with a body of whatever length is asked for.
 func blob(kind byte, body int) []byte {
 	out := make([]byte, 4+body)
 	binary.LittleEndian.PutUint32(out, uint32(body)<<8|uint32(kind))
@@ -17,9 +16,6 @@ func blob(kind byte, body int) []byte {
 	return out
 }
 
-// The header is a type in the low byte and a length in the three above it. Reading those the wrong
-// way round gives a plausible-looking type and a nonsense length, which is why it is worth a test
-// rather than a careful read.
 func TestTheHeaderIsATypeAndThreeBytesOfLength(t *testing.T) {
 	got, err := ReadBlob(blob(tlvNVM, 2186))
 	if err != nil {
@@ -33,8 +29,6 @@ func TestTheHeaderIsATypeAndThreeBytesOfLength(t *testing.T) {
 	}
 }
 
-// A file shorter than it says is a download that would fail partway through, with the chip
-// refusing a segment and nothing saying why.
 func TestATruncatedBlobIsRefused(t *testing.T) {
 	full := blob(tlvPatch, 4000)
 
@@ -52,12 +46,7 @@ func TestSomethingThatIsNeitherIsRefused(t *testing.T) {
 	}
 }
 
-// The real patch off the device, as its header describes itself. These are the numbers read out of
-// /bt_firmware/image/btfwnpla.tlv on the device, so they are what the chip will be told.
 func TestAPatchHeaderReadsItsFields(t *testing.T) {
-	// The length in the header is the length of the file, so the buffer has to be that long: the
-	// first version of this declared thirty thousand bytes and allocated thirty two, and ReadBlob
-	// was right to refuse it.
 	const body = 30020
 
 	raw := make([]byte, 4+body)
@@ -90,13 +79,10 @@ func TestAPatchHeaderReadsItsFields(t *testing.T) {
 	}
 }
 
-// Every byte of the file goes, in order, once. A download that dropped or repeated a piece leaves
-// the chip running code that is almost right, which is worse than one that will not start.
 func TestTheSegmentsAreTheWholeFileInOrder(t *testing.T) {
 	for _, size := range []int{1, segment - 1, segment, segment + 1, 30020, 2186} {
 		b, err := ReadBlob(blob(tlvPatch, size))
 		if err != nil {
-			// A patch needs a header; the short ones are only exercised for their segmenting.
 			b = Blob{Raw: blob(tlvPatch, size)}
 		}
 
@@ -117,8 +103,6 @@ func TestTheSegmentsAreTheWholeFileInOrder(t *testing.T) {
 	}
 }
 
-// The count follows from the size, and getting it wrong by one is the classic way to send a file
-// with its last few bytes missing.
 func TestTheSegmentCountFollowsTheSize(t *testing.T) {
 	for _, tc := range []struct{ size, want int }{
 		{1, 1},
@@ -134,8 +118,6 @@ func TestTheSegmentCountFollowsTheSize(t *testing.T) {
 	}
 }
 
-// A segment command is the request, the length, and the piece — and it has to fit in the one byte
-// an HCI command has for its parameter length.
 func TestASegmentCommandCarriesItsLength(t *testing.T) {
 	piece := make([]byte, segment)
 	for i := range piece {

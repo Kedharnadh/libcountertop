@@ -36,7 +36,6 @@ func BenchmarkEmbedding(b *testing.B) {
 	}
 }
 
-// One step is 80 ms of audio, so anything approaching 80 ms here is not viable on the device.
 func BenchmarkStep(b *testing.B) {
 	e, err := New()
 	if err != nil {

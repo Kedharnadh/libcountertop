@@ -1,8 +1,6 @@
 package schema
 
-// Visual is the live audio visual the device draws.
 type Visual struct {
-	// Kind names one of the visuals in internal/ui/visual.
 	Kind string `json:"kind"`
 
 	Label string `json:"label"`

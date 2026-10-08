@@ -5,8 +5,7 @@ import (
 	"fmt"
 )
 
-// Field slots of the schema tables we read. Slot numbers are part of the file format: they are
-// assigned by field order in schema.fbs and never reused, so appended fields do not disturb them.
+// Slot numbers follow field order in schema.fbs and are never reused.
 const (
 	modelOperatorCodes = 1
 	modelSubgraphs     = 2
@@ -39,7 +38,6 @@ const (
 	bufferOffset = 1
 )
 
-// TensorType is the schema's TensorType enum.
 type TensorType uint8
 
 const (
@@ -66,7 +64,6 @@ func (t TensorType) String() string {
 	return fmt.Sprintf("type%d", uint8(t))
 }
 
-// Op is the schema's BuiltinOperator enum, limited to the codes this package names.
 type Op int32
 
 const (
@@ -129,7 +126,6 @@ func (o Op) String() string {
 	return fmt.Sprintf("OP_%d", int32(o))
 }
 
-// Activation is the schema's ActivationFunctionType enum.
 type Activation uint8
 
 const (
@@ -141,8 +137,6 @@ const (
 	ActSignBit
 )
 
-// Model is a parsed .tflite file. Weight data is referenced in place, so the byte slice handed
-// to Parse must outlive the model.
 type Model struct {
 	Description string
 	Subgraphs   []*Subgraph
@@ -159,18 +153,14 @@ type Subgraph struct {
 }
 
 type TensorDesc struct {
-	Name string
-	Type TensorType
-	// Shape is the shape recorded at conversion time. Dimensions the signature marks dynamic
-	// hold whatever value the converter traced, so they are a starting point, not a promise.
+	Name     string
+	Type     TensorType
 	Shape    []int
 	Dynamic  []bool
 	Buffer   int
 	Variable bool
 }
 
-// OpDesc is one operator with its builtin options already decoded. Options are read at load so
-// that a kernel invoked every audio frame is not walking flatbuffer vtables to find its stride.
 type OpDesc struct {
 	Op      Op
 	Custom  string
@@ -198,8 +188,6 @@ type OpDesc struct {
 
 var errShort = errors.New("tflite: buffer too short")
 
-// Parse reads a model. Malformed input reaches the accessors as out-of-range indexing, so the
-// panic is converted rather than checked at every offset.
 func Parse(b []byte) (m *Model, err error) {
 	if len(b) < 8 {
 		return nil, errShort
@@ -254,13 +242,17 @@ func Parse(b []byte) (m *Model, err error) {
 			ot := os.table(j)
 			idx := int(ot.u32f(operatorOpcodeIndex, 0))
 			if idx >= codes.len() {
-				return nil, fmt.Errorf("tflite: operator %d has opcode index %d of %d", j, idx, codes.len())
+				return nil, fmt.Errorf(
+					"tflite: operator %d has opcode index %d of %d",
+					j,
+					idx,
+					codes.len(),
+				)
 			}
 			ct := codes.table(idx)
 			code := Op(ct.i32f(opcodeBuiltin, 0))
 			if code == 0 {
-				// Models written before builtin_code widened to int32 carry the code in the
-				// deprecated byte field, and ADD is genuinely zero in both.
+				// Models written before builtin_code widened to int32 carry the code in the deprecated byte field.
 				code = Op(ct.u8f(opcodeDeprecatedBuiltin, 0))
 			}
 			o := &OpDesc{
@@ -282,7 +274,6 @@ func Parse(b []byte) (m *Model, err error) {
 	return m, nil
 }
 
-// buffer returns the constant data for a tensor, or nil when the tensor is computed.
 func (m *Model) buffer(i int) []byte {
 	if i <= 0 || i >= len(m.buffers) {
 		return nil
@@ -299,8 +290,6 @@ type convParams struct {
 	act       Activation
 }
 
-// decodeOptions reads one operator's builtin options. Slot numbers are per options type and
-// mean nothing outside the operator that uses them, hence the switch.
 func (o *OpDesc) decodeOptions(t table, present bool) {
 	o.conv = convParams{strideW: 1, strideH: 1, dilationW: 1, dilationH: 1}
 	o.pool = poolParams{strideW: 1, strideH: 1, filterW: 1, filterH: 1}

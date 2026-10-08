@@ -58,7 +58,8 @@ func (p *Preview) selectStream() (int, int, int) {
 }
 func (p *Preview) placement(box ui.Rect, w, h int) (float32, float32, surface.Matrix) {
 	fw, fh := p.options.Display.Native()
-	x, y, m, _ := p.options.Display.Orientation().Place(fw, fh, geometry.Rect{X: box.X, Y: box.Y, W: box.W, H: box.H}, w, h)
+	x, y, m, _ := p.options.Display.Orientation().
+		Place(fw, fh, geometry.Rect{X: box.X, Y: box.Y, W: box.W, H: box.H}, w, h)
 	return x, y, m
 }
 
@@ -236,7 +237,13 @@ const (
 	camLag   = 200 * time.Millisecond
 )
 
-func (p *Preview) feed(ctx context.Context, c *surface.Client, pts time.Duration, data []byte, done <-chan struct{}) error {
+func (p *Preview) feed(
+	ctx context.Context,
+	c *surface.Client,
+	pts time.Duration,
+	data []byte,
+	done <-chan struct{},
+) error {
 	for {
 		_, err := c.VideoSample(camLayer, pts, 0, data)
 		if !errors.Is(err, surface.Full) {

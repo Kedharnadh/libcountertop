@@ -4,8 +4,6 @@ import "math"
 
 const NameOcean = "Ocean"
 
-// Every wave has to be a different length: hold the period steady and this stops being water and
-// becomes a machine breathing.
 const (
 	oceanWave = 11.0
 	oceanVary = 0.3
@@ -38,14 +36,16 @@ var oceanSound = Sound{
 					period = g.between(oceanWave*(1-oceanVary), oceanWave*(1+oceanVary))
 				}
 
-				// Cubed sine: a swell that leans towards its break rather than a symmetrical hump.
 				if n%ctrl == 0 {
 					s := float32(math.Sin(math.Pi * float64(phase)))
 					env = s * s * s
 				}
 				n++
 
-				out := swell.run(bed.next(g), corner(oceanTrough+(oceanBreak-oceanTrough)*env, g.Rate))
+				out := swell.run(
+					bed.next(g),
+					corner(oceanTrough+(oceanBreak-oceanTrough)*env, g.Rate),
+				)
 				dst[i] = out*(oceanFloor+(1-oceanFloor)*env) + oceanSpray*foam.next(g)*env*env
 			}
 		}

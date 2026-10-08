@@ -5,13 +5,7 @@ import (
 	"math"
 )
 
-// FlatBuffers accessors, enough of the format to read a .tflite file.
-//
-// A table is addressed by its position in the buffer and reached through a vtable that maps
-// field slots to byte offsets within the table. A slot past the end of the vtable, or holding
-// zero, means the field was not written and takes its default. Offsets to tables, strings and
-// vectors are stored relative to the position of the offset itself, so following one is always
-// an addition. Unions occupy two slots: a type byte followed by the value.
+// A vtable slot past the end, or holding zero, means the field takes its default.
 type buf []byte
 
 func (b buf) u8(p uint32) uint8   { return b[p] }
@@ -32,10 +26,8 @@ func root(b buf) table {
 	return table{b, b.u32(0)}
 }
 
-// slot returns the offset of a field within the table, or zero when the field is absent.
 func (t table) slot(id int) uint32 {
-	// The soffset is signed and points backwards, and unsigned wraparound gets the subtraction
-	// right for either sign.
+	// The vtable soffset is signed and points backwards.
 	vt := t.pos - uint32(t.b.i32(t.pos))
 	off := uint32(4 + 2*id)
 	if off >= uint32(t.b.u16(vt)) {

@@ -6,7 +6,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
-// box is a whole screen, which is what the dashboard hands out until it hosts anything else.
 func box(w, h int) ui.Rect { return ui.Rect{W: w, H: h} }
 
 func TestArrangeStaysOnScreen(t *testing.T) {
@@ -38,7 +37,6 @@ func TestArrangeStaysOnScreen(t *testing.T) {
 	}
 }
 
-// The date belongs under the time, not over it.
 func TestArrangePutsTheDateUnderTheTime(t *testing.T) {
 	l, _ := arrange(Read(at(12, 34), true), box(1920, 1200))
 
@@ -47,7 +45,6 @@ func TestArrangePutsTheDateUnderTheTime(t *testing.T) {
 	}
 }
 
-// The suffix sits beside the time, and must not overlap it.
 func TestArrangePutsTheSuffixBesideTheTime(t *testing.T) {
 	l, _ := arrange(Read(at(15, 30), false), box(1920, 1200))
 
@@ -60,7 +57,6 @@ func TestArrangePutsTheSuffixBesideTheTime(t *testing.T) {
 	}
 }
 
-// The block is centered as a whole, so the same margin is left above and below it.
 func TestArrangeCentresTheBlock(t *testing.T) {
 	l, _ := arrange(Read(at(12, 34), true), box(1920, 1200))
 
@@ -72,8 +68,6 @@ func TestArrangeCentresTheBlock(t *testing.T) {
 	}
 }
 
-// The box is what it centers in, not the screen. Offsetting the box has to move the face with it,
-// or a face handed a corner will draw in the middle of the panel.
 func TestArrangeFollowsTheBoxItIsGiven(t *testing.T) {
 	r := Read(at(12, 34), true)
 

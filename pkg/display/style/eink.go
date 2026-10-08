@@ -6,9 +6,15 @@ import (
 
 const Eink = "eink"
 
-var einkStyle = Style{Name: Eink, Palette: "Paper", Family: sans, Kit: eink{}, Shape: func(c *gogui.ThemeCfg) {
-	c.Radius, c.RadiusSmall, c.RadiusMedium, c.RadiusLarge = 0, 0, 0, 2
-}}
+var einkStyle = Style{
+	Name:    Eink,
+	Palette: "Paper",
+	Family:  sans,
+	Kit:     eink{},
+	Shape: func(c *gogui.ThemeCfg) {
+		c.Radius, c.RadiusSmall, c.RadiusMedium, c.RadiusLarge = 0, 0, 0, 2
+	},
+}
 
 type eink struct{}
 
@@ -104,14 +110,22 @@ func rule(vertical bool, marks []Span) func(gogui.SliderLookState) gogui.SliderP
 
 func (eink) Progress(cfg *gogui.ProgressBarCfg) {
 	t := gogui.CurrentTheme().Cfg
-	cfg.Radius, cfg.Color, cfg.ColorBar = gogui.NoRadius, t.TextStyleDef.Color.WithOpacity(0.15), t.TextStyleDef.Color
+	cfg.Radius, cfg.Color, cfg.ColorBar = gogui.NoRadius, t.TextStyleDef.Color.WithOpacity(
+		0.15,
+	), t.TextStyleDef.Color
 }
 
 func (eink) Field(cfg *gogui.InputCfg) {
 	cfg.Radius, cfg.SizeBorder = gogui.NoRadius, gogui.BorderPx(1)
 }
 
-func (k eink) Tab(cfg *gogui.ContainerCfg, st *gogui.TextStyle, state State) { k.Key(cfg, st, state) }
+func (k eink) Tab(
+	cfg *gogui.ContainerCfg,
+	st *gogui.TextStyle,
+	state State,
+) {
+	k.Key(cfg, st, state)
+}
 
 func (eink) Tile(cfg *gogui.ContainerCfg, state State) {
 	t := gogui.CurrentTheme().Cfg

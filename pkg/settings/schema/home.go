@@ -28,7 +28,6 @@ func (p HomePick) Empty() bool {
 	return !p.All && len(p.Labels) == 0 && len(p.Areas) == 0 && len(p.Entities) == 0
 }
 
-// Clone returns a pick with detached selection slices.
 func (p HomePick) Clone() HomePick {
 	p.Labels = slices.Clone(p.Labels)
 	p.Areas = slices.Clone(p.Areas)

@@ -1,8 +1,6 @@
-# Native sources travel with the Go module. Always write outputs into the consumer's tree.
 NATIVE := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 NDK ?= $(firstword $(ANDROID_NDK_HOME) $(ANDROID_NDK_LATEST_HOME) $(wildcard /opt/homebrew/Caskroom/android-ndk/*/AndroidNDK*.app/Contents/NDK))
 NDK_HOST := $(if $(filter Darwin,$(shell uname -s)),darwin-x86_64,linux-x86_64)
-# API is required: the consumer resolves it from board metadata.
 PREFIX ?= countertop
 OUT ?= $(CURDIR)/bin
 NDK_CC := $(NDK)/toolchains/llvm/prebuilt/$(NDK_HOST)/bin/armv7a-linux-androideabi$(API)-clang

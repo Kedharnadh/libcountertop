@@ -4,6 +4,7 @@ import (
 	"time"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
+
 	"github.com/ygelfand/libcountertop/pkg/audio/volume"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
@@ -13,7 +14,6 @@ import (
 	media "github.com/ygelfand/libcountertop/pkg/media/source"
 )
 
-// Player supplies the active playback and its transport.
 type Player interface {
 	Now() media.Now
 	Named() string
@@ -60,7 +60,14 @@ func spans(marks []videoplayer.Mark, length time.Duration) []style.Span {
 	}
 	out := make([]style.Span, 0, len(marks))
 	for _, m := range marks {
-		out = append(out, style.Span{From: float32(m.From) / float32(length), To: float32(m.To) / float32(length), Color: Color(m.Color)})
+		out = append(
+			out,
+			style.Span{
+				From:  float32(m.From) / float32(length),
+				To:    float32(m.To) / float32(length),
+				Color: Color(m.Color),
+			},
+		)
 	}
 	return out
 }

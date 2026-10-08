@@ -24,8 +24,6 @@ func roundTrip(t *testing.T, e Element) Element {
 	return got
 }
 
-// A number is written in the smallest width that holds it, and the width is in the tag rather than
-// beside it.
 func TestANumberTakesTheSmallestWidthThatHoldsIt(t *testing.T) {
 	for _, tc := range []struct {
 		v     uint32
@@ -53,7 +51,7 @@ func TestANumberTakesTheSmallestWidthThatHoldsIt(t *testing.T) {
 	}
 }
 
-// Every assigned Bluetooth identifier is a short UUID, and an audio sink is 0x110b.
+// Audio sink is 0x110b.
 func TestAShortUUIDGoesOutAndComesBack(t *testing.T) {
 	got := roundTrip(t, UUID16(0x110b))
 
@@ -85,7 +83,6 @@ func TestTextAndBoolAndNil(t *testing.T) {
 	}
 }
 
-// Most of a service record is sequences inside sequences, so nesting has to survive the trip.
 func TestSequencesNest(t *testing.T) {
 	want := Sequence(
 		UUID16(0x0100), // L2CAP
@@ -117,8 +114,6 @@ func TestSequencesNest(t *testing.T) {
 	}
 }
 
-// The length is written in as few bytes as hold it, and a record long enough to need two is the
-// case that catches an encoder that only ever writes one.
 func TestALongSequenceUsesAWiderLength(t *testing.T) {
 	var children []Element
 	for range 100 {
@@ -144,8 +139,6 @@ func TestALongSequenceUsesAWiderLength(t *testing.T) {
 	}
 }
 
-// A buffer that has not all arrived is a short read, which a caller tells apart from a malformed
-// one.
 func TestAnElementThatHasNotAllArrived(t *testing.T) {
 	whole, err := Sequence(UUID16(0x110b), Text("a name")).Marshal()
 	if err != nil {
@@ -174,8 +167,6 @@ func TestWhatIsNotAnElement(t *testing.T) {
 	}
 }
 
-// A child that runs past the end of its sequence is a malformed record: the length already said
-// where the sequence stops, so this is not more to read.
 func TestASequenceWhoseChildOverrunsIt(t *testing.T) {
 	// A sequence of two bytes holding a uint that claims four.
 	bad := []byte{TypeSequence<<3 | size8b, 0x02, TypeUint<<3 | size4, 0xff}

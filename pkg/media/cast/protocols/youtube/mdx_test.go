@@ -17,15 +17,21 @@ func launched(t *testing.T, screens screensFunc) (*cast.Receiver, string) {
 	r := cast.NewReceiver("Kitchen")
 	r.Register(&Protocol{screens: screens})
 
-	out, err := r.Receive(cast.Message{Source: cast.SenderID, Destination: cast.ReceiverID,
-		Namespace: cast.NSReceiver, Payload: `{"type":"LAUNCH","requestId":1,"appId":"` + music + `"}`})
+	out, err := r.Receive(cast.Message{
+		Source:      cast.SenderID,
+		Destination: cast.ReceiverID,
+		Namespace:   cast.NSReceiver,
+		Payload:     `{"type":"LAUNCH","requestId":1,"appId":"` + music + `"}`,
+	})
 	if err != nil || len(out) == 0 {
 		t.Fatalf("launch: %d answers, %v", len(out), err)
 	}
 	var st struct {
 		Status cast.ReceiverStatus `json:"status"`
 	}
-	json.Unmarshal([]byte(out[0].Payload), &st)
+	if err := json.Unmarshal([]byte(out[0].Payload), &st); err != nil {
+		t.Fatal(err)
+	}
 	app := st.Status.Applications[0]
 
 	var names []string
@@ -79,8 +85,14 @@ func TestWithNoScreenYetNothingIsAnswered(t *testing.T) {
 func TestAnAppThatDoesNotNameTheProtocolDoesNotSpeakIt(t *testing.T) {
 	r := cast.NewReceiver("Kitchen")
 	r.Register(&Protocol{screens: func(string) (string, string, bool) { return "s", "d", true }})
-	r.Receive(cast.Message{Source: cast.SenderID, Destination: cast.ReceiverID,
-		Namespace: cast.NSReceiver, Payload: `{"type":"LAUNCH","requestId":1,"appId":"C35B0678"}`})
+	if _, err := r.Receive(cast.Message{
+		Source:      cast.SenderID,
+		Destination: cast.ReceiverID,
+		Namespace:   cast.NSReceiver,
+		Payload:     `{"type":"LAUNCH","requestId":1,"appId":"C35B0678"}`,
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	out, _ := r.Receive(cast.Message{Source: "phone-1", Destination: "x",
 		Namespace: NSMDX, Payload: `{"type":"getMdxSessionStatus"}`})

@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	esphome "github.com/ygelfand/go-esphome-device"
+
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
@@ -19,13 +20,53 @@ type entities struct {
 
 func (c *Calls) build() {
 	c.ha = entities{
-		incoming: &esphome.Switch{Base: esphome.Base{ObjectID: "call_incoming", Name: "Incoming calls", Icon: "mdi:phone-incoming", Category: esphome.CategoryConfig}},
-		auto:     &esphome.Switch{Base: esphome.Base{ObjectID: "call_auto_answer", Name: "Auto-answer calls", Icon: "mdi:phone-in-talk", Category: esphome.CategoryConfig}},
-		wake:     &esphome.Switch{Base: esphome.Base{ObjectID: "call_pause_wake", Name: "Pause wake word during calls", Icon: "mdi:microphone-off", Category: esphome.CategoryConfig}},
-		video:    &esphome.Switch{Base: esphome.Base{ObjectID: "call_auto_video", Name: "Auto-answer with camera on", Icon: "mdi:video", Category: esphome.CategoryConfig}},
-		stream:   &esphome.Select{Base: esphome.Base{ObjectID: "call_stream", Name: "Call video stream", Icon: "mdi:video-box", Category: esphome.CategoryConfig}, Options: labels(config.CallStreams())},
-		state:    &esphome.TextSensor{Base: esphome.Base{ObjectID: "call_state", Name: "Call", Icon: "mdi:phone"}},
-		peer:     &esphome.TextSensor{Base: esphome.Base{ObjectID: "call_peer", Name: "Call with", Icon: "mdi:account-voice"}},
+		incoming: &esphome.Switch{
+			Base: esphome.Base{
+				ObjectID: "call_incoming",
+				Name:     "Incoming calls",
+				Icon:     "mdi:phone-incoming",
+				Category: esphome.CategoryConfig,
+			},
+		},
+		auto: &esphome.Switch{
+			Base: esphome.Base{
+				ObjectID: "call_auto_answer",
+				Name:     "Auto-answer calls",
+				Icon:     "mdi:phone-in-talk",
+				Category: esphome.CategoryConfig,
+			},
+		},
+		wake: &esphome.Switch{
+			Base: esphome.Base{
+				ObjectID: "call_pause_wake",
+				Name:     "Pause wake word during calls",
+				Icon:     "mdi:microphone-off",
+				Category: esphome.CategoryConfig,
+			},
+		},
+		video: &esphome.Switch{
+			Base: esphome.Base{
+				ObjectID: "call_auto_video",
+				Name:     "Auto-answer with camera on",
+				Icon:     "mdi:video",
+				Category: esphome.CategoryConfig,
+			},
+		},
+		stream: &esphome.Select{
+			Base: esphome.Base{
+				ObjectID: "call_stream",
+				Name:     "Call video stream",
+				Icon:     "mdi:video-box",
+				Category: esphome.CategoryConfig,
+			},
+			Options: labels(config.CallStreams()),
+		},
+		state: &esphome.TextSensor{
+			Base: esphome.Base{ObjectID: "call_state", Name: "Call", Icon: "mdi:phone"},
+		},
+		peer: &esphome.TextSensor{
+			Base: esphome.Base{ObjectID: "call_peer", Name: "Call with", Icon: "mdi:account-voice"},
+		},
 	}
 	c.ha.incoming.OnCommand = c.SetIncoming
 	c.ha.auto.OnCommand = c.SetAutoAnswer
@@ -39,7 +80,15 @@ func (c *Calls) build() {
 }
 
 func (c *Calls) Entities() []esphome.Entity {
-	return []esphome.Entity{c.ha.incoming, c.ha.auto, c.ha.wake, c.ha.video, c.ha.stream, c.ha.state, c.ha.peer}
+	return []esphome.Entity{
+		c.ha.incoming,
+		c.ha.auto,
+		c.ha.wake,
+		c.ha.video,
+		c.ha.stream,
+		c.ha.state,
+		c.ha.peer,
+	}
 }
 
 func (c *Calls) Restore(cfg config.Call) {

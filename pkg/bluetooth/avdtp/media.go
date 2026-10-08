@@ -5,48 +5,30 @@ import (
 	"fmt"
 )
 
-// Media packets: the audio, which arrives on the transport channel rather than the signalling one.
-//
-// Everything else in this package is a request with an answer. This is the one direction that is
-// neither — packets arrive as fast as the phone encodes them and nothing is sent back, so a mistake
-// here is not a refusal but a stream that decodes to noise.
-//
-// Two headers sit in front of the frames. An RTP header, because A2DP carries audio the way
-// everything else does, and then one byte of A2DP's own saying how many frames follow or which
-// piece of one this is.
+// An RTP header, then one A2DP byte: a frame count or a fragment position.
 
-// rtpHeader is the fixed part, before any contributing sources or extension.
 const rtpHeader = 12
 
-// rtpVersion is the only version there has been.
 const rtpVersion = 2
 
-// Media is one packet off the transport channel.
 type Media struct {
-	// Sequence counts packets and wraps. A gap means a packet was lost, which is audible as a
-	// click and not worth concealing here — a caller that cares can see the gap.
 	Sequence uint16
 
-	// Timestamp counts samples, not time, at whatever rate was configured.
+	// RTP timestamp, in samples at the configured rate.
 	Timestamp uint32
 
 	SSRC uint32
 
-	// Fragmented says Payload is a piece of one frame rather than whole frames. Start and Last
-	// mark the ends of the run; a fragment in the middle has neither.
 	Fragmented bool
 	Start      bool
 	Last       bool
 
-	// Count means two different things depending on Fragmented, which is the part of this header
-	// worth reading twice. Whole packets: how many frames Payload holds. Fragments: how many
-	// pieces of this frame are still to come, counting this one, so the last fragment says 1.
+	// Frames in Payload, or for a fragment the pieces left including this one.
 	Count int
 
 	Payload []byte
 }
 
-// ParseMedia reads one packet.
 func ParseMedia(buf []byte) (Media, error) {
 	if len(buf) < rtpHeader+1 {
 		return Media{}, ErrShort
@@ -56,8 +38,6 @@ func ParseMedia(buf []byte) (Media, error) {
 		return Media{}, fmt.Errorf("avdtp: rtp version %d, want %d", v, rtpVersion)
 	}
 
-	// Contributing sources and an extension are both legal and both rare. Skipping them by their
-	// own lengths is cheaper than refusing a packet that is perfectly well formed.
 	at := rtpHeader + int(buf[0]&0x0f)*4
 	if buf[0]&0x10 != 0 {
 		if len(buf) < at+4 {
@@ -83,7 +63,6 @@ func ParseMedia(buf []byte) (Media, error) {
 	}, nil
 }
 
-// Marshal writes a packet. Only tests send these — a sink receives.
 func (m Media) Marshal() []byte {
 	out := make([]byte, rtpHeader+1+len(m.Payload))
 
@@ -109,26 +88,13 @@ func (m Media) Marshal() []byte {
 	return out
 }
 
-// payloadType is the dynamic type A2DP conventionally uses. Nothing checks it on the way in,
-// because phones do not agree on it and the transport channel carries nothing else anyway.
 const payloadType = 96
 
-// Reassembler puts fragmented frames back together.
-//
-// A frame is only split when it does not fit the transport channel's packet size, which at the
-// bitpools a phone actually picks is uncommon — so this is the path that goes untested on a desk
-// and then runs on somebody's phone. It keeps at most one frame in hand: a run that never finishes
-// is dropped the moment a new one starts, rather than growing.
 type Reassembler struct {
 	partial []byte
 	left    int
 }
 
-// Push takes a packet and returns whatever frames are now complete.
-//
-// A whole packet passes straight through. A fragment is held until its run finishes, and a run that
-// does not add up is dropped — a frame assembled out of pieces of two different ones decodes to a
-// burst of noise, which is worse through a speaker than a missing frame.
 func (r *Reassembler) Push(m Media) []byte {
 	if !m.Fragmented {
 		r.reset()
@@ -136,8 +102,7 @@ func (r *Reassembler) Push(m Media) []byte {
 	}
 
 	if m.Start {
-		// Start and last together is a frame fragmented into one piece, which is a contradiction
-		// the spec allows and some encoders emit at the end of a run.
+		// The spec allows a one-piece fragment with start and last both set.
 		if m.Last {
 			r.reset()
 			return m.Payload
@@ -148,8 +113,6 @@ func (r *Reassembler) Push(m Media) []byte {
 		return nil
 	}
 
-	// A fragment with no run started, or one more than the start packet promised. Either way this
-	// side has lost track and cannot tell which frame the bytes belong to.
 	if r.partial == nil || r.left <= 0 {
 		r.reset()
 		return nil
@@ -162,7 +125,6 @@ func (r *Reassembler) Push(m Media) []byte {
 		return nil
 	}
 
-	// The last fragment has to be the one the count said, or the frame has a hole in it.
 	frame := r.partial
 	short := r.left != 0
 	r.reset()

@@ -7,9 +7,6 @@ import (
 	"time"
 )
 
-// A sender, scripted. Everything goes through Receive the way it would off a real connection.
-
-// from builds a message as a sender would send it.
 func from(sender, namespace, body string) Message {
 	return Message{
 		Source:      sender,
@@ -19,7 +16,6 @@ func from(sender, namespace, body string) Message {
 	}
 }
 
-// toApp is a message addressed to a running application rather than to the receiver.
 func toApp(sender, transport, namespace, body string) Message {
 	return Message{
 		Source:      sender,
@@ -29,7 +25,6 @@ func toApp(sender, transport, namespace, body string) Message {
 	}
 }
 
-// answered is the one message back, and fails if there was not exactly one.
 func answered(t *testing.T, r *Receiver, m Message) Message {
 	t.Helper()
 
@@ -49,7 +44,6 @@ func answered(t *testing.T, r *Receiver, m Message) Message {
 	return direct[0]
 }
 
-// replyTo is the message back to whoever sent one, ignoring any broadcast to the others.
 func replyTo(t *testing.T, r *Receiver, m Message) Message {
 	t.Helper()
 
@@ -67,7 +61,6 @@ func replyTo(t *testing.T, r *Receiver, m Message) Message {
 	return Message{}
 }
 
-// status reads a receiver status out of a payload.
 func status(t *testing.T, payload string) ReceiverStatus {
 	t.Helper()
 
@@ -80,7 +73,6 @@ func status(t *testing.T, payload string) ReceiverStatus {
 	return got.Status
 }
 
-// mediaStatus reads a media status list out of a payload.
 func mediaStatus(t *testing.T, payload string) []MediaStatus {
 	t.Helper()
 
@@ -93,7 +85,6 @@ func mediaStatus(t *testing.T, payload string) []MediaStatus {
 	return got.Status
 }
 
-// player records what the receiver asked it to do.
 type player struct {
 	loaded  *Media
 	at      time.Duration
@@ -124,7 +115,6 @@ func (p *player) Stop() error {
 func (p *player) Seek(to time.Duration) error { p.sought = to; return nil }
 func (p *player) Elapsed() time.Duration      { return p.sought }
 
-// The whole thing, in the order a sender does it: connect, look, launch, load, play, stop.
 func TestASenderCastsSomethingAndControlsIt(t *testing.T) {
 	p := &player{}
 	r := NewReceiver("Kitchen")
@@ -134,24 +124,20 @@ func TestASenderCastsSomethingAndControlsIt(t *testing.T) {
 	r.Launched = func(app string) { launched = app }
 	r.Stopped = func(app string) { stopped = app }
 
-	// Connect, which is not answered.
 	if out, err := r.Receive(from(SenderID, NSConnection, Connect())); err != nil || len(out) != 0 {
 		t.Fatalf("connect gave %d messages, %v", len(out), err)
 	}
 
-	// The heartbeat, which must never be missed.
 	pong := answered(t, r, from(SenderID, NSHeartbeat, Ping()))
 	if h, _ := Kind(pong.Payload); h.Type != TypePong {
 		t.Fatalf("a ping was answered with %q", h.Type)
 	}
 
-	// What are you doing? Nothing.
 	first := answered(t, r, from(SenderID, NSReceiver, `{"type":"GET_STATUS","requestId":1}`))
 	if got := status(t, first.Payload); len(got.Applications) != 0 {
 		t.Errorf("a fresh receiver says %d applications are running", len(got.Applications))
 	}
 
-	// Launch, which is answered with a receiver status and not a type of its own.
 	out := answered(t, r, from(SenderID, NSReceiver,
 		`{"type":"LAUNCH","requestId":2,"appId":"`+DefaultMediaReceiver+`"}`))
 
@@ -178,7 +164,6 @@ func TestASenderCastsSomethingAndControlsIt(t *testing.T) {
 		t.Fatal("the application has no transport id, so nothing can be addressed to it")
 	}
 
-	// It has to say it speaks the media namespace, or a sender never tries.
 	var speaks bool
 	for _, n := range app[0].Namespaces {
 		if n.Name == NSMedia {
@@ -189,7 +174,6 @@ func TestASenderCastsSomethingAndControlsIt(t *testing.T) {
 		t.Error("the application does not claim the media namespace")
 	}
 
-	// Load something.
 	loaded := answered(t, r, toApp(SenderID, transport, NSMedia, `{
 		"type":"LOAD","requestId":3,
 		"media":{"contentId":"http://example/track.mp3","streamType":"BUFFERED","contentType":"audio/mpeg",
@@ -221,7 +205,6 @@ func TestASenderCastsSomethingAndControlsIt(t *testing.T) {
 		t.Fatal("the load produced no session id")
 	}
 
-	// Pause, addressed to that session.
 	paused := answered(t, r, toApp(SenderID, transport, NSMedia,
 		`{"type":"PAUSE","requestId":4,"mediaSessionId":`+itoa(session)+`}`))
 
@@ -232,8 +215,13 @@ func TestASenderCastsSomethingAndControlsIt(t *testing.T) {
 		t.Errorf("state %q after a pause", got[0].PlayerState)
 	}
 
-	// And stop the application.
-	stops, err := r.Receive(from(SenderID, NSReceiver, `{"type":"STOP","requestId":5,"sessionId":"`+app[0].SessionID+`"}`))
+	stops, err := r.Receive(
+		from(
+			SenderID,
+			NSReceiver,
+			`{"type":"STOP","requestId":5,"sessionId":"`+app[0].SessionID+`"}`,
+		),
+	)
 	if err != nil {
 		t.Fatalf("stop: %v", err)
 	}
@@ -241,7 +229,8 @@ func TestASenderCastsSomethingAndControlsIt(t *testing.T) {
 	for _, m := range stops {
 		if m.Namespace == NSMedia {
 			got := mediaStatus(t, m.Payload)
-			idled = len(got) == 1 && got[0].PlayerState == StateIdle && got[0].IdleReason == IdleCancelled
+			idled = len(got) == 1 && got[0].PlayerState == StateIdle &&
+				got[0].IdleReason == IdleCancelled
 		}
 	}
 	if !idled {
@@ -268,13 +257,6 @@ func itoa(v int) string {
 	return string(out)
 }
 
-// A sender that asks for its own application gets it, and gets told that is what is running.
-//
-// This device has one behaviour and nothing to launch, so an id it does not recognise is not a
-// reason to refuse: senders do not read a refusal as an invitation to try the default. Music
-// Assistant asks for C35B0678 and, refused, raises rather than falling back — it tells the person
-// to turn a setting off. What it does next does not depend on the id either, since it sends LOAD
-// on the standard media namespace.
 func TestAnyApplicationIsAccepted(t *testing.T) {
 	for _, app := range []string{DefaultMediaReceiver, "C35B0678", "DD107DDB", "DEADBEEF"} {
 		r := NewReceiver("Kitchen")
@@ -291,7 +273,6 @@ func TestAnyApplicationIsAccepted(t *testing.T) {
 			t.Errorf("%s is running %q, want the id that was asked for", app, got)
 		}
 
-		// Reported as running, because a sender checks that before it sends anything.
 		apps := status(t, out.Payload).Applications
 		if len(apps) != 1 || apps[0].AppID != app {
 			t.Errorf("%s: the status does not name it as running: %+v", app, apps)
@@ -299,8 +280,6 @@ func TestAnyApplicationIsAccepted(t *testing.T) {
 	}
 }
 
-// What is offered stays honest: only the namespaces this device actually speaks are reported, so
-// a sender looking for an application's own protocol can see it is not there.
 func TestAcceptingAnAppDoesNotPromiseItsNamespaces(t *testing.T) {
 	r := NewReceiver("Kitchen")
 
@@ -321,8 +300,6 @@ func TestAcceptingAnAppDoesNotPromiseItsNamespaces(t *testing.T) {
 	}
 }
 
-// A second sender joining the application already running is ordinary, and must not restart it —
-// that would take the music off for whoever started it.
 func TestASecondSenderJoinsRatherThanRestarts(t *testing.T) {
 	r := NewReceiver("Kitchen")
 
@@ -330,7 +307,9 @@ func TestASecondSenderJoinsRatherThanRestarts(t *testing.T) {
 		`{"type":"LAUNCH","requestId":1,"appId":"`+DefaultMediaReceiver+`"}`))
 	was := status(t, first.Payload).Applications[0].SessionID
 
-	r.Receive(from("sender-1", NSConnection, Connect()))
+	if _, err := r.Receive(from("sender-1", NSConnection, Connect())); err != nil {
+		t.Fatal(err)
+	}
 
 	out, err := r.Receive(from("sender-1", NSReceiver,
 		`{"type":"LAUNCH","requestId":1,"appId":"`+DefaultMediaReceiver+`"}`))
@@ -344,13 +323,15 @@ func TestASecondSenderJoinsRatherThanRestarts(t *testing.T) {
 	}
 }
 
-// A change one sender made has to reach the others, or two phones with the app open disagree about
-// whether anything is playing.
 func TestTheOtherSendersAreToldAboutAChange(t *testing.T) {
 	r := NewReceiver("Kitchen")
 
-	r.Receive(from(SenderID, NSConnection, Connect()))
-	r.Receive(from("sender-1", NSConnection, Connect()))
+	if _, err := r.Receive(from(SenderID, NSConnection, Connect())); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Receive(from("sender-1", NSConnection, Connect())); err != nil {
+		t.Fatal(err)
+	}
 
 	out, err := r.Receive(from(SenderID, NSReceiver,
 		`{"type":"LAUNCH","requestId":1,"appId":"`+DefaultMediaReceiver+`"}`))
@@ -376,8 +357,6 @@ func TestTheOtherSendersAreToldAboutAChange(t *testing.T) {
 	}
 }
 
-// Level and mute arrive separately all the time, and setting the other to zero is the difference
-// between muting a speaker and turning it all the way down.
 func TestAMuteDoesNotMoveTheLevel(t *testing.T) {
 	r := NewReceiver("Kitchen")
 
@@ -406,8 +385,6 @@ func TestAMuteDoesNotMoveTheLevel(t *testing.T) {
 	}
 }
 
-// A sender that has lost track and names a session that is not the one loaded must not be allowed
-// to pause music somebody else started.
 func TestACommandForTheWrongSessionIsRefused(t *testing.T) {
 	r := NewReceiver("Kitchen")
 	p := &player{}
@@ -431,8 +408,6 @@ func TestACommandForTheWrongSessionIsRefused(t *testing.T) {
 	}
 }
 
-// Autoplay false is a sender asking for it loaded and paused, which is not the same as not sending
-// the field at all.
 func TestAutoplayFalseLoadsWithoutStarting(t *testing.T) {
 	r := NewReceiver("Kitchen")
 	p := &player{}
@@ -442,8 +417,12 @@ func TestAutoplayFalseLoadsWithoutStarting(t *testing.T) {
 		`{"type":"LAUNCH","requestId":1,"appId":"`+DefaultMediaReceiver+`"}`))
 	transport := status(t, out.Payload).Applications[0].TransportID
 
-	loaded := answered(t, r, toApp(SenderID, transport, NSMedia,
-		`{"type":"LOAD","requestId":2,"autoplay":false,"media":{"contentId":"http://example/a.mp3"}}`))
+	loaded := answered(t, r, toApp(
+		SenderID,
+		transport,
+		NSMedia,
+		`{"type":"LOAD","requestId":2,"autoplay":false,"media":{"contentId":"http://example/a.mp3"}}`,
+	))
 
 	if p.started {
 		t.Error("autoplay false started playing")
@@ -453,7 +432,6 @@ func TestAutoplayFalseLoadsWithoutStarting(t *testing.T) {
 	}
 }
 
-// A load the player refuses is a LOAD_FAILED, and leaves nothing half loaded behind.
 func TestALoadThePlayerRefuses(t *testing.T) {
 	r := NewReceiver("Kitchen")
 	p := &player{fail: errBroken}
@@ -485,8 +463,6 @@ type castError struct{ s string }
 
 func (e *castError) Error() string { return e.s }
 
-// Stopping the media is not stopping the application: a sender can load something else without
-// launching again.
 func TestStoppingTheMediaLeavesTheApplicationUp(t *testing.T) {
 	r := NewReceiver("Kitchen")
 	r.Player = &player{}
@@ -508,20 +484,25 @@ func TestStoppingTheMediaLeavesTheApplicationUp(t *testing.T) {
 	}
 }
 
-// The end of a track is something nothing asked for and every sender wants to hear about.
 func TestFinishingTellsEverySender(t *testing.T) {
 	r := NewReceiver("Kitchen")
 	r.Player = &player{}
 
-	r.Receive(from(SenderID, NSConnection, Connect()))
-	r.Receive(from("sender-1", NSConnection, Connect()))
+	if _, err := r.Receive(from(SenderID, NSConnection, Connect())); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Receive(from("sender-1", NSConnection, Connect())); err != nil {
+		t.Fatal(err)
+	}
 
 	out := replyTo(t, r, from(SenderID, NSReceiver,
 		`{"type":"LAUNCH","requestId":1,"appId":"`+DefaultMediaReceiver+`"}`))
 	transport := status(t, out.Payload).Applications[0].TransportID
 
-	r.Receive(toApp(SenderID, transport, NSMedia,
-		`{"type":"LOAD","requestId":2,"media":{"contentId":"http://example/a.mp3"}}`))
+	if _, err := r.Receive(toApp(SenderID, transport, NSMedia,
+		`{"type":"LOAD","requestId":2,"media":{"contentId":"http://example/a.mp3"}}`)); err != nil {
+		t.Fatal(err)
+	}
 
 	told := r.Finished()
 	if len(told) != 1 || told[0].Destination != Broadcast {
@@ -545,8 +526,6 @@ func TestFinishingTellsEverySender(t *testing.T) {
 	}
 }
 
-// Nothing running means nothing to command, and a sender with a stale transport id has to be told
-// rather than left waiting.
 func TestACommandWithNothingRunning(t *testing.T) {
 	r := NewReceiver("Kitchen")
 
@@ -556,7 +535,6 @@ func TestACommandWithNothingRunning(t *testing.T) {
 	}
 }
 
-// Asking what is playing when nothing is is a fair question with an empty answer, not a refusal.
 func TestAskingWhatIsPlayingWhenNothingIs(t *testing.T) {
 	r := NewReceiver("Kitchen")
 
@@ -571,8 +549,6 @@ func TestAskingWhatIsPlayingWhenNothingIs(t *testing.T) {
 	}
 }
 
-// A payload that is not JSON is a sender's bug, and dropping the connection over it turns that into
-// a device that cannot be cast to.
 func TestRubbishIsAnErrorAndNotAnAnswer(t *testing.T) {
 	r := NewReceiver("Kitchen")
 
@@ -585,7 +561,6 @@ func TestRubbishIsAnErrorAndNotAnAnswer(t *testing.T) {
 	}
 }
 
-// A namespace this does not speak is not answered: the status already listed what is on offer.
 func TestANamespaceThisDoesNotSpeak(t *testing.T) {
 	r := NewReceiver("Kitchen")
 
@@ -598,13 +573,18 @@ func TestANamespaceThisDoesNotSpeak(t *testing.T) {
 	}
 }
 
-// A sender that has gone away stops being told about changes.
 func TestAClosedSenderIsNotToldAnyMore(t *testing.T) {
 	r := NewReceiver("Kitchen")
 
-	r.Receive(from(SenderID, NSConnection, Connect()))
-	r.Receive(from("sender-1", NSConnection, Connect()))
-	r.Receive(from("sender-1", NSConnection, Close()))
+	if _, err := r.Receive(from(SenderID, NSConnection, Connect())); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Receive(from("sender-1", NSConnection, Connect())); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Receive(from("sender-1", NSConnection, Close())); err != nil {
+		t.Fatal(err)
+	}
 
 	out, err := r.Receive(from(SenderID, NSReceiver,
 		`{"type":"LAUNCH","requestId":1,"appId":"`+DefaultMediaReceiver+`"}`))
@@ -618,7 +598,6 @@ func TestAClosedSenderIsNotToldAnyMore(t *testing.T) {
 	}
 }
 
-// A seek moves the player and may say what to do about playing.
 func TestSeeking(t *testing.T) {
 	r := NewReceiver("Kitchen")
 	p := &player{}
@@ -642,8 +621,6 @@ func TestSeeking(t *testing.T) {
 	}
 }
 
-// A sender greys out what the status does not claim, so this is the difference between a pause
-// button that works and one that is not drawn.
 func TestTheStatusSaysWhatCanBeDoneToIt(t *testing.T) {
 	r := NewReceiver("Kitchen")
 	r.Player = &player{}
@@ -670,7 +647,6 @@ func TestTheStatusSaysWhatCanBeDoneToIt(t *testing.T) {
 		}
 	}
 
-	// And does not claim what is not implemented.
 	if got.SupportedMediaCommands&CommandQueueNext != 0 {
 		t.Error("the status claims a queue, which would get a next button that does nothing")
 	}
@@ -680,15 +656,23 @@ func TestTheBroadcastCarriesTheMedia(t *testing.T) {
 	r := NewReceiver("Kitchen")
 	r.Player = &player{}
 
-	r.Receive(from(SenderID, NSConnection, Connect()))
-	r.Receive(from("sender-1", NSConnection, Connect()))
+	if _, err := r.Receive(from(SenderID, NSConnection, Connect())); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Receive(from("sender-1", NSConnection, Connect())); err != nil {
+		t.Fatal(err)
+	}
 
 	out := replyTo(t, r, from(SenderID, NSReceiver,
 		`{"type":"LAUNCH","requestId":1,"appId":"`+DefaultMediaReceiver+`"}`))
 	transport := status(t, out.Payload).Applications[0].TransportID
 
-	answers, err := r.Receive(toApp(SenderID, transport, NSMedia,
-		`{"type":"LOAD","requestId":2,"media":{"contentId":"http://example/a.mp3","metadata":{"title":"x"}}}`))
+	answers, err := r.Receive(toApp(
+		SenderID,
+		transport,
+		NSMedia,
+		`{"type":"LOAD","requestId":2,"media":{"contentId":"http://example/a.mp3","metadata":{"title":"x"}}}`,
+	))
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -711,8 +695,18 @@ func launched(t *testing.T) (*Receiver, string) {
 	t.Helper()
 	r := NewReceiver("dev")
 	r.Player = &player{}
-	r.Receive(from(SenderID, NSConnection, Connect()))
-	out := replyTo(t, r, from(SenderID, NSReceiver, `{"type":"LAUNCH","requestId":1,"appId":"`+DefaultMediaReceiver+`"}`))
+	if _, err := r.Receive(from(SenderID, NSConnection, Connect())); err != nil {
+		t.Fatal(err)
+	}
+	out := replyTo(
+		t,
+		r,
+		from(
+			SenderID,
+			NSReceiver,
+			`{"type":"LAUNCH","requestId":1,"appId":"`+DefaultMediaReceiver+`"}`,
+		),
+	)
 	return r, status(t, out.Payload).Applications[0].TransportID
 }
 
@@ -720,8 +714,26 @@ func TestStreamVolumeIsAccepted(t *testing.T) {
 	r, transport := launched(t)
 	var level float64
 	r.Volume = func(l float64, _ bool) { level = l }
-	replyTo(t, r, toApp(SenderID, transport, NSMedia, `{"type":"LOAD","requestId":2,"media":{"contentId":"http://example/a.mp3"}}`))
-	got := replyTo(t, r, toApp(SenderID, transport, NSMedia, `{"type":"SET_VOLUME","requestId":3,"volume":{"level":0.25}}`))
+	replyTo(
+		t,
+		r,
+		toApp(
+			SenderID,
+			transport,
+			NSMedia,
+			`{"type":"LOAD","requestId":2,"media":{"contentId":"http://example/a.mp3"}}`,
+		),
+	)
+	got := replyTo(
+		t,
+		r,
+		toApp(
+			SenderID,
+			transport,
+			NSMedia,
+			`{"type":"SET_VOLUME","requestId":3,"volume":{"level":0.25}}`,
+		),
+	)
 	if h, _ := Kind(got.Payload); h.Type != TypeMediaStatus {
 		t.Fatalf("answer %s", got.Payload)
 	}
@@ -732,7 +744,16 @@ func TestStreamVolumeIsAccepted(t *testing.T) {
 
 func TestLiveMediaCannotSeek(t *testing.T) {
 	r, transport := launched(t)
-	loaded := replyTo(t, r, toApp(SenderID, transport, NSMedia, `{"type":"LOAD","requestId":2,"media":{"contentUrl":"http://example/radio","streamType":"LIVE","contentType":"audio/mpeg"}}`))
+	loaded := replyTo(
+		t,
+		r,
+		toApp(
+			SenderID,
+			transport,
+			NSMedia,
+			`{"type":"LOAD","requestId":2,"media":{"contentUrl":"http://example/radio","streamType":"LIVE","contentType":"audio/mpeg"}}`,
+		),
+	)
 	s := mediaStatus(t, loaded.Payload)[0]
 	if s.SupportedMediaCommands&CommandSeek != 0 {
 		t.Error("live media offers seek")
@@ -740,19 +761,24 @@ func TestLiveMediaCannotSeek(t *testing.T) {
 	if s.MediaCategory != "AUDIO" {
 		t.Errorf("category %q", s.MediaCategory)
 	}
-	sought := replyTo(t, r, toApp(SenderID, transport, NSMedia, `{"type":"SEEK","requestId":3,"currentTime":30}`))
+	sought := replyTo(
+		t,
+		r,
+		toApp(SenderID, transport, NSMedia, `{"type":"SEEK","requestId":3,"currentTime":30}`),
+	)
 	if h, _ := Kind(sought.Payload); h.Type == TypeMediaStatus {
 		t.Error("a seek on live media was accepted")
 	}
 }
 
-// Forgetting a connection leaves nothing behind for the next one.
 func TestForgettingAConnection(t *testing.T) {
 	r := NewReceiver("Kitchen")
 	p := &player{}
 	r.Player = p
 
-	r.Receive(from(SenderID, NSConnection, Connect()))
+	if _, err := r.Receive(from(SenderID, NSConnection, Connect())); err != nil {
+		t.Fatal(err)
+	}
 	out := answered(t, r, from(SenderID, NSReceiver,
 		`{"type":"LAUNCH","requestId":1,"appId":"`+DefaultMediaReceiver+`"}`))
 	transport := status(t, out.Payload).Applications[0].TransportID
@@ -769,7 +795,6 @@ func TestForgettingAConnection(t *testing.T) {
 		t.Error("the player was not stopped")
 	}
 
-	// And the next launch is answered to that sender alone, since the old ones are gone.
 	again, err := r.Receive(from("sender-2", NSReceiver,
 		`{"type":"LAUNCH","requestId":1,"appId":"`+DefaultMediaReceiver+`"}`))
 	if err != nil {
@@ -784,8 +809,12 @@ func TestForgettingAConnection(t *testing.T) {
 
 func TestEndingFromThisEndTellsEverySender(t *testing.T) {
 	r := NewReceiver("Kitchen")
-	r.Receive(from(SenderID, NSConnection, Connect()))
-	r.Receive(from("sender-1", NSConnection, Connect()))
+	if _, err := r.Receive(from(SenderID, NSConnection, Connect())); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Receive(from("sender-1", NSConnection, Connect())); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := r.Receive(from(SenderID, NSReceiver,
 		`{"type":"LAUNCH","requestId":1,"appId":"`+DefaultMediaReceiver+`"}`)); err != nil {
 		t.Fatal(err)
@@ -810,7 +839,14 @@ func TestEndingFromThisEndTellsEverySender(t *testing.T) {
 
 func TestAMediaChangeIsBroadcastWithoutARequestID(t *testing.T) {
 	r, transport := launched(t)
-	out, err := r.Receive(toApp(SenderID, transport, NSMedia, `{"type":"LOAD","requestId":2,"media":{"contentId":"http://example/a.mp3"}}`))
+	out, err := r.Receive(
+		toApp(
+			SenderID,
+			transport,
+			NSMedia,
+			`{"type":"LOAD","requestId":2,"media":{"contentId":"http://example/a.mp3"}}`,
+		),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -830,12 +866,22 @@ func TestAMediaChangeIsBroadcastWithoutARequestID(t *testing.T) {
 
 func TestConnectingToTheAppGetsTheMediaStatus(t *testing.T) {
 	r, transport := launched(t)
-	r.Receive(toApp(SenderID, transport, NSMedia, `{"type":"LOAD","requestId":2,"media":{"contentId":"http://example/a.mp3"}}`))
+	if _, err := r.Receive(
+		toApp(
+			SenderID,
+			transport,
+			NSMedia,
+			`{"type":"LOAD","requestId":2,"media":{"contentId":"http://example/a.mp3"}}`,
+		),
+	); err != nil {
+		t.Fatal(err)
+	}
 	out, err := r.Receive(toApp("sender-2", transport, NSConnection, Connect()))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(out) != 1 || out[0].Destination != "sender-2" || out[0].Namespace != NSMedia || !strings.Contains(out[0].Payload, `"requestId":0`) {
+	if len(out) != 1 || out[0].Destination != "sender-2" || out[0].Namespace != NSMedia ||
+		!strings.Contains(out[0].Payload, `"requestId":0`) {
 		t.Fatalf("connecting gave %+v", out)
 	}
 	if got := mediaStatus(t, out[0].Payload); len(got) != 1 || got[0].Media == nil {
@@ -847,17 +893,25 @@ func TestAnAppPublishesWhatItPlays(t *testing.T) {
 	r, transport := launched(t)
 	app := &player{playing: true, sought: 42 * time.Second}
 	pub := &Published{
-		Media:    Media{ContentID: "abc", ContentType: "x-youtube/video", StreamType: StreamBuffered, Duration: 300},
+		Media: Media{
+			ContentID:   "abc",
+			ContentType: "x-youtube/video",
+			StreamType:  StreamBuffered,
+			Duration:    300,
+		},
 		State:    StatePlaying,
 		Commands: 311299,
 		Custom:   json.RawMessage(`{"playerState":1}`),
 	}
 	out := r.Publish(app, pub)
-	if len(out) != 1 || out[0].Destination != Broadcast || out[0].Source != transport || strings.Contains(out[0].Payload, "requestId") {
+	if len(out) != 1 || out[0].Destination != Broadcast || out[0].Source != transport ||
+		strings.Contains(out[0].Payload, "requestId") {
 		t.Fatalf("published %+v", out)
 	}
 	s := mediaStatus(t, out[0].Payload)[0]
-	if s.Media == nil || s.Media.ContentID != "abc" || s.SupportedMediaCommands != 311299 || s.CurrentTime != 42 || string(s.CustomData) != `{"playerState":1}` {
+	if s.Media == nil || s.Media.ContentID != "abc" || s.SupportedMediaCommands != 311299 ||
+		s.CurrentTime != 42 ||
+		string(s.CustomData) != `{"playerState":1}` {
 		t.Fatalf("status %s", out[0].Payload)
 	}
 	session := s.MediaSessionID
@@ -869,7 +923,16 @@ func TestAnAppPublishesWhatItPlays(t *testing.T) {
 		t.Error("the same video got a new session")
 	}
 
-	paused := replyTo(t, r, toApp(SenderID, transport, NSMedia, `{"type":"PAUSE","requestId":5,"mediaSessionId":`+itoa(session)+`}`))
+	paused := replyTo(
+		t,
+		r,
+		toApp(
+			SenderID,
+			transport,
+			NSMedia,
+			`{"type":"PAUSE","requestId":5,"mediaSessionId":`+itoa(session)+`}`,
+		),
+	)
 	if app.playing || mediaStatus(t, paused.Payload)[0].PlayerState != StatePaused {
 		t.Errorf("pause gave %s", paused.Payload)
 	}
@@ -893,20 +956,62 @@ func (s *stepper) Step(by int) error { s.by += by; return nil }
 func TestAnAppIsAskedForStatusAndSteps(t *testing.T) {
 	r, transport := launched(t)
 	app := &stepper{}
-	out := r.Publish(app, &Published{Media: Media{ContentID: "abc", StreamType: StreamBuffered}, State: StatePlaying, Commands: CommandQueueNext})
+	out := r.Publish(
+		app,
+		&Published{
+			Media:    Media{ContentID: "abc", StreamType: StreamBuffered},
+			State:    StatePlaying,
+			Commands: CommandQueueNext,
+		},
+	)
 	session := mediaStatus(t, out[0].Payload)[0].MediaSessionID
 
-	asked := answered(t, r, toApp(SenderID, transport, NSMedia, `{"type":"GET_STATUS","requestId":7}`))
-	if s := mediaStatus(t, asked.Payload); len(s) != 1 || s[0].Media == nil || s[0].Media.ContentID != "abc" {
+	asked := answered(
+		t,
+		r,
+		toApp(SenderID, transport, NSMedia, `{"type":"GET_STATUS","requestId":7}`),
+	)
+	if s := mediaStatus(
+		t,
+		asked.Payload,
+	); len(s) != 1 || s[0].Media == nil ||
+		s[0].Media.ContentID != "abc" {
 		t.Fatalf("status %s", asked.Payload)
 	}
 
-	replyTo(t, r, toApp(SenderID, transport, NSMedia, `{"type":"QUEUE_NEXT","requestId":8,"mediaSessionId":`+itoa(session)+`}`))
-	replyTo(t, r, toApp(SenderID, transport, NSMedia, `{"type":"QUEUE_UPDATE","requestId":9,"jump":-1,"mediaSessionId":`+itoa(session)+`}`))
+	replyTo(
+		t,
+		r,
+		toApp(
+			SenderID,
+			transport,
+			NSMedia,
+			`{"type":"QUEUE_NEXT","requestId":8,"mediaSessionId":`+itoa(session)+`}`,
+		),
+	)
+	replyTo(
+		t,
+		r,
+		toApp(
+			SenderID,
+			transport,
+			NSMedia,
+			`{"type":"QUEUE_UPDATE","requestId":9,"jump":-1,"mediaSessionId":`+itoa(session)+`}`,
+		),
+	)
 	if app.by != 0 {
 		t.Errorf("stepped %d", app.by)
 	}
-	replyTo(t, r, toApp(SenderID, transport, NSMedia, `{"type":"QUEUE_UPDATE","requestId":10,"jump":1,"mediaSessionId":`+itoa(session)+`}`))
+	replyTo(
+		t,
+		r,
+		toApp(
+			SenderID,
+			transport,
+			NSMedia,
+			`{"type":"QUEUE_UPDATE","requestId":10,"jump":1,"mediaSessionId":`+itoa(session)+`}`,
+		),
+	)
 	if app.by != 1 {
 		t.Errorf("stepped %d", app.by)
 	}

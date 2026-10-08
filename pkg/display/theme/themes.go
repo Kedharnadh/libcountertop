@@ -1,9 +1,5 @@
 package theme
 
-// All is every theme that can be chosen, in the order they are offered.
-//
-// Dark ones first: the device is a lamp in a room, and most of the time it should be the quieter
-// thing in it.
 var All = []Theme{
 	{
 		Name: "Midnight", Dark: true,
@@ -126,18 +122,13 @@ var All = []Theme{
 	},
 }
 
-// DefaultName is the theme a device nobody has chosen for shows. Light: it is also where a missing
-// or unreadable settings file lands, and a white panel reads as a device warming up where a black
-// one reads as one that has not come on.
 const DefaultName = "Paper"
 
-// Default is that theme.
 func Default() Theme {
 	t, _ := ByName(DefaultName)
 	return t
 }
 
-// Names is every theme, for offering as a setting.
 func Names() []string {
 	out := make([]string, 0, len(All))
 	for _, t := range All {
@@ -146,8 +137,6 @@ func Names() []string {
 	return out
 }
 
-// ByName finds a theme. An unknown name is not one: a device asked for something it does not have
-// keeps what it is showing rather than falling back silently to something else.
 func ByName(name string) (Theme, bool) {
 	for _, t := range All {
 		if t.Name == name {

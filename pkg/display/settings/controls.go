@@ -2,6 +2,7 @@ package settings
 
 import (
 	gogui "github.com/go-gui-org/go-gui/gui"
+
 	widget "github.com/ygelfand/libcountertop/pkg/display/model"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/say"
@@ -17,7 +18,12 @@ func (p *BasicPages) Poster() *shell.Page {
 			return []widget.Row{
 					{Label: say.T("poster.show"), Kind: widget.Toggle, On: cfg.Enabled},
 					{Label: say.T("poster.next"), Dim: !cfg.Enabled},
-					{Label: say.T("poster.every"), Kind: widget.Chevron, Value: cfg.Every.Label(), Dim: !cfg.Enabled},
+					{
+						Label: say.T("poster.every"),
+						Kind:  widget.Chevron,
+						Value: cfg.Every.Label(),
+						Dim:   !cfg.Enabled,
+					},
 				}, []func(int){
 					func(int) { p.options.Poster.SetEnabled(!cfg.Enabled) },
 					func(int) { p.options.Poster.Next() },
@@ -86,13 +92,52 @@ func (p *BasicPages) VolumeEdge() *shell.Page {
 func (p *BasicPages) System() *shell.Page {
 	return &shell.Page{Title: say.T("system.title"), Build: func() ([]widget.Row, []func(int)) {
 		c := p.state()
-		return []widget.Row{{Glyph: gogui.IconTextSize, Label: say.T("settings.language"), Kind: widget.Chevron, Value: say.Name(say.Chosen())}, {Glyph: gogui.IconClock, Label: say.T("datetime.title"), Kind: widget.Chevron, Value: zonepolicy.Label(p.options.Zone.ChosenZone())}, {Glyph: gogui.IconKeyboard, Label: say.T("keyboard.size"), Kind: widget.Chevron, Value: c.Screen.Keyboard.Label()}, {Glyph: gogui.IconSync, Label: say.T("settings.power"), Kind: widget.Chevron}}, []func(int){p.open(func() shell.View { return p.Language() }), p.open(func() shell.View { return p.DateTime() }), p.open(func() shell.View { return p.Keyboard() }), p.open(p.options.PowerPage)}
+		return []widget.Row{
+				{
+					Glyph: gogui.IconTextSize,
+					Label: say.T("settings.language"),
+					Kind:  widget.Chevron,
+					Value: say.Name(say.Chosen()),
+				},
+				{
+					Glyph: gogui.IconClock,
+					Label: say.T("datetime.title"),
+					Kind:  widget.Chevron,
+					Value: zonepolicy.Label(p.options.Zone.ChosenZone()),
+				},
+				{
+					Glyph: gogui.IconKeyboard,
+					Label: say.T("keyboard.size"),
+					Kind:  widget.Chevron,
+					Value: c.Screen.Keyboard.Label(),
+				},
+				{Glyph: gogui.IconSync, Label: say.T("settings.power"), Kind: widget.Chevron},
+			}, []func(int){
+				p.open(func() shell.View { return p.Language() }),
+				p.open(func() shell.View { return p.DateTime() }),
+				p.open(func() shell.View { return p.Keyboard() }),
+				p.open(p.options.PowerPage),
+			}
 	}}
 }
 func (p *BasicPages) DateTime() *shell.Page {
 	return &shell.Page{Title: say.T("datetime.title"), Build: func() ([]widget.Row, []func(int)) {
 		c := p.state()
-		return []widget.Row{{Label: say.T("clock.zone"), Kind: widget.Chevron, Value: zonepolicy.Label(p.options.Zone.ChosenZone())}, {Label: say.T("clock.hours"), Kind: widget.Toggle, On: c.Screen.Hours == config.TwentyFourHour}}, []func(int){p.open(func() shell.View { return p.Zone() }), func(int) { p.toggleHours(c.Screen.Hours) }}
+		return []widget.Row{
+				{
+					Label: say.T("clock.zone"),
+					Kind:  widget.Chevron,
+					Value: zonepolicy.Label(p.options.Zone.ChosenZone()),
+				},
+				{
+					Label: say.T("clock.hours"),
+					Kind:  widget.Toggle,
+					On:    c.Screen.Hours == config.TwentyFourHour,
+				},
+			}, []func(int){
+				p.open(func() shell.View { return p.Zone() }),
+				func(int) { p.toggleHours(c.Screen.Hours) },
+			}
 	}}
 }
 func (p *BasicPages) Keyboard() *shell.Page {

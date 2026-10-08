@@ -6,8 +6,6 @@ import (
 	"math"
 )
 
-// Square fills an axis-aligned square of side size centred on x, y, blending c by its alpha and by
-// how much of each edge pixel it covers.
 func Square(img *image.RGBA, x, y, size float32, c color.NRGBA, additive bool) {
 	b := img.Bounds()
 	x0, y0, x1, y1 := x-size/2, y-size/2, x+size/2, y+size/2
@@ -28,7 +26,6 @@ func cover(p, lo, hi float32) float32 {
 	return max(0, min(p+1, hi)-max(p, lo))
 }
 
-// Line draws a one pixel antialiased line (Xiaolin Wu).
 func Line(img *image.RGBA, x0, y0, x1, y1 float32, c color.NRGBA, additive bool) {
 	line(img, x0, y0, x1, y1, c, additive, false)
 }
@@ -72,8 +69,6 @@ func line(img *image.RGBA, x0, y0, x1, y1 float32, c color.NRGBA, additive, join
 	}
 }
 
-// Polyline strokes the points (x0, y0, x1, y1, ...) at width with round ends. Under a pixel wide it
-// is a hairline with its alpha scaled by the width.
 func Polyline(img *image.RGBA, pts []float32, width float32, c color.NRGBA, additive bool) {
 	if len(pts) < 4 {
 		return
@@ -124,7 +119,6 @@ func Polyline(img *image.RGBA, pts []float32, width float32, c color.NRGBA, addi
 	}
 }
 
-// Under fills between a curve (x ascending: x0, y0, x1, y1, ...) and the row base, column by column.
 func Under(img *image.RGBA, pts []float32, base float32, c color.NRGBA) {
 	b := img.Bounds()
 	yb := min(int(base), b.Dy()-1)
@@ -144,7 +138,6 @@ func Under(img *image.RGBA, pts []float32, base float32, c color.NRGBA) {
 	}
 }
 
-// Over lays a premultiplied RGBA layer onto dst within r, the canvas's source-over.
 func Over(dst, src *image.RGBA, r image.Rectangle) {
 	r = r.Intersect(dst.Bounds()).Intersect(src.Bounds())
 	for y := r.Min.Y; y < r.Max.Y; y++ {
@@ -163,8 +156,6 @@ func Over(dst, src *image.RGBA, r image.Rectangle) {
 	}
 }
 
-// Wedge fills a round-capped segment whose half-width runs from w0 at (ax, ay) to w1 at (bx, by),
-// its edge feathered over soft pixels.
 func Wedge(img *image.RGBA, ax, ay, bx, by, w0, w1, soft float32, c color.NRGBA, additive bool) {
 	b := img.Bounds()
 	dx, dy := bx-ax, by-ay

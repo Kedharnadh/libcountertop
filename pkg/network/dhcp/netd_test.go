@@ -32,23 +32,21 @@ func TestQuote(t *testing.T) {
 	}
 }
 
-// fakeNetd answers one connection with replies, and records what it was asked.
 func fakeNetd(t *testing.T, replies ...string) (*netd, <-chan string) {
 	t.Helper()
 
-	// Not t.TempDir: it puts the test's name in the path, and a socket path has about a hundred
-	// bytes to fit in, which a descriptive name spends on its own.
+	// sun_path holds 108 bytes, and t.TempDir paths can exceed it.
 	dir, err := os.MkdirTemp("", "netd")
 	if err != nil {
 		t.Fatalf("temp dir: %v", err)
 	}
-	t.Cleanup(func() { os.RemoveAll(dir) })
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 
 	ln, err := net.Listen("unix", filepath.Join(dir, "s"))
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
-	t.Cleanup(func() { ln.Close() })
+	t.Cleanup(func() { _ = ln.Close() })
 
 	asked := make(chan string, len(replies))
 	go func() {
@@ -65,7 +63,9 @@ func fakeNetd(t *testing.T, replies ...string) (*netd, <-chan string) {
 				return
 			}
 			asked <- strings.TrimRight(cmd, "\x00")
-			conn.Write([]byte(reply))
+			if _, err := conn.Write([]byte(reply)); err != nil {
+				return
+			}
 		}
 	}()
 
@@ -137,8 +137,6 @@ func TestCmdNumbersEachCommand(t *testing.T) {
 	}
 }
 
-// Without the on-link route, replies to a machine on our own subnet are sent to the router
-// instead of straight to it and never arrive — which reads as a blocked port and is not one.
 func TestOnLink(t *testing.T) {
 	tests := []struct {
 		name string
@@ -161,7 +159,6 @@ func TestOnLink(t *testing.T) {
 	}
 }
 
-// A lease with nothing usable gives no route rather than a wrong one.
 func TestOnLinkWithoutAMask(t *testing.T) {
 	if got := onLink(net.IPNet{IP: net.ParseIP("10.0.0.1")}); got != "" {
 		t.Errorf("onLink with no mask gave %q", got)

@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// A connect carries four fixed bytes before its headers, which nothing else does.
 func TestAConnectCarriesItsVersionAndSize(t *testing.T) {
 	raw := Connect(672, CoverArtTarget).Marshal()
 
@@ -37,7 +36,6 @@ func TestAConnectCarriesItsVersionAndSize(t *testing.T) {
 	}
 }
 
-// The answer to a connect hands back the identifier every later request carries.
 func TestReadingTheAnswerToAConnect(t *testing.T) {
 	raw := []byte{OK, 0, 0, Version, 0, 0x02, 0x00}
 	raw = append(raw, Uint32(HeaderConnection, 0x12345678).Marshal()...)
@@ -63,8 +61,6 @@ func TestReadingTheAnswerToAConnect(t *testing.T) {
 	}
 }
 
-// A handle is seven ascii digits and travels as utf-16, null terminated. Sixteen bytes, and a
-// target that is handed eight will not find the image.
 func TestAHandleIsSixteenBytesOfUnicode(t *testing.T) {
 	h := Text(HeaderName, "2964560")
 
@@ -79,7 +75,6 @@ func TestAHandleIsSixteenBytesOfUnicode(t *testing.T) {
 	}
 }
 
-// The whole of asking for a thumbnail, which is the request the player card makes.
 func TestAskingForAThumbnail(t *testing.T) {
 	raw := Thumbnail(0x0a0b0c0d, "2964560").Marshal()
 
@@ -108,7 +103,6 @@ func TestAskingForAThumbnail(t *testing.T) {
 		t.Errorf("type %q, want it null terminated", kind.Value)
 	}
 
-	// The image handle header is what a target reads the handle from.
 	if _, ok := Find(headers, HeaderImgHandle); !ok {
 		t.Error("the handle is not in the image handle header")
 	}
@@ -117,7 +111,6 @@ func TestAskingForAThumbnail(t *testing.T) {
 	}
 }
 
-// A long image arrives over several answers: body, body, then end of body.
 func TestABodyArrivingInPieces(t *testing.T) {
 	first, err := ParseAnswer(answer(Continue, Bytes(HeaderBody, []byte("abc"))), false)
 	if err != nil {
@@ -140,8 +133,6 @@ func TestABodyArrivingInPieces(t *testing.T) {
 	}
 }
 
-// The request for the rest carries the session and nothing else. Repeating the name would start
-// the fetch over instead of continuing it.
 func TestAskingForTheRestCarriesOnlyTheSession(t *testing.T) {
 	headers, err := ParseHeaders(More(7).Marshal()[packetHeader:])
 	if err != nil {
@@ -156,8 +147,6 @@ func TestAskingForTheRestCarriesOnlyTheSession(t *testing.T) {
 	}
 }
 
-// Each encoding is a different width, and a reader that guesses wrong reads the next header's
-// identifier as data.
 func TestHeadersOfEveryEncodingRoundTrip(t *testing.T) {
 	want := []Header{
 		Text(HeaderName, "hi"),
@@ -187,14 +176,12 @@ func TestHeadersOfEveryEncodingRoundTrip(t *testing.T) {
 	}
 }
 
-// A header claiming more than arrived is refused rather than read past.
 func TestAHeaderLongerThanThePacket(t *testing.T) {
 	if _, err := ParseHeaders([]byte{HeaderType, 0x00, 0x40, 0x01}); err == nil {
 		t.Error("a header claiming 64 bytes with one present was accepted")
 	}
 }
 
-// A length under the header size would have a reader looping on the same bytes.
 func TestAHeaderClaimingLessThanItsOwnHeader(t *testing.T) {
 	if _, err := ParseHeaders([]byte{HeaderType, 0x00, 0x01, 0xff}); err == nil {
 		t.Error("a header claiming one byte was accepted")
@@ -207,7 +194,6 @@ func TestAPacketShorterThanItsHeader(t *testing.T) {
 	}
 }
 
-// answer builds a response packet with these headers.
 func answer(code byte, headers ...Header) []byte {
 	out := []byte{code, 0, 0}
 	for _, h := range headers {

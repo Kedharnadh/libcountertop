@@ -11,19 +11,28 @@ import (
 )
 
 func NewRoot() *cobra.Command {
-	root := Group("ctl", "Drive the running device", "Commands act on the live daemon. Input coordinates follow the viewed orientation.")
+	root := Group(
+		"ctl",
+		"Drive the running device",
+		"Commands act on the live daemon. Input coordinates follow the viewed orientation.",
+	)
 	root.SilenceErrors, root.SilenceUsage = true, true
 	root.CompletionOptions.DisableDefaultCmd = true
 	return root
 }
 
 func Group(use, short, long string) *cobra.Command {
-	return &cobra.Command{Use: use, Short: short, Long: long, RunE: func(cmd *cobra.Command, args []string) error {
-		if len(args) > 0 {
-			return fmt.Errorf("%s: %q is not one of its commands", cmd.Name(), args[0])
-		}
-		return cmd.Help()
-	}}
+	return &cobra.Command{
+		Use:   use,
+		Short: short,
+		Long:  long,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				return fmt.Errorf("%s: %q is not one of its commands", cmd.Name(), args[0])
+			}
+			return cmd.Help()
+		},
+	}
 }
 
 func Says(cmd *cobra.Command, run func([]string) (string, error)) *cobra.Command {
@@ -37,7 +46,10 @@ func Says(cmd *cobra.Command, run func([]string) (string, error)) *cobra.Command
 	return cmd
 }
 
-func ContextSays(cmd *cobra.Command, run func(context.Context, []string) (string, error)) *cobra.Command {
+func ContextSays(
+	cmd *cobra.Command,
+	run func(context.Context, []string) (string, error),
+) *cobra.Command {
 	cmd.RunE = func(c *cobra.Command, args []string) error {
 		out, err := run(c.Context(), args)
 		if out != "" {
@@ -61,21 +73,46 @@ func Literal(cmd *cobra.Command) {
 }
 
 var categories = map[string]string{
-	"version": "device", "state": "device", "log": "device", "peers": "device", "wait": "device", "ready": "device",
-	"tap": "input", "hold": "input", "swipe": "input", "button": "input", "turn": "input",
-	"shot": "display", "size": "display", "stats": "display", "fps": "display", "open": "display", "stack": "display", "message": "display", "clear": "display", "gltime": "display", "render": "display", "clip": "display", "thumbs": "display", "boot": "display",
-	"record": "audio", "echo": "audio", "volume": "audio", "mixer": "audio", "player": "audio", "cancel": "audio",
+	"version": "device",
+	"state":   "device",
+	"log":     "device",
+	"peers":   "device",
+	"wait":    "device",
+	"ready":   "device",
+	"tap":     "input",
+	"hold":    "input",
+	"swipe":   "input",
+	"button":  "input",
+	"turn":    "input",
+	"shot":    "display",
+	"size":    "display",
+	"stats":   "display",
+	"fps":     "display",
+	"open":    "display",
+	"stack":   "display",
+	"message": "display",
+	"clear":   "display",
+	"gltime":  "display",
+	"render":  "display",
+	"clip":    "display",
+	"thumbs":  "display",
+	"boot":    "display",
+	"timer":   "display",
+	"record":  "audio",
+	"echo":    "audio",
+	"volume":  "audio",
+	"mixer":   "audio",
+	"player":  "audio",
+	"cancel":  "audio",
 	"youtube": "media",
 }
 
-// Organize gives independently supplied board commands a consistent task hierarchy.
 func Organize(root *cobra.Command) {
 	commands := root.Commands()
 	root.RemoveCommand(commands...)
 	groups := make(map[string]*cobra.Command)
 	var echo, record *cobra.Command
-	var put func(*cobra.Command)
-	put = func(cmd *cobra.Command) {
+	put := func(cmd *cobra.Command) {
 		name := cmd.Name()
 		if name == "echo" {
 			echo = cmd
@@ -117,9 +154,15 @@ func Organize(root *cobra.Command) {
 			record.AddCommand(echo)
 		} else if strings.Contains(record.Use, "raw|echo") {
 			for _, mode := range []string{"raw", "echo"} {
-				record.AddCommand(&cobra.Command{Use: mode + " SECONDS [PATH]", Args: cobra.RangeArgs(1, 2), RunE: func(cmd *cobra.Command, args []string) error {
-					return record.RunE(cmd, append([]string{mode}, args...))
-				}})
+				record.AddCommand(
+					&cobra.Command{
+						Use:  mode + " SECONDS [PATH]",
+						Args: cobra.RangeArgs(1, 2),
+						RunE: func(cmd *cobra.Command, args []string) error {
+							return record.RunE(cmd, append([]string{mode}, args...))
+						},
+					},
+				)
 			}
 		}
 	}
@@ -133,7 +176,6 @@ func Organize(root *cobra.Command) {
 	Literal(root)
 }
 
-// Execute builds a fresh tree per request; Cobra's parsed state is never shared across callers.
 func Execute(ctx context.Context, makeTree func() *cobra.Command, args []string) (string, error) {
 	root := makeTree()
 	var out strings.Builder
@@ -156,7 +198,12 @@ func Execute(ctx context.Context, makeTree func() *cobra.Command, args []string)
 }
 
 func WaitCommand() *cobra.Command {
-	return &cobra.Command{Use: "wait MILLISECONDS", Short: "Wait between harness steps", Args: cobra.ExactArgs(1), RunE: wait}
+	return &cobra.Command{
+		Use:   "wait MILLISECONDS",
+		Short: "Wait between harness steps",
+		Args:  cobra.ExactArgs(1),
+		RunE:  wait,
+	}
 }
 
 func wait(cmd *cobra.Command, args []string) error {

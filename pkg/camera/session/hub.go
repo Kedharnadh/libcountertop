@@ -14,7 +14,6 @@ var ErrMuted = errors.New("livecam: the camera is off while the microphones are 
 var ErrNoStill = errors.New("livecam: the helper could not make a picture")
 var ErrRestarted = errors.New("livecam: the camera configuration changed")
 
-// Size is the encoded camera frame geometry.
 type Size struct {
 	Width  int `json:"width"`
 	Height int `json:"height"`
@@ -25,7 +24,6 @@ type Picture struct {
 	Width, Height int
 }
 
-// Transport is the vendor camera helper's socket, not a direct camera-node owner.
 type Transport interface {
 	Next(time.Duration) (helper.Frame, error)
 	AskStill() error
@@ -34,7 +32,6 @@ type Transport interface {
 	Close() error
 }
 
-// Snapshot distinguishes session geometry/encoding changes from parameters applied in place.
 type Snapshot struct {
 	Config     helper.Config
 	Key        string
@@ -125,7 +122,13 @@ func (h *Hub) acquire() (*Session, error) {
 			}
 			return nil, err
 		}
-		s := &Session{hub: h, stream: stream, snapshot: snapshot, done: make(chan struct{}), opened: time.Now()}
+		s := &Session{
+			hub:      h,
+			stream:   stream,
+			snapshot: snapshot,
+			done:     make(chan struct{}),
+			opened:   time.Now(),
+		}
 		h.cur = s
 		go h.read(s)
 		go h.follow(s)
@@ -152,7 +155,6 @@ func (h *Hub) release(s *Session) {
 	})
 }
 
-// retire invalidates only this session. Existing consumers observe its read loop ending.
 func (h *Hub) retire(s *Session, cause error) {
 	s.idle.Cancel()
 	if cause != nil && s.err == nil {
@@ -161,7 +163,7 @@ func (h *Hub) retire(s *Session, cause error) {
 	if h.cur == s {
 		h.cur = nil
 	}
-	s.stream.Close()
+	_ = s.stream.Close()
 }
 func (h *Hub) Join(at int) (*Session, <-chan helper.Frame, error) {
 	if at < 0 || at >= 2 {
@@ -185,7 +187,6 @@ func (h *Hub) Join(at int) (*Session, <-chan helper.Frame, error) {
 	return s, ch, nil
 }
 
-// Leave is idempotent, including after the session was replaced.
 func (h *Hub) Leave(s *Session, frames <-chan helper.Frame) {
 	if s == nil || s.hub != h {
 		return
@@ -195,7 +196,10 @@ func (h *Hub) Leave(s *Session, frames <-chan helper.Frame) {
 	found := false
 	for at := range s.out {
 		before := len(s.out[at])
-		s.out[at] = slices.DeleteFunc(s.out[at], func(ch chan helper.Frame) bool { return ch == frames })
+		s.out[at] = slices.DeleteFunc(
+			s.out[at],
+			func(ch chan helper.Frame) bool { return ch == frames },
+		)
 		found = found || len(s.out[at]) != before
 	}
 	if found {
@@ -248,7 +252,6 @@ func (h *Hub) Still(within time.Duration) (Picture, error) {
 		err = s.stream.AskStill()
 	}
 	h.mu.Unlock()
-	// Remove canceled/failed requests so a later response cannot block delivery or suppress a new ask.
 	defer func() {
 		h.mu.Lock()
 		s.stills = slices.DeleteFunc(s.stills, func(ch chan helper.Frame) bool { return ch == got })
@@ -355,7 +358,6 @@ func (h *Hub) read(s *Session) {
 	}
 }
 
-// Sizes is the encoded geometry of each enabled stream in the current snapshot.
 func (h *Hub) Sizes() []Size {
 	c := h.options.Snapshot().Config
 	if c.Width <= 0 || c.Height <= 0 {

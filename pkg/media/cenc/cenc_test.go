@@ -25,10 +25,44 @@ func u32(v uint32) []byte { return binary.BigEndian.AppendUint32(nil, v) }
 func u64(v uint64) []byte { return binary.BigEndian.AppendUint64(nil, v) }
 
 var (
-	trackKey = [16]byte{0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f}
-	groupKey = [16]byte{0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xaa, 0xab, 0xac, 0xad, 0xae, 0xaf}
-	sps      = []byte{0x67, 0x4d, 0x40, 0x1f, 0x01}
-	pps      = []byte{0x68, 0xee, 0x3c}
+	trackKey = [16]byte{
+		0x10,
+		0x11,
+		0x12,
+		0x13,
+		0x14,
+		0x15,
+		0x16,
+		0x17,
+		0x18,
+		0x19,
+		0x1a,
+		0x1b,
+		0x1c,
+		0x1d,
+		0x1e,
+		0x1f,
+	}
+	groupKey = [16]byte{
+		0xa0,
+		0xa1,
+		0xa2,
+		0xa3,
+		0xa4,
+		0xa5,
+		0xa6,
+		0xa7,
+		0xa8,
+		0xa9,
+		0xaa,
+		0xab,
+		0xac,
+		0xad,
+		0xae,
+		0xaf,
+	}
+	sps = []byte{0x67, 0x4d, 0x40, 0x1f, 0x01}
+	pps = []byte{0x68, 0xee, 0x3c}
 )
 
 func tenc(kid [16]byte, ivSize byte) []byte {
@@ -112,10 +146,17 @@ func segmentOf(decode uint64, samples []fakeSample, senc, aux bool, groups []int
 			for range samples {
 				sizes = append(sizes, 16)
 			}
-			parts = append(parts, full("saiz", 0, 0, sizes), full("saio", 0, 0, u32(1), u32(auxOffset)))
+			parts = append(
+				parts,
+				full("saiz", 0, 0, sizes),
+				full("saio", 0, 0, u32(1), u32(auxOffset)),
+			)
 		}
 		if senc {
-			parts = append(parts, full("senc", 0, sencSubsample, u32(uint32(len(samples))), auxData))
+			parts = append(
+				parts,
+				full("senc", 0, sencSubsample, u32(uint32(len(samples))), auxData),
+			)
 		}
 		if groups != nil {
 			entry := append([]byte{0, 0, 1, 8}, groupKey[:]...)
@@ -168,7 +209,8 @@ func TestAVideoInitReadsItsProtectionAndParameterSets(t *testing.T) {
 	if tr.Scheme != SchemeCENC || tr.KeyID != trackKey || tr.IVSize != 8 || tr.LengthSize != 4 {
 		t.Errorf("protection %q %x iv %d len %d", tr.Scheme, tr.KeyID, tr.IVSize, tr.LengthSize)
 	}
-	if len(tr.SPS) != 1 || !bytes.Equal(tr.SPS[0], sps) || len(tr.PPS) != 1 || !bytes.Equal(tr.PPS[0], pps) {
+	if len(tr.SPS) != 1 || !bytes.Equal(tr.SPS[0], sps) || len(tr.PPS) != 1 ||
+		!bytes.Equal(tr.PPS[0], pps) {
 		t.Errorf("parameter sets %x %x", tr.SPS, tr.PPS)
 	}
 }
@@ -178,7 +220,8 @@ func TestAnAudioInitReadsItsRateChannelsAndConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tr.Format != "mp4a" || tr.Rate != 44100 || tr.Channels != 2 || !bytes.Equal(tr.Config, []byte{0x12, 0x10}) {
+	if tr.Format != "mp4a" || tr.Rate != 44100 || tr.Channels != 2 ||
+		!bytes.Equal(tr.Config, []byte{0x12, 0x10}) {
 		t.Errorf("track %s %d Hz x %d config %x", tr.Format, tr.Rate, tr.Channels, tr.Config)
 	}
 }
@@ -198,7 +241,8 @@ func checkPictures(t *testing.T, samples []Sample, want []fakeSample, keys [][16
 		if s.IV != iv || s.KeyID != keys[i] {
 			t.Errorf("#%d iv %x key %x", i, s.IV, s.KeyID)
 		}
-		if len(s.Subsamples) != 1 || s.Subsamples[0].Clear != uint32(w.clear) || int(s.Subsamples[0].Clear+s.Subsamples[0].Encrypted) != len(w.data) {
+		if len(s.Subsamples) != 1 || s.Subsamples[0].Clear != uint32(w.clear) ||
+			int(s.Subsamples[0].Clear+s.Subsamples[0].Encrypted) != len(w.data) {
 			t.Errorf("#%d subsamples %v", i, s.Subsamples)
 		}
 	}

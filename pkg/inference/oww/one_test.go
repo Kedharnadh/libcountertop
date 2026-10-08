@@ -7,9 +7,6 @@ import (
 	"testing"
 )
 
-// TestScoreOne scores one clip with one model, both given explicitly, so a number can be compared
-// against another implementation with no model selection in the way. ONE_NOPAD feeds the clip as
-// it is, for clips that already carry their own silence; ONE_SEQ prints every score.
 func TestScoreOne(t *testing.T) {
 	model, clip := os.Getenv("ONE_MODEL"), os.Getenv("ONE_CLIP")
 	if model == "" || clip == "" {

@@ -23,7 +23,17 @@ const SponsorBlockURL = "https://sponsor.ajay.app/api/skipSegments"
 
 const sponsorBlockWait = 3 * time.Second
 
-var Categories = []string{"sponsor", "selfpromo", "interaction", "intro", "outro", "preview", "hook", "music_offtopic", "filler"}
+var Categories = []string{
+	"sponsor",
+	"selfpromo",
+	"interaction",
+	"intro",
+	"outro",
+	"preview",
+	"hook",
+	"music_offtopic",
+	"filler",
+}
 
 func ParseCategories(text string) []string {
 	var out []string
@@ -60,7 +70,12 @@ func marks(segs []Segment) []playback.Mark {
 	return out
 }
 
-func Segments(ctx context.Context, c *http.Client, endpoint, id string, categories []string) ([]Segment, error) {
+func Segments(
+	ctx context.Context,
+	c *http.Client,
+	endpoint, id string,
+	categories []string,
+) ([]Segment, error) {
 	if len(categories) == 0 {
 		return nil, nil
 	}
@@ -106,7 +121,8 @@ func Segments(ctx context.Context, c *http.Client, endpoint, id string, categori
 			continue
 		}
 		for _, s := range v.Segments {
-			if s.ActionType != "skip" || !slices.Contains(categories, s.Category) || len(s.Segment) != 2 {
+			if s.ActionType != "skip" || !slices.Contains(categories, s.Category) ||
+				len(s.Segment) != 2 {
 				continue
 			}
 			from, to := s.Segment[0], s.Segment[1]

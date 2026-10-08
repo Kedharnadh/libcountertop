@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-// element builds one media element item the way a target writes it.
 func element(uid uint64, name string, attrs map[uint32]string) []byte {
 	body := binary.BigEndian.AppendUint64(nil, uid)
 	body = append(body, 0x00)                          // audio
@@ -26,7 +25,6 @@ func element(uid uint64, name string, attrs map[uint32]string) []byte {
 	return append(out, body...)
 }
 
-// listing wraps items as a whole GetFolderItems answer.
 func listing(items ...[]byte) []byte {
 	out := []byte{BrowseOK}
 	out = binary.BigEndian.AppendUint16(out, 1) // uid counter
@@ -37,8 +35,6 @@ func listing(items ...[]byte) []byte {
 	return out
 }
 
-// A now playing list is what says which track comes next, which nothing on the control channel
-// reports.
 func TestReadingANowPlayingList(t *testing.T) {
 	raw := listing(
 		element(52, "3AM", map[uint32]string{
@@ -71,8 +67,6 @@ func TestReadingANowPlayingList(t *testing.T) {
 	}
 }
 
-// Every entry carries its own length, so a kind this does not read is stepped over rather than
-// ending the list. A target sends what it likes.
 func TestAnUnreadableKindDoesNotEndTheList(t *testing.T) {
 	odd := []byte{0x7f, 0x00, 0x03, 0xaa, 0xbb, 0xcc}
 
@@ -90,15 +84,12 @@ func TestAnUnreadableKindDoesNotEndTheList(t *testing.T) {
 	}
 }
 
-// A refusal is an error rather than an empty list, so a caller does not read "no tracks" as "the
-// queue is empty".
 func TestARefusedListingIsAnError(t *testing.T) {
 	if _, err := ParseFolderItems([]byte{BrowseNoPlayers, 0, 0, 0, 0}); err == nil {
 		t.Error("a refused listing came back as an empty one")
 	}
 }
 
-// A count larger than what arrived yields what is there rather than reading past it.
 func TestACountLargerThanTheListing(t *testing.T) {
 	raw := listing(element(1, "Only", nil))
 	raw[3], raw[4] = 0x00, 0x09 // claim nine
@@ -118,7 +109,6 @@ func TestAListingShorterThanItsHeader(t *testing.T) {
 	}
 }
 
-// The request names the scope and an inclusive range, and asks for every attribute.
 func TestAskingForARangeOfAList(t *testing.T) {
 	b := FolderItems(ScopeNowPlaying, 0, 24)
 
@@ -150,7 +140,6 @@ func TestPointingAtAPlayer(t *testing.T) {
 	}
 }
 
-// folder builds one folder item, which carries a byte more than an element does before its name.
 func folder(uid uint64, name string) []byte {
 	body := binary.BigEndian.AppendUint64(nil, uid)
 	body = append(body, 0x01)                          // titles
@@ -178,7 +167,6 @@ func TestAFolderIsNamedFromOneByteFurtherIn(t *testing.T) {
 	}
 }
 
-// The count comes before the range, because a target refuses a range that runs past the end.
 func TestCountingAScope(t *testing.T) {
 	b := TotalItems(ScopeNowPlaying)
 
@@ -208,8 +196,6 @@ func TestARefusedCountIsAnError(t *testing.T) {
 	}
 }
 
-// The artwork of anything but the playing track is asked for one entry at a time, since a listing
-// carries it only for what is playing.
 func TestAskingAboutOneEntry(t *testing.T) {
 	b := ItemAttributes(ScopeNowPlaying, 4, 2, AttrCoverArt)
 
@@ -254,7 +240,6 @@ func TestReadingWhatAnEntrySaid(t *testing.T) {
 	}
 }
 
-// The counter a listing came with is what an entry is asked about against.
 func TestTheCounterOfAListing(t *testing.T) {
 	got, ok := Counter(listing(element(1, "Aja", nil)))
 	if !ok {

@@ -11,15 +11,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 )
 
-// Every primitive that is handed a rectangle draws inside it.
-//
-// This is the contract everything else in the tree is built on: a face, a row, a card and an
-// overlay all place things by working out a rectangle and calling one of these. FillRounded was
-// painting one pixel outside itself for years and nothing noticed, which is the argument for
-// checking the rest rather than assuming.
-//
-// The shapes are deliberately awkward — one pixel, one dimension far larger than the other, an even
-// and an odd size — because that is where rounding and centring go wrong.
 func TestEveryPrimitiveStaysInsideTheRectangleItIsGiven(t *testing.T) {
 	palette := theme.Default()
 
@@ -46,7 +37,10 @@ func TestEveryPrimitiveStaysInsideTheRectangleItIsGiven(t *testing.T) {
 		{"FillRounded 1", func(s Surface, r Rect) { FillRounded(s, r, 1, white) }},
 		{"FillRounded half", func(s Surface, r Rect) { FillRounded(s, r, min(r.W, r.H)/2, white) }},
 		{"FillRounded huge", func(s Surface, r Rect) { FillRounded(s, r, max(r.W, r.H), white) }},
-		{"DrawIcon", func(s Surface, r Rect) { DrawIcon(s, icons.ActionSettings, r, white, black) }},
+		{
+			"DrawIcon",
+			func(s Surface, r Rect) { DrawIcon(s, icons.ActionSettings, r, white, black) },
+		},
 		{"DrawIconFilling", func(s Surface, r Rect) {
 			DrawIconFilling(s, icons.ActionSettings, r, white, black)
 		}},
@@ -61,7 +55,6 @@ func TestEveryPrimitiveStaysInsideTheRectangleItIsGiven(t *testing.T) {
 		}},
 	}
 
-	// Room on all four sides, so an overrun in any direction lands where it can be seen.
 	const pad = 12
 
 	for _, d := range draws {
@@ -75,13 +68,19 @@ func TestEveryPrimitiveStaysInsideTheRectangleItIsGiven(t *testing.T) {
 			d.draw(img, at)
 
 			if painted := Changed(blank, img); !at.Holds(painted) {
-				t.Errorf("%s in %dx%d painted %+v, outside %+v", d.name, shape.W, shape.H, painted, at)
+				t.Errorf(
+					"%s in %dx%d painted %+v, outside %+v",
+					d.name,
+					shape.W,
+					shape.H,
+					painted,
+					at,
+				)
 			}
 		}
 	}
 }
 
-// An image drawn at a point covers its own size from there and no more.
 func TestDrawingAnImageCoversItsOwnSize(t *testing.T) {
 	palette := theme.Default()
 	art := NewImage(23, 17, palette.Accent)
@@ -98,7 +97,6 @@ func TestDrawingAnImageCoversItsOwnSize(t *testing.T) {
 	}
 }
 
-// Text centred in a box stays in it, as long as it fits. What happens when it does not is #141.
 func TestTextThatFitsStaysInItsBox(t *testing.T) {
 	const pad = 20
 	font := MustLoad(Regular, 18)

@@ -98,7 +98,12 @@ func TestVisibleIsTheCoveringViewAndWhatIsAboveIt(t *testing.T) {
 	s.Push(page)
 	s.Push(card)
 	if s.Visible(under) || !s.Visible(page) || !s.Visible(card) {
-		t.Errorf("visible: under %v page %v card %v", s.Visible(under), s.Visible(page), s.Visible(card))
+		t.Errorf(
+			"visible: under %v page %v card %v",
+			s.Visible(under),
+			s.Visible(page),
+			s.Visible(card),
+		)
 	}
 }
 

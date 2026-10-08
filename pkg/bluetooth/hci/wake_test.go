@@ -7,12 +7,6 @@ import (
 	"time"
 )
 
-// Waking a chip on a busy line.
-//
-// The acknowledgement is one byte in a stream also carrying advertising reports, and it does not
-// arrive at the front of it. Waking means reading past whole packets to reach it.
-
-// advertising is an LE meta event, the packet the acknowledgement arrives behind.
 func advertising() []byte {
 	body := []byte{0x02, 0x01, 0x03, 0x00, 0x01, 0x63, 0x81, 0x46, 0x00, 0x00, 0x1e}
 	return append([]byte{typeEvent, 0x3e, byte(len(body))}, body...)
@@ -22,7 +16,6 @@ func TestWakingPastWhatIsAlreadyOnTheLine(t *testing.T) {
 	p, chip := paired(t)
 	p.asleep.Store(true)
 
-	// Reports first, acknowledgement last.
 	go func() {
 		chip.Write(advertising())
 		chip.Write(advertising())
@@ -46,7 +39,6 @@ func TestWakingPastWhatIsAlreadyOnTheLine(t *testing.T) {
 	}
 }
 
-// The reports themselves are not thrown away getting to it: they belong to whoever is scanning.
 func TestWakingKeepsTheEventsItReadPastAsleep(t *testing.T) {
 	p, chip := paired(t)
 	p.asleep.Store(true)
@@ -69,7 +61,6 @@ func TestWakingKeepsTheEventsItReadPastAsleep(t *testing.T) {
 	}
 }
 
-// A chip that says nothing still fails, rather than the fix turning every wake into a success.
 func TestWakingAChipThatNeverAnswers(t *testing.T) {
 	p, _ := paired(t)
 	p.asleep.Store(true)

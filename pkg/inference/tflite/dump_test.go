@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// TestDumpEmbeddingLayers prints the geometry of the embedding model. Whether its convolutions
-// pad along time decides whether the model can be evaluated incrementally.
 func TestDumpEmbeddingLayers(t *testing.T) {
 	raw, err := os.ReadFile("../oww/assets/embedding_model.tflite")
 	if err != nil {
@@ -35,8 +33,17 @@ func TestDumpEmbeddingLayers(t *testing.T) {
 			t.Logf("%2d CONV_2D     in %-16v filter %-16v out %-16v samePad=%-5v stride=%dx%d",
 				i, x.Shape, w.Shape, y.Shape, o.conv.samePad, o.conv.strideH, o.conv.strideW)
 		case OpMaxPool2D:
-			t.Logf("%2d MAX_POOL_2D in %-16v filter %dx%d            out %-16v samePad=%-5v stride=%dx%d",
-				i, x.Shape, o.pool.filterH, o.pool.filterW, y.Shape, o.pool.samePad, o.pool.strideH, o.pool.strideW)
+			t.Logf(
+				"%2d MAX_POOL_2D in %-16v filter %dx%d            out %-16v samePad=%-5v stride=%dx%d",
+				i,
+				x.Shape,
+				o.pool.filterH,
+				o.pool.filterW,
+				y.Shape,
+				o.pool.samePad,
+				o.pool.strideH,
+				o.pool.strideW,
+			)
 		case OpPad:
 			p := in.Tensor(o.Inputs[1])
 			t.Logf("%2d PAD         in %-16v pads %v      out %-16v", i, x.Shape, p.I32, y.Shape)
@@ -44,8 +51,6 @@ func TestDumpEmbeddingLayers(t *testing.T) {
 	}
 }
 
-// TestDumpClassifierOps prints one classifier's operators and shapes. Point it at a model with
-// DUMP_MODEL.
 func TestDumpClassifierOps(t *testing.T) {
 	path := os.Getenv("DUMP_MODEL")
 	if path == "" {

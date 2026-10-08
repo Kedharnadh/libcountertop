@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// producer records what it was told. What matters is the state it is left in — a producer left
-// standing down never plays again and nothing reports an error about it.
 type producer struct {
 	mu       sync.Mutex
 	down     bool
@@ -68,8 +66,6 @@ func TestNewestProducerIsTheOneHeard(t *testing.T) {
 	}
 }
 
-// The point of a stack rather than a single slot: a track is minutes, a noise machine is hours, and
-// the room should carry on when the track ends instead of going quiet.
 func TestWhatWasInterruptedCarriesOn(t *testing.T) {
 	a := &Arbiter{}
 	group, track := &producer{}, &producer{}
@@ -86,8 +82,6 @@ func TestWhatWasInterruptedCarriesOn(t *testing.T) {
 	}
 }
 
-// A producer that finishes while something else is on top was already stood down and is not the one
-// being heard, so nothing should be resumed on its account.
 func TestFinishingUnderneathChangesNothing(t *testing.T) {
 	a := &Arbiter{}
 	group, track := &producer{}, &producer{}
@@ -104,8 +98,6 @@ func TestFinishingUnderneathChangesNothing(t *testing.T) {
 	}
 }
 
-// A voice turn holds the speaker across several sounds. Whoever is heard has to stand down once and
-// come back once, however the producers change underneath.
 func TestTheHoldWinsOverAHandover(t *testing.T) {
 	a := &Arbiter{}
 	group, track := &producer{}, &producer{}
@@ -116,7 +108,6 @@ func TestTheHoldWinsOverAHandover(t *testing.T) {
 		t.Fatal("the group ignored the speaker being taken")
 	}
 
-	// A track starting mid-turn must not become audible just because it is newest.
 	a.Took(track)
 	if !track.held() {
 		t.Error("a track that started while the speaker was held began playing")
@@ -128,8 +119,6 @@ func TestTheHoldWinsOverAHandover(t *testing.T) {
 	}
 }
 
-// Ducking reaches the ones waiting too, so resuming one mid-turn does not bring it back at full
-// volume.
 func TestDuckingReachesTheOnesWaiting(t *testing.T) {
 	a := &Arbiter{}
 	group, track := &producer{}, &producer{}
@@ -147,10 +136,6 @@ func TestDuckingReachesTheOnesWaiting(t *testing.T) {
 	}
 }
 
-// Ducking only reaches audio written after it. A stream is sent ahead of the clock, so seconds of it
-// can already be queued at full volume — which is what "the duck happened, but late" sounds like.
-// The one being heard has to go back and re-scale it, and only that one: the others queued nothing,
-// and asking them all would attenuate the same samples twice.
 func TestOnlyTheProducerBeingHeardRescalesWhatIsQueued(t *testing.T) {
 	a := &Arbiter{}
 	group, track := &producer{}, &producer{}
@@ -167,8 +152,6 @@ func TestOnlyTheProducerBeingHeardRescalesWhatIsQueued(t *testing.T) {
 	}
 }
 
-// Coming out of a turn there is nothing to fix: what is queued went in quiet and draining it is the
-// end of the duck. Re-scaling by one would be a no-op, and by anything else would be wrong.
 func TestNothingIsRescaledWhenTheTurnEnds(t *testing.T) {
 	a := &Arbiter{}
 	track := &producer{}
@@ -183,7 +166,6 @@ func TestNothingIsRescaledWhenTheTurnEnds(t *testing.T) {
 	}
 }
 
-// A producer starting during a turn has to arrive already quiet, or it blares over the reply.
 func TestAProducerStartingMidTurnArrivesQuiet(t *testing.T) {
 	a := &Arbiter{}
 	a.Duck(true)
@@ -196,8 +178,6 @@ func TestAProducerStartingMidTurnArrivesQuiet(t *testing.T) {
 	}
 }
 
-// The same producer starting twice — a stream reconnecting, say — must not leave a stale copy behind
-// that later gets resumed as if it were still there.
 func TestStartingTwiceLeavesOneEntry(t *testing.T) {
 	a := &Arbiter{}
 	group := &producer{}
@@ -211,10 +191,6 @@ func TestStartingTwiceLeavesOneEntry(t *testing.T) {
 	}
 }
 
-// The media player is one producer that replaces its own track, so every noise or media switch is
-// the same stream taking the speaker again. When that happens while the speaker is held, the hold
-// already stood the stream down once — standing it down again leaves a resume outstanding, and it
-// waits on a gate nobody opens: playing on paper, silent in the room, until the process restarts.
 func TestAResumingTrackRetakingTheSpeakerIsNotHeldTwice(t *testing.T) {
 	a := &Arbiter{}
 	track := &producer{}
@@ -225,7 +201,6 @@ func TestAResumingTrackRetakingTheSpeakerIsNotHeldTwice(t *testing.T) {
 		t.Fatal("the track ignored the speaker being taken")
 	}
 
-	// A track change mid-hold: the stream re-joins as itself.
 	a.Took(track)
 	if !track.held() {
 		t.Error("a track must stay stood down while the speaker is held")
@@ -237,9 +212,6 @@ func TestAResumingTrackRetakingTheSpeakerIsNotHeldTwice(t *testing.T) {
 	}
 }
 
-// A sound that ends during the hold and starts again before it is over is still the producer the
-// hold stood down: stopping the noise to start another one must not leave it waiting on a second
-// suspend that one resume cannot answer.
 func TestARetakeAfterGivingBackDuringAHoldIsNotHeldTwice(t *testing.T) {
 	a := &Arbiter{}
 	track := &producer{}
@@ -250,7 +222,6 @@ func TestARetakeAfterGivingBackDuringAHoldIsNotHeldTwice(t *testing.T) {
 		t.Fatal("the track ignored the speaker being taken")
 	}
 
-	// A stop mid-hold, then a new sound before the hold ends.
 	a.Gave(track)
 	a.Took(track)
 	if !track.held() {
@@ -263,8 +234,6 @@ func TestARetakeAfterGivingBackDuringAHoldIsNotHeldTwice(t *testing.T) {
 	}
 }
 
-// A producer that takes the speaker back while another is standing down for it is the one heard.
-// Leaving both down is the wedge where something reports that it is playing to a silent room.
 func TestARetakeIsHeardRatherThanLeftStandingDown(t *testing.T) {
 	a := &Arbiter{}
 	stream, spin := &producer{}, &producer{}
@@ -286,8 +255,6 @@ func TestARetakeIsHeardRatherThanLeftStandingDown(t *testing.T) {
 	}
 }
 
-// Owns is what says whether the audio waiting in the queue may be thrown away. Getting it from a
-// producer's own standing is what turns a stop during a reply into a reply cut off mid-word.
 func TestTheQueueBelongsToWhateverIsBeingHeard(t *testing.T) {
 	a := &Arbiter{}
 	track, spin := &producer{}, &producer{}

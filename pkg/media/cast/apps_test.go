@@ -8,7 +8,6 @@ import (
 	"testing"
 )
 
-// A sender shows the running app's name, and every app used to report itself as the default receiver.
 func TestALaunchedAppIsReportedByItsOwnName(t *testing.T) {
 	for id, want := range map[string]string{
 		DefaultMediaReceiver: "Default Media Receiver",
@@ -66,7 +65,13 @@ func TestAnAppSpeaksMediaAndOnlyTheProtocolsRegistered(t *testing.T) {
 	}
 
 	r.Register(fake{})
-	if got := names(r, Lookup("2DB7CC49")); !slices.Equal(got, []string{NSMedia, "urn:x-cast:fake"}) {
+	if got := names(
+		r,
+		Lookup("2DB7CC49"),
+	); !slices.Equal(
+		got,
+		[]string{NSMedia, "urn:x-cast:fake"},
+	) {
 		t.Errorf("YouTube Music speaks %v once its protocol is registered", got)
 	}
 	if got := names(r, Lookup("C35B0678")); !slices.Equal(got, []string{NSMedia}) {
@@ -74,7 +79,9 @@ func TestAnAppSpeaksMediaAndOnlyTheProtocolsRegistered(t *testing.T) {
 	}
 }
 
-var uuid = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
+var uuid = regexp.MustCompile(
+	`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`,
+)
 
 func TestALaunchedAppIsReportedTheWayARealDeviceReportsIt(t *testing.T) {
 	r := NewReceiver("Kitchen")
@@ -84,7 +91,8 @@ func TestALaunchedAppIsReportedTheWayARealDeviceReportsIt(t *testing.T) {
 	if !uuid.MatchString(a.SessionID) || a.TransportID != a.SessionID {
 		t.Errorf("session %q transport %q", a.SessionID, a.TransportID)
 	}
-	if a.UniversalAppID != "2DB7CC49" || a.AppType != "WEB" || a.LaunchedFromCloud || a.IsIdleScreen {
+	if a.UniversalAppID != "2DB7CC49" || a.AppType != "WEB" || a.LaunchedFromCloud ||
+		a.IsIdleScreen {
 		t.Errorf("reported as %+v", a)
 	}
 	if a.IconURL == "" || a.StatusText != "YouTube Music" {

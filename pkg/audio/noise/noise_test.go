@@ -5,11 +5,8 @@ import (
 	"testing"
 )
 
-// rate is what the speaker runs at, which is where these are used.
 const rate = 48000
 
-// The bands the slope is measured over: octaves, high enough that brown's own corner at 150 Hz is well
-// below them and low enough to stay under Nyquist.
 var bands = []float64{750, 1500, 3000, 6000, 12000}
 
 const (
@@ -17,8 +14,6 @@ const (
 	blocks    = 200
 )
 
-// TestSlopes is what tells the colors apart, since getting a filter wrong yields something that still
-// sounds like noise and nothing else here would notice.
 func TestSlopes(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -39,8 +34,6 @@ func TestSlopes(t *testing.T) {
 	}
 }
 
-// TestLevelsMatch is why one sound can be swapped for another while it is playing, and it is where the
-// RMS and Peak fields come from: the numbers this logs are the ones that go in the files.
 func TestLevelsMatch(t *testing.T) {
 	for _, name := range Names() {
 		s := byName[name]
@@ -63,19 +56,12 @@ func TestLevelsMatch(t *testing.T) {
 	}
 }
 
-// A resonator has to pass noise at the same level wherever it is placed. It did not: the gain at
-// resonance goes as 1/((1-r)·2·sin ω), so droplets came out louder the lower they were pitched and wind
-// changed level as its band swept. Everything built on burst and reson depends on this.
 func TestResonatorGainDoesNotDependOnPitch(t *testing.T) {
 	g := &Gen{Rate: rate, rand: newRand(1)}
 
-	// Nothing narrower: a filter that rings for a fifth of a second is a couple of hertz wide, and
-	// measuring one takes longer than the whole suite.
 	for _, decay := range []float32{0.002, 0.02} {
 		var low, high float32 = 1, 0
 
-		// From 400 Hz up, which is where the sounds place them. Lower than that a band this wide reaches
-		// past zero and there is no meaningful peak left to normalize.
 		for _, freq := range []float32{400, 1600, 6400} {
 			r := newReson(freq, decay, rate)
 
@@ -96,8 +82,6 @@ func TestResonatorGainDoesNotDependOnPitch(t *testing.T) {
 	}
 }
 
-// A mix has to come out at the same level as one of them, which is the whole point of mixing at a
-// known level: putting crickets under wind must not be a step up in volume.
 func TestMixHoldsTheLevel(t *testing.T) {
 	rms, peak := levels(mixSeeded(rate, 3, NameWind, NameCrickets), blockSize*blocks)
 	t.Logf("wind+crickets: rms %.4f, peak %.3f", rms, peak)
@@ -122,7 +106,6 @@ func TestUnknownSoundsPlayNothing(t *testing.T) {
 	}
 }
 
-// slope fits dB against octave over the bands, which is the number that names a color.
 func slope(fill Fill) float64 {
 	power := make([]float64, len(bands))
 	buf := make([]float32, blockSize)
@@ -134,7 +117,6 @@ func slope(fill Fill) float64 {
 		}
 	}
 
-	// Least squares over octave index: the bands are an octave apart, so the index is the x axis.
 	var sx, sy, sxx, sxy float64
 	for i, p := range power {
 		x, y := float64(i), 10*math.Log10(p/blocks)
@@ -144,8 +126,6 @@ func slope(fill Fill) float64 {
 	return (n*sxy - sx*sy) / (n*sxx - sx*sx)
 }
 
-// goertzel is the power at one frequency, which is all that is wanted here: five bins rather than a
-// whole spectrum.
 func goertzel(samples []float32, freq float64) float64 {
 	k := math.Round(freq / rate * float64(len(samples)))
 	w := 2 * math.Pi * k / float64(len(samples))

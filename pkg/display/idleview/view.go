@@ -166,7 +166,8 @@ func (v *View) run(ctx context.Context) {
 		if !v.options.Shell.Visible(v) {
 			return
 		}
-		if fps := v.options.Read().Visual.MaxFPS; fps <= 0 || now.Sub(shaded) >= time.Second/time.Duration(fps)-2*time.Millisecond {
+		if fps := v.options.Read().Visual.MaxFPS; fps <= 0 ||
+			now.Sub(shaded) >= time.Second/time.Duration(fps)-2*time.Millisecond {
 			shaded = now
 			v.shade()
 		}
@@ -220,7 +221,6 @@ type Dependencies struct {
 	Shell   *shell.Shell
 }
 
-// Close stops drawing and waits for the view's input and GPU resources to be released.
 func (v *View) Close() {
 	v.mu.Lock()
 	stop, done := v.stop, v.done

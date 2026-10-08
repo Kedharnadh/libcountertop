@@ -2,9 +2,6 @@ package sendspin
 
 import "testing"
 
-// The wire is little-endian signed, and the sign is the part worth testing: a 24-bit sample that is
-// not sign-extended before narrowing turns quiet negative audio into full-scale positive, which is
-// loud and wrong rather than subtly wrong.
 func TestPCMUnpacksSignedLittleEndian(t *testing.T) {
 	for _, c := range []struct {
 		name  string
@@ -17,7 +14,6 @@ func TestPCMUnpacksSignedLittleEndian(t *testing.T) {
 		// 24-bit narrows by a byte: 0x7FFFFF is full scale positive, 0x800000 full scale negative.
 		{"24-bit", 24, []byte{0x00, 0x00, 0x00, 0xFF, 0xFF, 0x7F, 0x00, 0x00, 0x80}, []int16{0, 32767, -32768}},
 
-		// A quiet negative sample. -256 at 24 bits is 0xFFFF00, which must stay negative.
 		{"24-bit quiet negative", 24, []byte{0x00, 0xFF, 0xFF}, []int16{-1}},
 
 		{"32-bit", 32, []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x7F}, []int16{0, 32767}},
@@ -44,8 +40,6 @@ func TestPCMUnpacksSignedLittleEndian(t *testing.T) {
 	}
 }
 
-// A short read is a bug somewhere upstream, and playing it as if it were whole samples shifts every
-// channel afterwards — so it has to be refused rather than rounded down.
 func TestPCMRefusesAPartialSample(t *testing.T) {
 	d, _ := newPCMDecoder(24)
 	if _, err := d.decode([]byte{0x01, 0x02}); err == nil {
@@ -57,7 +51,6 @@ func TestNoDecoderForAnUnknownCodec(t *testing.T) {
 	if _, err := decoderFor("mp3", 48000, 2, 16, nil); err == nil {
 		t.Error("mp3 was accepted")
 	}
-	// FLAC cannot start without the header, and starting anyway would decode noise.
 	if _, err := decoderFor("flac", 48000, 2, 16, nil); err == nil {
 		t.Error("flac was accepted with no codec header")
 	}
@@ -66,8 +59,6 @@ func TestNoDecoderForAnUnknownCodec(t *testing.T) {
 	}
 }
 
-// The buffer is reused between chunks, so a shorter chunk after a longer one must not leave the tail
-// of the previous one visible.
 func TestTheReusedBufferIsCutToLength(t *testing.T) {
 	d, _ := newPCMDecoder(16)
 
@@ -83,9 +74,6 @@ func TestTheReusedBufferIsCutToLength(t *testing.T) {
 	}
 }
 
-// Opus is always 48 kHz whatever the source was, which is the whole reason it is advertised first.
-// The server takes the first it can serve, so the order is what decides whether the room gets a
-// lossless stream or a lossy one.
 func TestLosslessIsOfferedFirst(t *testing.T) {
 	offered := formats()
 

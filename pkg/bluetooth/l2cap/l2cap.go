@@ -1,15 +1,3 @@
-// Package l2cap speaks L2CAP, the layer everything else in Bluetooth Classic is carried on.
-//
-// Above HCI and below the profiles: a phone that wants to play music opens an SDP channel to find
-// out what this device is, then an AVDTP one to negotiate and stream. Both are L2CAP channels, and
-// this is what opens them.
-//
-// Bytes in, bytes out. Nothing here touches the radio — it is handed whole PDUs by whatever
-// reassembled them and hands back what to send, which is what makes a stack with no hardware on
-// this side of it testable at all.
-//
-// Basic mode only. Retransmission and streaming modes exist and A2DP does not need them: the
-// profile runs over basic mode and the codec tolerates loss better than a retransmit would help.
 package l2cap
 
 import (
@@ -18,49 +6,39 @@ import (
 	"fmt"
 )
 
-// The channels that are always there. Everything else is opened and given a number at the time.
 const (
-	// CIDSignalling carries the commands that open and close the rest.
 	CIDSignalling = 0x0001
 
-	// CIDConnectionless is broadcast data, which nothing here sends or wants.
 	CIDConnectionless = 0x0002
 
-	// CIDDynamic is the first number a channel of our own may be given. Below it is reserved.
+	// Below 0x0040 is reserved.
 	CIDDynamic = 0x0040
 )
 
-// The protocol and service multiplexers worth naming: what a far end asks for when it opens a
-// channel, and how it says what the channel is for.
 const (
 	PSMSDP         = 0x0001
-	PSMAVCTP       = 0x0017 // remote control, which is AVRCP
-	PSMAVDTP       = 0x0019 // the audio stream itself
-	PSMAVCTPBrowse = 0x001b // remote control again, for the half about which player
+	PSMAVCTP       = 0x0017 // AVRCP
+	PSMAVDTP       = 0x0019
+	PSMAVCTPBrowse = 0x001b // AVRCP browsing
 )
 
-// Header is the length and channel every frame starts with.
+// Length and channel ID.
 const Header = 4
 
-// MTUDefault is what a channel carries before anyone says otherwise, and MTUSignalling is the
-// smaller one the signalling channel is guaranteed.
+// MTUSignalling is the minimum the signalling channel is guaranteed.
 const (
 	MTUDefault    = 672
 	MTUSignalling = 48
 )
 
-// ErrShort is a buffer that does not hold what its header says. It is the ordinary state of a
-// stream being read, not a fault, so callers tell it apart from a malformed packet.
 var ErrShort = errors.New("l2cap: shorter than its header says")
 
-// Frame is one L2CAP packet: a channel and what was sent on it.
 type Frame struct {
 	CID     uint16
 	Payload []byte
 }
 
-// ParseFrame reads a frame. The payload points into buf rather than being copied, because the
-// caller already owns a reassembled PDU and copying it again helps nobody.
+// The payload aliases buf.
 func ParseFrame(buf []byte) (Frame, error) {
 	if len(buf) < Header {
 		return Frame{}, ErrShort
@@ -74,7 +52,6 @@ func ParseFrame(buf []byte) (Frame, error) {
 	return Frame{CID: binary.LittleEndian.Uint16(buf[2:]), Payload: buf[Header:]}, nil
 }
 
-// Marshal writes a frame for sending.
 func (f Frame) Marshal() []byte {
 	out := make([]byte, Header+len(f.Payload))
 	binary.LittleEndian.PutUint16(out, uint16(len(f.Payload)))
@@ -83,7 +60,6 @@ func (f Frame) Marshal() []byte {
 	return out
 }
 
-// What a signalling command is asking for.
 const (
 	CodeReject             = 0x01
 	CodeConnectRequest     = 0x02
@@ -98,25 +74,17 @@ const (
 	CodeInfoResponse       = 0x0b
 )
 
-// commandHeader is the code, the identifier and the length.
+// Code, identifier, length.
 const commandHeader = 4
 
-// Command is one signalling command, before anyone has worked out which one.
-//
-// The identifier is what pairs a response with its request. A far end may have several outstanding
-// and answer them in any order, so matching on the code alone would hand the wrong answer to the
-// wrong question.
+// The identifier pairs a response with its request.
 type Command struct {
 	Code byte
 	ID   byte
 	Data []byte
 }
 
-// ParseCommands reads every command in one signalling frame.
-//
-// Several may share a frame, which is why this is a list. A trailing byte that is not a whole
-// command is a malformed frame rather than a short read: the frame is already complete by the time
-// it gets here.
+// Several commands may share a frame.
 func ParseCommands(payload []byte) ([]Command, error) {
 	var out []Command
 
@@ -146,7 +114,6 @@ func ParseCommands(payload []byte) ([]Command, error) {
 	return out, nil
 }
 
-// Marshal writes one command.
 func (c Command) Marshal() []byte {
 	out := make([]byte, commandHeader+len(c.Data))
 	out[0] = c.Code
@@ -156,7 +123,6 @@ func (c Command) Marshal() []byte {
 	return out
 }
 
-// Signal wraps commands into a frame on the signalling channel.
 func Signal(commands ...Command) Frame {
 	var payload []byte
 	for _, c := range commands {
@@ -165,14 +131,11 @@ func Signal(commands ...Command) Frame {
 	return Frame{CID: CIDSignalling, Payload: payload}
 }
 
-// Connect is a far end asking to open a channel: what it wants to talk to, and the number it will
-// know the channel by at its own end.
 type Connect struct {
 	PSM       uint16
 	SourceCID uint16
 }
 
-// Command writes a connection request.
 func (r Connect) Command(id byte) Command {
 	data := make([]byte, 4)
 	binary.LittleEndian.PutUint16(data, r.PSM)
@@ -191,7 +154,6 @@ func ParseConnect(c Command) (Connect, error) {
 	}, nil
 }
 
-// How a connection request was answered.
 const (
 	ConnectSuccess     = 0x0000
 	ConnectPending     = 0x0001
@@ -200,8 +162,6 @@ const (
 	ConnectNoResources = 0x0004
 )
 
-// Connected answers a connection request. The two channel numbers are each end's own: a channel has
-// a different number at either side and neither may assume the other's.
 type Connected struct {
 	DestinationCID uint16
 	SourceCID      uint16
@@ -231,7 +191,6 @@ func ParseConnected(c Command) (Connected, error) {
 	}, nil
 }
 
-// Disconnect closes a channel, and the response says the same two numbers back.
 type Disconnect struct {
 	DestinationCID uint16
 	SourceCID      uint16
@@ -255,15 +214,12 @@ func (d Disconnect) Command(code, id byte) Command {
 	return Command{Code: code, ID: id, Data: data}
 }
 
-// Why a command could not be understood at all, which is different from a request being refused.
 const (
 	RejectNotUnderstood = 0x0000
 	RejectBadMTU        = 0x0001
 	RejectBadCID        = 0x0002
 )
 
-// Reject says a command made no sense. Sent rather than ignoring one, because a far end waiting on
-// an answer it will never get is worse than being told no.
 func Reject(id byte, reason uint16, extra ...uint16) Command {
 	data := make([]byte, 2+2*len(extra))
 	binary.LittleEndian.PutUint16(data, reason)

@@ -18,11 +18,16 @@ type stalling struct{ first string }
 func (s stalling) RoundTrip(req *http.Request) (*http.Response, error) {
 	r, w := io.Pipe()
 	go func() {
-		io.WriteString(w, s.first)
+		_, _ = io.WriteString(w, s.first)
 		<-req.Context().Done()
 		w.CloseWithError(req.Context().Err())
 	}()
-	return &http.Response{StatusCode: http.StatusOK, Status: "200 OK", Body: r, Header: http.Header{}}, nil
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Status:     "200 OK",
+		Body:       r,
+		Header:     http.Header{},
+	}, nil
 }
 
 func TestAPollThatGoesSilentEndsAsQuiet(t *testing.T) {
@@ -30,7 +35,11 @@ func TestAPollThatGoesSilentEndsAsQuiet(t *testing.T) {
 	Quiet = 150 * time.Millisecond
 	defer func() { Quiet = was }()
 
-	s := &Session{long: &http.Client{Transport: stalling{first: "15\n[[4,[\"noop\"]]]\n"}}, sid: "S", gid: "G"}
+	s := &Session{
+		long: &http.Client{Transport: stalling{first: "15\n[[4,[\"noop\"]]]\n"}},
+		sid:  "S",
+		gid:  "G",
+	}
 	var got []string
 	start := time.Now()
 	err := s.Poll(context.Background(), func(m Message) { got = append(got, m.Name) })
@@ -51,7 +60,12 @@ func (r *recording) RoundTrip(req *http.Request) (*http.Response, error) {
 	b, _ := io.ReadAll(req.Body)
 	v, _ := url.ParseQuery(string(b))
 	r.forms = append(r.forms, v)
-	return &http.Response{StatusCode: http.StatusOK, Status: "200 OK", Body: io.NopCloser(strings.NewReader("")), Header: http.Header{}}, nil
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Status:     "200 OK",
+		Body:       io.NopCloser(strings.NewReader("")),
+		Header:     http.Header{},
+	}, nil
 }
 
 func TestTheScreenNamesItsCastDevice(t *testing.T) {
@@ -75,7 +89,10 @@ func TestTheScreenNamesItsCastDevice(t *testing.T) {
 
 func TestTheServersDiscoveryEchoIsNotAnswered(t *testing.T) {
 	rec := &recording{}
-	st := &station{ctx: context.Background(), env: cast.Env{Device: cast.Device{ID: "266a1baa915744d5e2531b227c645271"}}}
+	st := &station{
+		ctx: context.Background(),
+		env: cast.Env{Device: cast.Device{ID: "266a1baa915744d5e2531b227c645271"}},
+	}
 	st.bind(&Session{short: &http.Client{Transport: rec}})
 
 	st.handle(Message{Name: "onSetDiscoveryDeviceId"})
@@ -95,14 +112,20 @@ func TestNothingPlayingReportsStateZero(t *testing.T) {
 	}
 	f := rec.forms[0]
 	if f.Get("req0__sc") != "nowPlaying" || f.Get("req0_videoId") != "" ||
-		f.Get("req1__sc") != "onStateChange" || f.Get("req1_state") != "0" || f.Get("req1_playabilityStatus") != "OK" {
+		f.Get(
+			"req1__sc",
+		) != "onStateChange" || f.Get("req1_state") != "0" || f.Get("req1_playabilityStatus") != "OK" {
 		t.Errorf("sent %v", f)
 	}
 }
 
 func TestACancelledPollIsNotQuiet(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	s := &Session{long: &http.Client{Transport: stalling{first: "15\n[[4,[\"noop\"]]]\n"}}, sid: "S", gid: "G"}
+	s := &Session{
+		long: &http.Client{Transport: stalling{first: "15\n[[4,[\"noop\"]]]\n"}},
+		sid:  "S",
+		gid:  "G",
+	}
 	err := s.Poll(ctx, func(Message) { cancel() })
 	if errors.Is(err, ErrQuiet) {
 		t.Fatalf("err %v", err)

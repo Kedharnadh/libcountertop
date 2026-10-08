@@ -2,12 +2,6 @@ package theme
 
 import "testing"
 
-// Whether the float64 in Blend is what costs, which is the premise #83 is built on. The comparison
-// is against fixed point over the same coverage values a glyph produces, since that is where the
-// blending happens: one call per covered pixel, with the coverage as a byte.
-
-// blendFixed is the same mix in integers. Kept in the test rather than the package: this is a
-// measurement of whether the change is worth making, not the change.
 func blendFixed(c, other Color, a byte) Color {
 	switch a {
 	case 0:
@@ -16,15 +10,12 @@ func blendFixed(c, other Color, a byte) Color {
 		return other
 	}
 
-	// Rounded, and over 255 rather than 256, so full coverage lands exactly on the other color
-	// instead of one short of it.
 	mix := func(x, y byte) byte {
 		return byte((int(x)*(255-int(a)) + int(y)*int(a) + 127) / 255)
 	}
 	return Color{mix(c.R, other.R), mix(c.G, other.G), mix(c.B, other.B)}
 }
 
-// coverage is what a rasterized glyph hands over: mostly solid or empty, with edges in between.
 func coverage() []byte {
 	out := make([]byte, 4096)
 	for i := range out {
@@ -61,9 +52,6 @@ func BenchmarkBlend(b *testing.B) {
 	})
 }
 
-// The two have to agree, or the comparison is between a blend and something else. One step of 255
-// is allowed: the float rounds towards zero and the fixed point rounds to nearest, so they part by
-// at most one.
 func TestFixedAgreesWithFloat(t *testing.T) {
 	fg := Color{R: 0xf5, G: 0x00, B: 0xfa}
 	bg := Color{R: 0x11, G: 0xff, B: 0x18}
@@ -85,9 +73,6 @@ func TestFixedAgreesWithFloat(t *testing.T) {
 	}
 }
 
-// The ends have to be exact, whatever the middle does: a fully covered pixel is the ink and an
-// uncovered one is untouched. Anything else leaves a glyph sitting on a box a shade off the
-// background.
 func TestTheEndsAreExact(t *testing.T) {
 	fg := Color{R: 0xf5, G: 0xf7, B: 0xfa}
 	bg := Color{R: 0x11, G: 0x13, B: 0x18}

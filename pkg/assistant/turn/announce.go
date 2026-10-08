@@ -2,21 +2,18 @@ package turn
 
 import (
 	"context"
-	"github.com/ygelfand/libcountertop/pkg/media/pcm"
 	"log/slog"
+
+	"github.com/ygelfand/libcountertop/pkg/media/pcm"
 
 	esphome "github.com/ygelfand/go-esphome-device"
 
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
 
-// announce plays what Home Assistant asks for, then reports back. It runs off the connection's
-// read loop: fetching and playing must not block it.
 func (t *Conversation) announce(a esphome.Announce) {
 	slog.Info("announce", "text", a.Text, "start_conversation", a.StartConversation)
 
-	// One claim covers both urls, so silencing an announcement stops the whole thing rather than
-	// letting the second one start once the first has been drained.
 	t.player.Sounding(true)
 	claim := t.sound.Claim("announce", func(ctx context.Context, _ Speaker) error {
 		for _, url := range []string{a.PreannounceMediaID, a.MediaID} {
@@ -41,16 +38,12 @@ func (t *Conversation) announce(a esphome.Announce) {
 			slog.Error("reporting the announcement failed", "err", err)
 		}
 
-		// Home Assistant uses this to open a conversation without a wake word. An announcement that
-		// was cut off was cut off on purpose, so nothing follows it.
 		if a.StartConversation && !claim.Stopped() {
 			t.Start(0)
 		}
 	})
 }
 
-// play fetches audio and queues it. Home Assistant serves it converted to media.Formats. Waiting
-// for it to be heard is the driver's, not ours: this returns as soon as it has been handed over.
 func (t *Conversation) play(ctx context.Context, url string, started func()) error {
 	samples, err := pcm.Fetch(ctx, url)
 	if err != nil {

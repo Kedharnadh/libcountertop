@@ -1,4 +1,3 @@
-// Adapted from go-gui (MIT): gui/backend/internal/gpu and gui/backend/internal/glyphconv; see NOTICE.
 package gogui
 
 import (
@@ -102,10 +101,15 @@ func styleToGlyphConfig(s gui.TextStyle) glyph.TextConfig {
 	}
 	return glyph.TextConfig{
 		Style: glyph.TextStyle{
-			FontName:           s.Family,
-			Size:               s.Size,
-			Color:              glyph.Color{R: s.Color.R, G: s.Color.G, B: s.Color.B, A: s.Color.A},
-			BgColor:            glyph.Color{R: s.BgColor.R, G: s.BgColor.G, B: s.BgColor.B, A: s.BgColor.A},
+			FontName: s.Family,
+			Size:     s.Size,
+			Color:    glyph.Color{R: s.Color.R, G: s.Color.G, B: s.Color.B, A: s.Color.A},
+			BgColor: glyph.Color{
+				R: s.BgColor.R,
+				G: s.BgColor.G,
+				B: s.BgColor.B,
+				A: s.BgColor.A,
+			},
 			Typeface:           s.Typeface,
 			Underline:          s.Underline,
 			Strikethrough:      s.Strikethrough,
@@ -115,8 +119,13 @@ func styleToGlyphConfig(s gui.TextStyle) glyph.TextConfig {
 			CellHeight:         s.CellHeight,
 			NoBuiltinBoxGlyphs: s.NoBuiltinBoxGlyphs,
 			StrokeWidth:        s.StrokeWidth,
-			StrokeColor:        glyph.Color{R: s.StrokeColor.R, G: s.StrokeColor.G, B: s.StrokeColor.B, A: s.StrokeColor.A},
-			Features:           s.Features,
+			StrokeColor: glyph.Color{
+				R: s.StrokeColor.R,
+				G: s.StrokeColor.G,
+				B: s.StrokeColor.B,
+				A: s.StrokeColor.A,
+			},
+			Features: s.Features,
 		},
 		Block: glyph.BlockStyle{
 			Align:       align,
@@ -135,7 +144,11 @@ const (
 	stopsInTM         = 4
 )
 
-func packGradientUniforms(gdef *gui.GradientDef, stops []gui.GradientStop, w, h float32) (tm, tm2 [16]float32) {
+func packGradientUniforms(
+	gdef *gui.GradientDef,
+	stops []gui.GradientStop,
+	w, h float32,
+) (tm, tm2 [16]float32) {
 	n := min(len(stops), gradientStopSlots)
 	for i := range n {
 		dst, slot := &tm, i

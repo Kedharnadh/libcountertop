@@ -53,7 +53,7 @@ func (b *Beneath) Adopt(c *surface.Client, id uint32, s Spec) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.c != nil && b.kept != 0 && b.kept != id {
-		b.c.Destroy(b.kept)
+		_ = b.c.Destroy(b.kept)
 	}
 	b.c, b.kept, b.spec = c, id, s
 }
@@ -62,7 +62,7 @@ func (b *Beneath) Supersede(id uint32) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.c != nil && b.kept != 0 && b.kept != id {
-		b.c.Destroy(b.kept)
+		_ = b.c.Destroy(b.kept)
 		b.c, b.kept = nil, 0
 	}
 }
@@ -71,7 +71,7 @@ func (b *Beneath) Clear() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.c != nil && b.kept != 0 {
-		b.c.Destroy(b.kept)
+		_ = b.c.Destroy(b.kept)
 	}
 	b.c, b.kept = nil, 0
 }

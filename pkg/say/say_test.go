@@ -21,8 +21,6 @@ func TestEnglishIsThere(t *testing.T) {
 	}
 }
 
-// The identifiers are the naming scheme, and a stray one is how a screen ends up showing a dotted
-// string to somebody.
 func TestIdentifiersAreDotted(t *testing.T) {
 	ids, err := Ids()
 	if err != nil {
@@ -39,8 +37,6 @@ func TestIdentifiersAreDotted(t *testing.T) {
 	}
 }
 
-// An identifier nothing defines comes back as itself rather than empty, so it is visible on the
-// panel instead of being a row with nothing in it.
 func TestAMissingIdentifierIsItsOwnName(t *testing.T) {
 	if got := T("nothing.defines.this"); got != "nothing.defines.this" {
 		t.Errorf("a missing identifier came back as %q", got)
@@ -53,8 +49,6 @@ func TestAMissingIdentifierIsItsOwnName(t *testing.T) {
 	}
 }
 
-// The point of the fallback: a translation that covers half the panel shows the other half in
-// English, rather than showing identifiers or refusing to load.
 func TestAPartialTranslationFallsBackPerString(t *testing.T) {
 	if err := Load("pl", "settings.title: Ustawienia\n"); err != nil {
 		t.Fatal(err)
@@ -73,7 +67,6 @@ func TestAPartialTranslationFallsBackPerString(t *testing.T) {
 	}
 }
 
-// A language with no messages at all is English rather than a panel of identifiers.
 func TestAnUnknownLanguageIsEnglish(t *testing.T) {
 	t.Cleanup(func() { Use(English.String()) })
 
@@ -87,7 +80,6 @@ func TestAnUnknownLanguageIsEnglish(t *testing.T) {
 	}
 }
 
-// Untranslated is what a translator reads to know what is left.
 func TestUntranslatedReportsWhatIsLeft(t *testing.T) {
 	if err := Load("fi", "settings.title: Asetukset\n"); err != nil {
 		t.Fatal(err)
@@ -109,7 +101,6 @@ func TestUntranslatedReportsWhatIsLeft(t *testing.T) {
 	}
 }
 
-// English is offered first, because it is the one that is complete.
 func TestEnglishIsOfferedFirst(t *testing.T) {
 	if got := Languages(); len(got) == 0 || got[0] != "en" {
 		t.Errorf("the languages are %v", got)

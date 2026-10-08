@@ -60,8 +60,39 @@ const (
 const Default = ClassicVU
 
 var order = []Kind{
-	LensFlares, ClassicVU, Aurora, Mercury, Ribbons, Galaxy, Halo, Pulsar, Phosphor, Tesla, Orb,
-	DigitalVU, PaintSplash, Fireworks, Synthwave, HAL9000, Mother, LightCycles, LCARS, PipBoy3, PipBoyNV, PipBoy4, PipBoy76, KoiPond, RainOnGlass, Cymatics, Fire, NeonSign, LavaLamp, InkInWater, Thunderstorm, Fireflies, Matrix,
+	LensFlares,
+	ClassicVU,
+	Aurora,
+	Mercury,
+	Ribbons,
+	Galaxy,
+	Halo,
+	Pulsar,
+	Phosphor,
+	Tesla,
+	Orb,
+	DigitalVU,
+	PaintSplash,
+	Fireworks,
+	Synthwave,
+	HAL9000,
+	Mother,
+	LightCycles,
+	LCARS,
+	PipBoy3,
+	PipBoyNV,
+	PipBoy4,
+	PipBoy76,
+	KoiPond,
+	RainOnGlass,
+	Cymatics,
+	Fire,
+	NeonSign,
+	LavaLamp,
+	InkInWater,
+	Thunderstorm,
+	Fireflies,
+	Matrix,
 }
 
 type Traits struct {
@@ -155,7 +186,11 @@ func single(a analysis.Analysis, g gate) analysis.Analysis {
 }
 
 func merged(a, b analysis.Analysis) analysis.Analysis {
-	out := analysis.Analysis{Level: max(a.Level, b.Level), Peak: max(a.Peak, b.Peak), Onsets: a.Onsets + b.Onsets}
+	out := analysis.Analysis{
+		Level:  max(a.Level, b.Level),
+		Peak:   max(a.Peak, b.Peak),
+		Onsets: a.Onsets + b.Onsets,
+	}
 	aw, ab := scaled(a, micGate)
 	bw, bb := scaled(b, speakerGate)
 	for i := range out.Bands {
@@ -167,7 +202,10 @@ func merged(a, b analysis.Analysis) analysis.Analysis {
 	return out
 }
 
-func scaled(a analysis.Analysis, g gate) (wave [analysis.WavePoints]float32, bands [analysis.Bands]float32) {
+func scaled(
+	a analysis.Analysis,
+	g gate,
+) (wave [analysis.WavePoints]float32, bands [analysis.Bands]float32) {
 	gate := float32(smoothstep(g.lo, g.hi, float64(a.Level)))
 	if gate <= 0 {
 		return wave, bands
@@ -259,7 +297,10 @@ func Built() []Kind {
 			out = append(out, k)
 		}
 	}
-	slices.SortFunc(out, func(a, b Kind) int { return strings.Compare(strings.ToLower(a.Label()), strings.ToLower(b.Label())) })
+	slices.SortFunc(
+		out,
+		func(a, b Kind) int { return strings.Compare(strings.ToLower(a.Label()), strings.ToLower(b.Label())) },
+	)
 	return out
 }
 

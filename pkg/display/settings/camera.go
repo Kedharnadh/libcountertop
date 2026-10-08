@@ -35,7 +35,11 @@ type CameraPages[K any] struct {
 }
 
 func NewCameraPages[K any](o CameraOptions[K]) *CameraPages[K] {
-	return &CameraPages[K]{options: o, sections: map[setting.Group]*shell.Page{}, choices: map[string]*shell.Page{}}
+	return &CameraPages[K]{
+		options:  o,
+		sections: map[setting.Group]*shell.Page{},
+		choices:  map[string]*shell.Page{},
+	}
 }
 func (p *CameraPages[K]) Page() *shell.Page {
 	p.mu.Lock()
@@ -81,7 +85,6 @@ func (p *CameraPages[K]) reset(int) {
 	p.options.Redraw()
 }
 
-// shown is the groups this panel offers: the ones with something in them.
 func (p *CameraPages[K]) Shown() []setting.Group {
 	var out []setting.Group
 	for _, g := range p.options.Table().Groups() {
@@ -125,8 +128,11 @@ func (p *CameraPages[K]) makePage() *shell.Page {
 				})
 				taps = append(taps, p.open(func() *shell.Page { return p.Section(g) }))
 			}
-			rows = append(rows, widget.Row{Label: say.T("camera.stream"), Hint: say.T("features.rtsp.hint"),
-				Kind: widget.Toggle, On: p.options.Stream()})
+			rows = append(
+				rows,
+				widget.Row{Label: say.T("camera.stream"), Hint: say.T("features.rtsp.hint"),
+					Kind: widget.Toggle, On: p.options.Stream()},
+			)
 			taps = append(taps, func(int) { p.options.SetStream(!p.options.Stream()) })
 			p.mu.Lock()
 			armed := time.Since(p.armed) < resetWindow
@@ -184,8 +190,6 @@ func (p *CameraPages[K]) Row(s setting.Setting[K], sh *K) (widget.Row, func(int)
 		row.Level = s.Percent(s.Level(sh))
 		row.Snap = func(level int) int { return s.Percent(s.Raw(level)) }
 
-		// An absolute knob says its value. A doubling one says how far along it is: a gain of 128
-		// sixteenths means nothing next to a bar, and half way does.
 		if s.Scale == setting.Linear {
 			row.Value = s.Read(sh)
 			if s.Unit != "" {
@@ -207,7 +211,6 @@ func (p *CameraPages[K]) Row(s setting.Setting[K], sh *K) (widget.Row, func(int)
 	return row, nil
 }
 
-// dimmed fades a row that has nothing to do and takes its action away.
 func Dimmed(row *widget.Row, idle bool, act func(int)) func(int) {
 	if !idle {
 		return act
@@ -220,8 +223,6 @@ func (p *CameraPages[K]) makeChoice(s setting.Setting[K]) *shell.Page {
 	return p.watch(&shell.Page{
 		Title: s.Title(),
 		Build: func() ([]widget.Row, []func(int)) {
-			// Read afresh: the page stays up while options are picked, so a value captured when
-			// it opened would leave the mark on whatever was chosen first.
 			cfg := p.options.Read()
 			knob := s
 			if current, ok := p.options.Table().Find(knob.Name); ok {

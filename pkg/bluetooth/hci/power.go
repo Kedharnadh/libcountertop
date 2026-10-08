@@ -8,28 +8,17 @@ import (
 	"time"
 )
 
-// Where the kernel keeps the radio switches. The Bluetooth one here is bt_power, a driver whose
-// only job is the chip's enable line: there is no Bluetooth stack behind it, so unblocking it
-// powers the part and nothing else happens.
+// bt_power drives only the chip's enable line.
 
-// settle is how long the chip is given after being let out of reset. It comes up on its own clock
-// and will not answer before then, and a version request into a chip that is still starting reads
-// as a chip that is not there.
 const settle = 100 * time.Millisecond
 
-// Power finds the Bluetooth kill switch and takes it off, so the chip is running when the UART is
-// opened. Reports whether it had to change anything.
-//
-// Idempotent, because the way this gets used is running the bring-up again after it went wrong,
-// and power-cycling the chip halfway through that is its own confusion.
 func Power(on bool, directory string) (changed bool, err error) {
 	at, err := killSwitch(directory)
 	if err != nil {
 		return false, err
 	}
 
-	// Soft is the one userspace owns. Hard is a physical switch, and a device that has one wired
-	// says so here rather than by staying silent once the rest is right.
+	// rfkill: soft is userspace's, hard is a physical switch.
 	if hard, err := reads(filepath.Join(at, "hard")); err == nil && hard == "1" {
 		return false, fmt.Errorf("ble: the radio is blocked by something physical")
 	}
@@ -63,8 +52,7 @@ func turning(on bool) string {
 	return "blocking"
 }
 
-// killSwitch is the rfkill directory for Bluetooth. By type rather than by number, because the
-// numbering follows the order the drivers registered and the wifi one is next to it.
+// rfkill indices follow driver registration order.
 func killSwitch(directory string) (string, error) {
 	entries, err := os.ReadDir(directory)
 	if err != nil {

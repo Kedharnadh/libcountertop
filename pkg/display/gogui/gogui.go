@@ -7,6 +7,7 @@ import (
 	"image/draw"
 	_ "image/jpeg"
 	_ "image/png"
+	"log/slog"
 	"math"
 	"os"
 	"strings"
@@ -22,7 +23,12 @@ import (
 type Sink interface {
 	Program(slot int, vs, fs string) error
 	Texture(id uint32, w, h, x, y, rw, rh int, pix []byte) error
-	Frame(rot int, clear [4]float32, quads []float32, runs []uint32) (submitUS, finishUS uint32, err error)
+	Frame(
+		rot int,
+		clear [4]float32,
+		quads []float32,
+		runs []uint32,
+	) (submitUS, finishUS uint32, err error)
 }
 
 const (
@@ -111,14 +117,22 @@ func New(sink Sink, w *gui.Window) (*Renderer, error) {
 	if err := sink.Program(slotImage, shader.VsGLSL, shader.FsImageClipGLSL); err != nil {
 		return nil, err
 	}
-	r := &Renderer{sink: sink, images: map[string]picture{}, mem: map[string]memPicture{}, events: make(chan gui.Event, 256), wake: make(chan struct{}, 1)}
+	r := &Renderer{
+		sink:   sink,
+		images: map[string]picture{},
+		mem:    map[string]memPicture{},
+		events: make(chan gui.Event, 256),
+		wake:   make(chan struct{}, 1),
+	}
 	r.back = &glyphBack{r: r, textures: map[glyph.TextureID]*page{}}
 	ts, err := glyph.NewTextSystem(r.back)
 	if err != nil {
 		return nil, fmt.Errorf("gogui: text system: %w", err)
 	}
 	if data := gui.IconFontData; len(data) > 0 {
-		ts.AddFontBytes(data)
+		if err := ts.AddFontBytes(data); err != nil {
+			slog.Warn("gogui: icon font", "err", err)
+		}
 	}
 	gui.LoadAppFonts(ts, "gogui")
 	r.textSys = ts
@@ -140,14 +154,25 @@ const (
 	Cancelled
 )
 
-var phases = [...]gui.EventType{gui.EventTouchesBegan, gui.EventTouchesMoved, gui.EventTouchesEnded, gui.EventTouchesCancelled}
+var phases = [...]gui.EventType{
+	gui.EventTouchesBegan,
+	gui.EventTouchesMoved,
+	gui.EventTouchesEnded,
+	gui.EventTouchesCancelled,
+}
 
 func (r *Renderer) Touch(p Phase, id uint64, x, y float32) {
 	if p < Began || p > Cancelled {
 		return
 	}
 	e := gui.Event{Type: phases[p], NumTouches: 1}
-	e.Touches[0] = gui.TouchPoint{Identifier: id, PosX: x, PosY: y, ToolType: gui.TouchToolFinger, Changed: true}
+	e.Touches[0] = gui.TouchPoint{
+		Identifier: id,
+		PosX:       x,
+		PosY:       y,
+		ToolType:   gui.TouchToolFinger,
+		Changed:    true,
+	}
 	if p == Moved {
 		select {
 		case r.events <- e:
@@ -242,7 +267,15 @@ func (r *Renderer) shadow(c *gui.RenderCmd) {
 	tm := identityTM()
 	tm[12], tm[13], tm[14] = c.OffsetX, c.OffsetY, c.Spread
 	r.runWith(slotShadow, 0, &tm, nil)
-	v := buildQuad(x-expand, y-expand, c.W+2*expand, c.H+2*expand, c.Color, c.Radius+c.Spread, c.BlurRadius)
+	v := buildQuad(
+		x-expand,
+		y-expand,
+		c.W+2*expand,
+		c.H+2*expand,
+		c.Color,
+		c.Radius+c.Spread,
+		c.BlurRadius,
+	)
 	r.push(&v)
 }
 
@@ -281,7 +314,10 @@ func (r *Renderer) memPicture(src string) picture {
 		return picture{}
 	}
 	m := memPicture{id: r.imageID(), seen: r.frame}
-	r.sink.Texture(m.id, w, h, 0, 0, w, h, pix)
+	if err := r.sink.Texture(m.id, w, h, 0, 0, w, h, pix); err != nil {
+		r.free = append(r.free, m.id)
+		return picture{}
+	}
 	r.mem[src] = m
 	return picture{id: m.id, ok: true}
 }
@@ -310,8 +346,21 @@ func (r *Renderer) picture(path string) picture {
 			b := src.Bounds()
 			nrgba := image.NewNRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
 			draw.Draw(nrgba, nrgba.Bounds(), src, b.Min, draw.Src)
-			p = picture{id: r.imageID(), ok: true}
-			r.sink.Texture(p.id, b.Dx(), b.Dy(), 0, 0, b.Dx(), b.Dy(), nrgba.Pix)
+			id := r.imageID()
+			if err := r.sink.Texture(
+				id,
+				b.Dx(),
+				b.Dy(),
+				0,
+				0,
+				b.Dx(),
+				b.Dy(),
+				nrgba.Pix,
+			); err != nil {
+				r.free = append(r.free, id)
+			} else {
+				p = picture{id: id, ok: true}
+			}
 		}
 	}
 	r.images[path] = p
@@ -346,7 +395,12 @@ func (r *Renderer) quad(x, y, w, h float32, c gui.Color, radius, thickness float
 
 func (r *Renderer) setClip(x, y, w, h float32) {
 	cx, cy, cw, ch := clipRect(x, y, w, h)
-	r.clip = [4]uint32{uint32(max(cx, 0)), uint32(max(cy, 0)), uint32(max(cw, 0)), uint32(max(ch, 0))}
+	r.clip = [4]uint32{
+		uint32(max(cx, 0)),
+		uint32(max(cy, 0)),
+		uint32(max(cw, 0)),
+		uint32(max(ch, 0)),
+	}
 	r.open = false
 }
 
@@ -372,7 +426,8 @@ func (r *Renderer) line(c *gui.RenderCmd) {
 const maxTriangleFloats = 1_200_000
 
 func (r *Renderer) triangles(c *gui.RenderCmd) {
-	if c.IsClipMask || len(c.Triangles) == 0 || len(c.Triangles)%6 != 0 || len(c.Triangles) > maxTriangleFloats {
+	if c.IsClipMask || len(c.Triangles) == 0 || len(c.Triangles)%6 != 0 ||
+		len(c.Triangles) > maxTriangleFloats {
 		return
 	}
 	n := len(c.Triangles) / 2
@@ -456,7 +511,7 @@ func (r *Renderer) draw(w *gui.Window) (Stats, error) {
 			r.triangles(c)
 		case gui.RenderText:
 			if len(c.Text) > 0 {
-				r.textSys.DrawText(c.X, c.Y, c.Text, textConfigFromRender(c))
+				_ = r.textSys.DrawText(c.X, c.Y, c.Text, textConfigFromRender(c))
 			}
 		case gui.RenderLayout, gui.RenderLayoutPlaced:
 			if c.LayoutPtr != nil {
@@ -472,11 +527,25 @@ func (r *Renderer) draw(w *gui.Window) (Stats, error) {
 	if r.clear != nil {
 		bg = *r.clear
 	}
-	clear := [4]float32{float32(bg.R) / 255, float32(bg.G) / 255, float32(bg.B) / 255, float32(bg.A) / 255}
+	clear := [4]float32{
+		float32(bg.R) / 255,
+		float32(bg.G) / 255,
+		float32(bg.B) / 255,
+		float32(bg.A) / 255,
+	}
 	sub, fin, err := r.sink.Frame(r.rot, clear, r.quads, r.runs)
 	return Stats{
-		Quads: len(r.quads) / quadFloats, Runs: len(r.runs) / runWords,
-		Bytes: len(r.quads)*4 + len(r.runs)*4, Encode: t2.Sub(t1), Send: time.Since(t2), SubmitUS: sub, FinishUS: fin,
+		Quads: len(r.quads) / quadFloats,
+		Runs:  len(r.runs) / runWords,
+		Bytes: len(
+			r.quads,
+		)*4 + len(
+			r.runs,
+		)*4,
+		Encode:   t2.Sub(t1),
+		Send:     time.Since(t2),
+		SubmitUS: sub,
+		FinishUS: fin,
 	}, err
 }
 
@@ -494,13 +563,13 @@ type glyphBack struct {
 func (b *glyphBack) NewTexture(width, height int) glyph.TextureID {
 	b.next++
 	b.textures[b.next] = &page{id: uint32(b.next), w: width, h: height}
-	b.r.sink.Texture(uint32(b.next), width, height, 0, 0, 0, 0, nil)
+	_ = b.r.sink.Texture(uint32(b.next), width, height, 0, 0, 0, 0, nil)
 	return b.next
 }
 
 func (b *glyphBack) UpdateTexture(id glyph.TextureID, data []byte) {
 	if p := b.textures[id]; p != nil && len(data) >= p.w*p.h*4 {
-		b.r.sink.Texture(p.id, p.w, p.h, 0, 0, p.w, p.h, data[:p.w*p.h*4])
+		_ = b.r.sink.Texture(p.id, p.w, p.h, 0, 0, p.w, p.h, data[:p.w*p.h*4])
 	}
 }
 
@@ -514,7 +583,7 @@ func (b *glyphBack) UpdateTextureRect(id glyph.TextureID, data []byte, srcStride
 	if h <= 0 || len(data) < (y+h)*srcStride {
 		return
 	}
-	b.r.sink.Texture(p.id, p.w, p.h, 0, y, p.w, h, data[y*srcStride:(y+h)*srcStride])
+	_ = b.r.sink.Texture(p.id, p.w, p.h, 0, y, p.w, h, data[y*srcStride:(y+h)*srcStride])
 }
 
 func (b *glyphBack) DeleteTexture(id glyph.TextureID) { delete(b.textures, id) }
@@ -543,7 +612,12 @@ func (b *glyphBack) DrawFilledRect(dst glyph.Rect, c glyph.Color) {
 	b.r.quad(dst.X, dst.Y, dst.Width, dst.Height, gui.Color{R: c.R, G: c.G, B: c.B, A: c.A}, 0, 0)
 }
 
-func (b *glyphBack) DrawTexturedQuadTransformed(id glyph.TextureID, src, dst glyph.Rect, c glyph.Color, _ glyph.AffineTransform) {
+func (b *glyphBack) DrawTexturedQuadTransformed(
+	id glyph.TextureID,
+	src, dst glyph.Rect,
+	c glyph.Color,
+	_ glyph.AffineTransform,
+) {
 	b.DrawTexturedQuad(id, src, dst, c)
 }
 

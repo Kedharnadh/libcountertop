@@ -9,9 +9,6 @@ func sink() Record {
 	return AudioSink(0x00010000, "Panel", UUIDAVDTP, FeatureSpeaker)
 }
 
-// What a phone needs to find, in the order it needs it: there is an audio sink, it conforms to
-// A2DP, and this is the channel. Miss any and the device either does not appear or appears and
-// cannot be connected to.
 func TestTheRecordSaysThereIsAnAudioSink(t *testing.T) {
 	r := sink()
 
@@ -50,8 +47,6 @@ func TestTheRecordClaimsTheA2DPProfile(t *testing.T) {
 	}
 }
 
-// The channel number is the part a phone actually connects to, and it is buried two sequences deep
-// in the protocol list.
 func TestAPhoneCanFindTheChannelToConnectTo(t *testing.T) {
 	protocols, ok := sink().Attribute(AttrProtocols)
 	if !ok {
@@ -67,8 +62,6 @@ func TestAPhoneCanFindTheChannelToConnectTo(t *testing.T) {
 	}
 }
 
-// A record outside the public browse group exists and is never found, which looks exactly like a
-// device that is not there.
 func TestTheRecordIsInThePublicBrowseGroup(t *testing.T) {
 	groups, ok := sink().Attribute(AttrBrowseGroups)
 	if !ok {
@@ -82,9 +75,7 @@ func TestTheRecordIsInThePublicBrowseGroup(t *testing.T) {
 	}
 }
 
-// The spec lets a reader stop once it passes the identifier it wants, so the order is not cosmetic.
 func TestTheRecordGoesOutSortedByIdentifier(t *testing.T) {
-	// Deliberately out of order.
 	r := Record{
 		{ID: AttrFeatures, Value: Uint(FeatureSpeaker)},
 		{ID: AttrRecordHandle, Value: Uint(1)},
@@ -110,8 +101,6 @@ func TestTheRecordGoesOutSortedByIdentifier(t *testing.T) {
 	}
 }
 
-// The whole record has to survive being written and read back, because that is all that happens to
-// it: it is built once and sent unchanged.
 func TestTheWholeRecordGoesOutAndComesBack(t *testing.T) {
 	b, err := sink().Element().Marshal()
 	if err != nil {
@@ -129,7 +118,6 @@ func TestTheWholeRecordGoesOutAndComesBack(t *testing.T) {
 		t.Fatalf("%d children came back, want seven attributes as pairs", len(got.Children))
 	}
 
-	// Walk it the way a phone would: find the protocol list by its identifier, then the channel.
 	for i := 0; i < len(got.Children); i += 2 {
 		id, _ := got.Children[i].Uint()
 		if id != AttrProtocols {
@@ -166,8 +154,6 @@ func TestAnAttributeThatIsNotThere(t *testing.T) {
 	}
 }
 
-// PSM is what a phone uses on a record it did not build, so it has to cope with one that is not
-// shaped the way ours is.
 func TestFindingTheChannelInSomethingThatIsNotAProtocolList(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -184,11 +170,6 @@ func TestFindingTheChannelInSomethingThatIsNotAProtocolList(t *testing.T) {
 	}
 }
 
-// The widths on the wire, which the spec fixes and a phone reads positionally.
-//
-// This is what a malformed record looks like from the outside: everything parses, nothing errors,
-// and the phone quietly decides the device is not what it claimed. Pinned as bytes rather than as
-// values, because the value is right either way and only the width is wrong.
 func TestARecordWritesItsFixedWidthsWide(t *testing.T) {
 	raw, err := AudioSink(0x00010000, "dev", 0x0019, FeatureSpeaker).Element().Marshal()
 	if err != nil {
@@ -207,8 +188,7 @@ func TestARecordWritesItsFixedWidthsWide(t *testing.T) {
 		// A record handle is four.
 		{"the handle itself", []byte{0x0a, 0x00, 0x01, 0x00, 0x00}},
 
-		// A PSM is two, inside the L2CAP layer of the protocol list. This is the one a phone
-		// connects to, and the reason a narrow one is a device that is found and never used.
+		// A PSM is two, inside the L2CAP layer of the protocol list.
 		{"L2CAP and its psm", []byte{0x19, 0x01, 0x00, 0x09, 0x00, 0x19}},
 
 		// So is a profile version.
@@ -219,7 +199,6 @@ func TestARecordWritesItsFixedWidthsWide(t *testing.T) {
 		}
 	}
 
-	// And nothing anywhere writes an attribute id narrow.
 	for id := range 0x20 {
 		if bytes.Contains(raw, []byte{0x08, byte(id), 0x0a}) {
 			t.Errorf("attribute %#02x is written as one byte", id)
@@ -227,7 +206,6 @@ func TestARecordWritesItsFixedWidthsWide(t *testing.T) {
 	}
 }
 
-// The same for the remote control records, which carry a psm of their own.
 func TestARemoteControlRecordWritesItsPSMWide(t *testing.T) {
 	raw, err := RemoteControl(1, "dev", 0x0017, 0, UUIDAVRemoteControlTarget, 0x0001).
 		Element().Marshal()

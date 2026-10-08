@@ -9,6 +9,7 @@ import (
 
 	"github.com/Sendspin/sendspin-go/pkg/protocol"
 	esphome "github.com/ygelfand/go-esphome-device"
+
 	core "github.com/ygelfand/libcountertop/pkg/audio/sendspin"
 	media "github.com/ygelfand/libcountertop/pkg/media/source"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
@@ -16,8 +17,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
 
-// Player is the room's membership of a group, as Home Assistant sees it: a listening port and an
-// advert saying the room is here.
 type Player struct {
 	options Dependencies
 	workers sync.WaitGroup
@@ -32,29 +31,19 @@ type Player struct {
 	running context.CancelFunc
 	wake    chan struct{}
 
-	// joined is the server holding the room, set while one is connected. Home Assistant's transport
-	// controls go to it, and there is nothing to send them to when it is nil.
 	joined *core.Session
 
-	// playing is the group's own playback state, which is the only thing that tells a pause from a
-	// track that ended: both leave this room silent.
 	playing track
 	paused  bool
 
-	// artwork is the newest encoded image the server sent. The display decodes it on demand.
 	artwork []byte
 
-	// Where the track had reached when the server last said, and when that was. The server sends
-	// progress now and then rather than continuously, so the bar runs from the clock between.
 	at        time.Duration
 	length    time.Duration
 	serverAt  int64
 	speed     int
 	serverNow func() int64
 }
-
-// artworkSize is what the server is asked to scale album art to.
-const artworkSize = 512
 
 func New(options Dependencies) *Player {
 	p := &Player{options: options,
@@ -111,11 +100,14 @@ func (p *Player) stepped(by time.Duration) {
 	if joined == nil {
 		return
 	}
-	slog.Info("the clock was stepped, starting the sendspin session again", "by", by.Round(time.Millisecond))
+	slog.Info(
+		"the clock was stepped, starting the sendspin session again",
+		"by",
+		by.Round(time.Millisecond),
+	)
 	joined.Close()
 }
 
-// What the state sensor says, from switched off to audible.
 const (
 	stateOff     = "off"
 	stateWaiting = "waiting"
@@ -129,17 +121,10 @@ func (p *Player) Entities() []esphome.Entity {
 	return []esphome.Entity{p.enabled, p.state, p.title, p.artist}
 }
 
-// Play, Pause and Stop implement media.Source: Home Assistant reaches for the speaker entity whoever
-// started the audio, so when a group is playing these are what its buttons mean.
-//
-// Stop falls back to pause because a room that joined a group cannot end what the group is playing;
-// leaving the group would silence this room and keep the rest going, which is not what stop means.
 func (p *Player) Play()  { p.tell("play") }
 func (p *Player) Pause() { p.tell("pause") }
 func (p *Player) Stop()  { p.tell("stop", "pause") }
 
-// Next and Previous move the whole group, not just this room: the server owns the queue, and a room
-// asking to skip is asking on everyone's behalf.
 func (p *Player) Next()     { p.tell("next") }
 func (p *Player) Previous() { p.tell("previous") }
 
@@ -152,28 +137,17 @@ func (p *Player) tell(want ...string) {
 		return
 	}
 
-	// Off the caller's thread: this arrives on Home Assistant's read loop, and the send holds a lock
-	// around a websocket write with no deadline on it. A server that stopped reading would take the
-	// device's own connection down with it.
 	safe.Go("sendspin command", func() { s.Command(want...) })
 }
 
-// Playing implements media.Source.
 func (p *Player) Playing() (playing, paused bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.state.Get() == statePlaying && !p.paused, p.paused
 }
 
-// Now implements media.Source: what the group is playing, for the entity and for the screen.
-//
-// Skipping is the server's to do and it does it for the whole house, so the controls offered are the
-// ones a room may press on everyone else's behalf.
-// Kind implements media.Source: a group the room has joined.
 func (*Player) Kind() media.Kind { return media.FromGroup }
 
-// Label implements media.Source. A server does not name itself in anything it sends, and the room's
-// own name is this device's rather than the group's.
 func (*Player) Label() string { return "" }
 
 func (p *Player) Now() media.Now {
@@ -196,9 +170,6 @@ func (p *Player) Now() media.Now {
 	}
 }
 
-// reached is where the track is now: where the server last said, plus the time since, while the
-// audio is going. Held to the length, since a server that stopped reporting would otherwise run the
-// bar off the end.
 func (p *Player) reached(playing bool) time.Duration {
 	at := p.at
 	if playing && p.serverNow != nil && p.speed > 0 {
@@ -210,7 +181,6 @@ func (p *Player) reached(playing bool) time.Duration {
 	return max(at, 0)
 }
 
-// moved takes the position the server reported.
 func (p *Player) moved(progress protocol.ProgressState, stamp int64, serverNow func() int64) {
 	if stamp == 0 {
 		stamp = serverNow()
@@ -227,9 +197,6 @@ func (p *Player) moved(progress protocol.ProgressState, stamp int64, serverNow f
 	p.changed()
 }
 
-// holds says which session owns the room, and nil when none does. The media player follows it: the
-// group answers Home Assistant's transport controls for as long as it is connected, whether or not
-// audio happens to be arriving this second.
 func (p *Player) holds(s *core.Session) {
 	p.mu.Lock()
 	p.joined = s
@@ -246,9 +213,6 @@ func (p *Player) holds(s *core.Session) {
 	}
 }
 
-// setState publishes it and tells the media player, which reads Playing from it.
-//
-// Starting to play is also what claims the card, since the card follows the last thing to play.
 func (p *Player) setState(state string) {
 	p.state.Set(state)
 
@@ -259,7 +223,6 @@ func (p *Player) setState(state string) {
 	p.changed()
 }
 
-// grouped takes the group's playback state, which is what separates a pause from a track ending.
 func (p *Player) grouped(state string) {
 	p.mu.Lock()
 	p.paused = state == "paused" || state == "stopped" && p.playing.Title != ""
@@ -267,15 +230,12 @@ func (p *Player) grouped(state string) {
 	p.changed()
 }
 
-// track is what the room is playing, as far as the metadata role has said.
 func (p *Player) track() track {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.playing
 }
 
-// plays publishes the track. The empty one clears the sensors rather than leaving them naming
-// something nobody can hear.
 func (p *Player) plays(t track) {
 	p.mu.Lock()
 	if t != p.playing {
@@ -293,7 +253,6 @@ func (p *Player) plays(t track) {
 	}
 }
 
-// drew keeps the newest album art.
 func (p *Player) drew(art protocol.ArtworkChunk) {
 	p.mu.Lock()
 	p.artwork = append([]byte(nil), art.Data...)
@@ -315,10 +274,8 @@ func artID(art []byte) uint64 {
 	return maphash.Bytes(artSeed, art)
 }
 
-// Restore puts the switch back where it was left. Listening waits for Run, once there is a network.
 func (p *Player) Restore(enabled bool) { p.enabled.Set(enabled) }
 
-// Run holds the port open for as long as the switch is on.
 func (p *Player) Run(ctx context.Context) error {
 	unwatch := p.options.Clock.WatchSteps(p.stepped)
 	defer unwatch()
@@ -335,11 +292,6 @@ func (p *Player) Run(ctx context.Context) error {
 	}
 }
 
-// SetEnabled turns the room's part in whole-house audio on or off and remembers it.
-//
-// Exported because the screen changes this too, and both have to do the same three things: tell
-// Home Assistant, write the file, and wake the loop. A second path that did two of them would leave
-// the device listening with a file that says it is not.
 func (p *Player) SetEnabled(on bool) {
 	if err := p.options.Settings.Update(func(c *schema.Sendspin) { c.Enabled = on }); err != nil {
 		slog.Error("saving a setting failed", "setting", p.enabled.ObjectID, "err", err)
@@ -350,7 +302,6 @@ func (p *Player) SetEnabled(on bool) {
 	p.rethink()
 }
 
-// rethink wakes the loop without blocking. A second ask while one is pending is the same ask.
 func (p *Player) rethink() {
 	select {
 	case p.wake <- struct{}{}:
@@ -358,7 +309,6 @@ func (p *Player) rethink() {
 	}
 }
 
-// settle makes what is running match what was asked for.
 func (p *Player) settle(parent context.Context) {
 	want := p.options.Settings.Read().Enabled
 
@@ -393,7 +343,10 @@ func (p *Player) settle(parent context.Context) {
 			slog.Error("sendspin listener stopped", "err", err)
 		}
 	})
-	safe.Go("sendspin advertise", func() { defer p.workers.Done(); advertise(ctx, name, core.Port) })
+	safe.Go(
+		"sendspin advertise",
+		func() { defer p.workers.Done(); advertise(ctx, name, core.Port) },
+	)
 
 	p.state.Set(stateWaiting)
 	slog.Info("sendspin waiting for a server", "name", name, "port", core.Port)
@@ -438,12 +391,24 @@ type Dependencies struct {
 }
 
 func (p *Player) listener() *core.Listener {
-	return core.NewListener(p.out, p.options.Arbitration, p.options.Device.Identity, core.Callbacks{State: p.setState, Connection: p.holds, Began: func() { p.options.Media.Began(p) }, Grouped: p.grouped, Artwork: p.drew, Metadata: func(m *protocol.MetadataState, now func() int64) {
-		p.plays(p.track().merge(m))
-		if m.Progress != nil {
-			p.moved(*m.Progress, m.Timestamp, now)
-		}
-	}})
+	return core.NewListener(
+		p.out,
+		p.options.Arbitration,
+		p.options.Device.Identity,
+		core.Callbacks{
+			State:      p.setState,
+			Connection: p.holds,
+			Began:      func() { p.options.Media.Began(p) },
+			Grouped:    p.grouped,
+			Artwork:    p.drew,
+			Metadata: func(m *protocol.MetadataState, now func() int64) {
+				p.plays(p.track().merge(m))
+				if m.Progress != nil {
+					p.moved(*m.Progress, m.Timestamp, now)
+				}
+			},
+		},
+	)
 }
 
 const ArtworkSize = 512

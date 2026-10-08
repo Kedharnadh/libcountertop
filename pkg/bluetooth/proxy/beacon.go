@@ -5,7 +5,6 @@ import (
 	"net"
 )
 
-// BeaconMinor is the iBeacon minor for this device, from the last two bytes of its MAC.
 func BeaconMinor(mac string) int {
 	address, err := net.ParseMAC(mac)
 	if err != nil || len(address) != 6 {
@@ -26,14 +25,12 @@ const (
 	iBeaconMeasuredPower = -59
 )
 
-// This randomly assigned UUID identifies Countertop receivers. BPS distinguishes individual
-// receivers by the complete UUID, major, and minor tuple.
+// BPS identifies a receiver by UUID, major and minor together.
 var iBeaconUUID = [16]byte{
 	0x9c, 0x5f, 0xa6, 0xf1, 0x91, 0xc4, 0x4f, 0x56,
 	0xbb, 0x9f, 0xd9, 0x2a, 0xcf, 0xd9, 0xd4, 0x0b,
 }
 
-// BeaconAdvertisement formats an iBeacon advertisement for minor.
 func BeaconAdvertisement(minor int) []byte {
 	if minor < 0 || minor > 0xffff {
 		return nil

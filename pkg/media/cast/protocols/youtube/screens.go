@@ -13,19 +13,16 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/media/cast/preferences"
 )
 
-// Retry is how long to wait after the lounge could not be reached or bound.
 const Retry = 30 * time.Second
 
 const firstRetry = 2 * time.Second
 
-// themes is which lounge screen each YouTube application pairs through.
 var themes = map[string]string{
 	"2DB7CC49": ThemeMusic,
 	"233637DE": ThemeYouTube,
 	"32EAB1DF": ThemeTV,
 }
 
-// screens keeps this device's lounge screens bound, one per theme, with their ids in the config.
 type screens struct {
 	opts cast.Env
 
@@ -47,7 +44,6 @@ func newScreens(opts cast.Env) *screens {
 	return s
 }
 
-// screen is the lounge screen an application pairs through, once YouTube has issued one.
 func (s *screens) screen(app string) (string, string, bool) {
 	theme, ok := themes[app]
 	if !ok {
@@ -86,7 +82,6 @@ func (s *screens) save() {
 	}
 }
 
-// run keeps every theme's screen bound until ctx ends.
 func (s *screens) run(ctx context.Context) {
 	s.mu.Lock()
 	s.ctx = ctx
@@ -97,7 +92,11 @@ func (s *screens) run(ctx context.Context) {
 		s.stations[theme] = newStation(ctx, theme, s.opts)
 	}
 	s.mu.Unlock()
-	slog.Info("youtube lounge", "mode", map[bool]string{false: "always", true: "on demand"}[onDemand])
+	slog.Info(
+		"youtube lounge",
+		"mode",
+		map[bool]string{false: "always", true: "on demand"}[onDemand],
+	)
 	if onDemand {
 		return
 	}
@@ -157,7 +156,6 @@ func (s *screens) idle(ctx context.Context, cancel context.CancelFunc, st *stati
 	}
 }
 
-// keep binds one screen and holds its long poll, binding again whenever the session goes.
 func (s *screens) keep(ctx context.Context, st *station) {
 	delay := firstRetry
 	for ctx.Err() == nil {
@@ -196,7 +194,14 @@ func (s *screens) bound(ctx context.Context, st *station) error {
 		return fmt.Errorf("a lounge token: %w", err)
 	}
 
-	screen := Screen{ID: id, Device: device, Name: s.opts.Name, Theme: theme, Brand: s.opts.Model, Model: s.opts.Model}
+	screen := Screen{
+		ID:     id,
+		Device: device,
+		Name:   s.opts.Name,
+		Theme:  theme,
+		Brand:  s.opts.Model,
+		Model:  s.opts.Model,
+	}
 	sess, err := Bind(ctx, s.opts.HTTP, s.opts.Long, screen, token)
 	if err != nil {
 		return fmt.Errorf("binding: %w", err)
@@ -212,7 +217,17 @@ func (s *screens) bound(ctx context.Context, st *station) error {
 			if m.Name == "noop" {
 				return
 			}
-			slog.Debug("youtube lounge in", "theme", theme, "aid", m.AID, "name", m.Name, "payload", string(m.Payload))
+			slog.Debug(
+				"youtube lounge in",
+				"theme",
+				theme,
+				"aid",
+				m.AID,
+				"name",
+				m.Name,
+				"payload",
+				string(m.Payload),
+			)
 			st.touch()
 			st.handle(m)
 		})

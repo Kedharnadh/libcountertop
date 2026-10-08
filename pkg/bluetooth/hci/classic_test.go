@@ -6,8 +6,6 @@ import (
 	"unicode/utf8"
 )
 
-// The name a phone shows beside the device, as the command carries it.
-
 func TestANameIsPaddedToTheFullWidth(t *testing.T) {
 	got := localName("Kitchen")
 
@@ -30,8 +28,6 @@ func TestAnEmptyNameIsAllPadding(t *testing.T) {
 	}
 }
 
-// A name longer than the command holds is cut at a rune. Cutting at the byte would leave a partial
-// one, which a phone draws as a replacement character in the name of the thing it is pairing with.
 func TestALongNameIsCutWithoutSplittingARune(t *testing.T) {
 	for _, name := range []string{
 		"a very long name " + string(bytes.Repeat([]byte("x"), 300)),
@@ -55,8 +51,6 @@ func TestALongNameIsCutWithoutSplittingARune(t *testing.T) {
 	}
 }
 
-// The class of device decides the icon a phone draws and whether it offers to send audio at all, so
-// it is worth pinning rather than trusting a comment.
 func TestTheDeviceSaysItIsALoudspeaker(t *testing.T) {
 	// Little endian on the wire: minor, major, service.
 	if SpeakerClass != [3]byte{0x14, 0x04, 0x24} {
@@ -80,7 +74,6 @@ func TestTheDeviceSaysItIsALoudspeaker(t *testing.T) {
 	}
 }
 
-// Both scans, or the device is either invisible or unreachable.
 func TestDiscoveryIsInquiryAndPage(t *testing.T) {
 	if scanDiscovery != 0x03 {
 		t.Errorf("scan enable %#02x, want both", scanDiscovery)

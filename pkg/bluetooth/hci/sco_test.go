@@ -16,7 +16,9 @@ func TestAnSCOPacketIsFramedAsItself(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.kind != typeSCO || got.sco.Handle != 6 || got.sco.Status != 2 || !bytes.Equal(got.sco.Data, []byte{2, 4, 2, 4}) || took != len(buf) {
+	if got.kind != typeSCO || got.sco.Handle != 6 || got.sco.Status != 2 ||
+		!bytes.Equal(got.sco.Data, []byte{2, 4, 2, 4}) ||
+		took != len(buf) {
 		t.Errorf("read %+v, took %d of %d", got, took, len(buf))
 	}
 	for n := range len(buf) {
@@ -63,7 +65,8 @@ func TestOnlyTheLatestSCOIsKept(t *testing.T) {
 	for i := range scoKept + 10 {
 		q.add(packet{kind: typeSCO, sco: scoPacket{Data: []byte{byte(i)}}})
 	}
-	if q.scos != scoKept+10 || len(q.sco) != scoKept || q.sco[0].Data[0] != 10 || q.sco[scoKept-1].Data[0] != scoKept+9 {
+	if q.scos != scoKept+10 || len(q.sco) != scoKept || q.sco[0].Data[0] != 10 ||
+		q.sco[scoKept-1].Data[0] != scoKept+9 {
 		t.Errorf("counted %d, kept %d from %d", q.scos, len(q.sco), q.sco[0].Data[0])
 	}
 }

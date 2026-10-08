@@ -7,19 +7,8 @@ import (
 
 func init() { register(Segments, segments{}) }
 
-// segments is a seven segment display: four digits and a colon, with the segments that are off
-// drawn faintly.
-//
-// It draws its own numerals rather than setting type, because a font has no way to say what a glyph
-// would have looked like, and the ghost of the unlit bars is the whole of the effect. The digit
-// itself is in sevenseg.go; this file is how they are arranged and sized.
 type segments struct{}
 
-// The block, against the box.
-//
-// Two shares because the face turns: four digits and a colon across a portrait panel are bound by
-// the width and come out a sixth of the height tall, which is a display lost in the middle of the
-// glass. Stacked, each row is two digits and the height is what binds.
 const (
 	segmentsWidthShare  = 0.88
 	segmentsHeightShare = 0.34
@@ -27,51 +16,37 @@ const (
 	segmentsRowGap      = 0.22
 )
 
-// A digit and its parts, against the digit's own height.
 const (
 	digitAspect = 0.56
 	digitGap    = 0.16
 	colonGap    = 0.30
 
-	// The bar, and the notch between bars so they do not run into one another at the corners.
 	barThick = 0.15
 	barNotch = 0.030
 
-	// How far the off segments are taken from the surface towards the text. Enough to see in a lit
-	// room, not enough to read as a digit.
 	segmentGhost = 0.09
 
 	segmentsDateOf  = 0.13
 	segmentsDateGap = 0.34
 )
 
-// segmentsCell is one lamp position: where it is and what is showing in it.
-//
-// The character is part of the layout rather than something read off the reading again, because
-// what makes this face cheap to repaint is knowing which of the four cells changed — and a cell
-// keeps its place whatever is in it.
 type segmentsCell struct {
 	At ui.Rect
 	Ch rune
 }
 
-// segmentsLayout is where the pieces land in a box.
 type segmentsLayout struct {
 	Cells []segmentsCell
 
-	// Date is the line under the display, empty when there is no date.
 	Date ui.Rect
 }
 
-// segmentsArrange places the lamps, so that drawing them and saying where they are cannot disagree.
 func segmentsArrange(in ui.Rect, r Reading) (segmentsLayout, *ui.Font) {
 	hour, minute, ok := lines(r)
 	if !ok {
 		return segmentsLayout{}, nil
 	}
 
-	// One line across, two lines down. Stacked drops the colon: what separates the hour from the
-	// minutes is the gap between the rows, and a colon left in would be a lamp with nothing to say.
 	rows := []string{hour + ":" + minute}
 	if in.H > in.W {
 		rows = []string{hour, minute}
@@ -114,7 +89,6 @@ func segmentsArrange(in ui.Rect, r Reading) (segmentsLayout, *ui.Font) {
 		top += height + between
 	}
 
-	// top has walked past the last row and one gap too many, which is where the date goes from.
 	top -= between
 
 	if r.Dated() {
@@ -148,7 +122,6 @@ func (segments) Draw(s ui.Surface, in ui.Rect, r Reading, palette theme.Theme) {
 	}
 }
 
-// runWidth is how wide the whole time comes out at a digit height.
 func runWidth(text string, width, gap, height int) int {
 	var w int
 	for _, c := range text {
@@ -161,10 +134,6 @@ func runWidth(text string, width, gap, height int) int {
 	return w - gap
 }
 
-// segmentsFit is the digit height that fits the box on both axes.
-//
-// Worked out rather than searched: every part of this face is a fixed fraction of the height, so
-// the width it needs is a fixed multiple too, and the largest height that fits is division.
 func segmentsFit(in ui.Rect, rows []string) int {
 	share := segmentsHeightShare
 	if len(rows) > 1 {

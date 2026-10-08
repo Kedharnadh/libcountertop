@@ -34,7 +34,17 @@ func Theme(style, theme string) string {
 	return theme
 }
 
-var All = []Style{standardStyle, materialStyle, glassStyle, einkStyle, metroStyle, terminalStyle, hifiStyle, neonStyle, skeuoStyle}
+var All = []Style{
+	standardStyle,
+	materialStyle,
+	glassStyle,
+	einkStyle,
+	metroStyle,
+	terminalStyle,
+	hifiStyle,
+	neonStyle,
+	skeuoStyle,
+}
 
 func init() {
 	gogui.RegisterAppFontBytes(goregular.TTF)
@@ -113,7 +123,9 @@ func spanAt(ss []Span, at float32) (gogui.Color, bool) {
 func version(pct float32, marks int) uint64 { return uint64(pct*1e6) + uint64(marks)<<32 }
 
 func placeholder(w, h float32) gogui.View {
-	return gogui.Row(gogui.ContainerCfg{Width: w, Height: h, Sizing: gogui.FixedFixed, Padding: gogui.NoPadding})
+	return gogui.Row(
+		gogui.ContainerCfg{Width: w, Height: h, Sizing: gogui.FixedFixed, Padding: gogui.NoPadding},
+	)
 }
 
 func mix(a, b gogui.Color, f float32) gogui.Color {
@@ -122,9 +134,18 @@ func mix(a, b gogui.Color, f float32) gogui.Color {
 }
 
 func vertical(top, bottom gogui.Color) *gogui.GradientDef {
-	return &gogui.GradientDef{Direction: gogui.GradientToBottom, Stops: []gogui.GradientStop{{Color: top, Pos: 0}, {Color: bottom, Pos: 1}}}
+	return &gogui.GradientDef{
+		Direction: gogui.GradientToBottom,
+		Stops:     []gogui.GradientStop{{Color: top, Pos: 0}, {Color: bottom, Pos: 1}},
+	}
 }
 
 func dial(x0, y0, x1, y1 float32, top, bottom gogui.Color) *gogui.CanvasGradient {
-	return &gogui.CanvasGradient{X1: x0, Y1: y0, X2: x1, Y2: y1, Stops: []gogui.GradientStop{{Color: top, Pos: 0}, {Color: bottom, Pos: 1}}}
+	return &gogui.CanvasGradient{
+		X1:    x0,
+		Y1:    y0,
+		X2:    x1,
+		Y2:    y1,
+		Stops: []gogui.GradientStop{{Color: top, Pos: 0}, {Color: bottom, Pos: 1}},
+	}
 }

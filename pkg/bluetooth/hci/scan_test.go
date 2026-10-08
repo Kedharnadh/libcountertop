@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// report builds one advertising report as the controller lays it out: event type, address type,
-// address least significant octet first, data length, data, RSSI.
 func report(kind, addressType byte, address [6]byte, data []byte, rssi int8) []byte {
 	out := []byte{kind, addressType}
 	for i := len(address) - 1; i >= 0; i-- {
@@ -17,7 +15,6 @@ func report(kind, addressType byte, address [6]byte, data []byte, rssi int8) []b
 	return append(out, byte(rssi))
 }
 
-// meta wraps reports the way an LE Meta event carries them.
 func meta(reports ...[]byte) []byte {
 	out := []byte{leAdvertisingReport, byte(len(reports))}
 	for _, r := range reports {
@@ -52,9 +49,6 @@ func TestReportsReadsAnAdvertisement(t *testing.T) {
 	}
 }
 
-// The wire carries an address backwards and Home Assistant wants it forwards. Reading it the wrong
-// way round gives a valid-looking address for a different device, which nothing downstream can
-// catch — so the reversal is asserted against a deliberately asymmetric address.
 func TestReportsPutsTheAddressTheRightWayRound(t *testing.T) {
 	want := [6]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06}
 
@@ -91,9 +85,6 @@ func TestReportsReadsSeveralInOneEvent(t *testing.T) {
 	}
 }
 
-// Anything within radio range can send these, so a malformed one has to be dropped rather than
-// read past the end of. Every truncation of a good event is tried, since which byte is missing is
-// not something the sender is obliged to be reasonable about.
 func TestReportsDropsWhatItCannotRead(t *testing.T) {
 	whole := meta(report(0x00, 0x01, [6]byte{1, 2, 3, 4, 5, 6}, []byte{0x02, 0x01, 0x06}, -64))
 
@@ -111,8 +102,6 @@ func TestReportsDropsWhatItCannotRead(t *testing.T) {
 	}
 }
 
-// A count that does not match what follows is the same problem from the other end: the event says
-// four reports and carries one.
 func TestReportsBelievesTheBytesRatherThanTheCount(t *testing.T) {
 	said := meta(report(0x00, 0x00, [6]byte{1, 2, 3, 4, 5, 6}, []byte{0x01}, -40))
 	said[1] = 4
@@ -125,8 +114,6 @@ func TestReportsBelievesTheBytesRatherThanTheCount(t *testing.T) {
 	}
 }
 
-// Anything that is not an advertising report belongs to somebody else. Connection complete is the
-// one most likely to turn up, since it shares the LE Meta event.
 func TestReportsIgnoresOtherLEEvents(t *testing.T) {
 	seen := 0
 	reports([]byte{0x01, 0x00, 0x00, 0x40, 0x00}, func(Advertisement) { seen++ })

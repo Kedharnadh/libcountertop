@@ -29,7 +29,6 @@ var visionOS = yt.ClientInfo{
 
 var useClient sync.Once
 
-// Track is a video as the player needs it.
 type Track struct {
 	ID        string
 	Title     string
@@ -37,7 +36,6 @@ type Track struct {
 	Duration  time.Duration
 	Thumbnail string
 
-	// Codec is the stream's, "opus" for WebM Opus.
 	Codec string
 }
 
@@ -61,7 +59,6 @@ func chunkFor(f *yt.Format) int64 {
 	return max(rateOf(f)*int64(chunkTime/time.Second), chunkFloor)
 }
 
-// Resolver turns video ids into tracks and their audio.
 type Resolver struct {
 	client   yt.Client
 	http     *http.Client
@@ -81,7 +78,6 @@ func NewResolver(c *http.Client, target func() playback.Target) *Resolver {
 	return &Resolver{client: yt.Client{HTTPClient: c}, http: c, target: target}
 }
 
-// Info is a video's title, author, length and thumbnail, without opening anything.
 func (r *Resolver) Info(ctx context.Context, id string) (Track, error) {
 	v, err := r.client.GetVideoContext(ctx, id)
 	if err != nil {
@@ -122,7 +118,16 @@ func (r *Resolver) Formats(ctx context.Context, id string) (string, error) {
 			f.ItagNo, f.MimeType, f.Height, f.FPS, f.Bitrate, f.ContentLength, track)
 	}
 	if live(v) {
-		d, err := hls.Describe(ctx, v.HLSManifestURL, hls.Options{HTTP: r.http, Ask: ask, Tallest: r.limits().Tallest, Fastest: r.limits().Fastest})
+		d, err := hls.Describe(
+			ctx,
+			v.HLSManifestURL,
+			hls.Options{
+				HTTP:    r.http,
+				Ask:     ask,
+				Tallest: r.limits().Tallest,
+				Fastest: r.limits().Fastest,
+			},
+		)
 		if err != nil {
 			fmt.Fprintf(&b, "hls: %v\n", err)
 		}
@@ -133,21 +138,30 @@ func (r *Resolver) Formats(ctx context.Context, id string) (string, error) {
 
 func live(v *yt.Video) bool { return v.HLSManifestURL != "" && v.Duration == 0 }
 
-// Audio resolves a video and opens its best Opus stream.
 func (r *Resolver) Audio(ctx context.Context, id string) (Track, io.ReadCloser, error) {
 	t, stream, err := r.open(ctx, id, "opus audio", bestOpus, ahead)
 	t.Codec = "opus"
 	return t, stream, err
 }
 
-// Video opens a video's best VP9 picture stream, which carries no sound.
 func (r *Resolver) Video(ctx context.Context, id string) (Track, io.ReadCloser, error) {
-	t, stream, err := r.open(ctx, id, "vp9 video", func(f yt.FormatList) *yt.Format { return bestVP9(f, r.limits()) }, 4)
+	t, stream, err := r.open(
+		ctx,
+		id,
+		"vp9 video",
+		func(f yt.FormatList) *yt.Format { return bestVP9(f, r.limits()) },
+		4,
+	)
 	t.Codec = "vp9"
 	return t, stream, err
 }
 
-func (r *Resolver) open(ctx context.Context, id, what string, pick func(yt.FormatList) *yt.Format, ahead int) (Track, io.ReadCloser, error) {
+func (r *Resolver) open(
+	ctx context.Context,
+	id, what string,
+	pick func(yt.FormatList) *yt.Format,
+	ahead int,
+) (Track, io.ReadCloser, error) {
 	v, err := r.client.GetVideoContext(ctx, id)
 	if err != nil {
 		return Track{}, nil, fmt.Errorf("youtube: resolving %s: %w", id, err)
@@ -162,7 +176,19 @@ func (r *Resolver) open(ctx context.Context, id, what string, pick func(yt.Forma
 		for _, c := range v.Formats {
 			offered = append(offered, fmt.Sprintf("%d:%s", c.ItagNo, c.MimeType))
 		}
-		slog.Warn("youtube formats without a pick", "video", id, "want", what, "duration", v.Duration, "hls", v.HLSManifestURL != "", "offered", strings.Join(offered, " "))
+		slog.Warn(
+			"youtube formats without a pick",
+			"video",
+			id,
+			"want",
+			what,
+			"duration",
+			v.Duration,
+			"hls",
+			v.HLSManifestURL != "",
+			"offered",
+			strings.Join(offered, " "),
+		)
 		return Track{}, nil, fmt.Errorf("youtube: %s has no %s", id, what)
 	}
 	for i := range v.Formats {
@@ -174,11 +200,49 @@ func (r *Resolver) open(ctx context.Context, id, what string, pick func(yt.Forma
 		if c.AudioTrack != nil {
 			track = c.AudioTrack.ID
 		}
-		slog.Debug("youtube format", "video", id, "what", what, "chosen", c == f, "itag", c.ItagNo, "mime", c.MimeType,
-			"bitrate", c.Bitrate, "length", c.ContentLength, "ms", c.ApproxDurationMs, "track", track,
-			"init", c.InitRange, "index", c.IndexRange)
+		slog.Debug(
+			"youtube format",
+			"video",
+			id,
+			"what",
+			what,
+			"chosen",
+			c == f,
+			"itag",
+			c.ItagNo,
+			"mime",
+			c.MimeType,
+			"bitrate",
+			c.Bitrate,
+			"length",
+			c.ContentLength,
+			"ms",
+			c.ApproxDurationMs,
+			"track",
+			track,
+			"init",
+			c.InitRange,
+			"index",
+			c.IndexRange,
+		)
 	}
-	slog.Debug("youtube stream", "video", id, "what", what, "itag", f.ItagNo, "chunk", chunkFor(f), "rate", rateOf(f), "lead", lead, "ahead", ahead)
+	slog.Debug(
+		"youtube stream",
+		"video",
+		id,
+		"what",
+		what,
+		"itag",
+		f.ItagNo,
+		"chunk",
+		chunkFor(f),
+		"rate",
+		rateOf(f),
+		"lead",
+		lead,
+		"ahead",
+		ahead,
+	)
 	url, err := r.client.GetStreamURLContext(ctx, v, f)
 	if err != nil {
 		return Track{}, nil, fmt.Errorf("youtube: opening %s: %w", id, err)
@@ -193,7 +257,21 @@ func (r *Resolver) open(ctx context.Context, id, what string, pick func(yt.Forma
 		}
 		return "", fmt.Errorf("youtube: %s has no %s", id, what)
 	}
-	stream := fetch.NewRanged(ctx, r.http, url, f.ContentLength, fetch.Chunks{Size: chunkFor(f), Rate: rateOf(f), Lead: lead, Retry: retryAfter, Ahead: ahead, Ask: ask, Renew: renew})
+	stream := fetch.NewRanged(
+		ctx,
+		r.http,
+		url,
+		f.ContentLength,
+		fetch.Chunks{
+			Size:  chunkFor(f),
+			Rate:  rateOf(f),
+			Lead:  lead,
+			Retry: retryAfter,
+			Ahead: ahead,
+			Ask:   ask,
+			Renew: renew,
+		},
+	)
 
 	return trackOf(id, v), stream, nil
 }
@@ -222,7 +300,8 @@ func bestVP9(formats yt.FormatList, limits playback.Target) *yt.Format {
 	var found []*yt.Format
 	for i := range formats {
 		f := &formats[i]
-		if strings.HasPrefix(f.MimeType, "video/webm") && strings.Contains(f.MimeType, "vp9") && within(f.Height, limits.Tallest) {
+		if strings.HasPrefix(f.MimeType, "video/webm") && strings.Contains(f.MimeType, "vp9") &&
+			within(f.Height, limits.Tallest) {
 			found = append(found, f)
 		}
 	}
@@ -242,7 +321,6 @@ func bestVP9(formats yt.FormatList, limits playback.Target) *yt.Format {
 	return found[0]
 }
 
-// bestOpus is the highest-bitrate audio-only Opus format.
 func bestOpus(formats yt.FormatList) *yt.Format {
 	var found []*yt.Format
 	for i := range formats {
@@ -269,8 +347,6 @@ func bestOpus(formats yt.FormatList) *yt.Format {
 
 type audio struct{ plain, original bool }
 
-// audioOf reads which rendition an audio format is: the original language or a dub, and whether it
-// has been compressed or had voices lifted.
 func audioOf(f *yt.Format) audio {
 	tags := xtags(f.URL)
 	a := audio{plain: tags["drc"] == "" && tags["vb"] == ""}

@@ -42,7 +42,13 @@ func (v *neon) wall() *image.RGBA {
 			for x := range w {
 				r, g, b, _ := brickAt(float64(x)+0.5, float64(y)+0.5, s)
 				o := img.PixOffset(x, y)
-				img.Pix[o], img.Pix[o+1], img.Pix[o+2], img.Pix[o+3] = uint8(255*r*0.7), uint8(255*g*0.7), uint8(255*b*0.75), 255
+				img.Pix[o], img.Pix[o+1], img.Pix[o+2], img.Pix[o+3] = uint8(
+					255*r*0.7,
+				), uint8(
+					255*g*0.7,
+				), uint8(
+					255*b*0.75,
+				), 255
 			}
 		}
 	})
@@ -221,8 +227,14 @@ func (v *neon) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 	f := v.fr.next(x)
 	v.advance(f)
 	buzz := 0.97 + 0.03*math.Sin(f.t*120)
-	vals := []float32{float32(v.bright * buzz * (1 + 0.35*v.flash)), float32(v.tint[0]), float32(v.tint[1]), float32(v.tint[2]),
-		float32(v.stutter), float32(v.stutterLevel(f.t))}
+	vals := []float32{
+		float32(v.bright * buzz * (1 + 0.35*v.flash)),
+		float32(v.tint[0]),
+		float32(v.tint[1]),
+		float32(v.tint[2]),
+		float32(v.stutter),
+		float32(v.stutterLevel(f.t)),
+	}
 	return g.Values(vals, float32(0.7+0.4*v.bright), 0.02, 2)
 }
 
@@ -259,7 +271,16 @@ func skeleton(mask *image.RGBA) *image.RGBA {
 					if on[i] == 0 {
 						continue
 					}
-					p := [8]uint8{on[i-w], on[i-w+1], on[i+1], on[i+w+1], on[i+w], on[i+w-1], on[i-1], on[i-w-1]}
+					p := [8]uint8{
+						on[i-w],
+						on[i-w+1],
+						on[i+1],
+						on[i+w+1],
+						on[i+w],
+						on[i+w-1],
+						on[i-1],
+						on[i-w-1],
+					}
 					n := int(p[0] + p[1] + p[2] + p[3] + p[4] + p[5] + p[6] + p[7])
 					if n < 2 || n > 6 {
 						continue

@@ -28,15 +28,13 @@ jobs:
         include:
           - api: 25
             prefix: echolocal
-            show: 1
           - api: 27
             prefix: lanovo
-            show: 0
     steps:
       - uses: actions/checkout@v7
       - name: install Android NDK
         run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;30.0.16248370"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/30.0.16248370" >> "$GITHUB_ENV"
-      - run: make -f native/Makefile all API=${{ matrix.api }} PREFIX=${{ matrix.prefix }} SHOW=${{ matrix.show }} OUT="$RUNNER_TEMP/helpers"
+      - run: make -f native/Makefile all API=${{ matrix.api }} PREFIX=${{ matrix.prefix }} OUT="$RUNNER_TEMP/helpers"
       - run: make -f native/Makefile test OUT="$RUNNER_TEMP/native-tests"

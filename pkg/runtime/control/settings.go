@@ -12,7 +12,6 @@ type Setting[T any] struct {
 	Write func(string) error
 }
 
-// Settings lists, reads and changes settings through the product's existing setters.
 func Settings[T any](read func() T, rows []Setting[T], args []string) (string, error) {
 	if len(args) == 0 {
 		rows = slices.Clone(rows)
@@ -35,5 +34,8 @@ func Settings[T any](read func() T, rows []Setting[T], args []string) (string, e
 		}
 		return row.Read(read()), nil
 	}
-	return "", fmt.Errorf("no such setting %q; run settings without arguments to list names", args[0])
+	return "", fmt.Errorf(
+		"no such setting %q; run settings without arguments to list names",
+		args[0],
+	)
 }

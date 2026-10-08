@@ -5,8 +5,6 @@ import (
 	"fmt"
 )
 
-// TypeGetAppAvailability asks which applications this device can run. A sender lists the device
-// only if its own application comes back available.
 const TypeGetAppAvailability = "GET_APP_AVAILABILITY"
 
 const (

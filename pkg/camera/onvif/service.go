@@ -15,7 +15,6 @@ const (
 	MediaPath  = "/onvif/media_service"
 )
 
-// Profile is one stream, as a media profile names it.
 type Profile struct {
 	Token         string
 	Name          string
@@ -25,7 +24,6 @@ type Profile struct {
 	Path          string
 }
 
-// Device is what the service says about the camera.
 type Device struct {
 	Manufacturer string
 	Model        string
@@ -39,7 +37,6 @@ type Device struct {
 	SnapshotPath string
 }
 
-// Service answers the device and media services.
 type Service struct {
 	Device Device
 	Now    func() time.Time
@@ -60,10 +57,10 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	reply, ok := s.answer(op, args, r.Host)
 	if !ok {
 		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, envelope(fault(op)))
+		_, _ = io.WriteString(w, envelope(fault(op)))
 		return
 	}
-	io.WriteString(w, envelope(reply))
+	_, _ = io.WriteString(w, envelope(reply))
 }
 
 type arg struct {
@@ -122,11 +119,19 @@ func (s *Service) answer(op string, args map[string]string, host string) (string
 			`</tt:UTCDateTime></tds:SystemDateAndTime></tds:GetSystemDateAndTimeResponse>`,
 			t.Hour(), t.Minute(), t.Second(), t.Year(), int(t.Month()), t.Day()), true
 	case "GetDeviceInformation":
-		return fmt.Sprintf(`<tds:GetDeviceInformationResponse><tds:Manufacturer>%s</tds:Manufacturer>`+
-			`<tds:Model>%s</tds:Model><tds:FirmwareVersion>%s</tds:FirmwareVersion>`+
-			`<tds:SerialNumber>%s</tds:SerialNumber><tds:HardwareId>%s</tds:HardwareId>`+
-			`</tds:GetDeviceInformationResponse>`,
-			escape(d.Manufacturer), escape(d.Model), escape(d.Firmware), escape(d.Serial), escape(d.Hardware)), true
+		return fmt.Sprintf(
+			`<tds:GetDeviceInformationResponse><tds:Manufacturer>%s</tds:Manufacturer>`+
+				`<tds:Model>%s</tds:Model><tds:FirmwareVersion>%s</tds:FirmwareVersion>`+
+				`<tds:SerialNumber>%s</tds:SerialNumber><tds:HardwareId>%s</tds:HardwareId>`+
+				`</tds:GetDeviceInformationResponse>`,
+			escape(
+				d.Manufacturer,
+			),
+			escape(d.Model),
+			escape(d.Firmware),
+			escape(d.Serial),
+			escape(d.Hardware),
+		), true
 	case "GetCapabilities":
 		return fmt.Sprintf(`<tds:GetCapabilitiesResponse><tds:Capabilities>`+
 			`<tt:Device><tt:XAddr>%s%s</tt:XAddr></tt:Device>`+
@@ -145,7 +150,11 @@ func (s *Service) answer(op string, args map[string]string, host string) (string
 		var b strings.Builder
 		b.WriteString(`<tds:GetScopesResponse>`)
 		for _, sc := range []string{"type/video_encoder", "Profile/Streaming", "name/" + scopeName(d.Name), "hardware/" + scopeName(d.Model)} {
-			fmt.Fprintf(&b, `<tds:Scopes><tt:ScopeDef>Fixed</tt:ScopeDef><tt:ScopeItem>onvif://www.onvif.org/%s</tt:ScopeItem></tds:Scopes>`, sc)
+			fmt.Fprintf(
+				&b,
+				`<tds:Scopes><tt:ScopeDef>Fixed</tt:ScopeDef><tt:ScopeItem>onvif://www.onvif.org/%s</tt:ScopeItem></tds:Scopes>`,
+				sc,
+			)
 		}
 		b.WriteString(`</tds:GetScopesResponse>`)
 		return b.String(), true
@@ -154,8 +163,11 @@ func (s *Service) answer(op string, args map[string]string, host string) (string
 			`<tt:Enabled>true</tt:Enabled><tt:Info><tt:Name>wlan0</tt:Name><tt:HwAddress>%s</tt:HwAddress></tt:Info>`+
 			`</tds:NetworkInterfaces></tds:GetNetworkInterfacesResponse>`, escape(d.MAC)), true
 	case "GetHostname":
-		return fmt.Sprintf(`<tds:GetHostnameResponse><tds:HostnameInformation><tt:FromDHCP>true</tt:FromDHCP>`+
-			`<tt:Name>%s</tt:Name></tds:HostnameInformation></tds:GetHostnameResponse>`, escape(d.Name)), true
+		return fmt.Sprintf(
+			`<tds:GetHostnameResponse><tds:HostnameInformation><tt:FromDHCP>true</tt:FromDHCP>`+
+				`<tt:Name>%s</tt:Name></tds:HostnameInformation></tds:GetHostnameResponse>`,
+			escape(d.Name),
+		), true
 	case "GetProfiles":
 		var b strings.Builder
 		b.WriteString(`<trt:GetProfilesResponse>`)
@@ -167,7 +179,10 @@ func (s *Service) answer(op string, args map[string]string, host string) (string
 	case "GetProfile":
 		for _, p := range s.profiles() {
 			if p.Token == args["ProfileToken"] {
-				return `<trt:GetProfileResponse>` + profileXML("trt:Profile", p) + `</trt:GetProfileResponse>`, true
+				return `<trt:GetProfileResponse>` + profileXML(
+					"trt:Profile",
+					p,
+				) + `</trt:GetProfileResponse>`, true
 			}
 		}
 		return "", false
@@ -184,7 +199,11 @@ func (s *Service) answer(op string, args map[string]string, host string) (string
 	case "GetStreamUri":
 		for _, p := range s.profiles() {
 			if p.Token == args["ProfileToken"] || args["ProfileToken"] == "" {
-				uri := fmt.Sprintf("rtsp://%s/%s", net.JoinHostPort(name, fmt.Sprint(d.RTSPPort)), strings.TrimPrefix(p.Path, "/"))
+				uri := fmt.Sprintf(
+					"rtsp://%s/%s",
+					net.JoinHostPort(name, fmt.Sprint(d.RTSPPort)),
+					strings.TrimPrefix(p.Path, "/"),
+				)
 				return fmt.Sprintf(`<trt:GetStreamUriResponse><trt:MediaUri><tt:Uri>%s</tt:Uri>`+
 					`<tt:InvalidAfterConnect>false</tt:InvalidAfterConnect><tt:InvalidAfterReboot>false</tt:InvalidAfterReboot>`+
 					`<tt:Timeout>PT0S</tt:Timeout></trt:MediaUri></trt:GetStreamUriResponse>`, escape(uri)), true
@@ -203,16 +222,31 @@ func (s *Service) answer(op string, args map[string]string, host string) (string
 }
 
 func profileXML(tag string, p Profile) string {
-	return fmt.Sprintf(`<%s token="%s" fixed="true"><tt:Name>%s</tt:Name>`+
-		`<tt:VideoSourceConfiguration token="source"><tt:Name>source</tt:Name><tt:UseCount>1</tt:UseCount>`+
-		`<tt:SourceToken>source</tt:SourceToken><tt:Bounds x="0" y="0" width="%d" height="%d"/></tt:VideoSourceConfiguration>`+
-		`<tt:VideoEncoderConfiguration token="%s_enc"><tt:Name>%s</tt:Name><tt:UseCount>1</tt:UseCount>`+
-		`<tt:Encoding>H264</tt:Encoding><tt:Resolution><tt:Width>%d</tt:Width><tt:Height>%d</tt:Height></tt:Resolution>`+
-		`<tt:Quality>5</tt:Quality><tt:RateControl><tt:FrameRateLimit>%d</tt:FrameRateLimit><tt:EncodingInterval>1</tt:EncodingInterval>`+
-		`<tt:BitrateLimit>%d</tt:BitrateLimit></tt:RateControl><tt:H264><tt:GovLength>%d</tt:GovLength><tt:H264Profile>Baseline</tt:H264Profile></tt:H264>`+
-		`<tt:SessionTimeout>PT60S</tt:SessionTimeout></tt:VideoEncoderConfiguration></%s>`,
-		tag, escape(p.Token), escape(p.Name), p.Width, p.Height,
-		escape(p.Token), escape(p.Name), p.Width, p.Height, p.FPS, p.Bitrate/1000, max(p.FPS*2, 1), tag)
+	return fmt.Sprintf(
+		`<%s token="%s" fixed="true"><tt:Name>%s</tt:Name>`+
+			`<tt:VideoSourceConfiguration token="source"><tt:Name>source</tt:Name><tt:UseCount>1</tt:UseCount>`+
+			`<tt:SourceToken>source</tt:SourceToken><tt:Bounds x="0" y="0" width="%d" height="%d"/></tt:VideoSourceConfiguration>`+
+			`<tt:VideoEncoderConfiguration token="%s_enc"><tt:Name>%s</tt:Name><tt:UseCount>1</tt:UseCount>`+
+			`<tt:Encoding>H264</tt:Encoding><tt:Resolution><tt:Width>%d</tt:Width><tt:Height>%d</tt:Height></tt:Resolution>`+
+			`<tt:Quality>5</tt:Quality><tt:RateControl><tt:FrameRateLimit>%d</tt:FrameRateLimit><tt:EncodingInterval>1</tt:EncodingInterval>`+
+			`<tt:BitrateLimit>%d</tt:BitrateLimit></tt:RateControl><tt:H264><tt:GovLength>%d</tt:GovLength><tt:H264Profile>Baseline</tt:H264Profile></tt:H264>`+
+			`<tt:SessionTimeout>PT60S</tt:SessionTimeout></tt:VideoEncoderConfiguration></%s>`,
+		tag,
+		escape(p.Token),
+		escape(p.Name),
+		p.Width,
+		p.Height,
+		escape(
+			p.Token,
+		),
+		escape(p.Name),
+		p.Width,
+		p.Height,
+		p.FPS,
+		p.Bitrate/1000,
+		max(p.FPS*2, 1),
+		tag,
+	)
 }
 
 func envelope(body string) string {
@@ -225,5 +259,7 @@ func envelope(body string) string {
 
 func fault(op string) string {
 	return `<s:Fault><s:Code><s:Value>s:Sender</s:Value><s:Subcode><s:Value>ter:ActionNotSupported</s:Value></s:Subcode></s:Code>` +
-		`<s:Reason><s:Text xml:lang="en">` + escape(op) + ` is not supported</s:Text></s:Reason></s:Fault>`
+		`<s:Reason><s:Text xml:lang="en">` + escape(
+		op,
+	) + ` is not supported</s:Text></s:Reason></s:Fault>`
 }

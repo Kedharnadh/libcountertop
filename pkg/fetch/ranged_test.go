@@ -48,7 +48,7 @@ func TestAStreamReadsBackWhole(t *testing.T) {
 		if n > 0 && r.Size() != int64(n) {
 			t.Errorf("%d bytes: size reads %d", n, r.Size())
 		}
-		r.Close()
+		_ = r.Close()
 	}
 }
 
@@ -59,7 +59,10 @@ func TestNoMoreThanTheReadAheadIsFetched(t *testing.T) {
 
 	time.Sleep(200 * time.Millisecond)
 	if got := requests.Load(); got > 4 {
-		t.Errorf("%d chunks fetched with nothing read, want at most the read-ahead and one in hand", got)
+		t.Errorf(
+			"%d chunks fetched with nothing read, want at most the read-ahead and one in hand",
+			got,
+		)
 	}
 }
 
@@ -70,7 +73,9 @@ func TestSeekStartsAgainFromTheOffset(t *testing.T) {
 	defer r.Close()
 
 	head := make([]byte, 50)
-	io.ReadFull(r, head)
+	if _, err := io.ReadFull(r, head); err != nil {
+		t.Fatal(err)
+	}
 
 	r.From(730)
 	rest, err := io.ReadAll(r)
@@ -86,7 +91,9 @@ func TestARefusedChunkIsTriedAgainAtAFreshURL(t *testing.T) {
 	body := content(300)
 	var refused atomic.Bool
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("fresh") == "" && strings.HasPrefix(r.Header.Get("Range"), "bytes=100-") && refused.CompareAndSwap(false, true) {
+		if r.URL.Query().Get("fresh") == "" &&
+			strings.HasPrefix(r.Header.Get("Range"), "bytes=100-") &&
+			refused.CompareAndSwap(false, true) {
 			http.Error(w, "no", http.StatusForbidden)
 			return
 		}
@@ -137,7 +144,13 @@ func TestAPacedStreamStaysWithinItsLead(t *testing.T) {
 	}))
 	t.Cleanup(s.Close)
 
-	r := NewRanged(t.Context(), http.DefaultClient, s.URL, 0, Chunks{Size: 100, Ahead: 10, Rate: 1000, Lead: 200 * time.Millisecond})
+	r := NewRanged(
+		t.Context(),
+		http.DefaultClient,
+		s.URL,
+		0,
+		Chunks{Size: 100, Ahead: 10, Rate: 1000, Lead: 200 * time.Millisecond},
+	)
 	got, err := io.ReadAll(r)
 	if err != nil || !bytes.Equal(got, body) {
 		t.Fatalf("read %d bytes, %v", len(got), err)
@@ -164,7 +177,13 @@ func TestARefusedChunkPartWayIsTriedAgain(t *testing.T) {
 	}))
 	t.Cleanup(s.Close)
 
-	r := NewRanged(t.Context(), http.DefaultClient, s.URL, 0, Chunks{Size: 100, Ahead: 2, Rate: 1 << 30, Retry: 10 * time.Millisecond})
+	r := NewRanged(
+		t.Context(),
+		http.DefaultClient,
+		s.URL,
+		0,
+		Chunks{Size: 100, Ahead: 2, Rate: 1 << 30, Retry: 10 * time.Millisecond},
+	)
 	got, err := io.ReadAll(r)
 	if err != nil || !bytes.Equal(got, body) {
 		t.Fatalf("read %d bytes, %v", len(got), err)

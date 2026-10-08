@@ -95,10 +95,19 @@ type unpluggedAnswer struct {
 }
 
 func credential(ctt string) map[string]any {
-	return map[string]any{"credentialTransferTokens": []map[string]string{{"token": ctt, "scope": "VIDEO"}}}
+	return map[string]any{
+		"credentialTransferTokens": []map[string]string{{"token": ctt, "scope": "VIDEO"}},
+	}
 }
 
-func postJSON(ctx context.Context, hc *http.Client, target string, body any, headers map[string]string, out any) error {
+func postJSON(
+	ctx context.Context,
+	hc *http.Client,
+	target string,
+	body any,
+	headers map[string]string,
+	out any,
+) error {
 	b, err := json.Marshal(body)
 	if err != nil {
 		return err
@@ -126,25 +135,50 @@ func postJSON(ctx context.Context, hc *http.Client, target string, body any, hea
 	return json.Unmarshal(data, out)
 }
 
-func unpluggedPlay(ctx context.Context, hc *http.Client, ctt, id, params string) (*unpluggedAnswer, error) {
+func unpluggedPlay(
+	ctx context.Context,
+	hc *http.Client,
+	ctt, id, params string,
+) (*unpluggedAnswer, error) {
 	body := map[string]any{
 		"videoId": id,
 		"params":  params,
 		"context": map[string]any{
-			"client":  map[string]string{"hl": "en", "gl": "US", "clientName": unpluggedClient, "clientVersion": unpluggedVersion},
+			"client": map[string]string{
+				"hl":            "en",
+				"gl":            "US",
+				"clientName":    unpluggedClient,
+				"clientVersion": unpluggedVersion,
+			},
 			"user":    credential(ctt),
 			"request": map[string]bool{"useSsl": true},
 		},
-		"playbackContext": map[string]any{"contentPlaybackContext": map[string]string{"html5Preference": "HTML5_PREF_WANTS"}},
-		"racyCheckOk":     true,
+		"playbackContext": map[string]any{
+			"contentPlaybackContext": map[string]string{"html5Preference": "HTML5_PREF_WANTS"},
+		},
+		"racyCheckOk": true,
 	}
 	var a unpluggedAnswer
-	err := postJSON(ctx, hc, unpluggedPlayer, body, map[string]string{"User-Agent": unpluggedAgent, "X-Youtube-Client-Version": unpluggedVersion}, &a)
+	err := postJSON(
+		ctx,
+		hc,
+		unpluggedPlayer,
+		body,
+		map[string]string{
+			"User-Agent":               unpluggedAgent,
+			"X-Youtube-Client-Version": unpluggedVersion,
+		},
+		&a,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("youtube tv: player: %w", err)
 	}
 	if a.PlayabilityStatus.Status != "OK" {
-		return nil, fmt.Errorf("youtube tv: %s: %s", a.PlayabilityStatus.Status, a.PlayabilityStatus.Reason)
+		return nil, fmt.Errorf(
+			"youtube tv: %s: %s",
+			a.PlayabilityStatus.Status,
+			a.PlayabilityStatus.Reason,
+		)
 	}
 	return &a, nil
 }
@@ -154,7 +188,8 @@ func pickUnplugged(fs []unpluggedFormat, limits playback.Target) (video, audio *
 		f := &fs[i]
 		switch {
 		case strings.HasPrefix(f.MimeType, "video/mp4") && strings.Contains(f.MimeType, "avc1") && within(f.Height, limits.Tallest) && within(f.FPS, limits.Fastest):
-			if video == nil || f.Height > video.Height || f.Height == video.Height && f.Bitrate > video.Bitrate {
+			if video == nil || f.Height > video.Height ||
+				f.Height == video.Height && f.Bitrate > video.Bitrate {
 				video = f
 			}
 		case strings.HasPrefix(f.MimeType, "audio/mp4") && strings.Contains(f.MimeType, "mp4a.40.2"):
@@ -177,12 +212,22 @@ func nonce() string {
 	return string(b)
 }
 
-func unpluggedLicense(ctx context.Context, hc *http.Client, ctt, id, cpn, session, params string, challenge []byte) ([]byte, error) {
+func unpluggedLicense(
+	ctx context.Context,
+	hc *http.Client,
+	ctt, id, cpn, session, params string,
+	challenge []byte,
+) ([]byte, error) {
 	pdrm, _ := url.QueryUnescape(params)
 	body := map[string]any{
 		"context": map[string]any{
-			"client": map[string]string{"hl": "en", "gl": "US", "clientName": licenseClient, "clientVersion": licenseVersion},
-			"user":   credential(ctt),
+			"client": map[string]string{
+				"hl":            "en",
+				"gl":            "US",
+				"clientName":    licenseClient,
+				"clientVersion": licenseVersion,
+			},
+			"user": credential(ctt),
 		},
 		"drmSystem":         "DRM_SYSTEM_WIDEVINE",
 		"videoId":           id,
@@ -261,8 +306,13 @@ func unpluggedNext(ctx context.Context, hc *http.Client, ctt, id string) (airing
 	body := map[string]any{
 		"videoId": id,
 		"context": map[string]any{
-			"client": map[string]string{"hl": "en", "gl": "US", "clientName": licenseClient, "clientVersion": licenseVersion},
-			"user":   credential(ctt),
+			"client": map[string]string{
+				"hl":            "en",
+				"gl":            "US",
+				"clientName":    licenseClient,
+				"clientVersion": licenseVersion,
+			},
+			"user": credential(ctt),
 		},
 	}
 	var a struct {
@@ -297,7 +347,14 @@ func unpluggedNext(ctx context.Context, hc *http.Client, ctt, id string) (airing
 			} `json:"watchEndpoint"`
 		} `json:"currentVideoEndpoint"`
 	}
-	err := postJSON(ctx, hc, guideURL, body, map[string]string{"Origin": licenseOrigin, "X-Origin": licenseOrigin}, &a)
+	err := postJSON(
+		ctx,
+		hc,
+		guideURL,
+		body,
+		map[string]string{"Origin": licenseOrigin, "X-Origin": licenseOrigin},
+		&a,
+	)
 	if err != nil {
 		return airing{}, fmt.Errorf("youtube tv: next: %w", err)
 	}
@@ -350,7 +407,19 @@ func (u *unplugged) guide(ctx context.Context) {
 			}
 			changed := u.changed
 			u.mu.Unlock()
-			slog.Info("youtube tv airing", "video", u.id, "title", a.title, "network", a.network, "slot", a.slot, "ends", a.ends)
+			slog.Info(
+				"youtube tv airing",
+				"video",
+				u.id,
+				"title",
+				a.title,
+				"network",
+				a.network,
+				"slot",
+				a.slot,
+				"ends",
+				a.ends,
+			)
 			if changed != nil {
 				changed()
 			}
@@ -364,7 +433,11 @@ func (u *unplugged) guide(ctx context.Context) {
 
 const heartbeatEvery = 30 * time.Second
 
-var heartbeatChecks = []string{"HEARTBEAT_CHECK_TYPE_LIVE_STREAM_STATUS", "HEARTBEAT_CHECK_TYPE_YPC", "HEARTBEAT_CHECK_TYPE_UNPLUGGED"}
+var heartbeatChecks = []string{
+	"HEARTBEAT_CHECK_TYPE_LIVE_STREAM_STATUS",
+	"HEARTBEAT_CHECK_TYPE_YPC",
+	"HEARTBEAT_CHECK_TYPE_UNPLUGGED",
+}
 
 func (u *unplugged) heartbeat(ctx context.Context, token, data, interval string) {
 	every := heartbeatEvery
@@ -390,10 +463,17 @@ func (u *unplugged) heartbeat(ctx context.Context, token, data, interval string)
 				"heartbeatChecks": heartbeatChecks,
 				"unpluggedParams": map[string]string{"clientPlayerPositionUtcMillis": at},
 			},
-			"playbackState": map[string]any{"playbackPosition": map[string]string{"utcTimeMillis": at}},
+			"playbackState": map[string]any{
+				"playbackPosition": map[string]string{"utcTimeMillis": at},
+			},
 			"context": map[string]any{
-				"client": map[string]string{"hl": "en", "gl": "US", "clientName": licenseClient, "clientVersion": licenseVersion},
-				"user":   credential(ctt),
+				"client": map[string]string{
+					"hl":            "en",
+					"gl":            "US",
+					"clientName":    licenseClient,
+					"clientVersion": licenseVersion,
+				},
+				"user": credential(ctt),
 			},
 		}
 		var a struct {
@@ -415,8 +495,23 @@ func (u *unplugged) heartbeat(ctx context.Context, token, data, interval string)
 			continue
 		}
 		if a.Playability.Status != "OK" {
-			slog.Warn("youtube tv heartbeat refused", "video", u.id, "status", a.Playability.Status, "reason", a.Playability.Reason)
-			u.fail(fmt.Errorf("youtube tv: %s", strings.ToLower(strings.Join(nonEmpty(a.Playability.Status, a.Playability.Reason), ": "))))
+			slog.Warn(
+				"youtube tv heartbeat refused",
+				"video",
+				u.id,
+				"status",
+				a.Playability.Status,
+				"reason",
+				a.Playability.Reason,
+			)
+			u.fail(
+				fmt.Errorf(
+					"youtube tv: %s",
+					strings.ToLower(
+						strings.Join(nonEmpty(a.Playability.Status, a.Playability.Reason), ": "),
+					),
+				),
+			)
 			return
 		}
 		if a.ServerData != "" {
@@ -473,7 +568,12 @@ type unplugged struct {
 	licMu sync.Mutex
 }
 
-func openUnplugged(ctx context.Context, env surfaceEnv, id, params, ctt string, at time.Duration) (*unplugged, error) {
+func openUnplugged(
+	ctx context.Context,
+	env surfaceEnv,
+	id, params, ctt string,
+	at time.Duration,
+) (*unplugged, error) {
 	if ctt == "" {
 		return nil, errors.New("youtube tv: the phone sent no credential")
 	}
@@ -508,7 +608,15 @@ func openUnplugged(ctx context.Context, env surfaceEnv, id, params, ctt string, 
 			u.info.Thumbnail = "https:" + u.info.Thumbnail
 		}
 	}
-	slog.Debug("youtube tv formats", "video", id, "picture", fmt.Sprintf("%dx%d@%d itag %d", video.Width, video.Height, video.FPS, video.Itag), "audio itag", audio.Itag)
+	slog.Debug(
+		"youtube tv formats",
+		"video",
+		id,
+		"picture",
+		fmt.Sprintf("%dx%d@%d itag %d", video.Width, video.Height, video.FPS, video.Itag),
+		"audio itag",
+		audio.Itag,
+	)
 
 	head, err := u.head(run, audio.URL, a.PlayerConfig.Live.MinDvrSequence)
 	if err != nil {
@@ -520,7 +628,12 @@ func openUnplugged(ctx context.Context, env surfaceEnv, id, params, ctt string, 
 	go func() { u.fail(u.follow(run, video.URL, start, true)) }()
 	go func() { u.fail(u.follow(run, audio.URL, start, false)) }()
 	go u.guide(run)
-	go u.heartbeat(run, a.HeartbeatParams.Token, a.HeartbeatParams.ServerData, a.HeartbeatParams.Interval)
+	go u.heartbeat(
+		run,
+		a.HeartbeatParams.Token,
+		a.HeartbeatParams.ServerData,
+		a.HeartbeatParams.Interval,
+	)
 
 	wait := time.NewTimer(tvStartWait)
 	defer wait.Stop()
@@ -553,8 +666,17 @@ func (u *unplugged) head(ctx context.Context, base, from string) (int64, error) 
 	return head, nil
 }
 
-func (u *unplugged) segment(ctx context.Context, base string, sq int64) ([]byte, http.Header, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"&sq="+strconv.FormatInt(sq, 10), nil)
+func (u *unplugged) segment(
+	ctx context.Context,
+	base string,
+	sq int64,
+) ([]byte, http.Header, error) {
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		base+"&sq="+strconv.FormatInt(sq, 10),
+		nil,
+	)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -565,7 +687,7 @@ func (u *unplugged) segment(ctx context.Context, base string, sq int64) ([]byte,
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<16))
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<16))
 		return nil, resp.Header, &statusError{code: resp.StatusCode}
 	}
 	b, err := io.ReadAll(io.LimitReader(resp.Body, segmentLimit))
@@ -584,7 +706,12 @@ func (u *unplugged) follow(ctx context.Context, base string, sq int64, video boo
 		if err != nil {
 			var se *statusError
 			if errors.As(err, &se) && misses < 30 {
-				if head, _ := strconv.ParseInt(hdr.Get("X-Head-Seqnum"), 10, 64); head > 0 && sq > head {
+				if head, _ := strconv.ParseInt(
+					hdr.Get("X-Head-Seqnum"),
+					10,
+					64,
+				); head > 0 &&
+					sq > head {
 					misses++
 					wait(ctx, segmentWait)
 					continue

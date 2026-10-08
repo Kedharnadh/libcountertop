@@ -6,14 +6,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 )
 
-// Within is a surface that only takes paint inside a rectangle.
-//
-// The same thing the driver does to the panel once damage has been declared, available over an
-// image so a test can draw a narrowed repaint and check it against a full one. A declared rectangle
-// is only right if those two agree.
-//
-// It reads back through whatever is underneath, which antialiasing needs, and reports the rectangle
-// as its clip so drawing can skip work outside it rather than rasterising and discarding.
 func Within(s Surface, to Rect) Surface { return within{under: s, to: to} }
 
 type within struct {
@@ -88,16 +80,6 @@ func (w within) At(x, y int) theme.Color {
 	return theme.Color{}
 }
 
-// Changed is the smallest rectangle holding every pixel where two pictures differ, and is empty
-// when they do not differ at all.
-//
-// What it is for: checking a damage rectangle. Declaring damage is how a repaint is made cheap, and
-// declaring one too small leaves a stale strip of screen that nothing catches until somebody looks
-// at the panel. The check that does catch it is this — draw the state before, draw the state after,
-// and see that everything which moved is inside what was declared.
-//
-// Pictures of different sizes have nothing meaningful to compare, so the whole of the larger one is
-// the answer: a caller that has changed the size has changed everything.
 func Changed(a, b *Image) Rect {
 	aw, ah := a.Size()
 	bw, bh := b.Size()
@@ -135,8 +117,6 @@ func Changed(a, b *Image) Rect {
 	return Rect{X: left, Y: top, W: right - left + 1, H: bottom - top + 1}
 }
 
-// Union is the smallest rectangle holding both, ignoring an empty one: a part that is not drawn
-// contributes nothing rather than dragging the rectangle to the origin.
 func (r Rect) Union(o Rect) Rect {
 	if o.W <= 0 || o.H <= 0 {
 		return r
@@ -153,10 +133,6 @@ func (r Rect) Union(o Rect) Rect {
 	return Rect{X: left, Y: top, W: right - left, H: bottom - top}
 }
 
-// Holds reports whether r covers the whole of inner, which is what a damage rectangle has to do for
-// the pixels that changed.
-//
-// An empty inner is held by anything: nothing changed, so there is nothing to cover.
 func (r Rect) Holds(inner Rect) bool {
 	if inner.W <= 0 || inner.H <= 0 {
 		return true

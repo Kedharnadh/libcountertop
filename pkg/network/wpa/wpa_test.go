@@ -159,7 +159,6 @@ func TestParseStatus(t *testing.T) {
 	}
 }
 
-// The supplicant answers status before it has joined anything, and with far fewer keys.
 func TestParseStatusDisconnected(t *testing.T) {
 	got := ParseStatus("wpa_state=DISCONNECTED\naddress=00:f4:8d:47:69:21\n")
 
@@ -174,8 +173,7 @@ func TestParseStatusDisconnected(t *testing.T) {
 	}
 }
 
-// address is the MAC and ip_address is the address: taking the wrong one reports a MAC as the
-// device's address, which reads as plausible everywhere it is shown.
+// In STATUS, address is the MAC and ip_address is the IPv4 address.
 func TestParseStatusDoesNotTakeTheMAC(t *testing.T) {
 	got := ParseStatus("wpa_state=COMPLETED\naddress=00:f4:8d:47:69:21\n")
 
@@ -196,15 +194,12 @@ func TestParseNetworks(t *testing.T) {
 	}
 }
 
-// A supplicant with nothing configured answers the header alone, which is not a network.
 func TestParseNetworksWhenEmpty(t *testing.T) {
 	if got := ParseNetworks("network id / ssid / bssid / flags\n"); len(got) != 0 {
 		t.Errorf("parseNetworks = %q, want none", got)
 	}
 }
 
-// Joined takes a name because COMPLETED alone is still true of the network being left, for a
-// second or two after select_network asks to switch.
 func TestJoined(t *testing.T) {
 	on := State{SSID: "iron.curtain", State: "COMPLETED"}
 

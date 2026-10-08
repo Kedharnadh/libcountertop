@@ -1,14 +1,14 @@
 package settings
 
 import (
+	"slices"
+
 	"github.com/ygelfand/libcountertop/pkg/display/model"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
-	"slices"
 )
 
-// Choose builds a typed settings picker with an optional preview for each value.
 func Choose[T interface {
 	comparable
 	Label() string

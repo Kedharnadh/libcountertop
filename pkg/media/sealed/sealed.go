@@ -63,7 +63,13 @@ type Player struct {
 	frames chan frame
 }
 
-func Open(name string, surf *surface.Client, cert []byte, license License, resample func(from int) func([]int16) []int16) (*Player, error) {
+func Open(
+	name string,
+	surf *surface.Client,
+	cert []byte,
+	license License,
+	resample func(from int) func([]int16) []int16,
+) (*Player, error) {
 	if surf == nil {
 		return nil, errors.New(name + ": the display helper is not connected")
 	}
@@ -74,7 +80,12 @@ func Open(name string, surf *surface.Client, cert []byte, license License, resam
 	return p, nil
 }
 
-func New(name string, surf *surface.Client, license License, resample func(from int) func([]int16) []int16) *Player {
+func New(
+	name string,
+	surf *surface.Client,
+	license License,
+	resample func(from int) func([]int16) []int16,
+) *Player {
 	p := &Player{
 		Name: name, surf: surf, license: license, resample: resample,
 		drm: 1 + drmIDs.Add(1), audio: 1 + audioIDs.Add(1),
@@ -149,7 +160,10 @@ func crypt(s cenc.Sample, subs []cenc.Subsample) *surface.Crypt {
 	}
 	k := &surface.Crypt{Mode: surface.CryptCENC, Key: s.KeyID, IV: s.IV}
 	for _, x := range subs {
-		k.Subsamples = append(k.Subsamples, surface.Subsample{Clear: x.Clear, Encrypted: x.Encrypted})
+		k.Subsamples = append(
+			k.Subsamples,
+			surface.Subsample{Clear: x.Clear, Encrypted: x.Encrypted},
+		)
 	}
 	return k
 }
@@ -300,7 +314,13 @@ func (p *Player) next(ctx context.Context) ([]byte, time.Duration, *surface.Cryp
 }
 
 func (p *Player) Video(width, height int) playback.Picture {
-	return playback.Picture{H264: true, Width: width, Height: height, Session: p.drm, Sealed: p.next}
+	return playback.Picture{
+		H264:    true,
+		Width:   width,
+		Height:  height,
+		Session: p.drm,
+		Sealed:  p.next,
+	}
 }
 
 func (p *Player) Ready() <-chan struct{} { return p.ready }
@@ -335,6 +355,6 @@ func (p *Player) Failure() error {
 
 func (p *Player) Close() {
 	p.Fail(io.EOF)
-	p.surf.AudioClose(p.audio)
-	p.surf.DRMClose(p.drm)
+	_ = p.surf.AudioClose(p.audio)
+	_ = p.surf.DRMClose(p.drm)
 }

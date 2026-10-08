@@ -73,10 +73,10 @@ func (s *session) close() {
 		}
 		close(s.done)
 		if s.udp != nil {
-			s.udp.Close()
+			_ = s.udp.Close()
 		}
 		if s.rtcp != nil {
-			s.rtcp.Close()
+			_ = s.rtcp.Close()
 		}
 	})
 }
@@ -128,7 +128,10 @@ func (s *session) send() {
 			case s.tcp != nil:
 				err = s.tcp.interleaved(s.channel, p.b)
 			case p.control:
-				s.rtcp.WriteToUDP(p.b, &net.UDPAddr{IP: s.peer.IP, Port: s.peer.Port + 1, Zone: s.peer.Zone})
+				_, _ = s.rtcp.WriteToUDP(
+					p.b,
+					&net.UDPAddr{IP: s.peer.IP, Port: s.peer.Port + 1, Zone: s.peer.Zone},
+				)
 			default:
 				_, err = s.udp.WriteToUDP(p.b, s.peer)
 			}

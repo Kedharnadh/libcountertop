@@ -73,21 +73,50 @@ func NewPreprocessor(frame, rate int, echo *MDF) (*Preprocessor, error) {
 		return nil, fmt.Errorf("aec: preprocessor frame %d is not a power of two", frame)
 	}
 	if echo != nil && echo.Frame() != frame {
-		return nil, fmt.Errorf("aec: preprocessor frame %d does not match the canceller's %d", frame, echo.Frame())
+		return nil, fmt.Errorf(
+			"aec: preprocessor frame %d does not match the canceller's %d",
+			frame,
+			echo.Frame(),
+		)
 	}
 	n, m := frame, ppBands
 	p := &Preprocessor{
-		frame: frame, n: n, m: m, echo: echo,
-		NoiseSuppress: ppNoiseSuppress, EchoSuppress: ppEchoSuppress, EchoSuppressActive: ppEchoSuppressActive,
-		bank: newFilterbank(m, rate, n),
-		tf:   fft.New(2 * n), buf: make([]complex64, 2*n),
-		window: make([]float32, 2*n), frameBuf: make([]float32, 2*n), spec: make([]complex64, n+1),
-		ps: make([]float32, n+m), noise: make([]float32, n+m), echoNoise: make([]float32, n+m),
-		residual: make([]float32, n+1), oldPS: make([]float32, n+m),
-		prior: make([]float32, n+m), post: make([]float32, n+m), gain: make([]float32, n+m), gain2: make([]float32, n+m),
-		gainFloor: make([]float32, n+m), zeta: make([]float32, n+m),
-		s: make([]float32, n), smin: make([]float32, n), stmp: make([]float32, n), updateProb: make([]bool, n),
-		inbuf: make([]float32, n), outbuf: make([]float32, n),
+		frame:              frame,
+		n:                  n,
+		m:                  m,
+		echo:               echo,
+		NoiseSuppress:      ppNoiseSuppress,
+		EchoSuppress:       ppEchoSuppress,
+		EchoSuppressActive: ppEchoSuppressActive,
+		bank:               newFilterbank(m, rate, n),
+		tf:                 fft.New(2 * n),
+		buf:                make([]complex64, 2*n),
+		window:             make([]float32, 2*n),
+		frameBuf:           make([]float32, 2*n),
+		spec:               make([]complex64, n+1),
+		ps:                 make([]float32, n+m),
+		noise:              make([]float32, n+m),
+		echoNoise:          make([]float32, n+m),
+		residual:           make([]float32, n+1),
+		oldPS:              make([]float32, n+m),
+		prior: make(
+			[]float32,
+			n+m,
+		),
+		post:      make([]float32, n+m),
+		gain:      make([]float32, n+m),
+		gain2:     make([]float32, n+m),
+		gainFloor: make([]float32, n+m),
+		zeta:      make([]float32, n+m),
+		s: make(
+			[]float32,
+			n,
+		),
+		smin:       make([]float32, n),
+		stmp:       make([]float32, n),
+		updateProb: make([]bool, n),
+		inbuf:      make([]float32, n),
+		outbuf:     make([]float32, n),
 	}
 	conjWindow(p.window)
 	for i := range n + m {
@@ -127,7 +156,11 @@ func (p *Preprocessor) SetEcho(echo *MDF) { p.echo = echo }
 
 func (p *Preprocessor) Run(x []int16) error {
 	if len(x)%p.frame != 0 {
-		return fmt.Errorf("aec: %d samples is not a whole number of %d sample frames", len(x), p.frame)
+		return fmt.Errorf(
+			"aec: %d samples is not a whole number of %d sample frames",
+			len(x),
+			p.frame,
+		)
 	}
 	for at := 0; at < len(x); at += p.frame {
 		p.step(x[at : at+p.frame])

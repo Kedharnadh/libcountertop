@@ -8,29 +8,19 @@ import (
 	"time"
 )
 
-// replyResume is how much to hold after a dip, rather than the whole buffer again: rebuilding it every
-// time turns a shortfall of a few milliseconds into a third of a second of silence.
 const replyResume = 80 * time.Millisecond
 
-// chunkQueue is how many chunks may wait for the errand. Home Assistant sends 32 ms at a time, so this
-// is a couple of seconds of slack: enough that the conversation never waits to hand one over, and
-// bounded because audio nobody has played yet is audio arriving faster than it can be heard.
 const chunkQueue = 64
 
-// stream is a reply arriving over the API, chunk by chunk, played as it goes. It belongs to the errand
-// that plays it: the conversation writes chunks and reads the counters once the claim is done.
 type Reply struct {
 	mu      sync.RWMutex
 	closed  bool
 	statsMu sync.Mutex
 	chunks  chan []byte
 
-	// buffer is how much to collect before playing any of it. Home Assistant paces itself to stay 384
-	// ms ahead, which is enough when speech arrives faster than it plays and not when it does not.
+	// Home Assistant paces itself to stay 384 ms ahead.
 	buffer time.Duration
 
-	// held is audio waiting for the cushion to fill, and flowing says the cushion is built and audio
-	// is going straight through.
 	held    []int16
 	flowing bool
 
@@ -39,8 +29,6 @@ type Reply struct {
 	splicesAt   uint64
 	underrunsAt uint64
 
-	// playingAt is when playback began, once the cushion had filled. Wall clock from here to the queue
-	// running dry is what measures gapping; a starved buffer is silence the seam count never sees.
 	playingAt time.Time
 }
 
@@ -53,8 +41,6 @@ func NewReply(splices, underruns uint64, buffer time.Duration) *Reply {
 	}
 }
 
-// send hands a chunk to whoever is playing it. A queue this deep only fills if audio is arriving
-// faster than it plays, in which case a dropped chunk is the least of it.
 func (s *Reply) Send(data []byte) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -69,7 +55,6 @@ func (s *Reply) Send(data []byte) {
 	}
 }
 
-// done says no more chunks are coming, which is what ends the errand.
 func (s *Reply) Done() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -79,8 +64,6 @@ func (s *Reply) Done() {
 	}
 }
 
-// play is the errand: it takes chunks until there are no more and queues them once enough has arrived
-// to play through a dip. Returning hands over to the driver, which waits for the audio to be heard.
 func (s *Reply) Play(ctx context.Context, p VoiceSink, started func()) error {
 	for {
 		select {
@@ -88,7 +71,6 @@ func (s *Reply) Play(ctx context.Context, p VoiceSink, started func()) error {
 			return nil
 		case data, ok := <-s.chunks:
 			if !ok {
-				// Whatever is still held will never be joined by more, so it just plays.
 				s.flush(p)
 				return nil
 			}
@@ -107,14 +89,11 @@ func (s *Reply) take(data []byte, p VoiceSink, started func()) {
 		peak = max(peak, int(samples[i]), -int(samples[i]))
 	}
 
-	// The first chunk is the pipeline delivering, so its limit is done with.
 	if s.bytes == 0 {
 		slog.Debug("reply audio started", "bytes", len(data))
 		started()
 	}
 
-	// How loud the reply arrives decides whether interpolating it can overflow, and the byte count
-	// against how long it takes to say is how a wrong sample rate would show up.
 	s.bytes += len(data)
 	s.peak = max(s.peak, peak)
 
@@ -146,12 +125,10 @@ func (s *Reply) flush(p VoiceSink) {
 	}
 }
 
-// heldSamples is a duration as a count of 16 kHz samples.
 func heldSamples(d time.Duration) int {
 	return int(d/time.Millisecond) * 16000 / 1000
 }
 
-// VoiceSink accepts the 16 kHz mono reply and reports whether its playback queue is empty.
 type VoiceSink interface {
 	PlayVoice([]int16)
 	Queued() int
@@ -166,5 +143,11 @@ type ReplyStats struct {
 func (s *Reply) Stats() ReplyStats {
 	s.statsMu.Lock()
 	defer s.statsMu.Unlock()
-	return ReplyStats{Bytes: s.bytes, Peak: s.peak, SplicesAt: s.splicesAt, UnderrunsAt: s.underrunsAt, PlayingAt: s.playingAt}
+	return ReplyStats{
+		Bytes:       s.bytes,
+		Peak:        s.peak,
+		SplicesAt:   s.splicesAt,
+		UnderrunsAt: s.underrunsAt,
+		PlayingAt:   s.playingAt,
+	}
 }

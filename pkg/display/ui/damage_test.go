@@ -42,8 +42,6 @@ func TestNothingChangedIsAnEmptyRectangle(t *testing.T) {
 	}
 }
 
-// The bounding box is inclusive of the pixels at its edges, which is the whole point: a rectangle
-// one pixel short leaves the stale strip this is meant to catch.
 func TestTheChangedRectangleHoldsTheEdgePixels(t *testing.T) {
 	a := NewImage(40, 30, black)
 	b := NewImage(40, 30, black)
@@ -74,8 +72,6 @@ func TestOnePixelChanged(t *testing.T) {
 	}
 }
 
-// Different sizes cannot be compared pixel for pixel, and answering with a small rectangle would be
-// worse than answering with all of it.
 func TestPicturesOfDifferentSizesChangedEverywhere(t *testing.T) {
 	got := Changed(NewImage(40, 30, black), NewImage(50, 20, black))
 	if got.W != 50 || got.H != 30 {
@@ -108,16 +104,12 @@ func TestARectangleHoldsWhatIsInsideIt(t *testing.T) {
 	}
 }
 
-// Nothing changed is held by anything, including a rectangle that is itself empty: there is no
-// stale strip when no pixel moved.
 func TestAnEmptyChangeIsHeldByAnything(t *testing.T) {
 	if !(Rect{}).Holds(Rect{}) {
 		t.Error("an empty rectangle does not hold an empty change")
 	}
 }
 
-// An empty damage rectangle means the whole screen where the driver reads it, but Holds is asked
-// about a real one: a caller that declared nothing and changed something has to fail here.
 func TestAnEmptyRectangleHoldsNoRealChange(t *testing.T) {
 	if (Rect{}).Holds(Rect{X: 1, Y: 1, W: 2, H: 2}) {
 		t.Error("an empty rectangle claims to hold a change")

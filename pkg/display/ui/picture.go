@@ -13,7 +13,6 @@ var pictures struct {
 	order []uint64
 }
 
-// Picture is an encoded image as something to draw, decoded once per id and nil where there is none.
 func Picture(raw []byte, id uint64) *Image {
 	if len(raw) == 0 {
 		return nil

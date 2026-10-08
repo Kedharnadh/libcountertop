@@ -1,10 +1,10 @@
-// Package sendspin contains device-independent synchronized playback and protocol sessions.
 package sendspin
 
 import (
 	"time"
 
 	"github.com/Sendspin/sendspin-go/pkg/protocol"
+
 	"github.com/ygelfand/libcountertop/pkg/audio/background"
 	"github.com/ygelfand/libcountertop/pkg/audio/volume"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -19,7 +19,6 @@ const StateOff = "off"
 const StateWaiting = "waiting"
 const StateJoined = "joined"
 const StatePlaying = "playing"
-const stateOff = StateOff
 const stateWaiting = StateWaiting
 const stateJoined = StateJoined
 const statePlaying = StatePlaying

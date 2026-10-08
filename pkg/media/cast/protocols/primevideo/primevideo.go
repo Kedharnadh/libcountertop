@@ -157,7 +157,17 @@ func (p *Protocol) Receive(app *cast.Application, m cast.Message) ([]cast.Messag
 	if err := json.Unmarshal([]byte(m.Payload), &in); err != nil {
 		return nil, fmt.Errorf("prime video: %w", err)
 	}
-	slog.Debug("prime video message", "type", in.Type, "device", in.Device, "marketplace", in.Marketplace, "content", in.Content)
+	slog.Debug(
+		"prime video message",
+		"type",
+		in.Type,
+		"device",
+		in.Device,
+		"marketplace",
+		in.Marketplace,
+		"content",
+		in.Content,
+	)
 
 	switch in.Type {
 	case "AmIRegistered":
@@ -169,7 +179,11 @@ func (p *Protocol) Receive(app *cast.Application, m cast.Message) ([]cast.Messag
 		p.mu.Unlock()
 		a := answer{Type: "AmIRegisteredResponse"}
 		if !registered {
-			a.Error = &failure{Code: "NotRegistered", Internal: "NotRegistered", Message: "deviceId " + device + " is not registered"}
+			a.Error = &failure{
+				Code:     "NotRegistered",
+				Internal: "NotRegistered",
+				Message:  "deviceId " + device + " is not registered",
+			}
 		}
 		return p.reply(m, a)
 
@@ -275,7 +289,12 @@ type loadRequest struct {
 func (p *Protocol) Load(app *cast.Application, m cast.Message) ([]cast.Message, error) {
 	var req loadRequest
 	if err := json.Unmarshal([]byte(m.Payload), &req); err != nil {
-		return []cast.Message{cast.Reply(m, cast.NSMedia, cast.LoadFailed(0))}, fmt.Errorf("prime video: load: %w", err)
+		return []cast.Message{
+				cast.Reply(m, cast.NSMedia, cast.LoadFailed(0)),
+			}, fmt.Errorf(
+				"prime video: load: %w",
+				err,
+			)
 	}
 	go p.resolve(m, req)
 	return nil, nil
@@ -296,9 +315,12 @@ func (p *Protocol) resolve(m cast.Message, req loadRequest) {
 	p.mu.Lock()
 	old := p.cur
 	p.cur, p.media = t, cast.Media{
-		ContentID: req.Media.ContentID, ContentType: req.Media.ContentType, StreamType: cast.StreamBuffered,
-		Duration: t.length.Seconds(), CustomData: req.Media.Custom,
-		Metadata: cast.Metadata{Title: "Prime Video"},
+		ContentID:   req.Media.ContentID,
+		ContentType: req.Media.ContentType,
+		StreamType:  cast.StreamBuffered,
+		Duration:    t.length.Seconds(),
+		CustomData:  req.Media.Custom,
+		Metadata:    cast.Metadata{Title: "Prime Video"},
 	}
 	p.mu.Unlock()
 	if old != nil {
@@ -341,7 +363,12 @@ func (p *Protocol) resolved(req loadRequest) (*title, error) {
 		return nil, errors.New("no content id")
 	}
 	p.mu.Lock()
-	a := Account{Token: p.access, Device: p.saved.Device, Marketplace: p.saved.Marketplace, Locale: p.locale}
+	a := Account{
+		Token:       p.access,
+		Device:      p.saved.Device,
+		Marketplace: p.saved.Marketplace,
+		Locale:      p.locale,
+	}
 	env, preloaded := p.envelopes[id]
 	p.mu.Unlock()
 	if v := strings.TrimSpace(req.Custom.Device); v != "" {
@@ -414,7 +441,13 @@ func (p *Protocol) screen() Screen {
 	if p.env.Video != nil {
 		t = p.env.Video()
 	}
-	return Screen{Width: t.Width, Height: t.Height, Tallest: t.Tallest, Codecs: []string{"H264"}, MaxResolution: resolution(t.Tallest)}
+	return Screen{
+		Width:         t.Width,
+		Height:        t.Height,
+		Tallest:       t.Tallest,
+		Codecs:        []string{"H264"},
+		MaxResolution: resolution(t.Tallest),
+	}
 }
 
 func resolution(tallest int) string {
@@ -449,7 +482,10 @@ func (p *Protocol) publish(t *title, state string, answer *cast.Message, request
 	p.mu.Lock()
 	m := p.media
 	p.mu.Unlock()
-	p.env.Publish(control{p}, &cast.Published{Media: m, State: state, Commands: 15, Answer: answer, Request: request})
+	p.env.Publish(
+		control{p},
+		&cast.Published{Media: m, State: state, Commands: 15, Answer: answer, Request: request},
+	)
 }
 
 func (p *Protocol) paused(t *title) bool {

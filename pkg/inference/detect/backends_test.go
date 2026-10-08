@@ -7,8 +7,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/inference/wake"
 )
 
-// fake is an engine that scores whatever is loaded into it, so the slot bookkeeping can be tested
-// without model files or inference.
 type fake struct {
 	loaded map[string]float64
 	fed    int
@@ -29,7 +27,6 @@ func (f *fake) feed([]int16) (map[string]float64, bool) {
 
 func (f *fake) close() { f.closed = true }
 
-// fakes replaces the engine builder for one test and reports what it handed out.
 func fakes(t *testing.T) map[wake.Kind]*fake {
 	t.Helper()
 
@@ -48,8 +45,6 @@ func model(id string, k wake.Kind) wake.Model {
 	return wake.Model{ID: id, Phrase: id, Kind: k, Path: id + ".tflite"}
 }
 
-// Two wake words can be models of different kinds, and then both engines run and each slot is judged
-// on the scores of its own. Nothing chooses: the models do.
 func TestSlotsOfDifferentKindsBothRun(t *testing.T) {
 	made := fakes(t)
 	e := New(2, nil)
@@ -67,7 +62,6 @@ func TestSlotsOfDifferentKindsBothRun(t *testing.T) {
 		t.Fatalf("built %d engines, want one per kind", len(made))
 	}
 
-	// Only the microWakeWord model is over the threshold, so only its slot fires.
 	made[wake.KindOpenWakeWord].loaded["glados"] = 0.1
 	made[wake.KindMicroWakeWord].loaded["hey_jarvis"] = 0.99
 	e.score([]int16{0})
@@ -93,7 +87,6 @@ func TestSlotsOfDifferentKindsBothRun(t *testing.T) {
 	}
 }
 
-// An engine costs a front end for every frame, so the last slot to leave takes it with it.
 func TestAnEngineGoesWithItsLastSlot(t *testing.T) {
 	made := fakes(t)
 	e := New(2, nil)
@@ -125,8 +118,6 @@ func TestAnEngineGoesWithItsLastSlot(t *testing.T) {
 	}
 }
 
-// The same wake word in both slots is one model in one engine, and one slot letting go of it must
-// not take it away from the other.
 func TestOneModelInTwoSlots(t *testing.T) {
 	made := fakes(t)
 	e := New(2, nil)
@@ -155,8 +146,6 @@ func TestOneModelInTwoSlots(t *testing.T) {
 	}
 }
 
-// Reloading a slot with another model of the same kind keeps that engine: it is still wanted, and
-// rebuilding it would throw away streaming state for nothing.
 func TestSwappingWithinAKindKeepsTheEngine(t *testing.T) {
 	made := fakes(t)
 	e := New(1, nil)

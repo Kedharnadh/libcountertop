@@ -1,4 +1,3 @@
-// Package navigation resolves shell views and prioritizes go-gui overlays.
 package navigation
 
 import (
@@ -7,6 +6,7 @@ import (
 	"sync"
 
 	gui "github.com/go-gui-org/go-gui/gui"
+
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 )
 
@@ -78,7 +78,10 @@ func (n *Nav) Show(overlay *Overlay) {
 	defer n.mu.Unlock()
 	if !slices.Contains(n.overlays, overlay) {
 		n.overlays = append(n.overlays, overlay)
-		slices.SortStableFunc(n.overlays, func(a, b *Overlay) int { return cmp.Compare(a.Priority, b.Priority) })
+		slices.SortStableFunc(
+			n.overlays,
+			func(a, b *Overlay) int { return cmp.Compare(a.Priority, b.Priority) },
+		)
 	}
 }
 func (n *Nav) Hide(overlay *Overlay) {
@@ -92,7 +95,6 @@ func (n *Nav) Overlays() []*Overlay {
 	return slices.Clone(n.overlays)
 }
 
-// BackSweep recognizes a sufficiently horizontal swipe beginning at the viewed right edge.
 func BackSweep(from [2]int, x, y, width int) bool {
 	dx, dy := from[0]-x, from[1]-y
 	if dy < 0 {

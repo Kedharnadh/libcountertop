@@ -13,20 +13,16 @@ var (
 	other = net.IPv4(192, 168, 1, 41)
 )
 
-// claim is an ARP frame in which sender says it holds addr.
 func claim(sender net.HardwareAddr, addr net.IP) []byte {
 	return arpAnnounce(sender, addr)
 }
 
-// Somebody else saying they hold our address is the conflict RFC 5227 section 2.4 is about.
 func TestAnotherHostClaimingOurAddressIsAConflict(t *testing.T) {
 	if !conflicting(claim(them, held), us, held) {
 		t.Error("another host claiming our address was not a conflict")
 	}
 }
 
-// Our own announcement comes back on the packet socket. Treating that as a conflict would make the
-// device argue with itself, and with the rate limit below, give the address up on the second one.
 func TestOurOwnAnnouncementIsNotAConflict(t *testing.T) {
 	if conflicting(claim(us, held), us, held) {
 		t.Error("the device's own announcement was read as a conflict")
@@ -39,20 +35,17 @@ func TestAClaimToSomeOtherAddressIsNotAConflict(t *testing.T) {
 	}
 }
 
-// A probe has a sender of zero: a host asking whether an address is free, not taking it. Answering
-// one is part of probing; it is not the ongoing conflict this watches for.
 func TestAProbeForOurAddressIsNotAConflict(t *testing.T) {
 	if conflicting(arpProbe(them, held), us, held) {
 		t.Error("a probe was read as an ongoing conflict")
 	}
 }
 
-// Anything that is not an ethernet IPv4 ARP frame is not an opinion about our address.
 func TestRubbishIsNotAConflict(t *testing.T) {
 	for _, frame := range [][]byte{
 		nil,
 		make([]byte, 4),
-		make([]byte, ethHeader+arpPayload), // all zeroes: not ARP
+		make([]byte, ethHeader+arpPayload),
 	} {
 		if conflicting(frame, us, held) {
 			t.Errorf("a frame of %d bytes was read as a conflict", len(frame))
@@ -66,8 +59,6 @@ func TestAConflictAgainstNoAddressIsNotOne(t *testing.T) {
 	}
 }
 
-// The policy from RFC 5227 section 2.4: answer once, and if the argument carries on inside the
-// interval, stop using the address rather than fight over it.
 func TestTheFirstConflictIsDefendedAndTheSecondGivesUp(t *testing.T) {
 	var d defender
 	at := time.Date(2026, time.September, 20, 12, 0, 0, 0, time.UTC)
@@ -80,7 +71,6 @@ func TestTheFirstConflictIsDefendedAndTheSecondGivesUp(t *testing.T) {
 	}
 }
 
-// Past the interval it is a new argument, not a continuation of the old one.
 func TestAConflictPastTheIntervalIsDefendedAgain(t *testing.T) {
 	var d defender
 	at := time.Date(2026, time.September, 20, 12, 0, 0, 0, time.UTC)
@@ -93,8 +83,6 @@ func TestAConflictPastTheIntervalIsDefendedAgain(t *testing.T) {
 	}
 }
 
-// Right on the boundary counts as past it, so a defence every ten seconds forever is possible and a
-// pair of hosts trading them as fast as they arrive is not.
 func TestTheIntervalBoundaryDefends(t *testing.T) {
 	var d defender
 	at := time.Date(2026, time.September, 20, 12, 0, 0, 0, time.UTC)
@@ -106,7 +94,6 @@ func TestTheIntervalBoundaryDefends(t *testing.T) {
 	}
 }
 
-// An argument that went quiet does not make the next one a surrender an hour later.
 func TestAnArgumentThatSettledIsForgotten(t *testing.T) {
 	var d defender
 	at := time.Date(2026, time.September, 20, 12, 0, 0, 0, time.UTC)
@@ -119,7 +106,6 @@ func TestAnArgumentThatSettledIsForgotten(t *testing.T) {
 	}
 }
 
-// Settling inside the interval is not settling: the argument is still going on.
 func TestSettlingInsideTheIntervalDoesNotForget(t *testing.T) {
 	var d defender
 	at := time.Date(2026, time.September, 20, 12, 0, 0, 0, time.UTC)
@@ -132,8 +118,6 @@ func TestSettlingInsideTheIntervalDoesNotForget(t *testing.T) {
 	}
 }
 
-// What a defence puts on the wire is the announcement, which is what re-asserts the address to
-// every cache on the segment.
 func TestADefenceIsAnAnnouncementOfOurOwn(t *testing.T) {
 	frame := arpAnnounce(us, held)
 
@@ -151,8 +135,6 @@ func TestADefenceIsAnAnnouncementOfOurOwn(t *testing.T) {
 		t.Errorf("the defence is from %v, want %v", got.senderMAC, us)
 	}
 
-	// And the other side of it: what we send has to read as a conflict to the host we are arguing
-	// with, or the two of them never resolve.
 	if !conflicting(frame, them, held) {
 		t.Error("our defence would not register as a claim on the other host")
 	}

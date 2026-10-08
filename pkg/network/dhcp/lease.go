@@ -8,12 +8,6 @@ import (
 	"github.com/insomniacslk/dhcp/dhcpv4"
 )
 
-// keeping reports whether an address already on the interface is the one a lease is for, and so
-// must be left alone rather than flushed.
-//
-// A renewal usually comes back with the address the device already had. Deleting it takes every
-// socket bound to it with it, so the connection to Home Assistant, the web server and mDNS would
-// all drop each time the lease came round.
 func keeping(addr net.IP, prefix uint8, want net.IP, wantPrefix uint8) bool {
 	if want == nil || addr == nil {
 		return false
@@ -21,7 +15,6 @@ func keeping(addr net.IP, prefix uint8, want net.IP, wantPrefix uint8) bool {
 	return prefix == wantPrefix && addr.Equal(want)
 }
 
-// Lease is what the DHCP server gave us.
 type Lease struct {
 	Address net.IPNet
 	Router  net.IP
@@ -30,20 +23,15 @@ type Lease struct {
 	Domain  string
 	Server  net.IP
 
-	// Expires is when the lease runs out. Renew is T1, when to start asking the server that granted
-	// it; Rebind is T2, when to stop waiting for that one and ask the segment. Halfway and seven
-	// eighths of the way through unless the server said otherwise.
+	// RFC 2131 4.4.5: T1 defaults to half the lease, T2 to seven eighths.
 	Expires time.Time
 	Renew   time.Time
 	Rebind  time.Time
 }
 
-// leaseFrom reads an ACK. Shared between the first one and every renewal, so what a lease means
-// cannot drift between the two paths.
 func leaseFrom(ack *dhcpv4.DHCPv4) (*Lease, error) {
 	mask := ack.SubnetMask()
 	if mask == nil {
-		// A server that did not say assumes classful, which is not something to guess at.
 		return nil, fmt.Errorf("dhcp: the lease carries no subnet mask")
 	}
 
@@ -72,8 +60,7 @@ func leaseFrom(ack *dhcpv4.DHCPv4) (*Lease, error) {
 		lease.Rebind = now.Add(t2)
 	}
 
-	// A server is allowed to say anything, and some say T2 before T1. Kept in order, because the
-	// renewal walks them in sequence and a T2 in the past would skip renewing altogether.
+	// Some servers send T2 at or before T1.
 
 	if !lease.Rebind.After(lease.Renew) {
 		lease.Rebind = lease.Renew.Add(life / 8)

@@ -2,13 +2,6 @@ package hci
 
 import "testing"
 
-// Taking whole packets off a stream of bytes.
-//
-// Runs without a UART on purpose: a packet split across reads, rubbish in front of one, and a sleep
-// byte between two are the cases that matter, and the device is the least convenient place to find
-// out any of them was handled wrongly.
-
-// Half a packet is not a fault, it is the ordinary state of a line being read.
 func TestDrainLeavesAPartialPacketAlone(t *testing.T) {
 	s := &stream{held: []byte{typeEvent, 0x01, 0x04, 0xaa}}
 
@@ -19,7 +12,6 @@ func TestDrainLeavesAPartialPacketAlone(t *testing.T) {
 		t.Errorf("%d bytes left, want the partial packet kept", len(s.held))
 	}
 
-	// The rest arrives and it comes together.
 	s.held = append(s.held, 0xbb, 0xcc, 0xdd)
 	if !s.drain(nil) {
 		t.Fatal("the completed packet was not found")
@@ -29,7 +21,6 @@ func TestDrainLeavesAPartialPacketAlone(t *testing.T) {
 	}
 }
 
-// Rubbish in front of a packet is stepped over rather than taking the packet with it.
 func TestDrainStepsPastRubbish(t *testing.T) {
 	s := &stream{held: []byte{0xaa, 0xbb, typeEvent, 0x01, 0x01, 0xcc}}
 
@@ -41,7 +32,6 @@ func TestDrainStepsPastRubbish(t *testing.T) {
 	}
 }
 
-// Nothing recognisable leaves nothing behind, rather than the same rubbish being rescanned for ever.
 func TestDrainOnNothingButRubbish(t *testing.T) {
 	s := &stream{held: []byte{0xaa, 0xbb, 0xcc}}
 
@@ -53,8 +43,6 @@ func TestDrainOnNothingButRubbish(t *testing.T) {
 	}
 }
 
-// The sleep protocol is single bytes between packets, so it gets the front of the buffer before
-// anything tries to parse it as one.
 func TestDrainLetsTheSleepProtocolGoFirst(t *testing.T) {
 	s := &stream{held: []byte{ibsSleep, typeEvent, 0x01, 0x00}}
 
@@ -74,8 +62,6 @@ func TestDrainLetsTheSleepProtocolGoFirst(t *testing.T) {
 	}
 }
 
-// Everything on the line is taken, not just the first one, and in the order it arrived: a command
-// status and the event that followed it are not interchangeable.
 func TestDrainTakesEverythingInOrder(t *testing.T) {
 	s := &stream{held: []byte{
 		typeEvent, 0x10, 0x00,

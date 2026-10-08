@@ -52,8 +52,24 @@ type lightCycles struct {
 
 func newLightCycles() *lightCycles {
 	v := &lightCycles{r: seeded(1982)}
-	v.cyc[0] = cycle{x: -7, z: 15, dir: 0, col: [3]float64{90, 225, 255}, lastTurn: -9, sampled: -9, h: 0.4}
-	v.cyc[1] = cycle{x: 7, z: 34, dir: 2, col: [3]float64{255, 150, 40}, lastTurn: -9, sampled: -9, h: 0.4}
+	v.cyc[0] = cycle{
+		x:        -7,
+		z:        15,
+		dir:      0,
+		col:      [3]float64{90, 225, 255},
+		lastTurn: -9,
+		sampled:  -9,
+		h:        0.4,
+	}
+	v.cyc[1] = cycle{
+		x:        7,
+		z:        34,
+		dir:      2,
+		col:      [3]float64{255, 150, 40},
+		lastTurn: -9,
+		sampled:  -9,
+		h:        0.4,
+	}
 	return v
 }
 
@@ -73,12 +89,35 @@ func (v *lightCycles) paintBack(back *image.RGBA) {
 	W, H, u := float64(v.st.w), float64(v.st.h), v.st.u
 	fx.Clear(back, color.NRGBA{0, 0, 0, 255})
 	hy := v.hy
-	fx.LinearRect(back, image.Rect(0, int(hy-H*0.25), v.st.w, int(hy)), 0, float32(hy-H*0.25), 0, float32(hy), []fx.Stop{
-		{At: 0, C: color.NRGBA{0, 40, 70, 0}}, {At: 1, C: color.NRGBA{0, 70, 110, 89}},
-	}, false)
-	fx.LinearRect(back, image.Rect(0, int(hy), v.st.w, v.st.h), 0, float32(hy), 0, float32(H), []fx.Stop{
-		{At: 0, C: hex(0x001426, 1)}, {At: 0.3, C: hex(0x000a14, 1)}, {At: 1, C: hex(0x000308, 1)},
-	}, false)
+	fx.LinearRect(
+		back,
+		image.Rect(0, int(hy-H*0.25), v.st.w, int(hy)),
+		0,
+		float32(hy-H*0.25),
+		0,
+		float32(hy),
+		[]fx.Stop{
+			{At: 0, C: color.NRGBA{0, 40, 70, 0}}, {At: 1, C: color.NRGBA{0, 70, 110, 89}},
+		},
+		false,
+	)
+	fx.LinearRect(
+		back,
+		image.Rect(0, int(hy), v.st.w, v.st.h),
+		0,
+		float32(hy),
+		0,
+		float32(H),
+		[]fx.Stop{
+			{
+				At: 0,
+				C:  hex(0x001426, 1),
+			},
+			{At: 0.3, C: hex(0x000a14, 1)},
+			{At: 1, C: hex(0x000308, 1)},
+		},
+		false,
+	)
 	lw := math.Max(1, 1.2*u)
 	for k := 10.0; k < 170; k += 2 {
 		y := v.py(0, k)
@@ -111,7 +150,18 @@ func (v *lightCycles) paintBack(back *image.RGBA) {
 	corners := [][2]float64{{-A, lcZ0}, {A, lcZ0}, {A, lcZ1}, {-A, lcZ1}, {-A, lcZ0}}
 	for i := 1; i < len(corners); i++ {
 		a, b := corners[i-1], corners[i]
-		fx.Wedge(back, float32(v.px(a[0], a[1])), float32(v.py(0, a[1])), float32(v.px(b[0], b[1])), float32(v.py(0, b[1])), float32(u), float32(u), float32(10*u), color.NRGBA{80, 200, 255, 110}, true)
+		fx.Wedge(
+			back,
+			float32(v.px(a[0], a[1])),
+			float32(v.py(0, a[1])),
+			float32(v.px(b[0], b[1])),
+			float32(v.py(0, b[1])),
+			float32(u),
+			float32(u),
+			float32(10*u),
+			color.NRGBA{80, 200, 255, 110},
+			true,
+		)
 	}
 	v.pts = v.pts[:0]
 	for _, c := range corners {
@@ -235,24 +285,71 @@ func (v *lightCycles) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 				continue
 			}
 			a := float32((math.Min(4, math.Floor(life*5)) + 0.5) / 5)
-			ax, ay, bx, by := float32(v.px(p0.x, p0.z)), float32(v.py(0, p0.z)), float32(v.px(p1.x, p1.z)), float32(v.py(0, p1.z))
+			ax, ay, bx, by := float32(
+				v.px(p0.x, p0.z),
+			), float32(
+				v.py(0, p0.z),
+			), float32(
+				v.px(p1.x, p1.z),
+			), float32(
+				v.py(0, p1.z),
+			)
 			ty0, ty1 := float32(v.py(p0.h, p0.z)), float32(v.py(p1.h, p1.z))
-			v.quads = append(v.quads, Quad{X: [4]float32{ax, bx, bx, ax}, Y: [4]float32{ay, by, ty1, ty0}, R: cr, G: cg, B: cb, A: 0.3 * a})
+			v.quads = append(
+				v.quads,
+				Quad{
+					X: [4]float32{ax, bx, bx, ax},
+					Y: [4]float32{ay, by, ty1, ty0},
+					R: cr,
+					G: cg,
+					B: cb,
+					A: 0.3 * a,
+				},
+			)
 			w := float32(2.2 * u)
-			v.segs = append(v.segs,
-				Segment{X0: ax, Y0: ty0, X1: bx, Y1: ty1, Width: w, R: hr, G: hg, B: hb, A: 0.95 * a},
-				Segment{X0: ax, Y0: ay, X1: bx, Y1: by, Width: w, R: hr, G: hg, B: hb, A: 0.95 * a})
+			v.segs = append(
+				v.segs,
+				Segment{
+					X0:    ax,
+					Y0:    ty0,
+					X1:    bx,
+					Y1:    ty1,
+					Width: w,
+					R:     hr,
+					G:     hg,
+					B:     hb,
+					A:     0.95 * a,
+				},
+				Segment{X0: ax, Y0: ay, X1: bx, Y1: by, Width: w, R: hr, G: hg, B: hb, A: 0.95 * a},
+			)
 		}
 		d := lcDirs[c.dir]
 		zz := c.z
 		sz := 10 / zz
 		sx, sy := v.px(c.x, zz), v.py(0.45, zz)
 		v.segs = append(v.segs, Segment{
-			X0: float32(v.px(c.x-d[0]*1.3, zz-d[1]*1.3)), Y0: float32(v.py(0.45, zz-d[1]*1.3)), X1: float32(sx), Y1: float32(sy),
-			Width: float32(10*u*sz + 1.5), R: hr, G: hg, B: hb, A: 1,
+			X0: float32(
+				v.px(c.x-d[0]*1.3, zz-d[1]*1.3),
+			),
+			Y0:    float32(v.py(0.45, zz-d[1]*1.3)),
+			X1:    float32(sx),
+			Y1:    float32(sy),
+			Width: float32(10*u*sz + 1.5),
+			R:     hr,
+			G:     hg,
+			B:     hb,
+			A:     1,
 		})
 		o := 10 * i
-		vals[o], vals[o+1], vals[o+2], vals[o+3] = float32(sx), float32(v.py(0, zz)), float32(110*u*sz), float32(0.32+0.3*c.flash)
+		vals[o], vals[o+1], vals[o+2], vals[o+3] = float32(
+			sx,
+		), float32(
+			v.py(0, zz),
+		), float32(
+			110*u*sz,
+		), float32(
+			0.32+0.3*c.flash,
+		)
 		vals[o+4], vals[o+5] = float32(sy), float32(130*u*sz*(1+0.6*c.flash)/2)
 		vals[o+6], vals[o+7], vals[o+8] = cr, cg, cb
 	}

@@ -10,36 +10,17 @@ import (
 	"time"
 )
 
-// The receiver: what a sender is talking to, and what it does about each thing it is told.
-//
-// Messages in, messages out. Nothing here owns a socket — the caller reads frames off one
-// connection and hands them over, and writes back whatever comes out. That is what lets the whole
-// conversation be driven by a test.
-//
-// Not safe for concurrent use: it is driven from whichever goroutine reads the connection.
-
-// DefaultMediaReceiver is the application every sender knows how to drive. Supporting it is what
-// makes this device something you can cast a url to from anything.
 const DefaultMediaReceiver = "CC1AD845"
 
-// Playing is what the host has to do to actually make a sound. Nothing here touches audio; the
-// receiver decides what should be happening and this is how it says so.
-//
-// Nil is fine and leaves a receiver that negotiates correctly and plays nothing, which is what it
-// does until the speaker is wired in.
 type Playing interface {
-	// Load is a new thing to play, and whether to start it now.
 	Load(m Media, at time.Duration, play bool) error
 
-	// Play, Pause and Stop are the transport.
 	Play() error
 	Pause() error
 	Stop() error
 
-	// Seek moves within what is loaded.
 	Seek(to time.Duration) error
 
-	// Elapsed is how far in it is, which a status reports.
 	Elapsed() time.Duration
 }
 
@@ -47,69 +28,47 @@ type Stepping interface {
 	Step(by int) error
 }
 
-// Receiver is this device as something to cast to.
 type Receiver struct {
-	// Name is what a sender shows. It goes in the mDNS record too, and the two have to agree or a
-	// sender lists one name and connects to a device calling itself another.
 	Name string
 
-	// Player is what actually makes a sound. Nil negotiates and plays nothing.
 	Player Playing
 
-	// Volume is called when a sender moves the volume, as a fraction from nought to one.
 	Volume func(level float64, muted bool)
 
-	// Launched and Stopped bracket an application running.
 	Launched func(app string)
 	Stopped  func(app string)
 
-	// Loaded is what a sender asked to play, before the player sees it.
 	Loaded func(m Media)
 
-	// Unspoken is a message on a namespace this does not speak, by its type; binary for protobuf.
 	Unspoken func(namespace, kind string)
 
-	// Credentials are the current ones, or nil while there are none.
 	Credentials func() *Credentials
 
-	// CRL is the device revocation list to answer a challenge with, or nil while there is none.
 	CRL func() []byte
 
-	// Challenged is a sender asking for device authentication, and whether it was answered.
 	Challenged func(c Challenge, answered bool)
 
-	// Available says whether an application can run here. Nil is every application.
 	Available func(app string) bool
 
-	// Identity is the device as advertised, which GET_DEVICE_INFO is answered from.
 	Identity func() Device
 
-	// Eureka is the device description a setup request is answered with.
 	Eureka func() Eureka
 
-	// Setup is every setup request, by type, with the data it carried.
 	Setup func(kind string, data json.RawMessage)
 
 	volume Volume
 
-	// protocols are the registered application protocols, by name.
 	protocols map[string]Protocol
 
-	// app is what is running, or nil. One at a time: this device is a speaker, and two
-	// applications wanting the same speaker is a fight rather than a feature.
 	app *Application
 
-	// media is what is loaded under it.
 	media   *Media
 	state   string
 	idle    string
 	session int
 
-	// senders is who has opened a conversation, so a status can be sent to each rather than
-	// broadcast blindly. The key is the sender's own endpoint id.
 	senders map[string]bool
 
-	// sessions counts up, so every launch and every load gets an id nothing else has used.
 	sessions int
 
 	appMedia appPlayer
@@ -150,7 +109,8 @@ func (r *Receiver) Publish(control Playing, p *Published) []Message {
 		Commands int
 		Custom   json.RawMessage
 	}{p.Media, p.State, p.Commands, p.Custom})
-	if p.Answer == nil && r.appMedia.control == control && r.appMedia.told == string(told) && r.session != 0 {
+	if p.Answer == nil && r.appMedia.control == control && r.appMedia.told == string(told) &&
+		r.session != 0 {
 		return nil
 	}
 	if r.media == nil || r.media.ContentID != p.Media.ContentID || r.session == 0 {
@@ -160,7 +120,12 @@ func (r *Receiver) Publish(control Playing, p *Published) []Message {
 	}
 	m := p.Media
 	r.media, r.state, r.idle = &m, p.State, ""
-	r.appMedia = appPlayer{control: control, commands: p.Commands, custom: p.Custom, told: string(told)}
+	r.appMedia = appPlayer{
+		control:  control,
+		commands: p.Commands,
+		custom:   p.Custom,
+		told:     string(told),
+	}
 	if p.Answer != nil {
 		return r.report(*p.Answer, p.Request)
 	}
@@ -174,7 +139,6 @@ func (r *Receiver) control() Playing {
 	return r.Player
 }
 
-// NewReceiver is a receiver answering to a name, with nothing running.
 func NewReceiver(name string) *Receiver {
 	return &Receiver{
 		Name:    name,
@@ -191,7 +155,6 @@ func NewReceiver(name string) *Receiver {
 
 func ptr[T any](v T) *T { return &v }
 
-// Status is what the receiver would report now.
 func (r *Receiver) Status() ReceiverStatus {
 	s := ReceiverStatus{Volume: r.volume, IsActiveInput: true}
 	if r.app != nil {
@@ -200,7 +163,6 @@ func (r *Receiver) Status() ReceiverStatus {
 	return s
 }
 
-// Running is the application id, or empty.
 func (r *Receiver) Running() string {
 	if r.app == nil {
 		return ""
@@ -208,17 +170,10 @@ func (r *Receiver) Running() string {
 	return r.app.AppID
 }
 
-// State is what the player is doing, for a caller drawing it.
 func (r *Receiver) State() string { return r.state }
 
-// Media is what is loaded, or nil.
 func (r *Receiver) Media() *Media { return r.media }
 
-// Receive takes one message and returns what to send back.
-//
-// An error is a message that could not be understood, not a broken connection: the caller logs it
-// and reads the next one. Dropping the connection over one bad payload turns a sender's bug into a
-// device that cannot be cast to.
 func (r *Receiver) Receive(m Message) ([]Message, error) {
 	switch m.Namespace {
 	case NSConnection:
@@ -244,8 +199,6 @@ func (r *Receiver) Receive(m Message) ([]Message, error) {
 		}
 	}
 
-	// A namespace this does not speak. Nothing to say: the receiver status already lists what the
-	// running application answers, and a sender that ignored it is not owed a second answer.
 	if r.Unspoken != nil {
 		kind := "binary"
 		if len(m.Binary) == 0 {
@@ -258,7 +211,6 @@ func (r *Receiver) Receive(m Message) ([]Message, error) {
 	return nil, nil
 }
 
-// deviceAuth answers a challenge from the current credentials, whichever made them.
 func (r *Receiver) deviceAuth(m Message) ([]Message, error) {
 	c, err := ParseChallenge(m.Binary)
 	if err != nil {
@@ -295,10 +247,8 @@ func (r *Receiver) deviceAuth(m Message) ([]Message, error) {
 	}}, nil
 }
 
-// reply is a message back to whoever sent one.
 func reply(to Message, namespace, body string) Message { return Reply(to, namespace, body) }
 
-// Reply is a message back to whoever sent one, from whoever it was sent to.
 func Reply(to Message, namespace, body string) Message {
 	return Message{
 		Source:      to.Destination,
@@ -308,10 +258,7 @@ func Reply(to Message, namespace, body string) Message {
 	}
 }
 
-// connection opens and closes a sender's conversation.
-//
-// Neither is answered. CONNECT has no reply in the protocol, and a receiver that invents one is
-// sending a sender something it has no case for.
+// CONNECT has no reply in the protocol.
 func (r *Receiver) connection(m Message) ([]Message, error) {
 	h, err := Kind(m.Payload)
 	if err != nil {
@@ -330,10 +277,6 @@ func (r *Receiver) connection(m Message) ([]Message, error) {
 	return nil, nil
 }
 
-// heartbeat answers a ping.
-//
-// The cheapest message here and the one that must never be missed: a sender that does not get a
-// pong inside its own timeout drops the connection, and the music stops for a reason nothing logs.
 func (r *Receiver) heartbeat(m Message) ([]Message, error) {
 	h, err := Kind(m.Payload)
 	if err != nil {
@@ -345,7 +288,6 @@ func (r *Receiver) heartbeat(m Message) ([]Message, error) {
 	return []Message{reply(m, NSHeartbeat, Pong())}, nil
 }
 
-// receiver answers the namespace about the device itself.
 func (r *Receiver) receiver(m Message) ([]Message, error) {
 	h, err := Kind(m.Payload)
 	if err != nil {
@@ -372,32 +314,15 @@ func (r *Receiver) receiver(m Message) ([]Message, error) {
 	return []Message{reply(m, NSReceiver, Invalid(h.RequestID, ReasonInvalidCommand))}, nil
 }
 
-// launch starts an application.
-//
-// Answered with a receiver status rather than with a type of its own. That is what the protocol
-// says and what senders wait for: one that answers "LAUNCHED" is a device that launches and then
-// appears to hang.
+// LAUNCH is answered with RECEIVER_STATUS, not a type of its own.
 func (r *Receiver) launch(m Message, h Header) ([]Message, error) {
 	req, err := ParseLaunch(m.Payload)
 	if err != nil {
 		return []Message{reply(m, NSReceiver, Invalid(h.RequestID, ReasonInvalidParams))}, nil
 	}
 
-	// Any application id is taken, and answered with the one behaviour this device has.
-	//
-	// A real Chromecast runs a web application per id and refuses the ones it does not have. This
-	// device has nothing to launch, so refusing would only be an imitation of that — and the
-	// senders that matter do not read a refusal as a reason to try something else. Music
-	// Assistant's cast provider launches its own id, C35B0678, and on a refusal raises rather than
-	// falling back, telling the person to turn a setting off instead.
-	//
-	// Safe to accept because what follows does not depend on the id: after the launch it sends
-	// LOAD on the standard media namespace, which is the one implemented here. The namespaces
-	// reported back are still only the ones actually spoken, so a sender looking for an
-	// application's own protocol can see it is not on offer.
+	// Music Assistant launches C35B0678 and raises on a refusal.
 
-	// Already running it. Not an error — a second sender joining the same application is ordinary
-	// — so it gets the status of what is there rather than a new session.
 	if r.app == nil || r.app.AppID != req.AppID {
 		r.release(IdleInterrupted)
 		r.start(req.AppID)
@@ -406,8 +331,6 @@ func (r *Receiver) launch(m Message, h Header) ([]Message, error) {
 	return r.announce(m, h.RequestID), nil
 }
 
-// start puts an application on.
-// sessionID is a random UUID, which is what real receivers use for a session and its transport.
 func sessionID() string {
 	var b [16]byte
 	rand.Read(b[:])
@@ -427,8 +350,6 @@ func (r *Receiver) start(app string) {
 		IconURL:        known.Icon,
 		SessionID:      id,
 
-		// The same string as the session. A sender addresses the application by the transport id,
-		// so the two being different is legal and being the same is what every real device does.
 		TransportID: id,
 
 		DisplayName: known.Name,
@@ -442,15 +363,12 @@ func (r *Receiver) start(app string) {
 	}
 }
 
-// stop takes it away.
 func (r *Receiver) stop(m Message, h Header) ([]Message, error) {
 	req, err := ParseStop(m.Payload)
 	if err != nil {
 		return []Message{reply(m, NSReceiver, Invalid(h.RequestID, ReasonInvalidParams))}, nil
 	}
 
-	// A stop naming a session that is not the one running is a sender that has lost track, and
-	// stopping anyway would take the music off for somebody else in the room.
 	if req.SessionID != "" && (r.app == nil || r.app.SessionID != req.SessionID) {
 		return []Message{reply(m, NSReceiver, Invalid(h.RequestID, ReasonInvalidParams))}, nil
 	}
@@ -460,7 +378,6 @@ func (r *Receiver) stop(m Message, h Header) ([]Message, error) {
 	return append(out, r.announce(m, h.RequestID)...), nil
 }
 
-// End stops the running application from this end, and is the status every sender is owed.
 func (r *Receiver) End() []Message {
 	if r.app == nil {
 		return nil
@@ -471,11 +388,21 @@ func (r *Receiver) End() []Message {
 }
 
 func (r *Receiver) broadcast() Message {
-	return Message{Source: ReceiverID, Destination: Broadcast, Namespace: NSReceiver, Payload: Status(0, r.Status())}
+	return Message{
+		Source:      ReceiverID,
+		Destination: Broadcast,
+		Namespace:   NSReceiver,
+		Payload:     Status(0, r.Status()),
+	}
 }
 
 func (r *Receiver) mediaBroadcast(status []MediaStatus) Message {
-	return Message{Source: r.app.TransportID, Destination: Broadcast, Namespace: NSMedia, Payload: MediaBroadcastPayload(status...)}
+	return Message{
+		Source:      r.app.TransportID,
+		Destination: Broadcast,
+		Namespace:   NSMedia,
+		Payload:     MediaBroadcastPayload(status...),
+	}
 }
 
 func (r *Receiver) cancelled() []Message {
@@ -486,14 +413,13 @@ func (r *Receiver) cancelled() []Message {
 	return []Message{r.mediaBroadcast(r.playing())}
 }
 
-// release stops whatever is running and says why the player went idle.
 func (r *Receiver) release(why string) {
 	if r.app == nil {
 		return
 	}
 
 	if r.Player != nil {
-		r.Player.Stop()
+		_ = r.Player.Stop()
 	}
 	r.appMedia = appPlayer{}
 
@@ -510,7 +436,6 @@ func (r *Receiver) release(why string) {
 	}
 }
 
-// setVolume moves the volume.
 func (r *Receiver) setVolume(m Message, h Header) ([]Message, error) {
 	req, err := ParseSetVolume(m.Payload)
 	if err != nil {
@@ -521,8 +446,6 @@ func (r *Receiver) setVolume(m Message, h Header) ([]Message, error) {
 }
 
 func (r *Receiver) applyVolume(req SetVolumeRequest) {
-	// Only what was asked for. A request carrying a mute and no level must not set the level, and
-	// the two arrive separately all the time.
 	if req.Volume.Level != nil {
 		r.volume.Level = ptr(*req.Volume.Level)
 	}
@@ -544,7 +467,6 @@ func (r *Receiver) streamVolume(m Message, h Header) ([]Message, error) {
 	return append(r.report(m, h.RequestID), r.broadcast()), nil
 }
 
-// Report takes the volume the device is at, and returns the status every sender is owed when it is news.
 func (r *Receiver) Report(level float64, muted bool) []Message {
 	if *r.volume.Level == level && *r.volume.Muted == muted {
 		return nil
@@ -553,23 +475,16 @@ func (r *Receiver) Report(level float64, muted bool) []Message {
 	return []Message{r.broadcast()}
 }
 
-// announce answers the sender that asked and tells everyone else.
-//
-// Both, because a change one sender made has to reach the others: two phones with the app open
-// should not disagree about whether anything is playing.
 func (r *Receiver) announce(m Message, request int) []Message {
 	return []Message{reply(m, NSReceiver, Status(request, r.Status())), r.broadcast()}
 }
 
-// mediaNamespace answers the namespace about what is playing.
 func (r *Receiver) mediaNamespace(m Message) ([]Message, error) {
 	h, err := Kind(m.Payload)
 	if err != nil {
 		return nil, err
 	}
 
-	// Nothing is running, so there is nothing to command. A sender that got here has a stale
-	// transport id, and an empty status is what tells it so.
 	if r.app == nil && h.Type != TypeGetStatus {
 		return []Message{reply(m, NSMedia, Invalid(h.RequestID, ReasonInvalidCommand))}, nil
 	}
@@ -579,7 +494,13 @@ func (r *Receiver) mediaNamespace(m Message) ([]Message, error) {
 		return r.load(m, h)
 	case TypeGetStatus:
 		return []Message{reply(m, NSMedia, MediaStatusPayload(h.RequestID, r.full()...))}, nil
-	case TypePlay, TypePause, TypeStopMedia, TypeSeek, TypeQueueNext, TypeQueuePrev, TypeQueueUpdate:
+	case TypePlay,
+		TypePause,
+		TypeStopMedia,
+		TypeSeek,
+		TypeQueueNext,
+		TypeQueuePrev,
+		TypeQueueUpdate:
 		return r.transport(m, h)
 	case TypeSetVolume:
 		return r.streamVolume(m, h)
@@ -588,7 +509,6 @@ func (r *Receiver) mediaNamespace(m Message) ([]Message, error) {
 	return []Message{reply(m, NSMedia, Invalid(h.RequestID, ReasonInvalidCommand))}, nil
 }
 
-// load takes something new to play.
 func (r *Receiver) load(m Message, h Header) ([]Message, error) {
 	if l := r.loader(); l != nil {
 		return l.Load(r.app, m)
@@ -627,15 +547,12 @@ func (r *Receiver) load(m Message, h Header) ([]Message, error) {
 	return r.report(m, h.RequestID), nil
 }
 
-// transport is play, pause, stop or seek.
 func (r *Receiver) transport(m Message, h Header) ([]Message, error) {
 	req, err := ParseMediaRequest(m.Payload)
 	if err != nil {
 		return []Message{reply(m, NSMedia, Invalid(h.RequestID, ReasonInvalidParams))}, nil
 	}
 
-	// A command for a session that is not the one loaded is a sender that has lost track. Acting
-	// on it would pause music somebody else started.
 	if req.MediaSessionID != 0 && req.MediaSessionID != r.session {
 		return []Message{reply(m, NSMedia, Invalid(h.RequestID, ReasonInvalidParams))}, nil
 	}
@@ -655,8 +572,6 @@ func (r *Receiver) transport(m Message, h Header) ([]Message, error) {
 		}
 
 	case TypeStopMedia:
-		// Stopping the media is not stopping the application: the sender can load something else
-		// without launching again.
 		if ctl := r.control(); ctl != nil {
 			act = ctl.Stop()
 		}
@@ -666,7 +581,9 @@ func (r *Receiver) transport(m Message, h Header) ([]Message, error) {
 		r.idle = IdleCancelled
 
 	case TypeSeek:
-		if (r.media != nil && r.media.Streaming()) || req.CurrentTime < 0 || math.IsNaN(req.CurrentTime) || math.IsInf(req.CurrentTime, 0) {
+		if (r.media != nil && r.media.Streaming()) || req.CurrentTime < 0 ||
+			math.IsNaN(req.CurrentTime) ||
+			math.IsInf(req.CurrentTime, 0) {
 			return []Message{reply(m, NSMedia, Invalid(h.RequestID, ReasonInvalidParams))}, nil
 		}
 		if ctl := r.control(); ctl != nil {
@@ -698,7 +615,6 @@ func (r *Receiver) transport(m Message, h Header) ([]Message, error) {
 	return r.report(m, h.RequestID), nil
 }
 
-// playing is the media status, or nothing at all when there is none.
 func (r *Receiver) playing() []MediaStatus {
 	if r.session == 0 {
 		return nil
@@ -728,7 +644,6 @@ func (r *Receiver) playing() []MediaStatus {
 	return []MediaStatus{s}
 }
 
-// report answers with the media status and tells the other senders.
 func (r *Receiver) full() []MediaStatus {
 	full := r.playing()
 	if len(full) > 0 {
@@ -739,11 +654,12 @@ func (r *Receiver) full() []MediaStatus {
 
 func (r *Receiver) report(m Message, request int) []Message {
 	full := r.full()
-	return []Message{reply(m, NSMedia, MediaStatusPayload(request, full...)), r.mediaBroadcast(full)}
+	return []Message{
+		reply(m, NSMedia, MediaStatusPayload(request, full...)),
+		r.mediaBroadcast(full),
+	}
 }
 
-// Finished is the player having reached the end on its own, which nothing asked for and every
-// sender wants to hear about.
 func (r *Receiver) Finished() []Message {
 	if r.session == 0 {
 		return nil
@@ -761,7 +677,6 @@ func (r *Receiver) Finished() []Message {
 	return []Message{r.mediaBroadcast(status)}
 }
 
-// Forget drops everything, for a connection that has gone away.
 func (r *Receiver) Forget() {
 	r.release(IdleCancelled)
 	clear(r.senders)

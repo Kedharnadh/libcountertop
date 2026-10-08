@@ -36,5 +36,14 @@ func (fakeVolume) Level() int             { return 100 }
 func (fakeVolume) Set(int)                {}
 func (fakeVolume) Watch(func(int)) func() { return func() {} }
 func testSink() *Sink {
-	return New(Dependencies{Queue: &fakeQueue{}, Settings: fakeSettings{}, Media: fakeMedia{}, Volume: fakeVolume{}, Arbitration: &background.Arbiter{}, Ducking: fakeDucking{}})
+	return New(
+		Dependencies{
+			Queue:       &fakeQueue{},
+			Settings:    fakeSettings{},
+			Media:       fakeMedia{},
+			Volume:      fakeVolume{},
+			Arbitration: &background.Arbiter{},
+			Ducking:     fakeDucking{},
+		},
+	)
 }

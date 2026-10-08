@@ -19,8 +19,17 @@ import (
 )
 
 func TestLoungeValuesReadAsStrings(t *testing.T) {
-	got := fields(json.RawMessage(`{"videoId":"Y7nDX15KJ5M","currentIndex":"13","currentTime":0,"flag":true,"none":null}`))
-	want := map[string]string{"videoId": "Y7nDX15KJ5M", "currentIndex": "13", "currentTime": "0", "flag": "true"}
+	got := fields(
+		json.RawMessage(
+			`{"videoId":"Y7nDX15KJ5M","currentIndex":"13","currentTime":0,"flag":true,"none":null}`,
+		),
+	)
+	want := map[string]string{
+		"videoId":      "Y7nDX15KJ5M",
+		"currentIndex": "13",
+		"currentTime":  "0",
+		"flag":         "true",
+	}
 	if len(got) != len(want) {
 		t.Errorf("read %v", got)
 	}
@@ -103,7 +112,8 @@ func TestYouTubeTVWithoutACredentialTellsTheCard(t *testing.T) {
 	for i := 0; i < 100 && len(out.failures()) == 0; i++ {
 		time.Sleep(10 * time.Millisecond)
 	}
-	if f := out.failures(); out.played || len(f) != 1 || !strings.Contains(f[0].Error(), "no credential") {
+	if f := out.failures(); out.played || len(f) != 1 ||
+		!strings.Contains(f[0].Error(), "no credential") {
 		t.Errorf("played %v, the card was told %v", out.played, f)
 	}
 	if got := s.logo(); got != cast.Lookup("32EAB1DF").Icon {
@@ -120,7 +130,6 @@ func TestTimesAreSecondsToTheMillisecond(t *testing.T) {
 	}
 }
 
-// counter is an output that reads a source to its end without making a sound.
 type counter struct {
 	mu      sync.Mutex
 	samples int
@@ -156,7 +165,6 @@ func (c *counter) Attend(*playback.Session)    {}
 func (c *counter) Position(src playback.Source) (time.Duration, bool) { return src.Start(), false }
 func (c *counter) Failed(error)                                       {}
 
-// Against YouTube itself, so only when asked: COUNTERTOP_LIVE=1.
 func TestAVideoPlaysThroughToItsEnd(t *testing.T) {
 	if os.Getenv("COUNTERTOP_LIVE") == "" {
 		t.Skip("set COUNTERTOP_LIVE=1 to play a real video")
@@ -165,8 +173,19 @@ func TestAVideoPlaysThroughToItsEnd(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	st := newStation(ctx, ThemeMusic, cast.Env{HTTP: &http.Client{Timeout: time.Minute}, Output: out})
-	st.handle(Message{Name: "setPlaylist", Payload: json.RawMessage(`{"videoId":"Y7nDX15KJ5M","currentIndex":"0","currentTime":"0"}`)})
+	st := newStation(
+		ctx,
+		ThemeMusic,
+		cast.Env{HTTP: &http.Client{Timeout: time.Minute}, Output: out},
+	)
+	st.handle(
+		Message{
+			Name: "setPlaylist",
+			Payload: json.RawMessage(
+				`{"videoId":"Y7nDX15KJ5M","currentIndex":"0","currentTime":"0"}`,
+			),
+		},
+	)
 
 	select {
 	case <-out.done:
@@ -184,7 +203,11 @@ func TestAVideoPlaysThroughToItsEnd(t *testing.T) {
 
 func TestTheStationPublishesToCast(t *testing.T) {
 	var got []*cast.Published
-	s := newStation(context.Background(), ThemeTV, cast.Env{Publish: func(_ cast.Playing, p *cast.Published) { got = append(got, p) }})
+	s := newStation(
+		context.Background(),
+		ThemeTV,
+		cast.Env{Publish: func(_ cast.Playing, p *cast.Published) { got = append(got, p) }},
+	)
 	s.list, s.index = "PL1", 2
 	s.reportLoading("vid", 0)
 	s.report(stateStopped)
@@ -192,10 +215,13 @@ func TestTheStationPublishesToCast(t *testing.T) {
 		t.Fatalf("published %+v", got)
 	}
 	p := got[0]
-	if p.Media.ContentID != "vid" || p.Media.ContentType != "x-youtube/video" || p.State != cast.StateBuffering || p.Commands != castCommands {
+	if p.Media.ContentID != "vid" || p.Media.ContentType != "x-youtube/video" ||
+		p.State != cast.StateBuffering ||
+		p.Commands != castCommands {
 		t.Errorf("loading %+v", p)
 	}
-	if string(p.Media.CustomData) != `{"currentIndex":2,"listId":"PL1"}` || string(p.Custom) != `{"playerState":3}` {
+	if string(p.Media.CustomData) != `{"currentIndex":2,"listId":"PL1"}` ||
+		string(p.Custom) != `{"playerState":3}` {
 		t.Errorf("custom %s %s", p.Media.CustomData, p.Custom)
 	}
 }

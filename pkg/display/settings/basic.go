@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
+
 	widget "github.com/ygelfand/libcountertop/pkg/display/model"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
@@ -87,10 +88,27 @@ func (p *BasicPages) Debug() *shell.Page {
 			fps, seed := p.state().Visual.MaxFPS, p.state().Visual.Seed
 			adb := p.options.Access.ADB()
 			return []widget.Row{
-					{Glyph: gogui.IconTerminal, Label: say.T("system.adb"), Hint: say.T("system.adb.hint"), Kind: widget.Toggle, On: adb},
+					{
+						Glyph: gogui.IconTerminal,
+						Label: say.T("system.adb"),
+						Hint:  say.T("system.adb.hint"),
+						Kind:  widget.Toggle,
+						On:    adb,
+					},
 					{Label: say.T("debug.visuals"), Kind: widget.Chevron},
-					{Label: say.T("debug.fps"), Kind: widget.Slider, Level: FpsLevel(fps), Snap: FpsSnap, Value: FpsSays(fps)},
-					{Label: say.T("debug.seed"), Kind: widget.Slider, Level: SeedLevel(seed), Value: SeedSays(seed)},
+					{
+						Label: say.T("debug.fps"),
+						Kind:  widget.Slider,
+						Level: FpsLevel(fps),
+						Snap:  FpsSnap,
+						Value: FpsSays(fps),
+					},
+					{
+						Label: say.T("debug.seed"),
+						Kind:  widget.Slider,
+						Level: SeedLevel(seed),
+						Value: SeedSays(seed),
+					},
 				}, []func(int){
 					func(int) { p.options.Access.SetADB(!adb) },
 					p.open(p.options.VisualPage),
@@ -146,7 +164,10 @@ func (p *BasicPages) Style() *shell.Page {
 			var cells []widget.Cell
 			var taps []func(int)
 			for _, name := range style.Names() {
-				cells = append(cells, widget.Cell{Label: say.T("style." + name), Chosen: name == now, Style: name})
+				cells = append(
+					cells,
+					widget.Cell{Label: say.T("style." + name), Chosen: name == now, Style: name},
+				)
 				taps = append(taps, func(int) {
 					if err := p.setStyle(name); err != nil {
 						slog.Error("the style could not be saved", "style", name, "err", err)
@@ -162,13 +183,17 @@ func (p *BasicPages) Theme() *shell.Page {
 	return &shell.Page{
 		Title: say.T("theme.title"),
 
-		// A grid rather than a row each: a row spends its width on a label and a small Swatch, and
-		// twelve of them do not fit on a screen. A tile is the Swatch, with the name on it.
 		Tiles: func() ([]widget.Cell, []func(int)) {
 			now := p.state().Screen.Theme
 			follow, _ := theme.ByName(style.Theme(p.state().Screen.Style, style.ThemeDefault))
 
-			cells := []widget.Cell{{Label: say.T("theme.default"), Chosen: now == style.ThemeDefault, Palette: &follow}}
+			cells := []widget.Cell{
+				{
+					Label:   say.T("theme.default"),
+					Chosen:  now == style.ThemeDefault,
+					Palette: &follow,
+				},
+			}
 			acts := []func(int){p.useTheme(style.ThemeDefault)}
 
 			for _, t := range theme.All {
@@ -189,8 +214,6 @@ func Swatch(t theme.Theme) func(ui.Surface, ui.Rect, theme.Theme) {
 	return func(s ui.Surface, at ui.Rect, _ theme.Theme) {
 		ui.FillRect(s, at, t.Background)
 
-		// A hairline, because a light theme's card on a light page has no edge of its own — and the
-		// card being that color is the first thing the row is there to say.
 		ui.Border(s, at, max(at.H/40, 1), t.Text.Blend(t.Background, 0.7))
 
 		on := []theme.Color{t.Surface, t.Text, t.Accent, t.Accent2}
@@ -198,13 +221,9 @@ func Swatch(t theme.Theme) func(ui.Surface, ui.Rect, theme.Theme) {
 		pad := int(float64(at.H) * swatchPad)
 		gap := int(float64(at.H) * swatchGap)
 
-		// Square, so the side is whichever of the two runs out first: the height the card leaves, or
-		// what is left of the width once the gaps are taken out.
 		wide := (at.W - pad*2 - gap*(len(on)-1)) / len(on)
 		side := min(at.H-pad*2, wide)
 
-		// Centered as a block rather than spread to the edges, so the squares stay a group on the
-		// card instead of four things pinned to its corners.
 		x := at.X + (at.W-side*len(on)-gap*(len(on)-1))/2
 		y := at.Y + (at.H-side)/2
 
@@ -249,7 +268,6 @@ func (p *BasicPages) Zone() *shell.Page {
 			rows := []widget.Row{{Label: "Home Assistant", Chosen: now == ""}}
 			acts := []func(int){p.useZone("")}
 
-			// Zones that are not in a region stand on their own, which today is UTC.
 			for _, z := range tz.In("") {
 				rows = append(rows, widget.Row{Label: z.Name, Chosen: z.Name == now})
 				acts = append(acts, p.useZone(z.Name))
@@ -296,19 +314,36 @@ func (p *BasicPages) Region(region string) *shell.Page {
 
 func (p *BasicPages) state() BasicState { return p.options.Preferences.Basic(p.options.UISize()) }
 func (p *BasicPages) setTheme(name string) {
-	if err := p.options.Preferences.Screen.Update(func(c *config.Screen) { c.Theme = name }); err == nil {
+	if err := p.options.Preferences.Screen.Update(
+		func(c *config.Screen) { c.Theme = name },
+	); err == nil {
 		p.options.Screen.Use(name)
 	}
 }
 func (p *BasicPages) setLanguage(tag string) {
 	say.Use(tag)
-	saveScreen(p.options.Preferences.Screen, p.options.Shell, "screen.language", func(c *config.Screen) { c.Language = tag })
+	saveScreen(
+		p.options.Preferences.Screen,
+		p.options.Shell,
+		"screen.language",
+		func(c *config.Screen) { c.Language = tag },
+	)
 }
 func (p *BasicPages) setKeyboard(v config.KeyboardSize) {
-	saveScreen(p.options.Preferences.Screen, p.options.Shell, "screen.keyboard", func(c *config.Screen) { c.Keyboard = v })
+	saveScreen(
+		p.options.Preferences.Screen,
+		p.options.Shell,
+		"screen.keyboard",
+		func(c *config.Screen) { c.Keyboard = v },
+	)
 }
 func (p *BasicPages) setVolumeEdge(v config.Edge) {
-	saveScreen(p.options.Preferences.Screen, p.options.Shell, "screen.volume", func(c *config.Screen) { c.Volume = v })
+	saveScreen(
+		p.options.Preferences.Screen,
+		p.options.Shell,
+		"screen.volume",
+		func(c *config.Screen) { c.Volume = v },
+	)
 }
 func (p *BasicPages) setStyle(v string) error { return p.options.Screen.Set("style", v) }
 func (p *BasicPages) setSize(v string) {

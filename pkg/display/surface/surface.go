@@ -61,7 +61,24 @@ const (
 	CryptCBCS  = 2
 )
 
-var Widevine = [16]byte{0xed, 0xef, 0x8b, 0xa9, 0x79, 0xd6, 0x4a, 0xce, 0xa3, 0xc8, 0x27, 0xdc, 0xd5, 0x1d, 0x21, 0xed}
+var Widevine = [16]byte{
+	0xed,
+	0xef,
+	0x8b,
+	0xa9,
+	0x79,
+	0xd6,
+	0x4a,
+	0xce,
+	0xa3,
+	0xc8,
+	0x27,
+	0xdc,
+	0xd5,
+	0x1d,
+	0x21,
+	0xed,
+}
 
 type Subsample struct{ Clear, Encrypted uint32 }
 
@@ -185,16 +202,16 @@ func Dial(path string) (*Client, error) {
 	}
 	cl := &Client{c: c, layers: map[uint32]*Layer{}}
 	if err := cl.send(opHello, magic, version); err != nil {
-		c.Close()
+		_ = c.Close()
 		return nil, err
 	}
 	words, _, err := cl.recv(opHello)
 	if err != nil {
-		c.Close()
+		_ = c.Close()
 		return nil, err
 	}
 	if len(words) != 3 || words[0] != version {
-		c.Close()
+		_ = c.Close()
 		return nil, ErrVersion
 	}
 	cl.Width, cl.Height = int(words[1]), int(words[2])
@@ -203,7 +220,6 @@ func Dial(path string) (*Client, error) {
 }
 
 func DialWait(path string, wait time.Duration) (*Client, error) {
-
 	deadline := time.Now().Add(wait)
 	for {
 		c, err := Dial(path)
@@ -245,7 +261,7 @@ func (c *Client) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for _, l := range c.layers {
-		syscall.Munmap(l.Pixels)
+		_ = syscall.Munmap(l.Pixels)
 	}
 	c.layers = nil
 	if err := c.c.Close(); !errors.Is(err, net.ErrClosed) {
@@ -257,7 +273,16 @@ func (c *Client) Close() error {
 func (c *Client) Create(id uint32, x, y, w, h, z int, flags uint32) (*Layer, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if err := c.send(opCreate, id, uint32(x), uint32(y), uint32(w), uint32(h), uint32(z), flags); err != nil {
+	if err := c.send(
+		opCreate,
+		id,
+		uint32(x),
+		uint32(y),
+		uint32(w),
+		uint32(h),
+		uint32(z),
+		flags,
+	); err != nil {
 		return nil, err
 	}
 	words, fd, err := c.recv(opCreate)
@@ -276,8 +301,14 @@ func (c *Client) Create(id uint32, x, y, w, h, z int, flags uint32) (*Layer, err
 		return nil, fmt.Errorf("surface: create sent no buffer")
 	}
 	stride := int(words[2])
-	pix, err := syscall.Mmap(fd, 0, stride*h, syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
-	syscall.Close(fd)
+	pix, err := syscall.Mmap(
+		fd,
+		0,
+		stride*h,
+		syscall.PROT_READ|syscall.PROT_WRITE,
+		syscall.MAP_SHARED,
+	)
+	_ = syscall.Close(fd)
 	if err != nil {
 		return nil, fmt.Errorf("surface: mapping layer %d: %w", id, err)
 	}
@@ -321,7 +352,17 @@ func (c *Client) Scene(ps []Placement) error {
 			vis = 1
 		}
 		alpha := uint32(max(0, min(1, p.Alpha)) * 1000)
-		words = append(words, p.ID, uint32(p.X), uint32(p.Y), uint32(p.W), uint32(p.H), uint32(p.Z), vis, alpha)
+		words = append(
+			words,
+			p.ID,
+			uint32(p.X),
+			uint32(p.Y),
+			uint32(p.W),
+			uint32(p.H),
+			uint32(p.Z),
+			vis,
+			alpha,
+		)
 	}
 	if err := c.send(opScene, words...); err != nil {
 		return err
@@ -343,7 +384,7 @@ func (c *Client) Destroy(id uint32) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if l := c.layers[id]; l != nil {
-		syscall.Munmap(l.Pixels)
+		_ = syscall.Munmap(l.Pixels)
 		delete(c.layers, id)
 	}
 	return c.send(opDestroy, id)
@@ -366,7 +407,17 @@ func MIME(codec uint32) string {
 func (c *Client) VideoOpen(id, codec uint32, w, h, z int, session uint32, decoder string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if err := c.sendData(opVideoOpen, []byte(decoder), id, codec, uint32(w), uint32(h), uint32(z), session, uint32(len(decoder))); err != nil {
+	if err := c.sendData(
+		opVideoOpen,
+		[]byte(decoder),
+		id,
+		codec,
+		uint32(w),
+		uint32(h),
+		uint32(z),
+		session,
+		uint32(len(decoder)),
+	); err != nil {
 		return err
 	}
 	ans, _, err := c.recv(opVideoOpen)
@@ -382,21 +433,42 @@ func (c *Client) VideoOpen(id, codec uint32, w, h, z int, session uint32, decode
 	return nil
 }
 
-func (c *Client) VideoSample(id uint32, pts time.Duration, flags uint32, data []byte) (Played, error) {
+func (c *Client) VideoSample(
+	id uint32,
+	pts time.Duration,
+	flags uint32,
+	data []byte,
+) (Played, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	us := uint64(pts / time.Microsecond)
-	if err := c.sendData(opVideoSample, data, id, uint32(us), uint32(us>>32), flags, uint32(len(data))); err != nil {
+	if err := c.sendData(
+		opVideoSample,
+		data,
+		id,
+		uint32(us),
+		uint32(us>>32),
+		flags,
+		uint32(len(data)),
+	); err != nil {
 		return Played{}, err
 	}
 	return c.played()
 }
 
-func (c *Client) VideoCrypt(id uint32, pts time.Duration, flags uint32, k *Crypt, data []byte) (Played, error) {
+func (c *Client) VideoCrypt(
+	id uint32,
+	pts time.Duration,
+	flags uint32,
+	k *Crypt,
+	data []byte,
+) (Played, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	us := uint64(pts / time.Microsecond)
-	words := append([]uint32{id, uint32(us), uint32(us >> 32), flags, uint32(len(data))}, k.words()...)
+	words := append(
+		[]uint32{id, uint32(us), uint32(us >> 32), flags, uint32(len(data))},
+		k.words()...)
 	if err := c.sendData(opVideoCrypt, data, words...); err != nil {
 		return Played{}, err
 	}
@@ -436,9 +508,20 @@ func (c *Client) VideoPlace(id uint32, x, y float32, m Matrix, z int, visible bo
 	if visible {
 		vis = 1
 	}
-	if err := c.send(opVideoPlace, id, math.Float32bits(x), math.Float32bits(y),
-		math.Float32bits(m.DsDx), math.Float32bits(m.DtDx), math.Float32bits(m.DtDy), math.Float32bits(m.DsDy),
-		uint32(z), vis); err != nil {
+	if err := c.send(
+		opVideoPlace,
+		id,
+		math.Float32bits(x),
+		math.Float32bits(y),
+		math.Float32bits(
+			m.DsDx,
+		),
+		math.Float32bits(m.DtDx),
+		math.Float32bits(m.DtDy),
+		math.Float32bits(m.DsDy),
+		uint32(z),
+		vis,
+	); err != nil {
 		return err
 	}
 	ans, _, err := c.recv(opVideoPlace)
@@ -540,7 +623,11 @@ func (c *Client) DRMProvision(scheme [16]byte) ([]byte, string, error) {
 	}
 	n := int(ans[1])
 	if n > len(data) {
-		return nil, "", fmt.Errorf("surface: provision request of %d bytes in a %d byte reply", n, len(data))
+		return nil, "", fmt.Errorf(
+			"surface: provision request of %d bytes in a %d byte reply",
+			n,
+			len(data),
+		)
 	}
 	return data[:n], string(data[n:]), nil
 }
@@ -589,17 +676,33 @@ func (c *Client) DRMClose(id uint32) error {
 func (c *Client) AudioOpen(id, session uint32, rate, channels int, config []byte) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if err := c.sendData(opAudioOpen, config, id, session, uint32(rate), uint32(channels), uint32(len(config))); err != nil {
+	if err := c.sendData(
+		opAudioOpen,
+		config,
+		id,
+		session,
+		uint32(rate),
+		uint32(channels),
+		uint32(len(config)),
+	); err != nil {
 		return err
 	}
 	return c.pairStatus(opAudioOpen)
 }
 
-func (c *Client) AudioSample(id uint32, pts time.Duration, flags uint32, k *Crypt, data []byte) (PCM, error) {
+func (c *Client) AudioSample(
+	id uint32,
+	pts time.Duration,
+	flags uint32,
+	k *Crypt,
+	data []byte,
+) (PCM, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	us := uint64(pts / time.Microsecond)
-	words := append([]uint32{id, uint32(us), uint32(us >> 32), flags, uint32(len(data))}, k.words()...)
+	words := append(
+		[]uint32{id, uint32(us), uint32(us >> 32), flags, uint32(len(data))},
+		k.words()...)
 	if err := c.sendData(opAudioSample, data, words...); err != nil {
 		return PCM{}, err
 	}
@@ -696,12 +799,12 @@ func (c *Client) GLRead(id uint32) ([]byte, int, int, error) {
 	}
 	w, h := int(ans[2]), int(ans[3])
 	m, err := syscall.Mmap(fd, 0, w*h*4, syscall.PROT_READ, syscall.MAP_SHARED)
-	syscall.Close(fd)
+	_ = syscall.Close(fd)
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("surface: mapping read of %d: %w", id, err)
 	}
 	pix := append([]byte(nil), m...)
-	syscall.Munmap(m)
+	_ = syscall.Munmap(m)
 	return pix, w, h, nil
 }
 
@@ -933,11 +1036,10 @@ func fill(c *net.UnixConn, b []byte) error {
 
 func closeFD(fd int) {
 	if fd >= 0 {
-		syscall.Close(fd)
+		_ = syscall.Close(fd)
 	}
 }
 
-// ScreenRead is the screen as SurfaceFlinger composed it, every layer included, as tight RGBA.
 func (c *Client) ScreenRead() ([]byte, int, int, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -962,21 +1064,20 @@ func (c *Client) ScreenRead() ([]byte, int, int, error) {
 	}
 	w, h := int(ans[1]), int(ans[2])
 	m, err := syscall.Mmap(fd, 0, w*h*4, syscall.PROT_READ, syscall.MAP_SHARED)
-	syscall.Close(fd)
+	_ = syscall.Close(fd)
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("surface: mapping the screen: %w", err)
 	}
 	pix := append([]byte(nil), m...)
-	syscall.Munmap(m)
+	_ = syscall.Munmap(m)
 	return pix, w, h, nil
 }
 
-// watch detects an idle helper disconnect .
 func (c *Client) watch() {
 	for c.Err() == nil {
 		time.Sleep(500 * time.Millisecond)
 		if c.hungUp() {
-			c.drop(errors.New("surface: the helper hung up"))
+			_ = c.drop(errors.New("surface: the helper hung up"))
 		}
 	}
 }

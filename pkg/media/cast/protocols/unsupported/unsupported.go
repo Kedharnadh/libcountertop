@@ -10,7 +10,10 @@ import (
 type Protocol struct{ out playback.Output }
 
 func init() {
-	cast.Define(cast.Unsupported, func(env cast.Env) cast.Protocol { return &Protocol{out: env.Output} })
+	cast.Define(
+		cast.Unsupported,
+		func(env cast.Env) cast.Protocol { return &Protocol{out: env.Output} },
+	)
 }
 
 func (p *Protocol) Name() string         { return cast.Unsupported }

@@ -2,7 +2,6 @@ package noise
 
 const NameFire = "Fire"
 
-// How many crackles arrive a second is itself wandering, so it comes in flurries and then almost stops.
 const (
 	fireRumble = 220.0
 

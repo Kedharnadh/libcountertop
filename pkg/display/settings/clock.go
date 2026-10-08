@@ -32,7 +32,12 @@ type ClockDependencies struct {
 type ClockPages struct{ options ClockDependencies }
 
 func NewClockPages(options ClockDependencies) *ClockPages { return &ClockPages{options: options} }
-func (p *ClockPages) open(view shell.View) func(int)      { return func(int) { p.options.Shell.Push(view) } }
+
+func (p *ClockPages) open(
+	view shell.View,
+) func(int) {
+	return func(int) { p.options.Shell.Push(view) }
+}
 func (p *ClockPages) Page() *shell.Page {
 	return &shell.Page{
 		Title: say.T("clock.title"),
@@ -40,11 +45,23 @@ func (p *ClockPages) Page() *shell.Page {
 			cfg := p.options.Preferences.ClockState()
 
 			return []widget.Row{
-					{Label: say.T("clock.face"), Kind: widget.Chevron, Value: cfg.Clock.Face.Label()},
+					{
+						Label: say.T("clock.face"),
+						Kind:  widget.Chevron,
+						Value: cfg.Clock.Face.Label(),
+					},
 					{Label: say.T("clock.position"), Kind: widget.Chevron,
 						Value: cfg.Clock.Position.Label()},
-					{Label: say.T("clock.size"), Kind: widget.Chevron, Value: cfg.Clock.Size.Label()},
-					{Label: say.T("clock.color"), Kind: widget.Chevron, Value: cfg.Clock.Ink.Label()},
+					{
+						Label: say.T("clock.size"),
+						Kind:  widget.Chevron,
+						Value: cfg.Clock.Size.Label(),
+					},
+					{
+						Label: say.T("clock.color"),
+						Kind:  widget.Chevron,
+						Value: cfg.Clock.Ink.Label(),
+					},
 					{Label: say.T("clock.date"), Kind: widget.Toggle, On: cfg.Clock.Date},
 				}, []func(int){
 					p.open(p.Faces(say.T("clock.face"),
@@ -59,7 +76,11 @@ func (p *ClockPages) Page() *shell.Page {
 	}
 }
 
-func (p *ClockPages) Faces(title string, now func() config.Face, use func(config.Face)) *shell.Page {
+func (p *ClockPages) Faces(
+	title string,
+	now func() config.Face,
+	use func(config.Face),
+) *shell.Page {
 	return &shell.Page{
 		Title: title,
 		Tiles: func() ([]widget.Cell, []func(int)) {
@@ -91,8 +112,6 @@ func (p *ClockPages) Preview(f config.Face) func(ui.Surface, ui.Rect, theme.Them
 		cfg := p.options.Preferences.ClockState()
 		reading := face.Read(time.Now(), cfg.Screen.Hours == config.TwentyFourHour)
 
-		// In the clock's own color, not the theme's. The row is previewing this device's clock, and
-		// a list of gray thumbnails picking a shape for an amber clock is previewing a different one.
 		face.Of(f).Draw(s, at, reading.Undated(), cfg.Clock.Ink.Over(palette))
 	}
 }
@@ -187,7 +206,13 @@ func (p *ClockPages) sizing(size config.Size) func(ui.Surface, ui.Rect, theme.Th
 	}
 }
 
-func (p *ClockPages) laid(s ui.Surface, box ui.Rect, palette theme.Theme, at config.Position, size config.Size) {
+func (p *ClockPages) laid(
+	s ui.Surface,
+	box ui.Rect,
+	palette theme.Theme,
+	at config.Position,
+	size config.Size,
+) {
 	cfg := p.options.Preferences.ClockState()
 	reading := face.Read(time.Now(), cfg.Screen.Hours == config.TwentyFourHour)
 

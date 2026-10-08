@@ -30,14 +30,23 @@ func newFake(t *testing.T) (*fake, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.RemoveAll(dir) })
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	path := filepath.Join(dir, "s")
 	ln, err := net.ListenUnix("unix", &net.UnixAddr{Name: path, Net: "unix"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	f := &fake{t: t, ln: ln, frames: make(chan []uint32, 8), scenes: make(chan []uint32, 8), gl: make(chan []uint32, 8), drm: make(chan []uint32, 8), shared: make(chan *os.File, 8), ver: version}
-	t.Cleanup(func() { ln.Close() })
+	f := &fake{
+		t:      t,
+		ln:     ln,
+		frames: make(chan []uint32, 8),
+		scenes: make(chan []uint32, 8),
+		gl:     make(chan []uint32, 8),
+		drm:    make(chan []uint32, 8),
+		shared: make(chan *os.File, 8),
+		ver:    version,
+	}
+	t.Cleanup(func() { _ = ln.Close() })
 	go f.serve()
 	return f, path
 }
@@ -63,7 +72,9 @@ func (f *fake) serve() {
 		case opCreate:
 			id, w, h := words[0], words[3], words[4]
 			file, _ := os.CreateTemp(f.t.TempDir(), "layer")
-			file.Truncate(int64(w * h * 4))
+			if err := file.Truncate(int64(w * h * 4)); err != nil {
+				f.t.Error(err)
+			}
 			f.shared <- file
 			answer(c, opCreate, syscall.UnixRights(int(file.Fd())), id, 0, w*4)
 		case opFrame:
@@ -131,7 +142,7 @@ func answerData(c *net.UnixConn, op uint32, data []byte, words ...uint32) {
 		binary.LittleEndian.PutUint32(buf[8+4*i:], w)
 	}
 	copy(buf[8+4*len(words):], data)
-	c.Write(buf)
+	_, _ = c.Write(buf)
 }
 
 func wordBytes(words []uint32) []byte {
@@ -149,7 +160,7 @@ func answer(c *net.UnixConn, op uint32, oob []byte, words ...uint32) {
 	for i, w := range words {
 		binary.LittleEndian.PutUint32(buf[8+4*i:], w)
 	}
-	c.WriteMsgUnix(buf, oob, nil)
+	_, _, _ = c.WriteMsgUnix(buf, oob, nil)
 }
 
 func TestAnotherVersionIsRefused(t *testing.T) {
@@ -176,7 +187,9 @@ func TestALayersPixelsAreSharedWithTheHelper(t *testing.T) {
 	}
 	l.Pixels[l.Stride+4] = 0xab
 	got := make([]byte, 32)
-	(<-f.shared).ReadAt(got, 0)
+	if _, err := (<-f.shared).ReadAt(got, 0); err != nil {
+		t.Fatal(err)
+	}
 	if got[20] != 0xab {
 		t.Errorf("the helper sees %x", got[20])
 	}
@@ -214,7 +227,9 @@ func TestASceneCarriesPlacement(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer c.Close()
-	if err := c.Scene([]Placement{{ID: 3, X: -5, Y: 6, W: 7, H: 8, Z: 9, Visible: true, Alpha: 0.5}}); err != nil {
+	if err := c.Scene(
+		[]Placement{{ID: 3, X: -5, Y: 6, W: 7, H: 8, Z: 9, Visible: true, Alpha: 0.5}},
+	); err != nil {
 		t.Fatal(err)
 	}
 	w := <-f.scenes
@@ -239,7 +254,8 @@ func TestGLOpsCarryTheirPayloads(t *testing.T) {
 	if err := c.GLTexture(4, 1, 2, 1, []byte{1, 2, 3, 4, 5, 6, 7, 8}); err != nil {
 		t.Fatal(err)
 	}
-	if w := <-f.gl; len(w) != 6 || w[1] != 1 || w[2] != 2 || w[4] != 0x04030201 || w[5] != 0x08070605 {
+	if w := <-f.gl; len(w) != 6 || w[1] != 1 || w[2] != 2 || w[4] != 0x04030201 ||
+		w[5] != 0x08070605 {
 		t.Errorf("texture %v", w)
 	}
 	if err := c.GLTexture(4, 0, 2, 2, make([]byte, 4)); err == nil {
@@ -251,7 +267,11 @@ func TestGLOpsCarryTheirPayloads(t *testing.T) {
 	if w := <-f.gl; len(w) != 7 || w[1] != WithLight || w[2] != 13 {
 		t.Errorf("program %v", w)
 	}
-	if err := c.GLValues(4, []float32{0.5, -1}, Glow{Amount: 0.9, Radius: 0.035, Passes: 2}); err != nil {
+	if err := c.GLValues(
+		4,
+		[]float32{0.5, -1},
+		Glow{Amount: 0.9, Radius: 0.035, Passes: 2},
+	); err != nil {
 		t.Fatal(err)
 	}
 	if w := <-f.gl; len(w) != 7 || w[1] != 2 || math.Float32frombits(w[2]) != 0.9 || w[4] != 2 ||
@@ -275,7 +295,10 @@ func TestADRMSessionCarriesItsSchemeCertificateAndChallenge(t *testing.T) {
 	if w[0] != 7 || w[1] != 1 || w[2] != uint32(len(cert)) {
 		t.Errorf("open %v", w[:3])
 	}
-	if b := wordBytes(w[3:]); !bytes.Equal(b[:16], Widevine[:]) || !bytes.Equal(b[16:16+len(cert)], cert) {
+	if b := wordBytes(
+		w[3:],
+	); !bytes.Equal(b[:16], Widevine[:]) ||
+		!bytes.Equal(b[16:16+len(cert)], cert) {
 		t.Errorf("scheme and cert %x", b)
 	}
 	got, err := c.DRMRequest(7, []byte{1, 2, 3, 4, 5, 6})
@@ -285,7 +308,8 @@ func TestADRMSessionCarriesItsSchemeCertificateAndChallenge(t *testing.T) {
 	if !bytes.Equal(got, fakeChallenge) {
 		t.Errorf("challenge %x, want %x", got, fakeChallenge)
 	}
-	if w := <-f.drm; w[0] != 7 || w[1] != 6 || !bytes.Equal(wordBytes(w[2:])[:6], []byte{1, 2, 3, 4, 5, 6}) {
+	if w := <-f.drm; w[0] != 7 || w[1] != 6 ||
+		!bytes.Equal(wordBytes(w[2:])[:6], []byte{1, 2, 3, 4, 5, 6}) {
 		t.Errorf("request %v", w)
 	}
 	if err := c.DRMProvide(7, []byte{0xaa}); err != nil {
@@ -303,7 +327,10 @@ func TestAnEncryptedSampleLaysOutItsCryptoBeforeItsData(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer c.Close()
-	k := &Crypt{Mode: CryptCENC, Subsamples: []Subsample{{Clear: 5, Encrypted: 11}, {Clear: 2, Encrypted: 0}}}
+	k := &Crypt{
+		Mode:       CryptCENC,
+		Subsamples: []Subsample{{Clear: 5, Encrypted: 11}, {Clear: 2, Encrypted: 0}},
+	}
 	for i := range 16 {
 		k.Key[i], k.IV[i] = byte(i), byte(0x80+i)
 	}
@@ -317,7 +344,8 @@ func TestAnEncryptedSampleLaysOutItsCryptoBeforeItsData(t *testing.T) {
 	}
 	w := <-f.drm
 	us := uint64(1500 * time.Millisecond / time.Microsecond)
-	if w[0] != 3 || w[1] != uint32(us) || w[2] != uint32(us>>32) || w[3] != SampleKey || w[4] != uint32(len(data)) {
+	if w[0] != 3 || w[1] != uint32(us) || w[2] != uint32(us>>32) || w[3] != SampleKey ||
+		w[4] != uint32(len(data)) {
 		t.Errorf("head %v", w[:5])
 	}
 	if w[5] != CryptCENC || w[8] != 2 {
@@ -384,7 +412,7 @@ func TestAHelperHangingUpIsReportedOnce(t *testing.T) {
 		}
 		read(c)
 		answer(c, opHello, nil, version, 960, 480)
-		c.Close()
+		_ = c.Close()
 	}()
 
 	c, err := Dial(path)
@@ -395,12 +423,12 @@ func TestAHelperHangingUpIsReportedOnce(t *testing.T) {
 	c.Dropped.Listen(func(err error) { drops = append(drops, err) })
 
 	for range 3 {
-		c.Frame(1, 1, []Rect{{W: 1, H: 1}})
+		_ = c.Frame(1, 1, []Rect{{W: 1, H: 1}})
 	}
 	if len(drops) != 1 || c.Err() == nil || !errors.Is(c.Err(), drops[0]) {
 		t.Fatalf("drops %v, err %v", drops, c.Err())
 	}
-	c.Close()
+	_ = c.Close()
 	if len(drops) != 1 {
 		t.Errorf("closing reported %d drops", len(drops))
 	}
@@ -414,7 +442,7 @@ func TestClosingIsNotADrop(t *testing.T) {
 	}
 	dropped := false
 	c.Dropped.Listen(func(error) { dropped = true })
-	c.Close()
+	_ = c.Close()
 	if dropped || c.Err() == nil {
 		t.Errorf("dropped %v, err %v", dropped, c.Err())
 	}
@@ -452,7 +480,7 @@ func TestVersion5RefusesVersion4Helper(t *testing.T) {
 	f.ver = 4
 	c, err := Dial(path)
 	if c != nil {
-		c.Close()
+		_ = c.Close()
 	}
 	if !errors.Is(err, ErrVersion) {
 		t.Fatalf("want ErrVersion, got %v", err)

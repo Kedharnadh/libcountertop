@@ -30,7 +30,11 @@ func TestAnUnknownThemeFallsBackToTheDefault(t *testing.T) {
 
 func TestEachStyleBringsItsTypeface(t *testing.T) {
 	for _, st := range style.All {
-		if got := Look(st.Name, theme.DefaultName, SizeLarge).Cfg.TextStyleDef.Family; got != st.Family {
+		if got := Look(
+			st.Name,
+			theme.DefaultName,
+			SizeLarge,
+		).Cfg.TextStyleDef.Family; got != st.Family {
 			t.Errorf("%s draws in %q, want %q", st.Name, got, st.Family)
 		}
 	}
@@ -40,7 +44,11 @@ func TestSizesDiffer(t *testing.T) {
 	large := Look(style.Standard, "", SizeLarge)
 	compact := Look(style.Standard, "", SizeCompact)
 	if large.Cfg.SizeTextMedium <= compact.Cfg.SizeTextMedium {
-		t.Errorf("large text %v is not bigger than compact %v", large.Cfg.SizeTextMedium, compact.Cfg.SizeTextMedium)
+		t.Errorf(
+			"large text %v is not bigger than compact %v",
+			large.Cfg.SizeTextMedium,
+			compact.Cfg.SizeTextMedium,
+		)
 	}
 }
 
@@ -49,8 +57,20 @@ func TestDefaultTakesEachStylesPalette(t *testing.T) {
 		if _, ok := theme.ByName(st.Palette); !ok {
 			t.Errorf("%s recommends %q, which is not a theme", st.Name, st.Palette)
 		}
-		if got := Look(st.Name, style.ThemeDefault, SizeLarge).Cfg.Name; !strings.Contains(got, "/"+st.Palette+"/") {
-			t.Errorf("%s with the default theme made %q, want its palette %q", st.Name, got, st.Palette)
+		if got := Look(
+			st.Name,
+			style.ThemeDefault,
+			SizeLarge,
+		).Cfg.Name; !strings.Contains(
+			got,
+			"/"+st.Palette+"/",
+		) {
+			t.Errorf(
+				"%s with the default theme made %q, want its palette %q",
+				st.Name,
+				got,
+				st.Palette,
+			)
 		}
 	}
 }

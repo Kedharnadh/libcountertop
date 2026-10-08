@@ -2,12 +2,14 @@ package boot
 
 import (
 	"fmt"
+	"strings"
+	"testing"
+
 	gui "github.com/go-gui-org/go-gui/gui"
+
 	backend "github.com/ygelfand/libcountertop/pkg/display/gogui"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/runtime/startup"
-	"strings"
-	"testing"
 )
 
 type sink struct {
@@ -36,15 +38,33 @@ func (s *sink) Frame(_ int, _ [4]float32, _ []float32, runs []uint32) (uint32, u
 }
 func TestProgressFramesContainRowsVersionAndSkip(t *testing.T) {
 	for _, size := range [][2]int{{1920, 1200}, {1200, 1920}, {960, 480}} {
-		s := &Scene{width: size[0], height: size[1], palette: theme.Default(), version: "test-build", skip: "Skip"}
-		s.w = gui.SimpleWindow("test", size[0], size[1], s, func(w *gui.Window) { w.SetView(s.view) })
+		s := &Scene{
+			width:   size[0],
+			height:  size[1],
+			palette: theme.Default(),
+			version: "test-build",
+			skip:    "Skip",
+		}
+		s.w = gui.SimpleWindow(
+			"test",
+			size[0],
+			size[1],
+			s,
+			func(w *gui.Window) { w.SetView(s.view) },
+		)
 		r, err := backend.New(&sink{}, s.w)
 		if err != nil {
 			t.Fatal(err)
 		}
 		s.r = r
 		s.w.Config.OnInit(s.w)
-		if err := s.Draw([]startup.Progress{{Name: "Wi-Fi", Doing: "joining"}, {Name: "Audio", Failed: true, Doing: "unavailable"}}, true); err != nil {
+		if err := s.Draw(
+			[]startup.Progress{
+				{Name: "Wi-Fi", Doing: "joining"},
+				{Name: "Audio", Failed: true, Doing: "unavailable"},
+			},
+			true,
+		); err != nil {
 			t.Fatal(err)
 		}
 		var labels strings.Builder
@@ -86,7 +106,12 @@ func TestBootTextUsesBundledFontAndPaletteBeforeMainGUI(t *testing.T) {
 			t.Fatal(err)
 		}
 		if out.glyphs == 0 || !out.uploaded {
-			t.Errorf("dark=%t: no rasterized glyphs: batches=%d atlas=%t", dark, out.glyphs, out.uploaded)
+			t.Errorf(
+				"dark=%t: no rasterized glyphs: batches=%d atlas=%t",
+				dark,
+				out.glyphs,
+				out.uploaded,
+			)
 		}
 		found := false
 		for _, cmd := range s.w.Renderers() {
@@ -114,7 +139,13 @@ func TestBootLayoutFitsPortraitAndLandscapeWithOversizedTheme(t *testing.T) {
 		for _, dark := range []bool{false, true} {
 			p := theme.Default().On(dark)
 			s := &Scene{width: size[0], height: size[1], palette: p, version: "build", skip: "Skip"}
-			s.w = gui.SimpleWindow("test", size[0], size[1], s, func(w *gui.Window) { w.SetView(s.view) })
+			s.w = gui.SimpleWindow(
+				"test",
+				size[0],
+				size[1],
+				s,
+				func(w *gui.Window) { w.SetView(s.view) },
+			)
 			cfg := bootTheme(p).Cfg
 			cfg.TextStyleDef.Size = 200
 			cfg.SpacingSmall = 100
@@ -128,7 +159,10 @@ func TestBootLayoutFitsPortraitAndLandscapeWithOversizedTheme(t *testing.T) {
 			s.w.Config.OnInit(s.w)
 			progress := make([]startup.Progress, 18)
 			for i := range progress {
-				progress[i] = startup.Progress{Name: fmt.Sprintf("part-%02d", i), Doing: "waiting for a deliberately very long network and hardware status"}
+				progress[i] = startup.Progress{
+					Name:  fmt.Sprintf("part-%02d", i),
+					Doing: "waiting for a deliberately very long network and hardware status",
+				}
 			}
 			if err := s.Draw(progress, true); err != nil {
 				t.Fatal(err)
@@ -151,10 +185,25 @@ func TestBootLayoutFitsPortraitAndLandscapeWithOversizedTheme(t *testing.T) {
 				}
 				found++
 				if cmd.FontSize > 22 {
-					t.Errorf("%v dark=%t: %q font size %v exceeds cap", size, dark, cmd.Text, cmd.FontSize)
+					t.Errorf(
+						"%v dark=%t: %q font size %v exceeds cap",
+						size,
+						dark,
+						cmd.Text,
+						cmd.FontSize,
+					)
 				}
 				if cmd.Y+cmd.H > float32(skip.Y) || cmd.X < 0 || cmd.X+cmd.W > float32(size[0])+1 {
-					t.Errorf("%v dark=%t: text %q outside progress area: x=%v y=%v w=%v h=%v", size, dark, cmd.Text, cmd.X, cmd.Y, cmd.W, cmd.H)
+					t.Errorf(
+						"%v dark=%t: text %q outside progress area: x=%v y=%v w=%v h=%v",
+						size,
+						dark,
+						cmd.Text,
+						cmd.X,
+						cmd.Y,
+						cmd.W,
+						cmd.H,
+					)
 				}
 			}
 			if found != 36 {

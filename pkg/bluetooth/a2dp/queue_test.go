@@ -6,8 +6,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/avrcp"
 )
 
-// The now playing list arrives whole, current track included, and the card shows what is behind it.
-
 func list() []avrcp.Item {
 	return []avrcp.Item{
 		{UID: 11, Track: avrcp.Track{Title: "Black Cow"}},
@@ -38,8 +36,6 @@ func same(t *testing.T, got []avrcp.Item, want ...string) {
 	}
 }
 
-// A uid is a position, not a name: the same few come round as the window moves. A handle learned
-// for one listing names whatever is at that position in the next.
 func TestANewListingForgetsTheOldHandles(t *testing.T) {
 	s := testSink()
 
@@ -63,25 +59,21 @@ func TestTheUidSaysWhereInTheListWeAre(t *testing.T) {
 	same(t, after(list(), state), "Deacon Blues")
 }
 
-// A phone that keeps no list of its own sends no uid, and the title is what is left to match on.
 func TestWithoutAUidTheTitleIsWhatMatches(t *testing.T) {
 	state := avrcp.State{Track: avrcp.Track{Title: "Aja"}}
 	same(t, after(list(), state), "Deacon Blues")
 }
 
-// The uid a phone sends when it has stopped is all ones, which is not an entry.
 func TestNothingPlayingLeavesTheWholeList(t *testing.T) {
 	state := avrcp.State{UID: nothing}
 	same(t, after(list(), state), "Black Cow", "Aja", "Deacon Blues")
 }
 
-// A track that is not in the list is a list that has not started, not an empty one.
 func TestATrackThatIsNotInTheListLeavesItWhole(t *testing.T) {
 	state := avrcp.State{UID: 99, Track: avrcp.Track{Title: "Peg"}}
 	same(t, after(list(), state), "Black Cow", "Aja", "Deacon Blues")
 }
 
-// The last entry playing means there is nothing behind it.
 func TestTheEndOfTheListIsEmpty(t *testing.T) {
 	state := avrcp.State{UID: 13, Track: avrcp.Track{Title: "Deacon Blues"}}
 	same(t, after(list(), state))

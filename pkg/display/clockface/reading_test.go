@@ -40,8 +40,6 @@ func TestRead(t *testing.T) {
 	}
 }
 
-// A 24 hour clock has no am or pm to show, and leaving one on would be read as the wrong time of
-// day.
 func TestTwentyFourHourHasNoSuffix(t *testing.T) {
 	for hour := range 24 {
 		if got := Read(at(hour, 0), true); got.Suffix != "" {
@@ -56,7 +54,6 @@ func TestDate(t *testing.T) {
 	}
 }
 
-// The reading is what decides whether to repaint, so two different minutes must not look the same.
 func TestTheReadingChangesWithTheMinute(t *testing.T) {
 	a := Read(at(9, 5), true).String()
 	b := Read(at(9, 6), true).String()
@@ -66,7 +63,6 @@ func TestTheReadingChangesWithTheMinute(t *testing.T) {
 	}
 }
 
-// Within a minute nothing changes, which is what stops the panel being redrawn every second.
 func TestTheReadingIsSteadyWithinAMinute(t *testing.T) {
 	a := Read(time.Date(2026, time.September, 19, 9, 5, 0, 0, time.UTC), true).String()
 	b := Read(time.Date(2026, time.September, 19, 9, 5, 59, 0, time.UTC), true).String()
@@ -76,8 +72,6 @@ func TestTheReadingIsSteadyWithinAMinute(t *testing.T) {
 	}
 }
 
-// Dropping the date has to change the reading, or the dashboard will not notice the setting moved
-// and will leave the old screen up.
 func TestUndatedIsADifferentReading(t *testing.T) {
 	r := Read(at(9, 5), true)
 
@@ -95,7 +89,6 @@ func TestUndatedIsADifferentReading(t *testing.T) {
 	}
 }
 
-// The faces that stack or box the pair only look right if both are the same width.
 func TestLinesPadTheHour(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -129,8 +122,6 @@ func TestLinesPadTheHour(t *testing.T) {
 	}
 }
 
-// Anything that is not a time falls through to a face that can draw it, rather than drawing half
-// of one.
 func TestSomethingWithNoColonDoesNotSplit(t *testing.T) {
 	if _, _, ok := lines(Reading{Time: "soon"}); ok {
 		t.Error("a reading with no colon split anyway")
@@ -140,8 +131,6 @@ func TestSomethingWithNoColonDoesNotSplit(t *testing.T) {
 	}
 }
 
-// The analog and words faces need numbers, and they take them from the same strings the other faces
-// draw so every face is showing the same minute.
 func TestClockReadsTheReading(t *testing.T) {
 	tests := []struct {
 		at           int

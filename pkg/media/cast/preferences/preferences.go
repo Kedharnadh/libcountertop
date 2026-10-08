@@ -1,5 +1,3 @@
-// Package preferences supplies the process-wide preferences already used by Cast protocols.
-// Products bind their existing config store; this package owns no files or defaults on a device.
 package preferences
 
 import "sync"
@@ -24,7 +22,6 @@ type Provider struct {
 var mu sync.RWMutex
 var current Provider
 
-// Configure binds the product before protocols are constructed.
 func Configure(provider Provider) { mu.Lock(); current = provider; mu.Unlock() }
 func snapshot() Provider          { mu.RLock(); defer mu.RUnlock(); return current }
 func Get() Settings {

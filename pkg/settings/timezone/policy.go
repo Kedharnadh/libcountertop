@@ -1,10 +1,12 @@
 package timezone
 
 import (
+	"log/slog"
+
 	esphome "github.com/ygelfand/go-esphome-device"
+
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	tz "github.com/ygelfand/libcountertop/pkg/timezone"
-	"log/slog"
 )
 
 const FollowHome = "Home Assistant"
@@ -14,7 +16,6 @@ type PolicyOptions struct {
 	Home, Chosen func(string) error
 }
 
-// Policy applies a persisted override ahead of the server's timezone.
 type Policy struct {
 	options PolicyOptions
 	Select  *esphome.Select
@@ -22,7 +23,15 @@ type Policy struct {
 
 func NewPolicy(options PolicyOptions) *Policy {
 	p := &Policy{options: options}
-	p.Select = &esphome.Select{Base: esphome.Base{ObjectID: "time_zone", Name: "Time zone", Icon: "mdi:map-clock", Category: esphome.CategoryConfig}, Options: append([]string{FollowHome}, tz.Names()...)}
+	p.Select = &esphome.Select{
+		Base: esphome.Base{
+			ObjectID: "time_zone",
+			Name:     "Time zone",
+			Icon:     "mdi:map-clock",
+			Category: esphome.CategoryConfig,
+		},
+		Options: append([]string{FollowHome}, tz.Names()...),
+	}
 	p.Select.OnCommand = func(name string) {
 		if name == FollowHome {
 			name = ""

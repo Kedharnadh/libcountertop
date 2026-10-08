@@ -3,21 +3,8 @@
 #include "textflag.h"
 
 // func dotVFP(a, b *float32, n int) float32
-//
-// Scalar VFP rather than NEON: Go's ARM assembler has no NEON mnemonics at all, and a kernel written
-// as raw WORD encodings is one nobody can review.
-//
-// Four independent accumulators, sixteen elements an iteration. The target is a Cortex-A53, two-wide
-// and in-order, and a multiply-accumulate that feeds itself stalls on its own latency — four chains
-// cover it.
-//
-// The loop is issue bound rather than latency bound, measured: spacing the loads further from the
-// multiplies that read them is worth under a percent, because one element costs two loads and a load
-// is an instruction. What is left to win is the loop's own arithmetic, which is why sixteen elements
-// go round at a time and not eight.
-//
-// The pointers move by hand. VLDR has no post-indexed form — MOVF.P assembles without the writeback
-// and silently reads the same element every iteration.
+// Go's ARM assembler has no NEON mnemonics.
+// VLDR has no post-indexed form; MOVF.P assembles without the writeback and rereads one element.
 TEXT ·dotVFP(SB), NOSPLIT, $0-16
 	MOVW	a+0(FP), R0
 	MOVW	b+4(FP), R1
@@ -28,9 +15,7 @@ TEXT ·dotVFP(SB), NOSPLIT, $0-16
 	MOVF	$(0.0), F2
 	MOVF	$(0.0), F3
 
-// Twelve registers hold six pairs, so a block is loaded, half of it consumed, and the registers
-// that frees refilled while the other half is still going. An in-order core reads its operands at
-// issue, so a register is free to be loaded again on the instruction after the one that read it.
+// An in-order core reads operands at issue: a register can be reloaded by the next instruction.
 sixteen:
 	CMP	$16, R2
 	BLT	eight
@@ -87,7 +72,6 @@ sixteen:
 	MULAF	F13, F12, F2
 	MULAF	F15, F14, F3
 
-	// Between the multiplies rather than after them: the integer pipe is idle here.
 	ADD	$64, R0
 	ADD	$64, R1
 	SUB	$16, R2

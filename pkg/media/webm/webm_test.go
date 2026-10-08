@@ -22,7 +22,17 @@ func el(id uint64, body []byte) []byte {
 		out = append(out, byte(id))
 	}
 	n := uint64(len(body))
-	out = append(out, 0x08, byte(n>>48), byte(n>>40), byte(n>>32), byte(n>>24), byte(n>>16), byte(n>>8), byte(n))
+	out = append(
+		out,
+		0x08,
+		byte(n>>48),
+		byte(n>>40),
+		byte(n>>32),
+		byte(n>>24),
+		byte(n>>16),
+		byte(n>>8),
+		byte(n),
+	)
 	out[len(out)-8] = 0x01
 	return append(out, body...)
 }
@@ -137,19 +147,29 @@ func TestAVideoReaderTakesTheVideoTrack(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if f.Track != w.Track || f.Time != w.Time || string(f.Data) != string(w.Data) || f.Key != w.Key {
+		if f.Track != w.Track || f.Time != w.Time || string(f.Data) != string(w.Data) ||
+			f.Key != w.Key {
 			t.Errorf("frame %+v, want %+v", f, w)
 		}
 	}
 }
 
 func TestTheIndexJumpsStraightToACluster(t *testing.T) {
-	tracks := el(idTracks, el(idTrackEntry, cat(el(idTrackNumber, u(1)), el(idCodecID, []byte("V_VP9")))))
+	tracks := el(
+		idTracks,
+		el(idTrackEntry, cat(el(idTrackNumber, u(1)), el(idCodecID, []byte("V_VP9")))),
+	)
 	c1 := el(idCluster, cat(el(idTimecode, u(0)), el(idSimpleBlock, block(1, 0, "first"))))
 	c2 := el(idCluster, cat(el(idTimecode, u(5000)), el(idSimpleBlock, block(1, 0, "second"))))
 	cues := func(p1, p2 uint64) []byte {
 		point := func(tm, pos uint64) []byte {
-			return el(idCuePoint, cat(el(idCueTime, u(tm)), el(idCueTrackPositions, cat(el(0xF7, u(1)), el(idCueClusterPosition, u(pos))))))
+			return el(
+				idCuePoint,
+				cat(
+					el(idCueTime, u(tm)),
+					el(idCueTrackPositions, cat(el(0xF7, u(1)), el(idCueClusterPosition, u(pos)))),
+				),
+			)
 		}
 		return el(idCues, cat(point(0, p1), point(5000, p2)))
 	}
@@ -170,7 +190,13 @@ func TestTheIndexJumpsStraightToACluster(t *testing.T) {
 	}
 	off, at, ok := r.Cue(7000 * 1_000_000)
 	if !ok || at != 5000*1_000_000 || off != segStart+int64(p2) {
-		t.Fatalf("cue for 7s: offset %d at %d ok %v, want %d at 5s", off, at, ok, segStart+int64(p2))
+		t.Fatalf(
+			"cue for 7s: offset %d at %d ok %v, want %d at 5s",
+			off,
+			at,
+			ok,
+			segStart+int64(p2),
+		)
 	}
 	r.Restart(bytes.NewReader(file[off:]), off)
 	f, err := r.Next()

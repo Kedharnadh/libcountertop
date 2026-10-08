@@ -42,10 +42,15 @@ func TestProductIdentityIsPreservedInHeadersSDPAndSenderReports(t *testing.T) {
 			if !strings.Contains(header.String(), "Server: "+id.Name+"\r\n") {
 				t.Fatal(header.String())
 			}
-			// SETUP is where the server's identity is propagated to its RTP session.
 			c := &conn{srv: srv, c: left}
 			srv.Handle("main", st)
-			status, _, _ := c.handle(&request{method: "SETUP", url: "rtsp://127.0.0.1/main/trackID=0", header: map[string]string{"transport": "RTP/AVP/TCP;unicast;interleaved=0-1"}})
+			status, _, _ := c.handle(
+				&request{
+					method: "SETUP",
+					url:    "rtsp://127.0.0.1/main/trackID=0",
+					header: map[string]string{"transport": "RTP/AVP/TCP;unicast;interleaved=0-1"},
+				},
+			)
 			if status != 200 || c.ses.cnamePrefix != id.CNAMEPrefix {
 				t.Fatalf("status=%d session=%+v", status, c.ses)
 			}

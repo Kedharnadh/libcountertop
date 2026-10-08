@@ -1,6 +1,7 @@
 package dhcp
 
 import (
+	"context"
 	"net"
 	"testing"
 	"time"
@@ -26,9 +27,6 @@ func TestARenewalIsARequest(t *testing.T) {
 	}
 }
 
-// What tells a renewal apart from the request that follows an offer. RFC 2131 table 5: ciaddr
-// carries an address the client is already using, and the requested-address option is for one it
-// has not got yet. A server reading the option would treat this as a new allocation.
 func TestTheAddressIsInCiaddrAndNotRequested(t *testing.T) {
 	msg := renewal(t)
 
@@ -40,9 +38,6 @@ func TestTheAddressIsInCiaddrAndNotRequested(t *testing.T) {
 	}
 }
 
-// RFC 2131 table 5 again: no server identifier on a renewal. Unicast it is already addressed to the
-// one server, and broadcast it must not be, or the only server that could answer a rebinding client
-// is the one that has stopped answering.
 func TestARenewalNamesNoServer(t *testing.T) {
 	for _, broadcasting := range []bool{false, true} {
 		msg, err := renewMessage(us, held, broadcasting, "speaker")
@@ -55,8 +50,6 @@ func TestARenewalNamesNoServer(t *testing.T) {
 	}
 }
 
-// A client that holds an address can be replied to directly, so it does not ask for the answer to
-// be broadcast at the whole segment.
 func TestARenewalDoesNotAskToBeBroadcastAt(t *testing.T) {
 	if renewal(t).IsBroadcast() {
 		t.Error("a renewal asked for a broadcast reply")
@@ -84,8 +77,6 @@ func ack(t *testing.T, opts ...dhcpv4.Modifier) *dhcpv4.DHCPv4 {
 	return msg
 }
 
-// A lease with no times of its own renews halfway through and rebinds at seven eighths, which is
-// what RFC 2131 section 4.4.5 says a client that was told nothing should do.
 func TestATimelessLeaseFallsBackToHalfAndSevenEighths(t *testing.T) {
 	life := 2 * time.Hour
 	got, err := leaseFrom(ack(t, dhcpv4.WithLeaseTime(uint32(life.Seconds()))))
@@ -104,9 +95,6 @@ func TestATimelessLeaseFallsBackToHalfAndSevenEighths(t *testing.T) {
 	within("expiry", got.Expires, life)
 }
 
-// Servers are allowed to say anything, and some say T2 at or before T1. Left as given, the renewal
-// would find the rebinding deadline already past and broadcast without ever asking the server that
-// granted the lease.
 func TestARebindTimeThatIsNotAfterRenewIsPutInOrder(t *testing.T) {
 	got, err := leaseFrom(ack(t,
 		dhcpv4.WithLeaseTime(3600),
@@ -125,8 +113,6 @@ func TestARebindTimeThatIsNotAfterRenewIsPutInOrder(t *testing.T) {
 	}
 }
 
-// A lease with no subnet mask is not one: the rest of it cannot be used without knowing what is
-// local, and guessing classful is how a device ends up unable to reach its own gateway.
 func TestALeaseWithNoMaskIsRefused(t *testing.T) {
 	msg, err := dhcpv4.New(
 		dhcpv4.WithMessageType(dhcpv4.MessageTypeAck),
@@ -142,4 +128,43 @@ func TestALeaseWithNoMaskIsRefused(t *testing.T) {
 
 func seconds(v uint32) []byte {
 	return []byte{byte(v >> 24), byte(v >> 16), byte(v >> 8), byte(v)}
+}
+
+func TestARebindReplyFromAnotherServerIsHeard(t *testing.T) {
+	loop := net.IPv4(127, 0, 0, 1)
+	listen := func() *net.UDPConn {
+		c, err := net.ListenUDP("udp4", &net.UDPAddr{IP: loop})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = c.Close() })
+		return c
+	}
+	asked, other, client := listen(), listen(), listen()
+
+	msg := renewal(t)
+	go func() {
+		buf := make([]byte, 1500)
+		_ = asked.SetDeadline(time.Now().Add(2 * time.Second))
+		n, from, err := asked.ReadFromUDP(buf)
+		if err != nil {
+			return
+		}
+		req, err := dhcpv4.FromBytes(buf[:n])
+		if err != nil {
+			return
+		}
+		reply := ack(t, dhcpv4.WithTransactionID(req.TransactionID), dhcpv4.WithLeaseTime(3600))
+		_, _ = other.WriteToUDP(reply.ToBytes(), from)
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	got, err := exchange(ctx, client, asked.LocalAddr().(*net.UDPAddr), msg, held)
+	if err != nil {
+		t.Fatalf("exchange: %v", err)
+	}
+	if !got.Address.IP.Equal(held) {
+		t.Errorf("leased %s, want %s", got.Address.IP, held)
+	}
 }

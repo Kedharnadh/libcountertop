@@ -6,9 +6,15 @@ import (
 
 const Hifi = "hifi"
 
-var hifiStyle = Style{Name: Hifi, Palette: "Braun", Family: sans, Kit: hifi{}, Shape: func(c *gogui.ThemeCfg) {
-	c.Radius, c.RadiusSmall, c.RadiusMedium, c.RadiusLarge = 4, 3, 4, 6
-}}
+var hifiStyle = Style{
+	Name:    Hifi,
+	Palette: "Braun",
+	Family:  sans,
+	Kit:     hifi{},
+	Shape: func(c *gogui.ThemeCfg) {
+		c.Radius, c.RadiusSmall, c.RadiusMedium, c.RadiusLarge = 4, 3, 4, 6
+	},
+}
 
 type hifi struct{}
 
@@ -145,14 +151,22 @@ func fader(vertical bool, marks []Span) func(gogui.SliderLookState) gogui.Slider
 
 func (hifi) Progress(cfg *gogui.ProgressBarCfg) {
 	t := gogui.CurrentTheme().Cfg
-	cfg.Radius, cfg.Color, cfg.ColorBar = gogui.RadiusSmall, t.ColorTextSecondary.WithOpacity(0.3), t.ColorAccent
+	cfg.Radius, cfg.Color, cfg.ColorBar = gogui.RadiusSmall, t.ColorTextSecondary.WithOpacity(
+		0.3,
+	), t.ColorAccent
 }
 
 func (hifi) Field(cfg *gogui.InputCfg) {
 	cfg.Radius, cfg.SizeBorder = gogui.RadiusSmall, gogui.BorderPx(1)
 }
 
-func (k hifi) Tab(cfg *gogui.ContainerCfg, st *gogui.TextStyle, state State) { k.Key(cfg, st, state) }
+func (k hifi) Tab(
+	cfg *gogui.ContainerCfg,
+	st *gogui.TextStyle,
+	state State,
+) {
+	k.Key(cfg, st, state)
+}
 
 func (hifi) Tile(cfg *gogui.ContainerCfg, state State) {
 	t := gogui.CurrentTheme().Cfg
@@ -168,7 +182,11 @@ func (hifi) Row(cfg *gogui.ContainerCfg, state State) {
 	cfg.Radius = gogui.RadiusSmall
 	switch state {
 	case Chosen:
-		cfg.Color, cfg.ColorBorder, cfg.SizeBorder = t.ColorAccent.WithOpacity(0.12), t.ColorAccent, gogui.BorderPx(1)
+		cfg.Color, cfg.ColorBorder, cfg.SizeBorder = t.ColorAccent.WithOpacity(
+			0.12,
+		), t.ColorAccent, gogui.BorderPx(
+			1,
+		)
 	case Partial:
 		cfg.ColorBorder, cfg.SizeBorder = t.ColorTextSecondary, gogui.BorderPx(1)
 	}

@@ -1,4 +1,3 @@
-// Package vectors supplies the shared SBC fixtures to integration tests.
 package vectors
 
 import "embed"

@@ -8,12 +8,23 @@ import (
 )
 
 func TestTheSetupEndpointServesTheDescription(t *testing.T) {
-	e := NewEureka(Device{ID: "266a1baa915744d5e2531b227c645271", Name: "dev", Model: "Panel"}, "Lenovo", "1")
+	e := NewEureka(
+		Device{ID: "266a1baa915744d5e2531b227c645271", Name: "dev", Model: "Panel"},
+		"Lenovo",
+		"1",
+	)
 	var seen []int
-	h := SetupHandler(func() Eureka { return e }, func() []byte { return []byte("png") }, func(_ *http.Request, status int) { seen = append(seen, status) })
+	h := SetupHandler(
+		func() Eureka { return e },
+		func() []byte { return []byte("png") },
+		func(_ *http.Request, status int) { seen = append(seen, status) },
+	)
 
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest("GET", "/setup/eureka_info?params=name,device_info.ssdp_udn", nil))
+	h.ServeHTTP(
+		rec,
+		httptest.NewRequest("GET", "/setup/eureka_info?params=name,device_info.ssdp_udn", nil),
+	)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d", rec.Code)
 	}
@@ -56,7 +67,8 @@ func TestTheSetupEndpointServesTheIcon(t *testing.T) {
 	h := SetupHandler(nil, func() []byte { return []byte("png") }, nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest("GET", IconPath, nil))
-	if rec.Code != http.StatusOK || rec.Body.String() != "png" || rec.Header().Get("Content-Type") != "image/png" {
+	if rec.Code != http.StatusOK || rec.Body.String() != "png" ||
+		rec.Header().Get("Content-Type") != "image/png" {
 		t.Errorf("icon: %d %q %q", rec.Code, rec.Body.String(), rec.Header().Get("Content-Type"))
 	}
 }

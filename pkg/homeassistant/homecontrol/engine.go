@@ -12,7 +12,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
 
-// Client supplies Home Assistant actions, discovery data and access notifications.
 type Client interface {
 	Entities(context.Context, ha.Filter) ([]ha.Entity, error)
 	Labels(context.Context) ([]ha.Label, error)
@@ -25,7 +24,6 @@ type States interface {
 	Follow(string, string) *states.Value
 }
 
-// Dependencies is the home controller's access to saved settings and device services.
 type Dependencies struct {
 	Settings storage.Section[config.Home]
 	Client   Client
@@ -47,9 +45,26 @@ type Engine struct {
 func New(o Dependencies) *Engine {
 	ctx, stop := context.WithCancel(context.Background())
 	e := &Engine{options: o, ctx: ctx, stop: stop, home: &Home{}}
-	e.selections = []Selection{{Key: "lights", Filter: ha.Filter{Domains: []string{"light"}}, engine: e}, {Key: "switches", Filter: ha.Filter{Domains: []string{"switch"}}, engine: e}}
-	e.cache = &cache{ctx: ctx, got: map[string]*result{}, fetch: e.fetch, now: time.Now, done: o.Shell.Redraw}
-	e.board = &Board{engine: e, open: map[string]bool{}, values: map[string]*states.Value{}, from: e.cache, follow: o.States.Follow, call: o.Client.Call, redraw: o.Shell.Redraw}
+	e.selections = []Selection{
+		{Key: "lights", Filter: ha.Filter{Domains: []string{"light"}}, engine: e},
+		{Key: "switches", Filter: ha.Filter{Domains: []string{"switch"}}, engine: e},
+	}
+	e.cache = &cache{
+		ctx:   ctx,
+		got:   map[string]*result{},
+		fetch: e.fetch,
+		now:   time.Now,
+		done:  o.Shell.Redraw,
+	}
+	e.board = &Board{
+		engine: e,
+		open:   map[string]bool{},
+		values: map[string]*states.Value{},
+		from:   e.cache,
+		follow: o.States.Follow,
+		call:   o.Client.Call,
+		redraw: o.Shell.Redraw,
+	}
 	return e
 }
 func (e *Engine) Name() string            { return "home control" }

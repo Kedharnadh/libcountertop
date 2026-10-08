@@ -21,8 +21,6 @@ func TestAMessageGoesOutAndComesBack(t *testing.T) {
 	}
 }
 
-// The label is four bits and wraps, and an answer carrying the wrong one is given to the wrong
-// question.
 func TestTheLabelSurvivesEveryValue(t *testing.T) {
 	for label := byte(0); label < 16; label++ {
 		got, err := ParseMessage(Message{Label: label, Signal: SignalStart}.Marshal())
@@ -35,11 +33,9 @@ func TestTheLabelSurvivesEveryValue(t *testing.T) {
 	}
 }
 
-// The signal is six bits sharing a byte with two reserved ones, so a parser that takes the whole
-// byte reads a different signal whenever those are set.
 func TestTheSignalIsSixBits(t *testing.T) {
 	raw := Message{Label: 1, Signal: SignalStart}.Marshal()
-	raw[1] |= 0xc0 // the two reserved bits, which a sender is allowed to set
+	raw[1] |= 0xc0 // reserved bits
 
 	got, err := ParseMessage(raw)
 	if err != nil {
@@ -50,8 +46,6 @@ func TestTheSignalIsSixBits(t *testing.T) {
 	}
 }
 
-// A fragmented message is refused rather than read as a short one. Silently truncating a capability
-// list configures the stream wrong, which is worse than not answering.
 func TestAFragmentedMessageIsRefused(t *testing.T) {
 	raw := Message{Label: 1, Signal: SignalGetAllCaps}.Marshal()
 	raw[0] = raw[0]&^(0x3<<2) | PacketStart<<2
@@ -70,7 +64,6 @@ func TestAMessageThatHasNotAllArrived(t *testing.T) {
 	}
 }
 
-// An answer carries the question's label and signal, or the phone cannot tell what was answered.
 func TestAnAnswerCarriesTheQuestion(t *testing.T) {
 	q := Message{Label: 9, Type: Command, Signal: SignalSetConfig}
 
@@ -84,15 +77,12 @@ func TestAnAnswerCarriesTheQuestion(t *testing.T) {
 		t.Errorf("the refusal came out %+v", no)
 	}
 
-	// The configuration signals name the category that was wrong first, which is what lets a phone
-	// try again rather than give up.
 	bad := q.RejectConfig(CatMediaCodec, ErrorUnsupportedConfig)
 	if len(bad.Data) != 2 || bad.Data[0] != CatMediaCodec || bad.Data[1] != ErrorUnsupportedConfig {
 		t.Errorf("the configuration refusal came out %x", bad.Data)
 	}
 }
 
-// One endpoint, advertised so a phone can address it.
 func TestEndpointsGoOutAndComeBack(t *testing.T) {
 	want := SEP{SEID: 1, Media: MediaAudio, TSEP: Sink}
 
@@ -127,7 +117,6 @@ func TestAnEndpointListThatDoesNotAddUp(t *testing.T) {
 	}
 }
 
-// Most commands name the endpoint they are for in the top six bits of their first byte.
 func TestReadingTheEndpointACommandIsFor(t *testing.T) {
 	got, ok := SEID([]byte{AddressTo(7)})
 	if !ok {

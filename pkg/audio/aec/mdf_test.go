@@ -43,7 +43,7 @@ func TestMDFCancelsAPureDelay(t *testing.T) {
 
 	ref := noiseAt(48000, 8000, 1)
 	gotMic, gotOut := runAny(t, c, echoed(ref, h), ref, 8000)
-	// speexdsp's own mdf.c, built and run on this input, reaches 22.5 dB by the fourth second.
+	// speexdsp's own mdf.c reaches 22.5 dB on this input by the fourth second.
 	if got := erle(gotMic, gotOut); got < 20 {
 		t.Fatalf("erle %.1f dB on a pure delay, want at least 20", got)
 	}

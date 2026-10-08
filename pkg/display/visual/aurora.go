@@ -52,12 +52,34 @@ type aurora struct {
 func newAurora() *aurora {
 	v := &aurora{r: seeded(21)}
 	v.green = fx.NewRamp([]fx.Stop{
-		{At: 0, C: color.NRGBA{200, 255, 225, 0}}, {At: 0.035, C: color.NRGBA{200, 255, 225, 230}}, {At: 0.09, C: color.NRGBA{70, 255, 155, 242}},
-		{At: 0.33, C: color.NRGBA{40, 220, 165, 140}}, {At: 0.62, C: color.NRGBA{60, 160, 210, 64}}, {At: 0.85, C: color.NRGBA{120, 90, 220, 26}}, {At: 1, C: color.NRGBA{120, 90, 220, 0}},
+		{
+			At: 0,
+			C:  color.NRGBA{200, 255, 225, 0},
+		},
+		{At: 0.035, C: color.NRGBA{200, 255, 225, 230}},
+		{At: 0.09, C: color.NRGBA{70, 255, 155, 242}},
+		{
+			At: 0.33,
+			C:  color.NRGBA{40, 220, 165, 140},
+		},
+		{At: 0.62, C: color.NRGBA{60, 160, 210, 64}},
+		{At: 0.85, C: color.NRGBA{120, 90, 220, 26}},
+		{At: 1, C: color.NRGBA{120, 90, 220, 0}},
 	})
 	v.violet = fx.NewRamp([]fx.Stop{
-		{At: 0, C: color.NRGBA{255, 215, 245, 0}}, {At: 0.035, C: color.NRGBA{255, 215, 245, 230}}, {At: 0.09, C: color.NRGBA{255, 95, 205, 242}},
-		{At: 0.33, C: color.NRGBA{190, 75, 255, 140}}, {At: 0.62, C: color.NRGBA{110, 85, 255, 64}}, {At: 0.85, C: color.NRGBA{60, 60, 200, 26}}, {At: 1, C: color.NRGBA{60, 60, 200, 0}},
+		{
+			At: 0,
+			C:  color.NRGBA{255, 215, 245, 0},
+		},
+		{At: 0.035, C: color.NRGBA{255, 215, 245, 230}},
+		{At: 0.09, C: color.NRGBA{255, 95, 205, 242}},
+		{
+			At: 0.33,
+			C:  color.NRGBA{190, 75, 255, 140},
+		},
+		{At: 0.62, C: color.NRGBA{110, 85, 255, 64}},
+		{At: 0.85, C: color.NRGBA{60, 60, 200, 26}},
+		{At: 1, C: color.NRGBA{60, 60, 200, 0}},
 	})
 	v.ribs = []ribbon{
 		{0, 0.52, 0.05, 0.9, 0.18, 0.03, 2.3, 0.27, 0.4, 1},
@@ -74,7 +96,17 @@ func (v *aurora) build() {
 	W, H, u := float64(v.st.w), float64(v.st.h), v.st.u
 	v.stars = v.stars[:0]
 	for range 240 {
-		v.stars = append(v.stars, star{v.r.next() * W, math.Pow(v.r.next(), 1.4) * H * 0.78, (0.4 + v.r.next()*v.r.next()*1.6) * u, 0.25 + v.r.next()*0.75, 0.6 + v.r.next()*2.4, v.r.next() * 2 * math.Pi})
+		v.stars = append(
+			v.stars,
+			star{
+				v.r.next() * W,
+				math.Pow(v.r.next(), 1.4) * H * 0.78,
+				(0.4 + v.r.next()*v.r.next()*1.6) * u,
+				0.25 + v.r.next()*0.75,
+				0.6 + v.r.next()*2.4,
+				v.r.next() * 2 * math.Pi,
+			},
+		)
 	}
 
 	be := softwarebackend.New(v.st.w, v.st.h)
@@ -140,7 +172,13 @@ func (v *aurora) advance(f frame) {
 	v.rips = live
 
 	if v.shoot == nil && t > v.nextShoot {
-		v.shoot = &shooting{t, W * (0.15 + v.r.next()*0.5), H * (0.05 + v.r.next()*0.25), W * (0.25 + v.r.next()*0.2), H * (0.12 + v.r.next()*0.1)}
+		v.shoot = &shooting{
+			t,
+			W * (0.15 + v.r.next()*0.5),
+			H * (0.05 + v.r.next()*0.25),
+			W * (0.25 + v.r.next()*0.2),
+			H * (0.12 + v.r.next()*0.1),
+		}
 	}
 	if v.shoot != nil && (t-v.shoot.t0)/0.9 >= 1 {
 		v.shoot = nil
@@ -178,9 +216,26 @@ func (v *aurora) base() *image.RGBA {
 	W, H := float64(v.st.w), float64(v.st.h)
 	img := image.NewRGBA(image.Rect(0, 0, v.st.w, v.st.h))
 	fx.LinearRect(img, img.Bounds(), 0, 0, 0, float32(H), []fx.Stop{
-		{At: 0, C: hex(0x010208, 1)}, {At: 0.45, C: hex(0x030b1c, 1)}, {At: 0.8, C: hex(0x08193a, 1)}, {At: 1, C: hex(0x0c2144, 1)},
+		{
+			At: 0,
+			C:  hex(0x010208, 1),
+		},
+		{At: 0.45, C: hex(0x030b1c, 1)},
+		{At: 0.8, C: hex(0x08193a, 1)},
+		{At: 1, C: hex(0x0c2144, 1)},
 	}, false)
-	fx.Radial(img, float32(W*0.5), float32(H*1.1), 0, float32(H*0.9), []fx.Stop{{At: 0, C: color.NRGBA{40, 90, 140, 46}}, {At: 1, C: color.NRGBA{40, 90, 140, 0}}}, false)
+	fx.Radial(
+		img,
+		float32(W*0.5),
+		float32(H*1.1),
+		0,
+		float32(H*0.9),
+		[]fx.Stop{
+			{At: 0, C: color.NRGBA{40, 90, 140, 46}},
+			{At: 1, C: color.NRGBA{40, 90, 140, 0}},
+		},
+		false,
+	)
 	ground := int(H * auroraGround)
 	stars := v.starMap()
 	for y := range v.st.h {
@@ -243,7 +298,15 @@ func (v *aurora) values(t float64) []float32 {
 	rips := v.rips[max(len(v.rips)-16, 0):]
 	for i, q := range rips {
 		b := 40 + 4*i
-		u[b], u[b+1], u[b+2], u[b+3] = float32(q.x0), float32(t-q.t0), float32(q.amp), float32(q.own)
+		u[b], u[b+1], u[b+2], u[b+3] = float32(
+			q.x0,
+		), float32(
+			t-q.t0,
+		), float32(
+			q.amp,
+		), float32(
+			q.own,
+		)
 	}
 	return u
 }

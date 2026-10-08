@@ -4,7 +4,6 @@ import "testing"
 
 const ourSEID = 1
 
-// config is what a phone sends to set up a stream: media transport, and one SBC configuration.
 func config(sbc SBC) []byte {
 	caps := []Capability{{Category: CatMediaTransport}, sbc.Capability()}
 
@@ -12,7 +11,6 @@ func config(sbc SBC) []byte {
 	return append(out, MarshalCapabilities(caps)...)
 }
 
-// picked is one configuration out of what the sink offers, which is what a phone sends back.
 func picked() SBC {
 	return SBC{
 		Rates:      Rate48000,
@@ -29,8 +27,6 @@ func command(signal byte, data ...byte) Message {
 	return Message{Label: 3, Type: Command, Signal: signal, Data: data}
 }
 
-// The whole conversation, the way a phone has it: find the endpoint, ask what it can do, configure
-// it, open it, start it. Six messages and audio is flowing.
 func TestAPhoneSetsUpAStream(t *testing.T) {
 	var started, stopped int
 
@@ -38,7 +34,6 @@ func TestAPhoneSetsUpAStream(t *testing.T) {
 	s.Started = func(*Endpoint) { started++ }
 	s.Stopped = func(*Endpoint) { stopped++ }
 
-	// Discover.
 	got := s.Handle(command(SignalDiscover))
 	if got.Type != ResponseAccept {
 		t.Fatalf("discover was refused: %x", got.Data)
@@ -57,7 +52,6 @@ func TestAPhoneSetsUpAStream(t *testing.T) {
 		t.Error("an idle endpoint reported itself in use")
 	}
 
-	// Get capabilities.
 	got = s.Handle(command(SignalGetCapabilities, AddressTo(ourSEID)))
 	if got.Type != ResponseAccept {
 		t.Fatalf("get capabilities was refused: %x", got.Data)
@@ -70,7 +64,6 @@ func TestAPhoneSetsUpAStream(t *testing.T) {
 		t.Error("the capabilities carried no codec")
 	}
 
-	// Set configuration.
 	got = s.Handle(command(SignalSetConfig, config(picked())...))
 	if got.Type != ResponseAccept {
 		t.Fatalf("set configuration was refused: %x", got.Data)
@@ -82,7 +75,6 @@ func TestAPhoneSetsUpAStream(t *testing.T) {
 		t.Errorf("the phone's endpoint came back %d, want 2", e.Remote)
 	}
 
-	// Open.
 	got = s.Handle(command(SignalOpen, AddressTo(ourSEID)))
 	if got.Type != ResponseAccept {
 		t.Fatalf("open was refused: %x", got.Data)
@@ -94,7 +86,6 @@ func TestAPhoneSetsUpAStream(t *testing.T) {
 		t.Error("audio was reported started before the phone said start")
 	}
 
-	// Start.
 	got = s.Handle(command(SignalStart, AddressTo(ourSEID)))
 	if got.Type != ResponseAccept {
 		t.Fatalf("start was refused: %x", got.Data)
@@ -106,7 +97,6 @@ func TestAPhoneSetsUpAStream(t *testing.T) {
 		t.Errorf("audio started %d times, want once", started)
 	}
 
-	// And the codec that was agreed is readable, which is what a decoder needs.
 	sbc, ok := s.Endpoint(ourSEID).Codec()
 	if !ok {
 		t.Fatal("no codec on a streaming endpoint")
@@ -115,7 +105,6 @@ func TestAPhoneSetsUpAStream(t *testing.T) {
 		t.Errorf("the agreed rate is %d", rate)
 	}
 
-	// Suspend puts it back to open, and stops the audio without tearing anything down.
 	got = s.Handle(command(SignalSuspend, AddressTo(ourSEID)))
 	if got.Type != ResponseAccept {
 		t.Fatalf("suspend was refused: %x", got.Data)
@@ -127,7 +116,6 @@ func TestAPhoneSetsUpAStream(t *testing.T) {
 		t.Errorf("audio stopped %d times, want once", stopped)
 	}
 
-	// Close takes it all the way back.
 	got = s.Handle(command(SignalClose, AddressTo(ourSEID)))
 	if got.Type != ResponseAccept {
 		t.Fatalf("close was refused: %x", got.Data)
@@ -137,8 +125,6 @@ func TestAPhoneSetsUpAStream(t *testing.T) {
 	}
 }
 
-// A command in the wrong state has its own refusal, and a stack that answers something else leaves
-// the phone retrying a thing that will never work.
 func TestACommandInTheWrongStateSaysSo(t *testing.T) {
 	s := NewServer(ourSEID)
 
@@ -154,8 +140,6 @@ func TestACommandInTheWrongStateSaysSo(t *testing.T) {
 	}
 }
 
-// Start and Suspend name a list, so their refusal has to say which endpoint failed — the phone
-// asked about several and "no" without a subject tells it nothing.
 func TestARefusedStartNamesTheEndpoint(t *testing.T) {
 	s := NewServer(ourSEID)
 
@@ -174,15 +158,12 @@ func TestARefusedStartNamesTheEndpoint(t *testing.T) {
 	}
 }
 
-// A list that is half applied leaves the phone and this device disagreeing about which streams are
-// running, so nothing moves until every endpoint in it has been checked.
 func TestAListIsCheckedBeforeAnythingMoves(t *testing.T) {
 	s := NewServer(ourSEID)
 
 	s.Handle(command(SignalSetConfig, config(picked())...))
 	s.Handle(command(SignalOpen, AddressTo(ourSEID)))
 
-	// One good endpoint and one that does not exist.
 	got := s.Handle(command(SignalStart, AddressTo(ourSEID), AddressTo(9)))
 	if got.Type != ResponseReject {
 		t.Fatal("a list with a bad endpoint was accepted")
@@ -192,13 +173,11 @@ func TestAListIsCheckedBeforeAnythingMoves(t *testing.T) {
 	}
 }
 
-// A configuration is checked against what was offered, and the refusal names the category so the
-// phone can try again.
 func TestAConfigurationThatWasNeverOffered(t *testing.T) {
 	s := NewServer(ourSEID)
 
 	never := picked()
-	never.Rates = Rate16000 // not in what the sink offers
+	never.Rates = Rate16000
 
 	got := s.Handle(command(SignalSetConfig, config(never)...))
 	if got.Type != ResponseReject {
@@ -215,8 +194,6 @@ func TestAConfigurationThatWasNeverOffered(t *testing.T) {
 	}
 }
 
-// An offer sent back as a configuration is not a choice, and guessing which option was meant is how
-// a stream runs at the wrong speed.
 func TestAConfigurationThatDidNotChoose(t *testing.T) {
 	s := NewServer(ourSEID)
 
@@ -229,7 +206,6 @@ func TestAConfigurationThatDidNotChoose(t *testing.T) {
 	}
 }
 
-// Media transport has to be there. Without it there is no agreement about how audio arrives.
 func TestAConfigurationWithNoMediaTransport(t *testing.T) {
 	s := NewServer(ourSEID)
 
@@ -245,8 +221,6 @@ func TestAConfigurationWithNoMediaTransport(t *testing.T) {
 	}
 }
 
-// Something we do not implement is refused by naming it, which is what lets the phone retry without
-// it rather than give up.
 func TestACapabilityWeDoNotImplement(t *testing.T) {
 	s := NewServer(ourSEID)
 
@@ -266,7 +240,6 @@ func TestACapabilityWeDoNotImplement(t *testing.T) {
 	}
 }
 
-// Configuring an endpoint somebody is already using is its own refusal, not a bad state.
 func TestConfiguringAnEndpointTwice(t *testing.T) {
 	s := NewServer(ourSEID)
 
@@ -281,7 +254,6 @@ func TestConfiguringAnEndpointTwice(t *testing.T) {
 	}
 }
 
-// A discovered endpoint says whether it is busy, which is how a phone knows not to try.
 func TestADiscoveredEndpointSaysWhetherItIsBusy(t *testing.T) {
 	s := NewServer(ourSEID)
 	s.Handle(command(SignalSetConfig, config(picked())...))
@@ -295,8 +267,6 @@ func TestADiscoveredEndpointSaysWhetherItIsBusy(t *testing.T) {
 	}
 }
 
-// Abort is never refused for state. A phone aborts when it has lost track, and an abort that can
-// fail leaves both ends stuck.
 func TestAbortAlwaysWorks(t *testing.T) {
 	for _, setup := range []func(*Server){
 		func(*Server) {},
@@ -320,8 +290,6 @@ func TestAbortAlwaysWorks(t *testing.T) {
 	}
 }
 
-// Aborting a stream that was running has to say the audio stopped, or whatever is decoding keeps
-// waiting for bytes that will not come.
 func TestAbortingAStreamStopsTheAudio(t *testing.T) {
 	var stopped int
 
@@ -338,7 +306,6 @@ func TestAbortingAStreamStopsTheAudio(t *testing.T) {
 	}
 }
 
-// A link dropping takes the stream with it, and has to say so for the same reason.
 func TestForgettingALinkStopsTheAudio(t *testing.T) {
 	var stopped int
 
@@ -374,7 +341,6 @@ func TestAnEndpointThatDoesNotExist(t *testing.T) {
 	}
 }
 
-// A signal nobody implements gets a general reject, which is a different thing from a refusal.
 func TestAnUnknownSignal(t *testing.T) {
 	got := NewServer(ourSEID).Handle(command(0x3f))
 
@@ -383,7 +349,6 @@ func TestAnUnknownSignal(t *testing.T) {
 	}
 }
 
-// Nothing here sends commands, so a response arriving is one to something we never asked.
 func TestAResponseIsNotAnswered(t *testing.T) {
 	got := NewServer(ourSEID).Handle(Message{Label: 1, Type: ResponseAccept, Signal: SignalStart})
 
@@ -392,7 +357,6 @@ func TestAResponseIsNotAnswered(t *testing.T) {
 	}
 }
 
-// Reading back what was agreed, which a phone does to check the two ends match.
 func TestGettingTheConfigurationBack(t *testing.T) {
 	s := NewServer(ourSEID)
 

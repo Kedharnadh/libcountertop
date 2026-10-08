@@ -2,10 +2,10 @@ package widgets
 
 import (
 	gogui "github.com/go-gui-org/go-gui/gui"
+
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
-// LivePreview tracks camera readiness for one GUI session.
 type LivePreview struct{ ready bool }
 
 func (p *LivePreview) View(w *gogui.Window, starting string, watch func(ui.Rect) bool) gogui.View {
@@ -38,18 +38,20 @@ func (p *LivePreview) View(w *gogui.Window, starting string, watch func(ui.Rect)
 	})
 }
 
-// Beside arranges a preview beside a list or above it in portrait mode.
 func Beside(w *gogui.Window, aside, list gogui.View) gogui.View {
 	vw, vh := w.WindowSize()
-	cfg := gogui.ContainerCfg{Sizing: gogui.FillFit, Padding: gogui.NoPadding, Spacing: gogui.SpacingLarge, Content: []gogui.View{aside, list}}
+	cfg := gogui.ContainerCfg{
+		Sizing:  gogui.FillFit,
+		Padding: gogui.NoPadding,
+		Spacing: gogui.SpacingLarge,
+		Content: []gogui.View{aside, list},
+	}
 	if vh > vw {
 		return gogui.Column(cfg)
 	}
 	return gogui.Row(cfg)
 }
 
-// Gestures prevents sliders from dragging their surrounding scroll view.
-// It belongs to one GUI session and runs on the UI loop.
 type Gestures struct {
 	gripped bool
 	Release func(gogui.EventCtx)

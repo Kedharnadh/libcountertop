@@ -18,7 +18,11 @@ func (o Orientation) point(fbW, fbH int, vx, vy float32) (float32, float32) {
 	return vx, vy
 }
 
-func (o Orientation) Place(fbW, fbH int, r Rect, w, h int) (x, y float32, m surface.Matrix, at Rect) {
+func (o Orientation) Place(
+	fbW, fbH int,
+	r Rect,
+	w, h int,
+) (x, y float32, m surface.Matrix, at Rect) {
 	x0, y0 := o.point(fbW, fbH, float32(r.X), float32(r.Y))
 	x1, y1 := o.point(fbW, fbH, float32(r.X+r.W), float32(r.Y))
 	x2, y2 := o.point(fbW, fbH, float32(r.X), float32(r.Y+r.H))

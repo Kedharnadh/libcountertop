@@ -9,14 +9,13 @@ import (
 
 	esphome "github.com/ygelfand/go-esphome-device"
 	"github.com/ygelfand/go-esphome-device/api"
+
 	"github.com/ygelfand/libcountertop/pkg/assistant/activity"
 	"github.com/ygelfand/libcountertop/pkg/inference/wake"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
 
-// errDuplicate is what Home Assistant reports to the devices that lost a race to answer: "Duplicate
-// wake-up detected for Glados". Every satellite in earshot hears the wake word and starts a turn, and
-// only the first is served.
+// Home Assistant's reply to satellites that lost the wake race: "Duplicate wake-up detected for Glados".
 const errDuplicate = "duplicate_wake_up_detected"
 
 type phase = Phase
@@ -31,23 +30,23 @@ const (
 type eventKind int
 
 const (
-	evStart       eventKind = iota // a wake word fired, or something asked for a turn
-	evHeard                        // Home Assistant has heard enough
-	evReplyText                    // a reply is coming
-	evReplyURL                     // the reply can be fetched whole
-	evStreamStart                  // reply audio is about to arrive over the API
-	evStreamAudio                  // a chunk of it
-	evStreamEnd                    // all of it has been sent
-	evPlayed                       // the reply has finished playing
-	evRunEnd                       // Home Assistant closed the run
-	evError                        // the pipeline failed
-	evCancel                       // the user gave up on it
-	evTimeout                      // Home Assistant never closed the run
-	evPending                      // a turn held back for the last one to close has waited long enough
-	evPlaying                      // the reply has audio, so the pipeline owes nothing more
-	evContinue                     // Home Assistant wants the answer to a question it just asked
-	evSpeaking                     // VAD detected speech has started
-	evAccepted                     // Home Assistant kept this turn and is transcribing it
+	evStart eventKind = iota
+	evHeard
+	evReplyText
+	evReplyURL
+	evStreamStart
+	evStreamAudio
+	evStreamEnd
+	evPlayed
+	evRunEnd
+	evError
+	evCancel
+	evTimeout
+	evPending
+	evPlaying
+	evContinue
+	evSpeaking
+	evAccepted
 )
 
 type event struct {
@@ -62,12 +61,6 @@ type event struct {
 	at      time.Time
 }
 
-// Conversation runs one turn at a time: microphone audio up, pipeline events back, spoken reply out.
-//
-// One goroutine owns the phase and everything derived from it. Everything else — the API read loop,
-// the audio streamer, the reply fetch, the buttons — posts events, so no state is read while it is
-// being written and an event that does not fit the phase is dropped by the transition rather than by
-// a guard flag.
 type Conversation struct {
 	replyID uint64
 	options Dependencies
@@ -76,55 +69,32 @@ type Conversation struct {
 	source  Microphone
 	speaker Speaker
 
-	// sound is who may make one. Everything audible goes through it, so cancelling is one call
-	// wherever the sound came from.
 	sound  Sound
 	player interface{ Sounding(bool) }
 	log    *activity.Log
 
 	events chan event
 
-	// out is everything bound for Home Assistant, so nothing local waits on the socket.
 	out chan func() error
 
-	// quietUntil is when the chime stops sounding, in unix nanoseconds, for the streamer to hold the
-	// microphone back until.
 	quietUntil atomic.Int64
 
-	// visible is the phase, published for anything outside the loop that needs to ask. Only the loop
-	// writes it, and a reader tolerates being a moment out of date: the button uses it to choose
-	// between starting and cancelling, and posting either is safe whichever it picks.
 	visible atomic.Int32
 
-	// Below here belongs to the run goroutine alone.
 	phase phase
 
-	// slot is the wake word slot that owns the turn, which decides the tone, the animation and the
-	// pipeline. A wake from another slot takes it over rather than being ignored, so the feedback
-	// follows the word that actually just fired.
 	slot int
 
 	stopAudio func()
 	deadline  *time.Timer
 
-	// holding is whether the turn has taken the speaker from a track, so that taking it twice or
-	// giving it back twice cannot happen however the turn ends.
 	holding bool
 
-	// followUp says this turn was opened without a wake word, so hearing nothing is a normal ending
-	// rather than Home Assistant having gone away.
 	followUp bool
 
-	// turn measures the one that is open and reports it when it closes. Nil while idle, and every
-	// method on it tolerates that, so the phases do not each have to check.
 	turn *activity.Turn
 
-	// pending is a turn owed once the current one has finished closing, nil when none.
-	//
-	// Home Assistant's events carry no run identifier, so a turn started while the last one is still
-	// ending cannot tell that one's events from its own — and the first thing to arrive is the old
-	// run's RUN_END, which would end the new turn instead. Waiting for the old run to close makes
-	// that event the go-ahead rather than a stray.
+	// Home Assistant's events carry no run identifier.
 	pending *nextTurn
 	grace   *time.Timer
 
@@ -134,17 +104,13 @@ type Conversation struct {
 	answer string
 }
 
-// graceStart is how long to wait for a stopped run to close before starting the next one anyway.
 const graceStart = 750 * time.Millisecond
 
-// nextTurn is a turn to open: which slot, and whether it follows a reply rather than a wake word.
 type nextTurn struct {
 	slot     int
 	followUp bool
 }
 
-// reply is which answer is being spoken, and how. Only one of them is set: a url means it is being
-// fetched whole, a stream means it is arriving over the API. Both play under one claim on the speaker.
 type reply struct {
 	url    string
 	stream *Reply
@@ -158,9 +124,16 @@ func NewConversation(vs *esphome.VoiceSatellite, options Dependencies) *Conversa
 		options.Presentation = &Presentation{}
 	}
 	c := &Conversation{
-		options: options, Word: options.Word, vs: vs, source: options.Source, speaker: options.Speaker,
-		sound: options.Sound, player: options.Player, log: options.Log,
-		events: make(chan event, 32), out: make(chan func() error, outDepth),
+		options: options,
+		Word:    options.Word,
+		vs:      vs,
+		source:  options.Source,
+		speaker: options.Speaker,
+		sound:   options.Sound,
+		player:  options.Player,
+		log:     options.Log,
+		events:  make(chan event, 32),
+		out:     make(chan func() error, outDepth),
 	}
 
 	vs.OnPipelineEvent = c.pipeline
@@ -173,18 +146,14 @@ func NewConversation(vs *esphome.VoiceSatellite, options Dependencies) *Conversa
 			return
 		}
 		if port != 0 {
-			// The legacy UDP path is not implemented; audio goes over the API.
 			slog.Warn("home assistant asked for udp audio", "port", port)
 		}
 	}
 	return c
 }
 
-// outDepth is how far behind Home Assistant may fall before audio is dropped, in frames of 20ms.
 const outDepth = 64
 
-// send queues a message rather than writing it. Ordering is why there is one queue and not a
-// goroutine each: Start, the audio, End and Stop only mean anything in that order.
 func (c *Conversation) send(what string, fn func() error) {
 	select {
 	case c.out <- fn:
@@ -193,8 +162,6 @@ func (c *Conversation) send(what string, fn func() error) {
 	}
 }
 
-// sendAudio queues a frame or drops it. Audio held back until a stalled link recovers is audio
-// nobody wants by then, and the frame is copied because the caller reuses it.
 func (c *Conversation) sendAudio(b []byte) {
 	frame := append([]byte(nil), b...)
 	select {
@@ -203,8 +170,6 @@ func (c *Conversation) sendAudio(b []byte) {
 	}
 }
 
-// sends drains the queue. A failure ends the turn through the same path a pipeline error takes, and
-// whatever is still queued belonged to that turn, so it goes with it.
 func (c *Conversation) sends(ctx context.Context) {
 	for {
 		select {
@@ -222,8 +187,6 @@ func (c *Conversation) sends(ctx context.Context) {
 	}
 }
 
-// post hands an event to the run loop. It never blocks: an event dropped because the queue is full
-// is better than stalling the connection's read loop.
 func (c *Conversation) post(e event) {
 	select {
 	case c.events <- e:
@@ -232,10 +195,8 @@ func (c *Conversation) post(e event) {
 	}
 }
 
-// Phase is what it is doing, for anything outside that needs to know.
 func (c *Conversation) Phase() phase { return phase(c.visible.Load()) }
 
-// Run owns the Conversation until ctx is cancelled.
 func (c *Conversation) Run(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	c.options.Presentation.Begin()
@@ -268,8 +229,6 @@ func (c *Conversation) Run(ctx context.Context) {
 	}
 }
 
-// handle is the transition table. Anything an event cannot do from the current phase is dropped
-// here, which is what makes the whole thing idempotent.
 func (c *Conversation) handle(e event) {
 	switch e.kind {
 	case evStart:
@@ -281,19 +240,18 @@ func (c *Conversation) handle(e event) {
 		}
 
 	case evAccepted:
-		// A follow-up chimes like any other turn: the microphone is open with nothing said to say so.
 		if c.phase == phaseListening {
 			c.options.Words.Chime(c.slot)
 			if c.options.Words.Tones(c.slot) {
 				c.quietUntil.Store(
-					time.Now().Add(c.options.Words.ChimeLength(c.slot) + c.options.HardwareTail).UnixNano(),
+					time.Now().
+						Add(c.options.Words.ChimeLength(c.slot) + c.options.HardwareTail).
+						UnixNano(),
 				)
 			}
 		}
 
 	case evContinue:
-		// The pipeline asked a question. Its answer is owed after the reply has been spoken, so this
-		// only records the intent; evPlayed opens it.
 		if c.phase != phaseIdle {
 			slog.Debug("pipeline asked for an answer", "slot", c.slot+1)
 			c.pending = &nextTurn{slot: c.slot, followUp: true}
@@ -323,21 +281,11 @@ func (c *Conversation) handle(e event) {
 		c.player.Sounding(true)
 
 	case evStreamStart:
-		// The turn has to be claimed before the audio arrives: Home Assistant closes the run as soon
-		// as it has handed over the text, and a turn still only thinking would take that as the end
-		// and go idle, discarding everything that followed.
 		if c.phase != phaseIdle && c.options.Words.Delivery(c.slot) == "stream" {
 			c.speak("")
 		}
 
 	case evReplyURL:
-		// Home Assistant serves the reply whole as well as streaming it over the API, and this
-		// arrives before the first streamed byte. Fetching cannot gap: the streamed copy arrives at
-		// about the rate it plays out, so any hiccup empties the queue and silence lands in the
-		// middle of a word. HTTP also says when the audio has ended, which the stream does not.
-		//
-		// Which of the two runs is the slot's setting, so ignoring the url here leaves the streamed
-		// copy to arrive on its own, exactly as it would have if Home Assistant had sent no url.
 		if c.phase == phaseIdle {
 			return
 		}
@@ -347,7 +295,6 @@ func (c *Conversation) handle(e event) {
 		c.speak(e.url)
 
 	case evStreamAudio:
-		// Retired as soon as a url arrives.
 		if c.phase == phaseIdle || c.reply.url != "" {
 			return
 		}
@@ -357,8 +304,6 @@ func (c *Conversation) handle(e event) {
 		c.reply.stream.Send(e.audio)
 
 	case evStreamEnd:
-		// Everything Home Assistant is going to send has been sent. What the errand is still holding
-		// back for the cushion plays, and it finishes once that has been heard.
 		if c.phase == phaseReplying && c.reply.stream != nil {
 			c.reply.stream.Done()
 		}
@@ -372,8 +317,6 @@ func (c *Conversation) handle(e event) {
 			slot := c.slot
 			c.idle("spoken", activity.Completed)
 
-			// Continual Conversation: the slot keeps listening after every reply, not only the ones
-			// Home Assistant asked to continue.
 			if c.pending == nil && c.options.Words.FollowUp(slot) > 0 {
 				slog.Info(
 					"listening again after the reply",
@@ -388,12 +331,10 @@ func (c *Conversation) handle(e event) {
 		}
 
 	case evRunEnd:
-		// While idle this is the stopped run closing, which is what a held-back turn is waiting for.
 		if c.phase == phaseIdle {
 			c.startPending()
 			return
 		}
-		// A reply is on its way or playing and owns the ring and the player until it has been heard.
 		if c.phase != phaseReplying {
 			c.idle("ended", activity.Completed)
 		}
@@ -408,10 +349,6 @@ func (c *Conversation) handle(e event) {
 		c.disarm()
 
 	case evError:
-		// Two devices in earshot both hear the wake word and both start a turn. Home Assistant keeps the
-		// first and refuses the rest, so this arrives on every device that lost — which is not a failure
-		// of any of them, and a chime and a red ring say the opposite to the room. It ends the turn and
-		// says nothing: the device that won is about to light up and answer.
 		if e.code == errDuplicate {
 			slog.Info("another device answered first", "slot", c.slot+1, "message", e.msg)
 			c.clearPending()
@@ -428,13 +365,9 @@ func (c *Conversation) handle(e event) {
 	case evCancel:
 		c.clearPending()
 
-		// Stopping the sound comes first and does not care whether a turn is open: an announcement
-		// plays with nothing else happening, and used to be the one thing cancel could not reach.
 		sounding := c.sound.Busy()
 		c.sound.Silence()
 
-		// The track is left alone. Cancelling means the turn is over, and a turn ending is what puts
-		// music back up to where it was — whoever wanted the music itself gone said so somewhere else.
 		if c.phase == phaseIdle && !sounding {
 			return
 		}
@@ -445,9 +378,6 @@ func (c *Conversation) handle(e event) {
 	case evTimeout:
 		c.clearPending()
 
-		// Nobody spoke into a turn nobody asked for, which is how a follow-up is meant to end. Every
-		// other timeout is something failing: listening means Home Assistant stopped answering,
-		// thinking means its pipeline is slower than the slot allows for.
 		if c.followUp && c.phase == phaseListening {
 			slog.Info("nothing followed", "slot", c.slot+1)
 			c.idle("nothing said", activity.Cancelled)
@@ -456,7 +386,13 @@ func (c *Conversation) handle(e event) {
 
 		switch c.phase {
 		case phaseListening:
-			slog.Warn("gave up listening", "slot", c.slot+1, "after", c.options.Words.MaxListen(c.slot))
+			slog.Warn(
+				"gave up listening",
+				"slot",
+				c.slot+1,
+				"after",
+				c.options.Words.MaxListen(c.slot),
+			)
 		case phaseThinking:
 			slog.Warn(
 				"gave up waiting for an answer",
@@ -471,24 +407,17 @@ func (c *Conversation) handle(e event) {
 	}
 }
 
-// muted reports whether the microphones are cut. A device that could not take the pin has none.
 func (c *Conversation) muted() (bool, error) { return c.options.Muted() }
 
-// start opens a turn on the pipeline paired with a slot.
 func (c *Conversation) start(n nextTurn) {
 	slot := n.slot
 
-	// A cut microphone hears nothing, so a turn started from a button would stream silence until it
-	// gave up — and worse, would look like the device is listening while it is muted.
 	if muted, err := c.muted(); err == nil && muted {
 		slog.Info("microphone muted, not starting a turn", "slot", slot+1)
 		c.trouble()
 		return
 	}
 
-	// Saying the wake word while the device is still listening is part of the sentence, not a new
-	// request: acting on it would cut off what the user is in the middle of saying. Once it is
-	// thinking or speaking, a wake word is a deliberate interruption and takes the turn over.
 	if c.phase == phaseListening {
 		slog.Info("wake word ignored, still listening", "slot", slot+1)
 		return
@@ -498,12 +427,9 @@ func (c *Conversation) start(n nextTurn) {
 		slog.Info("Conversation interrupted", "was", c.phase, "from", c.slot+1, "slot", slot+1)
 		c.sound.Silence()
 
-		// Held back before the turn ends, so that ending it does not hand the speaker back to a track
-		// for the moment it takes the next turn to open.
 		c.pending = &nextTurn{slot: slot}
 		c.idle("interrupted", activity.Cancelled)
 
-		// The stopped run has yet to close, and its last events are still on their way.
 		c.grace = time.NewTimer(graceStart)
 		return
 	}
@@ -516,10 +442,6 @@ func (c *Conversation) start(n nextTurn) {
 		return
 	}
 
-	// Which pipeline runs is resolved from the phrase, so a slot with no wake word in it cannot be
-	// reached: an empty phrase means the first pipeline. That is right for slot 0, where no wake word
-	// is a legitimate way to open a turn, and wrong for any other, where it would quietly run the
-	// wrong assistant instead of saying it could not run the one asked for.
 	phrase, ok := c.PhraseFor(slot)
 	if slot > 0 && !ok {
 		slog.Warn("no wake word in that slot, nothing to reach its pipeline with", "slot", slot+1)
@@ -530,12 +452,6 @@ func (c *Conversation) start(n nextTurn) {
 	c.slot = slot
 	c.followUp = n.followUp
 
-	// Before the chime, and before Home Assistant is told anything. Ducking is what the room hears
-	// first, and it has a second of queued music to get through, so every step it waits behind is a
-	// step of full-volume music over somebody who has already started talking.
-	//
-	// It also keeps the chime out of the duck: the chime is mixed into the queue after this, so it
-	// sounds at its own level rather than being faded along with the track underneath it.
 	c.hold(true)
 
 	c.quietUntil.Store(0)
@@ -553,14 +469,9 @@ func (c *Conversation) start(n nextTurn) {
 
 	c.arm(c.listenFor(n))
 	c.startAudio(slot)
-	// The phrase is logged for a follow-up too, because it is what chose the pipeline — not because
-	// anyone said it.
 	slog.Info("turn started", "slot", slot+1, "phrase", phrase, "follow_up", n.followUp)
 }
 
-// listenFor is how long a turn may listen. A follow-up gets its own, shorter, window when the slot
-// sets one: it was not asked for, so silence is a likely answer and holding the microphone open
-// through the full limit is what the wake word is there to avoid.
 func (c *Conversation) listenFor(n nextTurn) time.Duration {
 	if n.followUp {
 		if d := c.options.Words.FollowUp(n.slot); d > 0 {
@@ -570,8 +481,6 @@ func (c *Conversation) listenFor(n nextTurn) time.Duration {
 	return c.options.Words.MaxListen(n.slot)
 }
 
-// think stops sending audio. The same animation turned around says the device has stopped listening
-// and is waiting on an answer, which is a different thing to be doing and looks like one.
 func (c *Conversation) think() {
 	c.stopStreaming()
 	c.enter(phaseThinking)
@@ -579,11 +488,6 @@ func (c *Conversation) think() {
 
 }
 
-// speak moves to playing the reply. url is empty when it is arriving over the API instead.
-//
-// Either way it becomes one claim on the speaker, so silencing it stops the whole errand: a fetch
-// still downloading is abandoned rather than arriving to play into a cancelled turn, and a stream
-// still receiving stops taking chunks.
 func (c *Conversation) speak(url string) {
 	c.replyID++
 	id := c.replyID
@@ -593,9 +497,6 @@ func (c *Conversation) speak(url string) {
 
 	c.player.Sounding(true)
 
-	// The deadline is left as it was. Text arriving is not the pipeline delivering: it still owes the
-	// audio, and the limit it was given when the device stopped listening goes on running until some
-	// of that audio turns up.
 	errand := func(ctx context.Context, p Speaker) error {
 		return c.play(ctx, url, func() { c.post(event{kind: evPlaying, replyID: id}) })
 	}
@@ -621,9 +522,6 @@ func (c *Conversation) speak(url string) {
 	})
 }
 
-// idle puts everything back. why is only for the log.
-// idle closes whatever is open. The outcome is passed rather than read back out of why, so a new way
-// for a turn to end cannot quietly report itself as one of the old ones.
 func (c *Conversation) idle(why string, how activity.Outcome) {
 	c.replyID++
 	was := c.phase
@@ -658,7 +556,6 @@ func (c *Conversation) enter(p phase) {
 	c.options.Presentation.Phase(c.slot, c.phase)
 }
 
-// show hands the whole turn to whatever is drawing it.
 func (c *Conversation) show() {
 	c.options.Presentation.Show(Showing{
 		Phase: c.phase,
@@ -668,7 +565,6 @@ func (c *Conversation) show() {
 	})
 }
 
-// startPending opens the turn that was held back, if there is one.
 func (c *Conversation) startPending() {
 	next := c.pending
 	c.clearPending()
@@ -685,29 +581,20 @@ func (c *Conversation) clearPending() {
 		c.grace = nil
 	}
 
-	// A turn that is not going to open cannot be what a track is waiting for.
 	if c.phase == phaseIdle {
 		c.hold(false)
 	}
 }
 
-// hold takes the speaker away from a track for as long as a turn needs it, and is what gives it
-// back. A turn is several sounds with listening in between, so it holds it across all of them
-// rather than one claim at a time.
 func (c *Conversation) hold(on bool) {
 	if on == c.holding {
 		return
 	}
 	c.holding = on
 
-	// Every background, not just the track: a room playing along with the rest of the house is also
-	// something a reply has to be heard over, and it is not the media player's to quieten.
 	c.options.Sound.Duck(on)
 }
 
-// arm gives the current phase a limit; disarm removes it. Each phase sets its own, so a slow model
-// does not eat the time the microphone was meant to have and a live microphone is not bounded by how
-// long an answer may take.
 func (c *Conversation) arm(d time.Duration) {
 	c.disarm()
 	c.deadline = time.NewTimer(d)
@@ -720,15 +607,10 @@ func (c *Conversation) disarm() {
 	}
 }
 
-// trouble says a request could not be served. It takes its own claim at a priority above the turn,
-// so ending the turn that failed cannot take the indication away with it.
 func (c *Conversation) trouble() {
 	c.options.Failure()
 }
 
-// PhraseFor is what Home Assistant expects a turn to report for one of its wake word slots: the
-// spoken phrase, not the model's id. Which pipeline runs is resolved by comparing that phrase against
-// each slot's select, so a turn from slot n has to report slot n's own phrase.
 func (c *Conversation) PhraseFor(slot int) (string, bool) {
 	if c.Word == nil {
 		return "", false
@@ -743,8 +625,6 @@ func (c *Conversation) PhraseFor(slot int) (string, bool) {
 	return id, true
 }
 
-// pipeline turns what Home Assistant reports into events. It runs on the connection's read loop, so
-// it does nothing but translate.
 func (c *Conversation) pipeline(e esphome.PipelineEvent) {
 	switch e.Type {
 	case api.VoiceAssistantEvent_VOICE_ASSISTANT_STT_START:
@@ -771,8 +651,6 @@ func (c *Conversation) pipeline(e esphome.PipelineEvent) {
 			c.post(event{kind: evReplyURL, url: url})
 		}
 
-	// Home Assistant brackets the streamed audio with these, and calls the reply finished after the
-	// end. They are the reliable signals: the per-message end flag is not.
 	case api.VoiceAssistantEvent_VOICE_ASSISTANT_TTS_STREAM_START:
 		c.post(event{kind: evStreamStart})
 	case api.VoiceAssistantEvent_VOICE_ASSISTANT_TTS_STREAM_END:
@@ -784,32 +662,20 @@ func (c *Conversation) pipeline(e esphome.PipelineEvent) {
 	}
 }
 
-// tts is reply audio streamed over the API, as 16 kHz mono.
 func (c *Conversation) tts(data []byte, end bool) {
 	if len(data) > 0 {
 		c.post(event{kind: evStreamAudio, audio: data})
 	}
-	// The per-message end flag is not depended on: TTS_STREAM_END is what Home Assistant sends when it
-	// has finished, and it arrives whether or not this was ever set.
+	// TTS_STREAM_END marks the end of streamed audio; the per-message end flag is unreliable.
 	_ = end
 }
 
-// Start asks for a turn on a slot's pipeline. Wake detection and the buttons both use it.
 func (c *Conversation) Start(slot int) { c.post(event{kind: evStart, slot: slot}) }
 
-// Cancel gives up on whatever is happening.
 func (c *Conversation) Cancel() { c.post(event{kind: evCancel}) }
 
-// Busy reports whether there is anything to cancel.
 func (c *Conversation) Busy() bool { return c.Phase() != phaseIdle }
 
-// audioSettings asks Home Assistant to condition the microphone audio before recognition. The
-// array's analogue gain already matches what the vendor's own recogniser ran with, and speech still
-// reaches the pipeline around -45 dBFS, which is some 20 dB below what a recogniser wants: the vendor
-// made that up in its DSP, and this is the equivalent handled by the far end.
-//
-// Auto gain is a ceiling on how much the far end may apply, not a fixed boost, so it costs nothing
-// when the talker is close and loud.
 func audioSettings() *api.VoiceAssistantAudioSettings {
 	return &api.VoiceAssistantAudioSettings{
 		NoiseSuppressionLevel: 2,
@@ -818,14 +684,11 @@ func audioSettings() *api.VoiceAssistantAudioSettings {
 	}
 }
 
-// startAudio begins sending microphone frames. The streamer only reads, so it needs no coordination
-// beyond being told to stop.
 func (c *Conversation) startAudio(slot int) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	c.stopAudio = func() { cancel(); <-done }
 
-	// slot is captured rather than read from the loop's state, which the streamer does not own.
 	safe.Go("turn audio", func() { defer close(done); c.stream(ctx, slot) })
 }
 
@@ -839,19 +702,12 @@ func (c *Conversation) stopStreaming() {
 	c.send("end of audio", c.vs.EndAudio)
 }
 
-// stream sends microphone frames until it is told to stop.
 func (c *Conversation) stream(ctx context.Context, slot int) {
 	frames, unlisten := c.source.Listen("turn")
 	defer unlisten()
 
 	buf := make([]byte, 0, 320*2)
 
-	// Send what was already said before this turn began. The wake word can only be recognised after
-	// it has been spoken, and people run straight on into the request, so the opening words exist only
-	// in the microphone's history. Subscribing first means no audio falls between the two.
-	//
-	// A slot that chimes does not send it: whoever is talking waits for the tone, so the history holds
-	// the wake word rather than the request, and the tone itself is louder at the array than they are.
 	pre := c.source.Recent(250 * time.Millisecond)
 	if c.options.Words.Tones(slot) {
 		pre = nil
@@ -866,9 +722,6 @@ func (c *Conversation) stream(ctx context.Context, slot int) {
 		slog.Debug("sent audio history", "ms", len(pre)*1000/16000)
 	}
 
-	// What the microphone actually sends is the input to speech recognition, and a quiet or clipped
-	// stream explains a bad transcript better than anything downstream does.
-	// The tone is louder at the array than a talker across the room, so nothing is sent while it sounds.
 	var held int
 
 	var peak, samples int
@@ -923,8 +776,6 @@ func (c *Conversation) stream(ctx context.Context, slot int) {
 	}
 }
 
-// reported logs how a streamed reply went, once the errand that played it has finished and its
-// counters are nobody's to write. gap is silence the device had nothing to fill with.
 func (c *Conversation) reported(dry time.Time) {
 	s := c.reply.stream
 	if s == nil || s.Stats().Bytes == 0 || s.Stats().PlayingAt.IsZero() {

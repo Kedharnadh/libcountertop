@@ -7,6 +7,7 @@ import (
 	"time"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
+
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	videoplayer "github.com/ygelfand/libcountertop/pkg/display/videopage"
@@ -110,7 +111,9 @@ func (p *Renderer) Body(w *gogui.Window) gogui.View {
 
 	var cover gogui.View
 	if now.Art != nil {
-		cover = gogui.Image(gogui.ImageCfg{Src: Squared(ui.Picture(now.Art, now.ArtID)), Width: side, Height: side})
+		cover = gogui.Image(
+			gogui.ImageCfg{Src: Squared(ui.Picture(now.Art, now.ArtID)), Width: side, Height: side},
+		)
 	} else {
 		st := t.TextStyleIconXLarge
 		st.Color = t.Cfg.ColorTextSecondary
@@ -121,7 +124,15 @@ func (p *Renderer) Body(w *gogui.Window) gogui.View {
 		}))
 	}
 
-	words := []gogui.View{gogui.Text(gogui.TextCfg{Text: media.Heading(now), TextStyle: t.TextStyleTitle, Mode: gogui.TextModeWrap})}
+	words := []gogui.View{
+		gogui.Text(
+			gogui.TextCfg{
+				Text:      media.Heading(now),
+				TextStyle: t.TextStyleTitle,
+				Mode:      gogui.TextModeWrap,
+			},
+		),
+	}
 	if now.Artist != "" {
 		words = append(words, gogui.Label(now.Artist, gogui.TextStyle{}))
 	}
@@ -139,21 +150,79 @@ func (p *Renderer) Body(w *gogui.Window) gogui.View {
 	controls = append(controls, p.transport(now), p.loudness())
 
 	if beside {
-		info := gogui.Column(gogui.ContainerCfg{Sizing: gogui.FillFit, Padding: gogui.NoPadding, Spacing: gogui.SpacingSmall, Content: words})
-		head := gogui.Row(gogui.ContainerCfg{Sizing: gogui.FillFit, Padding: gogui.NoPadding, VAlign: gogui.VAlignMiddle, Spacing: gogui.SpacingLarge, Content: []gogui.View{cover, info}})
-		left := gogui.Column(gogui.ContainerCfg{Sizing: gogui.FillFill, Padding: gogui.NoPadding, Spacing: gogui.SpacingMedium, Content: append([]gogui.View{head}, controls...)})
-		right := gogui.Column(gogui.ContainerCfg{Width: float32(vw) * 0.4, Sizing: gogui.FixedFill, Padding: gogui.NoPadding, Content: []gogui.View{p.queue(now)}})
-		return gogui.Row(gogui.ContainerCfg{Sizing: gogui.FillFill, Padding: gogui.NoPadding, Spacing: gogui.SpacingLarge, Content: []gogui.View{left, right}})
+		info := gogui.Column(
+			gogui.ContainerCfg{
+				Sizing:  gogui.FillFit,
+				Padding: gogui.NoPadding,
+				Spacing: gogui.SpacingSmall,
+				Content: words,
+			},
+		)
+		head := gogui.Row(
+			gogui.ContainerCfg{
+				Sizing:  gogui.FillFit,
+				Padding: gogui.NoPadding,
+				VAlign:  gogui.VAlignMiddle,
+				Spacing: gogui.SpacingLarge,
+				Content: []gogui.View{cover, info},
+			},
+		)
+		left := gogui.Column(
+			gogui.ContainerCfg{
+				Sizing:  gogui.FillFill,
+				Padding: gogui.NoPadding,
+				Spacing: gogui.SpacingMedium,
+				Content: append([]gogui.View{head}, controls...),
+			},
+		)
+		right := gogui.Column(
+			gogui.ContainerCfg{
+				Width:   float32(vw) * 0.4,
+				Sizing:  gogui.FixedFill,
+				Padding: gogui.NoPadding,
+				Content: []gogui.View{p.queue(now)},
+			},
+		)
+		return gogui.Row(
+			gogui.ContainerCfg{
+				Sizing:  gogui.FillFill,
+				Padding: gogui.NoPadding,
+				Spacing: gogui.SpacingLarge,
+				Content: []gogui.View{left, right},
+			},
+		)
 	}
 
 	words = append(words, controls...)
-	text := gogui.Column(gogui.ContainerCfg{Sizing: gogui.FillFit, Spacing: gogui.SpacingMedium, Content: words})
-	main := gogui.Row(gogui.ContainerCfg{Sizing: gogui.FillFit, Spacing: gogui.SpacingLarge, Content: []gogui.View{cover, text}})
+	text := gogui.Column(
+		gogui.ContainerCfg{Sizing: gogui.FillFit, Spacing: gogui.SpacingMedium, Content: words},
+	)
+	main := gogui.Row(
+		gogui.ContainerCfg{
+			Sizing:  gogui.FillFit,
+			Spacing: gogui.SpacingLarge,
+			Content: []gogui.View{cover, text},
+		},
+	)
 	if tall {
-		main = gogui.Column(gogui.ContainerCfg{Sizing: gogui.FillFit, HAlign: gogui.HAlignCenter, Spacing: gogui.SpacingLarge, Content: []gogui.View{cover, text}})
+		main = gogui.Column(
+			gogui.ContainerCfg{
+				Sizing:  gogui.FillFit,
+				HAlign:  gogui.HAlignCenter,
+				Spacing: gogui.SpacingLarge,
+				Content: []gogui.View{cover, text},
+			},
+		)
 	}
 	if len(now.Queue) == 0 {
-		return gogui.Column(gogui.ContainerCfg{Sizing: gogui.FillFill, Scrollable: true, Padding: gogui.NoPadding, Content: []gogui.View{main}})
+		return gogui.Column(
+			gogui.ContainerCfg{
+				Sizing:     gogui.FillFill,
+				Scrollable: true,
+				Padding:    gogui.NoPadding,
+				Content:    []gogui.View{main},
+			},
+		)
 	}
 	return gogui.Column(gogui.ContainerCfg{
 		Sizing:  gogui.FillFill,
@@ -178,11 +247,30 @@ func clockWidth(w *gogui.Window, length time.Duration, st gogui.TextStyle) float
 	return widest
 }
 
-func clockLabel(text string, width float32, st gogui.TextStyle, align gogui.HorizontalAlign) gogui.View {
-	return gogui.Row(gogui.ContainerCfg{Width: width, Sizing: gogui.FixedFit, Padding: gogui.NoPadding, HAlign: align, Content: []gogui.View{gogui.Label(text, st)}})
+func clockLabel(
+	text string,
+	width float32,
+	st gogui.TextStyle,
+	align gogui.HorizontalAlign,
+) gogui.View {
+	return gogui.Row(
+		gogui.ContainerCfg{
+			Width:   width,
+			Sizing:  gogui.FixedFit,
+			Padding: gogui.NoPadding,
+			HAlign:  align,
+			Content: []gogui.View{gogui.Label(text, st)},
+		},
+	)
 }
 
-func (p *Renderer) progress(w *gogui.Window, now media.Now, sk media.Seeker, st gogui.TextStyle, marks []videoplayer.Mark) gogui.View {
+func (p *Renderer) progress(
+	w *gogui.Window,
+	now media.Now,
+	sk media.Seeker,
+	st gogui.TextStyle,
+	marks []videoplayer.Mark,
+) gogui.View {
 	at := p.seeking.shown(now.Elapsed)
 	canSeek := sk != nil && sk.CanSeek()
 	cfg := gogui.SliderCfg{
@@ -201,7 +289,11 @@ func (p *Renderer) progress(w *gogui.Window, now media.Now, sk media.Seeker, st 
 	content := []gogui.View{bar}
 	if now.LiveWithin == 0 {
 		wide := clockWidth(w, now.Length, st)
-		content = []gogui.View{clockLabel(ClockText(at), wide, st, gogui.HAlignRight), bar, clockLabel(ClockText(now.Length), wide, st, gogui.HAlignLeft)}
+		content = []gogui.View{
+			clockLabel(ClockText(at), wide, st, gogui.HAlignRight),
+			bar,
+			clockLabel(ClockText(now.Length), wide, st, gogui.HAlignLeft),
+		}
 	}
 	return gogui.Row(gogui.ContainerCfg{
 		Sizing:  gogui.FillFit,
@@ -221,7 +313,12 @@ type control struct {
 func (p *Renderer) transport(now media.Now) gogui.View {
 	middle := control{glyph: gogui.IconPlay, do: media.Controller.Play, primary: true}
 	if now.Playing && !now.Paused {
-		middle = control{glyph: gogui.IconPause, do: media.Controller.Pause, need: media.CanPause, primary: true}
+		middle = control{
+			glyph:   gogui.IconPause,
+			do:      media.Controller.Pause,
+			need:    media.CanPause,
+			primary: true,
+		}
 	}
 	t := gogui.CurrentTheme()
 	var shown []gogui.View
@@ -240,9 +337,25 @@ func (p *Renderer) transport(now media.Now) gogui.View {
 		if b.primary {
 			st.Size = reach() * 0.75
 		}
-		shown = append(shown, p.kit.KeyButton(fmt.Sprintf("transport-%d", i), b.glyph, st, widgets.Chosen(b.primary), func(gogui.EventCtx) { do(p.options.Player.Transport()) }))
+		shown = append(
+			shown,
+			p.kit.KeyButton(
+				fmt.Sprintf("transport-%d", i),
+				b.glyph,
+				st,
+				widgets.Chosen(b.primary),
+				func(gogui.EventCtx) { do(p.options.Player.Transport()) },
+			),
+		)
 	}
-	return gogui.Row(gogui.ContainerCfg{Sizing: gogui.FillFit, VAlign: gogui.VAlignMiddle, Spacing: gogui.SpacingMedium, Content: shown})
+	return gogui.Row(
+		gogui.ContainerCfg{
+			Sizing:  gogui.FillFit,
+			VAlign:  gogui.VAlignMiddle,
+			Spacing: gogui.SpacingMedium,
+			Content: shown,
+		},
+	)
 }
 
 func (p *Renderer) loudness() gogui.View {
@@ -282,9 +395,28 @@ func (p *Renderer) queue(now media.Now) gogui.View {
 		var content []gogui.View
 		if tr.Art != nil {
 			side := reach()
-			content = append(content, gogui.Image(gogui.ImageCfg{Src: Squared(ui.Picture(tr.Art, tr.ArtID)), Width: side, Height: side}))
+			content = append(
+				content,
+				gogui.Image(
+					gogui.ImageCfg{
+						Src:    Squared(ui.Picture(tr.Art, tr.ArtID)),
+						Width:  side,
+						Height: side,
+					},
+				),
+			)
 		}
-		content = append(content, gogui.Column(gogui.ContainerCfg{Sizing: gogui.FillFit, Padding: gogui.NoPadding, Clip: true, Content: line}))
+		content = append(
+			content,
+			gogui.Column(
+				gogui.ContainerCfg{
+					Sizing:  gogui.FillFit,
+					Padding: gogui.NoPadding,
+					Clip:    true,
+					Content: line,
+				},
+			),
+		)
 		if tr.Length > 0 {
 			content = append(content, gogui.Label(ClockText(tr.Length), secondary()))
 		}
@@ -300,14 +432,23 @@ func (p *Renderer) queue(now media.Now) gogui.View {
 		p.kit.ListRow(&row, style.Rest)
 		rows = append(rows, p.options.UI.Presses.Pressable(gogui.Row, row, onClick))
 	}
-	return gogui.Column(gogui.ContainerCfg{ID: "queue", Sizing: gogui.FillFill, Scrollable: true, OnGesture: p.options.UI.HoldStill, Spacing: gogui.SpacingSmall, Content: rows})
+	return gogui.Column(
+		gogui.ContainerCfg{
+			ID:         "queue",
+			Sizing:     gogui.FillFill,
+			Scrollable: true,
+			OnGesture:  p.options.UI.HoldStill,
+			Spacing:    gogui.SpacingSmall,
+			Content:    rows,
+		},
+	)
 }
 
 const PriorityMini = 5
 
 func (p *Renderer) Mini(w *gogui.Window) gogui.View {
 	now := p.options.Player.Now()
-	if p.options.Shell.Open() || !(now.Playing || now.Paused) {
+	if p.options.Shell.Open() || !now.Playing && !now.Paused {
 		return nil
 	}
 	t := gogui.CurrentTheme()
@@ -316,11 +457,23 @@ func (p *Renderer) Mini(w *gogui.Window) gogui.View {
 
 	var art gogui.View
 	if now.Art != nil {
-		art = gogui.Image(gogui.ImageCfg{Src: Squared(ui.Picture(now.Art, now.ArtID)), Width: side, Height: side})
+		art = gogui.Image(
+			gogui.ImageCfg{Src: Squared(ui.Picture(now.Art, now.ArtID)), Width: side, Height: side},
+		)
 	} else {
 		st := t.TextStyleIconLarge
 		st.Color = t.Cfg.ColorTextSecondary
-		art = gogui.Column(gogui.ContainerCfg{Width: side, Height: side, Sizing: gogui.FixedFixed, HAlign: gogui.HAlignCenter, VAlign: gogui.VAlignMiddle, Padding: gogui.NoPadding, Content: []gogui.View{gogui.Label(gogui.IconMusic, st)}})
+		art = gogui.Column(
+			gogui.ContainerCfg{
+				Width:   side,
+				Height:  side,
+				Sizing:  gogui.FixedFixed,
+				HAlign:  gogui.HAlignCenter,
+				VAlign:  gogui.VAlignMiddle,
+				Padding: gogui.NoPadding,
+				Content: []gogui.View{gogui.Label(gogui.IconMusic, st)},
+			},
+		)
 	}
 
 	words := []gogui.View{gogui.Label(media.Heading(now), gogui.TextStyle{})}
@@ -337,15 +490,37 @@ func (p *Renderer) Mini(w *gogui.Window) gogui.View {
 	}
 	middle := control{gogui.IconPlay, func(gogui.EventCtx) { p.options.Player.Transport().Play() }}
 	if now.Playing && !now.Paused {
-		middle = control{gogui.IconPause, func(gogui.EventCtx) { p.options.Player.Transport().Pause() }}
+		middle = control{
+			gogui.IconPause,
+			func(gogui.EventCtx) { p.options.Player.Transport().Pause() },
+		}
 	}
 	controls := []control{middle}
 	if now.Can.Has(media.CanNext) {
-		controls = append(controls, control{gogui.IconFastForward, func(gogui.EventCtx) { p.options.Player.Transport().Next() }})
+		controls = append(
+			controls,
+			control{
+				gogui.IconFastForward,
+				func(gogui.EventCtx) { p.options.Player.Transport().Next() },
+			},
+		)
 	}
-	controls = append(controls, control{gogui.IconExpand, func(gogui.EventCtx) { p.options.Player.Open() }})
+	controls = append(
+		controls,
+		control{gogui.IconExpand, func(gogui.EventCtx) { p.options.Player.Open() }},
+	)
 
-	content := []gogui.View{art, gogui.Column(gogui.ContainerCfg{Sizing: gogui.FillFit, Padding: gogui.NoPadding, Clip: true, Content: words})}
+	content := []gogui.View{
+		art,
+		gogui.Column(
+			gogui.ContainerCfg{
+				Sizing:  gogui.FillFit,
+				Padding: gogui.NoPadding,
+				Clip:    true,
+				Content: words,
+			},
+		),
+	}
 	for i, c := range controls {
 		content = append(content, p.kit.IconKey(gogui.ContainerCfg{
 			ID:      fmt.Sprintf("mini-%d", i),

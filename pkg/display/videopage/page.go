@@ -19,8 +19,6 @@ const (
 	spinAfter = 300 * time.Millisecond
 )
 
-// Page is a video on the shell: the picture shows through it, and its controls, spinner, logo
-// and errors are drawn like any other screen.
 type Page struct {
 	options Dependencies
 	c       Controls
@@ -98,7 +96,6 @@ func New(c Controls, o Dependencies) *Page {
 
 func (p *Page) Covers() bool { return true }
 
-// Follow points the controls at what plays now, when one track hands over to the next.
 func (p *Page) Follow(c Controls) {
 	p.mu.Lock()
 	p.c = c
@@ -179,7 +176,6 @@ func (p *Page) redraw() {
 	}
 }
 
-// Run puts the page up and keeps it current until ctx ends.
 func (p *Page) Run(ctx context.Context) {
 	p.Show()
 	quiet := p.options.Volume.Watch(func(int) {
@@ -207,7 +203,6 @@ func (p *Page) Run(ctx context.Context) {
 	}
 }
 
-// Show puts the page back up, for coming back to it from the mini player.
 func (p *Page) Show() {
 	p.mu.Lock()
 	held := p.hold.Held()
@@ -245,7 +240,21 @@ func (p *Page) tick() {
 	}
 	p.paused = now.Paused
 	spinning := p.loading && time.Since(p.began) > spinAfter
-	key := fmt.Sprintf("%v|%v|%d|%v|%v|%s|%s|%s|%d|%d|%d|%d", p.shown, p.picture, now.Elapsed/time.Second, now.Paused, now.Playing, now.Title, now.Artist, now.Album, now.ArtID, now.MarkID, now.Can, p.options.Volume.Level())
+	key := fmt.Sprintf(
+		"%v|%v|%d|%v|%v|%s|%s|%s|%d|%d|%d|%d",
+		p.shown,
+		p.picture,
+		now.Elapsed/time.Second,
+		now.Paused,
+		now.Playing,
+		now.Title,
+		now.Artist,
+		now.Album,
+		now.ArtID,
+		now.MarkID,
+		now.Can,
+		p.options.Volume.Level(),
+	)
 	changed := key != p.drawn
 	p.drawn = key
 	p.mu.Unlock()

@@ -8,17 +8,11 @@ import (
 	"time"
 )
 
-// fake is a supplicant that answers the handful of commands a switch sends, and remembers what it
-// was asked. The interesting behaviour is which network it says it is on afterwards.
 type fake struct {
-	// on is what STATUS reports, and what select_network changes when the join is going to work.
 	on string
 
-	// joins is what a network with this name does when selected: true associates, false does not,
-	// which is a wrong passphrase as far as anything here can tell.
 	joins map[string]bool
 
-	// configured is name by id, so remove_network and list_networks agree with each other.
 	configured map[string]string
 	next       int
 
@@ -58,7 +52,6 @@ func (f *fake) Cmd(words ...string) (string, error) {
 		return id, nil
 
 	case "set_network":
-		// set_network ID ssid HEX is the one that names it.
 		if len(words) == 4 && words[2] == "ssid" {
 			f.configured[words[1]] = unhex(words[3])
 		}
@@ -98,7 +91,7 @@ func unhex(s string) string {
 	var out []byte
 	for i := 0; i+1 < len(s); i += 2 {
 		var b int
-		fmt.Sscanf(s[i:i+2], "%02x", &b)
+		_, _ = fmt.Sscanf(s[i:i+2], "%02x", &b)
 		out = append(out, byte(b))
 	}
 	return string(out)
@@ -119,7 +112,6 @@ func TestSwitchingToAWorkingNetworkTakes(t *testing.T) {
 	}
 }
 
-// The whole point of the task: a wrong passphrase must not strand the device.
 func TestAFailedSwitchGoesBack(t *testing.T) {
 	f := newFake("old")
 	f.joins["new"] = false
@@ -143,7 +135,6 @@ func TestAFailedSwitchGoesBack(t *testing.T) {
 	}
 }
 
-// A network that did not associate must not be left configured, or every reboot retries it.
 func TestAFailedSwitchLeavesNothingBehind(t *testing.T) {
 	f := newFake("old")
 	f.joins["new"] = false
@@ -159,7 +150,6 @@ func TestAFailedSwitchLeavesNothingBehind(t *testing.T) {
 	}
 }
 
-// The configuration on disk never had the new network in it, so a failure has nothing to write.
 func TestAFailedSwitchDoesNotSave(t *testing.T) {
 	f := newFake("old")
 	f.joins["new"] = false
@@ -192,8 +182,6 @@ func TestSwitchingToNothingIsRefused(t *testing.T) {
 	}
 }
 
-// A device on no network has nothing to go back to, which is not a reason to hang on to a network
-// that does not work.
 func TestAFailedSwitchFromNothingStillCleansUp(t *testing.T) {
 	f := newFake("")
 	f.joins["new"] = false
@@ -209,8 +197,6 @@ func TestAFailedSwitchFromNothingStillCleansUp(t *testing.T) {
 	}
 }
 
-// A bad passphrase is caught before anything is torn down, so the device never leaves the network
-// it is on.
 func TestABadPassphraseNeverTouchesTheConnection(t *testing.T) {
 	f := newFake("old")
 

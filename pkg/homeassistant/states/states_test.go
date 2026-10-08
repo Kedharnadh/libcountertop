@@ -9,7 +9,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// peer is Home Assistant's end, keeping what the device sent it.
 type peer struct {
 	mu   sync.Mutex
 	sent []*api.SubscribeHomeAssistantStateResponse
@@ -41,8 +40,6 @@ func (p *peer) asked() []string {
 	return out
 }
 
-// Home Assistant asks once per connection what this device wants to hear about, and the whole
-// list goes back. Nothing is followed unless it is on that list.
 func TestEverythingFollowedIsOfferedWhenAsked(t *testing.T) {
 	s := &States{}
 	s.Follow("weather.home", "")
@@ -65,8 +62,6 @@ func TestEverythingFollowedIsOfferedWhenAsked(t *testing.T) {
 	}
 }
 
-// A value the screen keeps on showing, not a reading taken once: once would have Home Assistant
-// answer and stop.
 func TestTheDeviceAsksToBeToldEveryTime(t *testing.T) {
 	s := &States{}
 	s.Follow("weather.home", "")
@@ -79,8 +74,6 @@ func TestTheDeviceAsksToBeToldEveryTime(t *testing.T) {
 	}
 }
 
-// Two features showing one temperature ask for it once and read the same value, or they can
-// disagree about it on the same screen.
 func TestFollowingTheSameThingTwiceIsOneSubscription(t *testing.T) {
 	s := &States{}
 
@@ -94,14 +87,11 @@ func TestFollowingTheSameThingTwiceIsOneSubscription(t *testing.T) {
 		t.Errorf("%d subscriptions, want 1", got)
 	}
 
-	// And the attribute is part of what makes it the same thing.
 	if s.Follow("weather.home", ""); len(s.Following()) != 2 {
 		t.Error("the state and an attribute of it were taken for the same subscription")
 	}
 }
 
-// Something followed after Home Assistant has already asked is offered on the connection that is
-// there, rather than waiting for the next one.
 func TestFollowingLateIsOfferedStraightAway(t *testing.T) {
 	s := &States{}
 
@@ -114,8 +104,6 @@ func TestFollowingLateIsOfferedStraightAway(t *testing.T) {
 	}
 }
 
-// With nothing connected there is nobody to ask, and following has to be safe anyway: features
-// are built long before the server is listening.
 func TestFollowingWithNothingConnected(t *testing.T) {
 	s := &States{}
 
@@ -141,8 +129,6 @@ func TestStatesArriveAtTheValueTheyAreFor(t *testing.T) {
 	}
 }
 
-// A report for something nothing follows is dropped rather than kept: the list is what the device
-// asked for, and anything else is the server's business.
 func TestAStateNothingFollowsIsDropped(t *testing.T) {
 	s := &States{}
 	v := s.Follow("weather.home", "")
@@ -154,8 +140,6 @@ func TestAStateNothingFollowsIsDropped(t *testing.T) {
 	}
 }
 
-// Home Assistant reports the current value on every connection, and a redraw for a value that has
-// not moved is a redraw for nothing.
 func TestChangedOnlyFiresOnNews(t *testing.T) {
 	s := &States{}
 	v := s.Follow("weather.home", "")
@@ -178,8 +162,6 @@ func TestChangedOnlyFiresOnNews(t *testing.T) {
 	}
 }
 
-// Everything arrives as a string, including the states that are plainly numbers, and an entity
-// with nothing behind it sends a word.
 func TestOnlyANumberReadsAsANumber(t *testing.T) {
 	tests := []struct {
 		state string
@@ -206,8 +188,6 @@ func TestOnlyANumberReadsAsANumber(t *testing.T) {
 	}
 }
 
-// An entity nobody named is not followed, rather than followed under an empty name that every
-// report with no entity would match.
 func TestAnEmptyEntityIsNotFollowed(t *testing.T) {
 	s := &States{}
 
@@ -219,16 +199,12 @@ func TestAnEmptyEntityIsNotFollowed(t *testing.T) {
 	}
 }
 
-// The handler is what the server calls, and the two messages it cares about have to go to the
-// right halves.
 func TestTheHandlerAnswersTheRequestAndTakesTheReports(t *testing.T) {
 	s := &States{}
 	v := s.Follow("weather.home", "")
 
 	ctx := context.Background()
 
-	// No connection to answer on, which is the shape a test can build: what matters is that
-	// neither message is refused.
 	if err := s.Handle(ctx, nil, &api.SubscribeHomeAssistantStatesRequest{}); err != nil {
 		t.Fatalf("the request was refused: %v", err)
 	}
@@ -243,7 +219,6 @@ func TestTheHandlerAnswersTheRequestAndTakesTheReports(t *testing.T) {
 	}
 }
 
-// Anything else on the connection is not this package's, and passing it through has to be free.
 func TestTheHandlerIgnoresEverythingElse(t *testing.T) {
 	s := &States{}
 

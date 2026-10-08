@@ -1,12 +1,3 @@
-// Package mark turns SVG icons into the IconVG the panel draws.
-//
-// The icon set the binary carries is Material Design, which arrives already converted. This is for
-// everything else: any icon set whose glyphs are filled paths can be taken from, a file at a time,
-// without depending on the set or shipping a rasterizer for it.
-//
-// Filled paths only. Sets drawn as strokes with no fill — Lucide and Feather among them — come out
-// empty, because nothing here widens a stroke into an outline.
-//
 // The conversion is adapted from golang.org/x/exp/shiny/materialdesign/icons/gen.go, which is
 // Copyright 2016 The Go Authors and BSD licensed.
 package mark
@@ -24,10 +15,8 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
-// size is the width and height in IconVG's own space, whatever the SVG was drawn at.
 const size = 48
 
-// svg is as much of the format as a single-color icon uses.
 type svg struct {
 	ViewBox string   `xml:"viewBox,attr"`
 	Paths   []path   `xml:"path"`
@@ -45,18 +34,8 @@ type circle struct {
 	R  float32 `xml:"r,attr"`
 }
 
-// Convert turns one SVG into an icon. The viewBox may be any square; what comes out is scaled to
-// IconVG's space so icons from different sets are the same size beside each other.
-//
-// A box that is not square is centered in one that is, because an icon is drawn into a square and
-// anything else would be stretched to fill it.
 func Convert(data []byte) (ui.Icon, error) { return convert(data, false) }
 
-// Shaped is Convert for artwork whose box is not square and is meant not to be.
-//
-// A numeral is the case: it is drawn into a tall box, laid out by that box's proportions, and drawn
-// filling whatever it is given. Squaring it would declare half a box of margin that the layout then
-// has to know about and subtract, and would carry that margin in every mask.
 func Shaped(data []byte) (ui.Icon, error) { return convert(data, true) }
 
 func convert(data []byte, shaped bool) (ui.Icon, error) {
@@ -73,9 +52,6 @@ func convert(data []byte, shaped bool) (ui.Icon, error) {
 		return nil, fmt.Errorf("mark: the svg has no filled paths")
 	}
 
-	// Square unless the caller says the shape is the point, in which case the declared box is the
-	// drawing's own. Coordinates are the same either way: only what the rasterizer is told it is
-	// filling changes.
 	if !shaped {
 		extent = f32.Vec2{size, size}
 	}
@@ -111,8 +87,7 @@ func convert(data []byte, shaped bool) (ui.Icon, error) {
 			enc.ClosePathAbsMoveTo(cx-r, cy)
 		}
 
-		// Two half turns: one arc of a whole turn starts and ends in the same place, which is
-		// degenerate.
+		// An SVG arc whose endpoints coincide is degenerate.
 		enc.RelArcTo(r, r, 0, false, true, +2*r, 0)
 		enc.RelArcTo(r, r, 0, false, true, -2*r, 0)
 	}
@@ -129,14 +104,8 @@ func convert(data []byte, shaped bool) (ui.Icon, error) {
 	return ui.Icon(out), nil
 }
 
-// box reads the viewBox, which says what the coordinates in the path data are relative to.
-//
-// side is what the coordinates are scaled by, taken from the longer edge so a drawing of any shape
-// comes out the same size beside others. extent is that shape in IconVG's own space, which is the
-// box the drawing is declared to occupy. offset centers each axis on the origin.
 func box(viewBox string) (side float32, extent, offset f32.Vec2, err error) {
 	if viewBox == "" {
-		// The overwhelmingly common one, and what a file with no box is almost certainly drawn in.
 		return 24, f32.Vec2{size, size}, f32.Vec2{}, nil
 	}
 
@@ -168,7 +137,6 @@ func box(viewBox string) (side float32, extent, offset f32.Vec2, err error) {
 	return side, extent, offset, nil
 }
 
-// draw walks one path's data, emitting it as IconVG.
 func draw(enc *iconvg.Encoder, data string, side float32, offset f32.Vec2, started *bool) error {
 	data = strings.TrimSuffix(strings.TrimSpace(data), "z")
 	r := strings.NewReader(strings.ReplaceAll(data, ",", " "))
@@ -193,7 +161,7 @@ func draw(enc *iconvg.Encoder, data string, side float32, offset f32.Vec2, start
 		case 'a' <= b && b <= 'z':
 			op, relative = b, true
 		default:
-			r.UnreadByte()
+			_ = r.UnreadByte()
 		}
 
 		n := 0
@@ -265,16 +233,14 @@ func scan(args *[6]float32, r *strings.Reader, n int) {
 	for i := range n {
 		for {
 			if b, _ := r.ReadByte(); b != ' ' {
-				r.UnreadByte()
+				_ = r.UnreadByte()
 				break
 			}
 		}
-		fmt.Fscanf(r, "%f", &args[i])
+		_, _ = fmt.Fscanf(r, "%f", &args[i])
 	}
 }
 
-// normalize scales path coordinates into IconVG's space, which is centered on the origin where an
-// SVG's is not.
 func normalize(args *[6]float32, n int, op byte, side float32, offset f32.Vec2, relative bool) {
 	for i := range n {
 		args[i] *= size / side
@@ -294,8 +260,6 @@ func normalize(args *[6]float32, n int, op byte, side float32, offset f32.Vec2, 
 	}
 }
 
-// Must is Convert for an icon compiled in, where a file that will not convert is a mistake in the
-// build rather than something to handle.
 func Must(data []byte) ui.Icon {
 	icon, err := Convert(data)
 	if err != nil {

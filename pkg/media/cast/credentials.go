@@ -18,8 +18,6 @@ import (
 	"time"
 )
 
-// Credentials are what this device proves itself with: the certificate it presents on 8009, and the
-// device certificate chain whose key has signed it.
 type Credentials struct {
 	Peer          tls.Certificate
 	Device        []byte
@@ -29,11 +27,9 @@ type Credentials struct {
 
 	NotBefore, NotAfter time.Time
 
-	// Remote is whether they came from an oracle rather than being made here.
 	Remote bool
 }
 
-// Signature is the device key's signature over the peer certificate under the hash asked for.
 func (c *Credentials) Signature(h Hash) []byte {
 	if h == SHA256 {
 		return c.SHA256
@@ -41,11 +37,8 @@ func (c *Credentials) Signature(h Hash) []byte {
 	return c.SHA1
 }
 
-// PeerLife is how long a peer certificate made here is good for, matching what an oracle issues.
 const PeerLife = 48 * time.Hour
 
-// Authority makes credentials of our own: a root, an intermediate and a device certificate, kept for
-// as long as the process runs, and a fresh peer certificate each time it is asked.
 type Authority struct {
 	device       *rsa.PrivateKey
 	deviceDER    []byte
@@ -58,7 +51,6 @@ type savedAuthority struct {
 	Intermediate []byte `json:"intermediate_cert"`
 }
 
-// Marshal is the authority as it is kept between runs.
 func (a *Authority) Marshal() ([]byte, error) {
 	return json.Marshal(savedAuthority{
 		Device:       x509.MarshalPKCS1PrivateKey(a.device),
@@ -67,7 +59,6 @@ func (a *Authority) Marshal() ([]byte, error) {
 	})
 }
 
-// LoadAuthority reads back what Marshal kept, if it was made for this name.
 func LoadAuthority(data []byte, name string) (*Authority, error) {
 	var s savedAuthority
 	if err := json.Unmarshal(data, &s); err != nil {
@@ -82,7 +73,11 @@ func LoadAuthority(data []byte, name string) (*Authority, error) {
 		return nil, fmt.Errorf("cast: reading the kept device certificate: %w", err)
 	}
 	if cert.Subject.CommonName != name {
-		return nil, fmt.Errorf("cast: the kept authority is for %q, not %q", cert.Subject.CommonName, name)
+		return nil, fmt.Errorf(
+			"cast: the kept authority is for %q, not %q",
+			cert.Subject.CommonName,
+			name,
+		)
 	}
 	if !key.PublicKey.Equal(cert.PublicKey) {
 		return nil, fmt.Errorf("cast: the kept device key does not match its certificate")
@@ -93,7 +88,6 @@ func LoadAuthority(data []byte, name string) (*Authority, error) {
 	return &Authority{device: key, deviceDER: s.DeviceCert, intermediate: s.Intermediate}, nil
 }
 
-// NewAuthority makes the chain. Its dates are loose enough that a clock not yet set does not matter.
 func NewAuthority(name string) (*Authority, error) {
 	from := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 	until := time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -152,7 +146,6 @@ func NewAuthority(name string) (*Authority, error) {
 	return &Authority{device: deviceKey, deviceDER: deviceDER, intermediate: icaDER}, nil
 }
 
-// Issue makes a peer certificate valid from an hour before now for PeerLife, and signs it.
 func (a *Authority) Issue(name string, now time.Time) (*Credentials, error) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -218,8 +211,7 @@ func signatures(key *rsa.PrivateKey, peer []byte) ([]byte, []byte, error) {
 	return s1, s256, nil
 }
 
-// Oracle is what an oracle answers with. Every certificate, key and signature is base64 DER, and
-// every time is Unix seconds.
+// Certificates, keys and signatures are base64 DER; times are Unix seconds.
 type Oracle struct {
 	Public       string `json:"public"`
 	Private      string `json:"private"`
@@ -232,7 +224,6 @@ type Oracle struct {
 	Now          int64  `json:"now"`
 }
 
-// ParseOracle reads an oracle's answer into credentials, and the oracle's clock.
 func ParseOracle(body []byte) (*Credentials, time.Time, error) {
 	var o Oracle
 	if err := json.Unmarshal(body, &o); err != nil {
@@ -264,7 +255,11 @@ func ParseOracle(body []byte) (*Credentials, time.Time, error) {
 	}
 
 	return &Credentials{
-		Peer:          tls.Certificate{Certificate: [][]byte{raw["public"]}, PrivateKey: key, Leaf: leaf},
+		Peer: tls.Certificate{
+			Certificate: [][]byte{raw["public"]},
+			PrivateKey:  key,
+			Leaf:        leaf,
+		},
 		Device:        raw["device"],
 		Intermediates: [][]byte{raw["intermediate"]},
 		SHA1:          raw["sha1"],
@@ -281,7 +276,10 @@ func privateKey(der []byte) (crypto.Signer, error) {
 	}
 	k, err := x509.ParsePKCS8PrivateKey(der)
 	if err != nil {
-		return nil, fmt.Errorf("cast: the oracle's private key is neither PKCS#1 nor PKCS#8: %w", err)
+		return nil, fmt.Errorf(
+			"cast: the oracle's private key is neither PKCS#1 nor PKCS#8: %w",
+			err,
+		)
 	}
 	signer, ok := k.(crypto.Signer)
 	if !ok {

@@ -18,8 +18,6 @@ func TestAFrameGoesOutAndComesBackTheSame(t *testing.T) {
 	}
 }
 
-// A frame arrives whole — whatever reassembled it already waited. So a length that disagrees with
-// what is there is a malformed frame, not more to read.
 func TestAFrameWhoseLengthDisagreesWithItself(t *testing.T) {
 	whole := Frame{CID: 0x0040, Payload: []byte{1, 2, 3, 4}}.Marshal()
 
@@ -44,8 +42,6 @@ func TestAnEmptyFrameIsStillAFrame(t *testing.T) {
 	}
 }
 
-// Several commands may share one signalling frame, and the identifier is what pairs each answer
-// with its question.
 func TestSeveralCommandsInOneFrame(t *testing.T) {
 	want := []Command{
 		{Code: CodeConnectRequest, ID: 1, Data: []byte{0x19, 0x00, 0x41, 0x00}},
@@ -107,8 +103,6 @@ func TestReadingAConnectionRequest(t *testing.T) {
 	}
 }
 
-// A channel has a different number at each end, and answering with the wrong one in the wrong slot
-// is a channel neither side can address.
 func TestAConnectionResponseCarriesBothChannelNumbers(t *testing.T) {
 	want := Connected{DestinationCID: 0x0040, SourceCID: 0x0041, Result: ConnectSuccess}
 

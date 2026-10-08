@@ -4,7 +4,6 @@ import (
 	"time"
 )
 
-// Rate is the shared speaker queue's sample rate.
 const Rate = 48000
 
 const (

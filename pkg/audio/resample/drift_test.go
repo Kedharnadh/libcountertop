@@ -72,7 +72,13 @@ func TestSkewMovesTheRatioByWhatItSays(t *testing.T) {
 		for _, ppm := range []float64{500, -500, 37} {
 			got := float64(count(ppm)-plain) / float64(plain) * 1e6
 			if math.Abs(got+ppm) > 20 {
-				t.Errorf("from %d: skew %v moved the output by %.0f ppm, want %v", from, ppm, got, -ppm)
+				t.Errorf(
+					"from %d: skew %v moved the output by %.0f ppm, want %v",
+					from,
+					ppm,
+					got,
+					-ppm,
+				)
 			}
 		}
 	}

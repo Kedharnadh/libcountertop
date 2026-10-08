@@ -1,5 +1,3 @@
-// Package mtkcamera streams H.264 from the camera helper, the helper that runs the vendor camera stack into
-// hardware encoders. One client at a time; closing the stream stops the camera.
 package helper
 
 import (
@@ -42,10 +40,8 @@ type Config struct {
 
 	SubWidth, SubHeight, SubBitrate int
 
-	// Params is vendor camera parameters as key=value pairs joined by semicolons.
 	Params string
 
-	// Turn is quarter turns clockwise drawn on the GPU into the encoders, negative for none.
 	Turn int
 
 	Mirror bool
@@ -67,15 +63,26 @@ type Stream struct {
 	cfg Config
 }
 
-// Open starts the camera and encoder.
 func Open(socket string, cfg Config) (*Stream, error) {
 	c, err := net.DialTimeout("unix", socket, 2*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("mtkcamera: %w", err)
 	}
-	req := []uint32{magic, version, uint32(cfg.Width), uint32(cfg.Height), uint32(cfg.FPS),
-		uint32(cfg.Bitrate), uint32(cfg.Keyframe), uint32(cfg.SubWidth), uint32(cfg.SubHeight), uint32(cfg.SubBitrate),
-		turnWord(cfg.Turn, cfg.Mirror)}
+	req := []uint32{
+		magic,
+		version,
+		uint32(cfg.Width),
+		uint32(cfg.Height),
+		uint32(cfg.FPS),
+		uint32(
+			cfg.Bitrate,
+		),
+		uint32(cfg.Keyframe),
+		uint32(cfg.SubWidth),
+		uint32(cfg.SubHeight),
+		uint32(cfg.SubBitrate),
+		turnWord(cfg.Turn, cfg.Mirror),
+	}
 	if len(cfg.Params) > maxParams {
 		c.Close()
 		return nil, fmt.Errorf("mtkcamera: %d bytes of parameters", len(cfg.Params))
@@ -89,20 +96,44 @@ func Open(socket string, cfg Config) (*Stream, error) {
 		c.Close()
 		return nil, fmt.Errorf("mtkcamera: %w", err)
 	}
-	c.SetReadDeadline(time.Now().Add(15 * time.Second))
+	if err := c.SetReadDeadline(time.Now().Add(15 * time.Second)); err != nil {
+		c.Close()
+		return nil, fmt.Errorf("mtkcamera: %w", err)
+	}
 	var reply [4]uint32
 	if err := binary.Read(c, binary.LittleEndian, &reply); err != nil {
 		c.Close()
-		return nil, fmt.Errorf("mtkcamera: opening %dx%d@%d: %w", cfg.Width, cfg.Height, cfg.FPS, err)
+		return nil, fmt.Errorf(
+			"mtkcamera: opening %dx%d@%d: %w",
+			cfg.Width,
+			cfg.Height,
+			cfg.FPS,
+			err,
+		)
 	}
 	if reply[0] != 0 {
 		c.Close()
 		if why, ok := errs[reply[0]]; ok {
-			return nil, fmt.Errorf("mtkcamera: opening %dx%d@%d: %s", cfg.Width, cfg.Height, cfg.FPS, why)
+			return nil, fmt.Errorf(
+				"mtkcamera: opening %dx%d@%d: %s",
+				cfg.Width,
+				cfg.Height,
+				cfg.FPS,
+				why,
+			)
 		}
-		return nil, fmt.Errorf("mtkcamera: opening %dx%d@%d: status %d", cfg.Width, cfg.Height, cfg.FPS, reply[0])
+		return nil, fmt.Errorf(
+			"mtkcamera: opening %dx%d@%d: status %d",
+			cfg.Width,
+			cfg.Height,
+			cfg.FPS,
+			reply[0],
+		)
 	}
-	c.SetReadDeadline(time.Time{})
+	if err := c.SetReadDeadline(time.Time{}); err != nil {
+		c.Close()
+		return nil, fmt.Errorf("mtkcamera: %w", err)
+	}
 	return &Stream{c: c, cfg: cfg}, nil
 }
 
@@ -119,10 +150,11 @@ func turnWord(q int, mirror bool) uint32 {
 	return w
 }
 
-// Next blocks until the encoder has another frame, or within passes.
 func (s *Stream) Next(within time.Duration) (Frame, error) {
 	if within > 0 {
-		s.c.SetReadDeadline(time.Now().Add(within))
+		if err := s.c.SetReadDeadline(time.Now().Add(within)); err != nil {
+			return Frame{}, err
+		}
 	}
 	var head [4]uint32
 	if err := binary.Read(s.c, binary.LittleEndian, &head); err != nil {
@@ -163,7 +195,6 @@ func idr(b []byte) bool {
 	return false
 }
 
-// AskStill asks for an RGBA picture of the main stream, which arrives among the frames, empty on failure.
 func (s *Stream) AskStill() error {
 	_, err := s.c.Write([]byte{askStill})
 	return err
@@ -174,7 +205,6 @@ func (s *Stream) AskKey() error {
 	return err
 }
 
-// SetParams changes vendor camera parameters on the running camera.
 func (s *Stream) SetParams(params string) error {
 	if len(params) > maxParams {
 		return fmt.Errorf("mtkcamera: %d bytes of parameters", len(params))
@@ -189,7 +219,6 @@ func (s *Stream) SetParams(params string) error {
 
 func (s *Stream) Close() error { return s.c.Close() }
 
-// Timeout reports whether err is Next running out of time rather than the stream ending.
 func Timeout(err error) bool {
 	var ne net.Error
 	return errors.As(err, &ne) && ne.Timeout()

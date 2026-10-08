@@ -10,9 +10,6 @@ import (
 	fixtures "github.com/ygelfand/libcountertop/pkg/bluetooth/sbc/testdata"
 )
 
-// What the arbiter asks of this, and what happens to audio while something else has the speaker.
-
-// fed plays one frame from a vector and reports how many samples reached the card.
 func fed(t *testing.T, s *Sink) int {
 	t.Helper()
 
@@ -30,7 +27,6 @@ func fed(t *testing.T, s *Sink) int {
 		t.Fatal(err)
 	}
 
-	// The counters reset each time the stream reports itself, and it reports on the first frame.
 	s.said = time.Now()
 
 	before := s.samples
@@ -38,8 +34,6 @@ func fed(t *testing.T, s *Sink) int {
 	return s.samples - before
 }
 
-// Audio arriving while stood down is dropped rather than queued. A phone goes on sending whatever
-// this device does with it, so keeping it would play minutes late.
 func TestNothingIsPlayedWhileStoodDown(t *testing.T) {
 	s := testSink()
 	s.start("stand test")
@@ -60,8 +54,6 @@ func TestNothingIsPlayedWhileStoodDown(t *testing.T) {
 	}
 }
 
-// The arbiter delivers a standing again whenever anything moves, so the same one twice has to be
-// the same as once. Pausing the phone on every repeat would fight a person pressing play.
 func TestTheSameStandingTwiceIsOnce(t *testing.T) {
 	s := testSink()
 	s.start("repeat test")
@@ -78,7 +70,6 @@ func TestTheSameStandingTwiceIsOnce(t *testing.T) {
 		t.Error("a repeated standing lost the standing")
 	}
 
-	// And back up, which must not leave it thinking it is still down.
 	s.Stand(false)
 	s.Stand(false)
 
@@ -91,8 +82,6 @@ func TestTheSameStandingTwiceIsOnce(t *testing.T) {
 	}
 }
 
-// Ducking scales what is written next rather than silencing it: a voice turn talks over music, it
-// does not replace it.
 func TestDuckingQuietensRatherThanStops(t *testing.T) {
 	s := testSink()
 	s.start("duck test")

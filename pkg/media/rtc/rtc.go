@@ -67,7 +67,11 @@ type Media struct {
 	Received func(Message)
 }
 
-var h264 = webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264, ClockRate: videoClock, SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f"}
+var h264 = webrtc.RTPCodecCapability{
+	MimeType:    webrtc.MimeTypeH264,
+	ClockRate:   videoClock,
+	SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f",
+}
 
 type Stats struct {
 	AudioSent, AudioRecv, AudioLost uint64
@@ -116,12 +120,20 @@ type Link struct {
 func api() (*webrtc.API, error) {
 	m := &webrtc.MediaEngine{}
 	if err := m.RegisterCodec(webrtc.RTPCodecParameters{
-		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus, ClockRate: 48000, Channels: 2, SDPFmtpLine: "minptime=10;useinbandfec=1"},
-		PayloadType:        opusType,
+		RTPCodecCapability: webrtc.RTPCodecCapability{
+			MimeType:    webrtc.MimeTypeOpus,
+			ClockRate:   48000,
+			Channels:    2,
+			SDPFmtpLine: "minptime=10;useinbandfec=1",
+		},
+		PayloadType: opusType,
 	}, webrtc.RTPCodecTypeAudio); err != nil {
 		return nil, err
 	}
-	if err := m.RegisterCodec(webrtc.RTPCodecParameters{RTPCodecCapability: h264, PayloadType: h264Type}, webrtc.RTPCodecTypeVideo); err != nil {
+	if err := m.RegisterCodec(
+		webrtc.RTPCodecParameters{RTPCodecCapability: h264, PayloadType: h264Type},
+		webrtc.RTPCodecTypeVideo,
+	); err != nil {
 		return nil, err
 	}
 	reg := &interceptor.Registry{}
@@ -131,15 +143,22 @@ func api() (*webrtc.API, error) {
 	se := webrtc.SettingEngine{}
 	se.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)
 	se.SetNetworkTypes([]webrtc.NetworkType{webrtc.NetworkTypeUDP4})
-	return webrtc.NewAPI(webrtc.WithMediaEngine(m), webrtc.WithInterceptorRegistry(reg), webrtc.WithSettingEngine(se)), nil
+	return webrtc.NewAPI(
+		webrtc.WithMediaEngine(m),
+		webrtc.WithInterceptorRegistry(reg),
+		webrtc.WithSettingEngine(se),
+	), nil
 }
 
 func New(m Media, ended func(webrtc.PeerConnectionState)) (*Link, error) {
 	return NewWithStreamID(m, ended, "countertop")
 }
 
-// NewWithStreamID preserves the product's SDP stream identifier.
-func NewWithStreamID(m Media, ended func(webrtc.PeerConnectionState), streamID string) (*Link, error) {
+func NewWithStreamID(
+	m Media,
+	ended func(webrtc.PeerConnectionState),
+	streamID string,
+) (*Link, error) {
 	built, err := api()
 	if err != nil {
 		return nil, err
@@ -148,14 +167,18 @@ func NewWithStreamID(m Media, ended func(webrtc.PeerConnectionState), streamID s
 	if err != nil {
 		return nil, err
 	}
-	track, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus, ClockRate: 48000, Channels: 2}, "audio", streamID)
+	track, err := webrtc.NewTrackLocalStaticSample(
+		webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus, ClockRate: 48000, Channels: 2},
+		"audio",
+		streamID,
+	)
 	if err != nil {
-		pc.Close()
+		_ = pc.Close()
 		return nil, err
 	}
 	sender, err := pc.AddTrack(track)
 	if err != nil {
-		pc.Close()
+		_ = pc.Close()
 		return nil, err
 	}
 	ctx, stop := context.WithCancel(context.Background())
@@ -171,14 +194,20 @@ func NewWithStreamID(m Media, ended func(webrtc.PeerConnectionState), streamID s
 			}
 		}
 	case m.Screen != nil:
-		_, err = pc.AddTransceiverFromKind(webrtc.RTPCodecTypeVideo, webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionRecvonly})
+		_, err = pc.AddTransceiverFromKind(
+			webrtc.RTPCodecTypeVideo,
+			webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionRecvonly},
+		)
 	}
 	if err == nil {
 		negotiated, id := true, uint16(0)
-		l.talk, err = pc.CreateDataChannel("status", &webrtc.DataChannelInit{Negotiated: &negotiated, ID: &id})
+		l.talk, err = pc.CreateDataChannel(
+			"status",
+			&webrtc.DataChannelInit{Negotiated: &negotiated, ID: &id},
+		)
 	}
 	if err != nil {
-		l.Close()
+		_ = l.Close()
 		return nil, err
 	}
 	l.talk.OnOpen(func() {
@@ -187,7 +216,9 @@ func NewWithStreamID(m Media, ended func(webrtc.PeerConnectionState), streamID s
 		}
 	})
 	l.talk.OnMessage(l.heard)
-	pc.OnTrack(func(t *webrtc.TrackRemote, r *webrtc.RTPReceiver) { l.worker(func() { l.receive(t, r) }) })
+	pc.OnTrack(
+		func(t *webrtc.TrackRemote, r *webrtc.RTPReceiver) { l.worker(func() { l.receive(t, r) }) },
+	)
 	pc.OnConnectionStateChange(l.state)
 	return l, nil
 }
@@ -201,7 +232,9 @@ func (l *Link) Offer(ctx context.Context) (string, error) {
 }
 
 func (l *Link) Accept(ctx context.Context, offer string) (string, error) {
-	if err := l.pc.SetRemoteDescription(webrtc.SessionDescription{Type: webrtc.SDPTypeOffer, SDP: offer}); err != nil {
+	if err := l.pc.SetRemoteDescription(
+		webrtc.SessionDescription{Type: webrtc.SDPTypeOffer, SDP: offer},
+	); err != nil {
 		return "", err
 	}
 	answer, err := l.pc.CreateAnswer(nil)
@@ -212,7 +245,9 @@ func (l *Link) Accept(ctx context.Context, offer string) (string, error) {
 }
 
 func (l *Link) Answered(answer string) error {
-	return l.pc.SetRemoteDescription(webrtc.SessionDescription{Type: webrtc.SDPTypeAnswer, SDP: answer})
+	return l.pc.SetRemoteDescription(
+		webrtc.SessionDescription{Type: webrtc.SDPTypeAnswer, SDP: answer},
+	)
 }
 
 func (l *Link) settle(ctx context.Context, desc webrtc.SessionDescription) (string, error) {
@@ -349,7 +384,10 @@ func (l *Link) send() {
 				slog.Warn("call encode", "err", err)
 				continue
 			}
-			if err := l.track.WriteSample(media.Sample{Data: append([]byte(nil), out[:n]...), Duration: frame}); err != nil && !errors.Is(err, context.Canceled) {
+			if err := l.track.WriteSample(
+				media.Sample{Data: append([]byte(nil), out[:n]...), Duration: frame},
+			); err != nil &&
+				!errors.Is(err, context.Canceled) {
 				slog.Debug("call send", "err", err)
 			}
 		}
@@ -451,7 +489,11 @@ func (l *Link) watch(t *webrtc.TrackRemote) {
 		}
 		asked = time.Now()
 		l.count.keysRequested.Add(1)
-		l.pc.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(t.SSRC())}})
+		if err := l.pc.WriteRTCP(
+			[]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(t.SSRC())}},
+		); err != nil {
+			slog.Debug("call keyframe request", "err", err)
+		}
 	}
 	for {
 		p, _, err := t.ReadRTP()
@@ -501,16 +543,26 @@ func (l *Link) RequestKey() {
 		return
 	}
 	l.count.keysRequested.Add(1)
-	l.pc.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: ssrc}})
+	if err := l.pc.WriteRTCP(
+		[]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: ssrc}},
+	); err != nil {
+		slog.Debug("call keyframe request", "err", err)
+	}
 }
 
 func (l *Link) Stats() Stats {
 	c := &l.count
 	return Stats{
-		AudioSent: c.audioSent.Load(), AudioRecv: c.audioRecv.Load(), AudioLost: c.audioLost.Load(),
-		VideoSent: c.videoSent.Load(), VideoRecv: c.videoRecv.Load(), VideoKeys: c.videoKeys.Load(),
-		VideoWaiting: c.videoWaiting.Load(), KeysRequested: c.keysRequested.Load(), KeysAsked: c.keysAsked.Load(),
-		EncodeTotal: time.Duration(c.encode.Load()),
+		AudioSent:     c.audioSent.Load(),
+		AudioRecv:     c.audioRecv.Load(),
+		AudioLost:     c.audioLost.Load(),
+		VideoSent:     c.videoSent.Load(),
+		VideoRecv:     c.videoRecv.Load(),
+		VideoKeys:     c.videoKeys.Load(),
+		VideoWaiting:  c.videoWaiting.Load(),
+		KeysRequested: c.keysRequested.Load(),
+		KeysAsked:     c.keysAsked.Load(),
+		EncodeTotal:   time.Duration(c.encode.Load()),
 	}
 }
 

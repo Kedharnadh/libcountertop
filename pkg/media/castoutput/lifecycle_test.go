@@ -25,7 +25,11 @@ func (s *exiting) Read(ctx context.Context, _ []int16) (int, error) {
 func TestStopJoinsTheAudioWorker(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		o := newOutput()
-		s := &exiting{reading: make(chan struct{}), cancelled: make(chan struct{}), finish: make(chan struct{})}
+		s := &exiting{
+			reading:   make(chan struct{}),
+			cancelled: make(chan struct{}),
+			finish:    make(chan struct{}),
+		}
 		o.Play(s)
 		<-s.reading
 		stopped := make(chan struct{})

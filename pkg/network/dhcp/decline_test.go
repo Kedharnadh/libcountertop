@@ -24,8 +24,6 @@ func declined(t *testing.T, addr, server net.IP) []byte {
 	return frame
 }
 
-// A header carrying its own correct checksum sums to zero. That is what a receiver does with it,
-// and it is the only check that says the sum is right rather than merely consistent with itself.
 func TestTheIPHeaderChecksumVerifies(t *testing.T) {
 	ip := declined(t, net.IPv4(10, 100, 101, 106), net.IPv4(10, 100, 101, 1))[ethHeader:]
 
@@ -34,8 +32,6 @@ func TestTheIPHeaderChecksumVerifies(t *testing.T) {
 	}
 }
 
-// The same for UDP, over the pseudo header that makes the sum cover the addresses too. Zero and
-// all ones are the same number in ones complement, and a receiver accepts either.
 func TestTheUDPChecksumVerifies(t *testing.T) {
 	frame := declined(t, net.IPv4(10, 100, 101, 106), net.IPv4(10, 100, 101, 1))
 	ip := frame[ethHeader:]
@@ -52,8 +48,6 @@ func TestTheUDPChecksumVerifies(t *testing.T) {
 	}
 }
 
-// The sum is over a stream of bytes, not over each part separately: two parts of odd length join
-// in the middle of a sixteen bit word, and a DHCP payload is whatever length its options make it.
 func TestChecksumJoinsPartsOfOddLength(t *testing.T) {
 	first := []byte{0x01, 0x02, 0x03}
 	second := []byte{0x04, 0x05}
@@ -71,8 +65,6 @@ func TestChecksumOfAnEmptyThing(t *testing.T) {
 	}
 }
 
-// Every header, field by field. A frame that is almost right is one that goes out and is dropped
-// by something that never says so.
 func TestTheDeclineIsAddressedAsABroadcastFromNowhere(t *testing.T) {
 	frame := declined(t, net.IPv4(10, 100, 101, 106), net.IPv4(10, 100, 101, 1))
 
@@ -109,8 +101,6 @@ func TestTheDeclineIsAddressedAsABroadcastFromNowhere(t *testing.T) {
 	}
 }
 
-// The lengths in the two headers have to agree with the frame, or the receiver reads past the end
-// of the payload or stops short of it.
 func TestTheLengthsAgreeWithTheFrame(t *testing.T) {
 	frame := declined(t, net.IPv4(10, 100, 101, 106), net.IPv4(10, 100, 101, 1))
 	ip := frame[ethHeader:]
@@ -118,12 +108,15 @@ func TestTheLengthsAgreeWithTheFrame(t *testing.T) {
 	if got, want := int(binary.BigEndian.Uint16(ip[2:4])), len(frame)-ethHeader; got != want {
 		t.Errorf("the IP header says %d bytes, the frame has %d", got, want)
 	}
-	if got, want := int(binary.BigEndian.Uint16(ip[ipHeader+4:ipHeader+6])), len(ip)-ipHeader; got != want {
+	if got, want := int(
+		binary.BigEndian.Uint16(ip[ipHeader+4:ipHeader+6]),
+	), len(
+		ip,
+	)-ipHeader; got != want {
 		t.Errorf("the UDP header says %d bytes, the datagram has %d", got, want)
 	}
 }
 
-// What the server is being told, read back the way it will read it.
 func TestADeclineNamesTheAddressAndTheServer(t *testing.T) {
 	addr, server := net.IPv4(10, 100, 101, 106), net.IPv4(10, 100, 101, 1)
 
@@ -148,15 +141,11 @@ func TestADeclineNamesTheAddressAndTheServer(t *testing.T) {
 		t.Errorf("hardware address = %v, want %v", msg.ClientHWAddr, testMAC)
 	}
 
-	// The address goes in the option, not in ciaddr: ciaddr is for one the client is using, and
-	// the point of a decline is that it never started.
 	if !msg.ClientIPAddr.Equal(net.IPv4zero) {
 		t.Errorf("ciaddr = %v, want it empty", msg.ClientIPAddr)
 	}
 }
 
-// A lease from a server that did not name itself. Inventing an identifier would address the
-// decline to nobody, so there is simply no option.
 func TestADeclineWithNoServerOmitsTheIdentifier(t *testing.T) {
 	frame := declined(t, net.IPv4(10, 100, 101, 106), nil)
 	payload := frame[ethHeader+ipHeader+udpHeader:]

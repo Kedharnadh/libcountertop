@@ -103,7 +103,17 @@ func Open(ctx context.Context, master string, o Options) (*Stream, error) {
 		}
 		name = n.Renditions[0].Name
 	}
-	slog.Info("hls variant", "resolution", v.Resolution, "bandwidth", v.Bandwidth, "codecs", strings.Join(v.Codecs, ","), "audio", name)
+	slog.Info(
+		"hls variant",
+		"resolution",
+		v.Resolution,
+		"bandwidth",
+		v.Bandwidth,
+		"codecs",
+		strings.Join(v.Codecs, ","),
+		"audio",
+		name,
+	)
 
 	run, cancel := context.WithCancel(context.Background())
 	s := &Stream{
@@ -233,7 +243,15 @@ func (s *Stream) follow(ctx context.Context, u string, video, audio bool) error 
 		s.observe(m, walls)
 		if next < first {
 			if next >= 0 {
-				slog.Warn("hls fell behind the live window", "track", p.name, "wanted", next, "oldest", first)
+				slog.Warn(
+					"hls fell behind the live window",
+					"track",
+					p.name,
+					"wanted",
+					next,
+					"oldest",
+					first,
+				)
 			}
 			next = first + start(m, walls, s.o.Lead, s.o.From)
 		}
@@ -262,7 +280,15 @@ func (s *Stream) follow(ctx context.Context, u string, video, audio bool) error 
 			return io.EOF
 		}
 		if quiet := time.Since(progress); quiet > stall {
-			slog.Info("hls stream stopped", "track", p.name, "quiet", quiet.Round(time.Second), "next", next)
+			slog.Info(
+				"hls stream stopped",
+				"track",
+				p.name,
+				"quiet",
+				quiet.Round(time.Second),
+				"next",
+				next,
+			)
 			return io.EOF
 		}
 		if at < 0 {
@@ -277,10 +303,26 @@ func (s *Stream) follow(ctx context.Context, u string, video, audio bool) error 
 		if len(m.Segments) > 0 {
 			step = m.Segments[len(m.Segments)-1].Duration
 		}
-		if err := s.ahead(ctx, template, at, &next, &progress, &wall, step, stall, video, audio, p, m.TargetDuration); err != nil {
+		if err := s.ahead(
+			ctx,
+			template,
+			at,
+			&next,
+			&progress,
+			&wall,
+			step,
+			stall,
+			video,
+			audio,
+			p,
+			m.TargetDuration,
+		); err != nil {
 			return err
 		}
-		if err := pause(ctx, max(time.Duration(m.TargetDuration)*time.Second/8, missWait)); err != nil {
+		if err := pause(
+			ctx,
+			max(time.Duration(m.TargetDuration)*time.Second/8, missWait),
+		); err != nil {
 			return err
 		}
 	}
@@ -369,7 +411,17 @@ func (s *Stream) Began() time.Time {
 	return s.began
 }
 
-func (s *Stream) ahead(ctx context.Context, template string, at int, next *int, progress, wall *time.Time, step, stall time.Duration, video, audio bool, p *pace, target int) error {
+func (s *Stream) ahead(
+	ctx context.Context,
+	template string,
+	at int,
+	next *int,
+	progress, wall *time.Time,
+	step, stall time.Duration,
+	video, audio bool,
+	p *pace,
+	target int,
+) error {
 	mark := fmt.Sprintf("/sq/%d/", at)
 	if at < 0 || !strings.Contains(template, mark) {
 		return nil
@@ -401,7 +453,13 @@ func (s *Stream) ahead(ctx context.Context, template string, at int, next *int, 
 	return nil
 }
 
-func (s *Stream) take(ctx context.Context, u string, wall time.Time, video, audio bool, p *pace) (bool, error) {
+func (s *Stream) take(
+	ctx context.Context,
+	u string,
+	wall time.Time,
+	video, audio bool,
+	p *pace,
+) (bool, error) {
 	began := time.Now()
 	data, err := s.get(ctx, u, segmentMost)
 	if err != nil {
@@ -453,10 +511,27 @@ func (p *pace) report(s *Stream) {
 		}
 		return (sum / time.Duration(n)).Round(time.Millisecond)
 	}
-	slog.Debug("hls pace", "track", p.name,
-		"playlists", p.playlists, "playlist_mean", mean(p.playlistSum, p.playlists), "playlist_max", p.playlistMost.Round(time.Millisecond),
-		"segments", p.segments, "segment_mean", mean(p.segSum, p.segments), "segment_max", p.segMost.Round(time.Millisecond),
-		"misses", p.misses, "buffered", s.buffered().Round(100*time.Millisecond))
+	slog.Debug(
+		"hls pace",
+		"track",
+		p.name,
+		"playlists",
+		p.playlists,
+		"playlist_mean",
+		mean(p.playlistSum, p.playlists),
+		"playlist_max",
+		p.playlistMost.Round(time.Millisecond),
+		"segments",
+		p.segments,
+		"segment_mean",
+		mean(p.segSum, p.segments),
+		"segment_max",
+		p.segMost.Round(time.Millisecond),
+		"misses",
+		p.misses,
+		"buffered",
+		s.buffered().Round(100*time.Millisecond),
+	)
 	*p = pace{name: p.name, since: time.Now()}
 }
 
@@ -551,7 +626,10 @@ func (s *Stream) transport(data []byte, video, audio bool) error {
 		case *tscodecs.MPEG4Audio:
 			if audio {
 				cfg := c.Config
-				r.OnDataMPEG4Audio(t, func(pts int64, aus [][]byte) error { return s.aac(cfg, ticks(pts), aus) })
+				r.OnDataMPEG4Audio(
+					t,
+					func(pts int64, aus [][]byte) error { return s.aac(cfg, ticks(pts), aus) },
+				)
 			}
 		}
 	}
@@ -581,7 +659,11 @@ func (s *Stream) packed(data []byte) error {
 	for i, p := range pkts {
 		aus[i] = p.AU
 	}
-	cfg := mpeg4audio.AudioSpecificConfig{Type: pkts[0].Type, SampleRate: pkts[0].SampleRate, ChannelConfig: pkts[0].ChannelConfig}
+	cfg := mpeg4audio.AudioSpecificConfig{
+		Type:          pkts[0].Type,
+		SampleRate:    pkts[0].SampleRate,
+		ChannelConfig: pkts[0].ChannelConfig,
+	}
 	return s.aac(cfg, ticks(pts), aus)
 }
 
@@ -792,7 +874,11 @@ func narrowed(mv *playlist.Multivariant, o Options) (*playlist.Multivariant, err
 	if v == nil {
 		return nil, errors.New("hls: no H.264 and AAC-LC variant within the size limits")
 	}
-	out := &playlist.Multivariant{Version: mv.Version, IndependentSegments: mv.IndependentSegments, Variants: []*playlist.MultivariantVariant{v}}
+	out := &playlist.Multivariant{
+		Version:             mv.Version,
+		IndependentSegments: mv.IndependentSegments,
+		Variants:            []*playlist.MultivariantVariant{v},
+	}
 	if r := rendition(mv.Renditions, v.Audio); r != nil {
 		out.Renditions = []*playlist.MultivariantRendition{r}
 	}
@@ -834,14 +920,32 @@ func Describe(ctx context.Context, master string, o Options) (string, error) {
 		if v.FrameRate != nil {
 			fps = strconv.FormatFloat(*v.FrameRate, 'f', -1, 64)
 		}
-		fmt.Fprintf(&b, "%s variant %-10s %4sfps %9d bps %-28s audio=%s\n", mark, v.Resolution, fps, v.Bandwidth, strings.Join(v.Codecs, ","), v.Audio)
+		fmt.Fprintf(
+			&b,
+			"%s variant %-10s %4sfps %9d bps %-28s audio=%s\n",
+			mark,
+			v.Resolution,
+			fps,
+			v.Bandwidth,
+			strings.Join(v.Codecs, ","),
+			v.Audio,
+		)
 	}
 	for _, r := range mv.Renditions {
 		mark := " "
 		if chosen != nil && len(chosen.Renditions) > 0 && chosen.Renditions[0] == r {
 			mark = "*"
 		}
-		fmt.Fprintf(&b, "%s rendition %s group=%s name=%q lang=%s default=%v\n", mark, r.Type, r.GroupID, r.Name, r.Language, r.Default)
+		fmt.Fprintf(
+			&b,
+			"%s rendition %s group=%s name=%q lang=%s default=%v\n",
+			mark,
+			r.Type,
+			r.GroupID,
+			r.Name,
+			r.Language,
+			r.Default,
+		)
 	}
 	if chosen == nil {
 		return b.String(), nil
@@ -880,7 +984,15 @@ func peek(ctx context.Context, b *strings.Builder, master, uri string, o Options
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, playlistMost))
-	fmt.Fprintf(b, "  status %s, %d bytes, type %q, final %s, read err %v\n", resp.Status, len(body), resp.Header.Get("Content-Type"), tail(resp.Request.URL.String()), err)
+	fmt.Fprintf(
+		b,
+		"  status %s, %d bytes, type %q, final %s, read err %v\n",
+		resp.Status,
+		len(body),
+		resp.Header.Get("Content-Type"),
+		tail(resp.Request.URL.String()),
+		err,
+	)
 	fmt.Fprintf(b, "  %d EXTINF lines\n", bytes.Count(body, []byte("#EXTINF:")))
 	_, perr := playlist.Unmarshal(body)
 	fmt.Fprintf(b, "  parse: %v\n", perr)
@@ -914,12 +1026,25 @@ func segment(ctx context.Context, b *strings.Builder, u string, o Options) {
 	}
 	defer resp.Body.Close()
 	data, err := io.ReadAll(resp.Body)
-	fmt.Fprintf(b, "  segment %s, %d bytes, type %q, read err %v\n", resp.Status, len(data), resp.Header.Get("Content-Type"), err)
+	fmt.Fprintf(
+		b,
+		"  segment %s, %d bytes, type %q, read err %v\n",
+		resp.Status,
+		len(data),
+		resp.Header.Get("Content-Type"),
+		err,
+	)
 	fmt.Fprintf(b, "  starts % x %q\n", data[:min(len(data), 24)], data[:min(len(data), 24)])
 	if pts, rest, ok := id3Timestamp(data); ok {
 		var pkts mpeg4audio.ADTSPackets
 		perr := pkts.Unmarshal(rest)
-		fmt.Fprintf(b, "  packed audio at %v, %d ADTS frames, err %v\n", ticks(pts), len(pkts), perr)
+		fmt.Fprintf(
+			b,
+			"  packed audio at %v, %d ADTS frames, err %v\n",
+			ticks(pts),
+			len(pkts),
+			perr,
+		)
 		return
 	}
 	dmx := astits.NewDemuxer(ctx, bytes.NewReader(data))

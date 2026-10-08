@@ -11,14 +11,13 @@ const (
 	leAdvertisingData   = 0x2008
 	leAdvertisingEnable = 0x200A
 
-	// advertisingInterval is in units of 0.625 ms: one advertisement a second.
+	// 0.625 ms units.
 	advertisingInterval = 1600
 
 	advNonconnInd = 0x03
 	allChannels   = 0x07
 )
 
-// Advertise broadcasts data as a non-connectable LE advertisement until StopAdvertising.
 func (r *Radio) Advertise(data []byte) error {
 	if len(data) > 31 {
 		return errors.New("ble: advertising data exceeds 31 bytes")
@@ -54,7 +53,6 @@ func (r *Radio) Advertise(data []byte) error {
 	return nil
 }
 
-// StopAdvertising ends what Advertise started.
 func (r *Radio) StopAdvertising() error {
 	s, err := r.Line()
 	if err != nil {

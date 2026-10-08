@@ -53,7 +53,10 @@ func pulsarFill(arr *[pulsarP]float64, f *frame, seed, voice, lv float64) {
 		}
 		tex := noise2(float64(k)*0.55, seed) - 0.5
 		hill := noise2(float64(k)*0.13+3, seed*0.37)
-		arr[k] = math.Max(0, w*(0.12+0.22*hill+0.08*tex+(bv*1.25+0.22*tex*voice)*(0.25+1.05*lv))+0.018*tex+0.01)
+		arr[k] = math.Max(
+			0,
+			w*(0.12+0.22*hill+0.08*tex+(bv*1.25+0.22*tex*voice)*(0.25+1.05*lv))+0.018*tex+0.01,
+		)
 	}
 }
 
@@ -106,7 +109,15 @@ func (v *pulsar) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 		font := ui.MustLoad(ui.Bold, max(int(10*u*1.6), 7))
 		label := "PSR B1919+21  ·  ASSIST"
 		tw, _ := font.Measure(label)
-		ui.DrawText(rgbaSurface{back}, font, int(x0+pw)-tw, int(top-34*u+gap), theme.Color{R: 90, G: 90, B: 90}, theme.Color{}, label)
+		ui.DrawText(
+			rgbaSurface{back},
+			font,
+			int(x0+pw)-tw,
+			int(top-34*u+gap),
+			theme.Color{R: 90, G: 90, B: 90},
+			theme.Color{},
+			label,
+		)
 		if err := g.Texture(0, back); err != nil {
 			return err
 		}
@@ -135,7 +146,20 @@ func (v *pulsar) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 	case listening:
 		tint = [3]float64{140, 220, 255}
 	}
-	vals := []float32{float32(top), float32(gap), float32(gap * 7.5), float32(v.acc / pulsarEvery), float32(x0), float32(pw),
-		float32(math.Max(1, 1.25*u)), float32(v.st.w), float32(tint[0] / 255), float32(tint[1] / 255), float32(tint[2] / 255)}
+	vals := []float32{
+		float32(top),
+		float32(gap),
+		float32(gap * 7.5),
+		float32(v.acc / pulsarEvery),
+		float32(x0),
+		float32(pw),
+		float32(
+			math.Max(1, 1.25*u),
+		),
+		float32(v.st.w),
+		float32(tint[0] / 255),
+		float32(tint[1] / 255),
+		float32(tint[2] / 255),
+	}
 	return g.Values(vals, float32(0.22+0.25*f.level), 0.012, 2)
 }

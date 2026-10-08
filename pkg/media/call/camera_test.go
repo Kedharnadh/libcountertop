@@ -40,16 +40,22 @@ func (s *cameraTransport) Close() error {
 }
 
 func TestRTCCameraWithoutResizeSubscriberSendsConfiguredKeyframes(t *testing.T) {
-	transport := &cameraTransport{frames: make(chan helper.Frame, 2), done: make(chan struct{}), opened: make(chan struct{})}
+	transport := &cameraTransport{
+		frames: make(chan helper.Frame, 2),
+		done:   make(chan struct{}),
+		opened: make(chan struct{}),
+	}
 	hub := camerasession.New(camerasession.Options{
 		Snapshot: func() camerasession.Snapshot {
-			return camerasession.Snapshot{Config: helper.Config{Width: 1280, Height: 720}, Key: "main"}
+			return camerasession.Snapshot{
+				Config: helper.Config{Width: 1280, Height: 720},
+				Key:    "main",
+			}
 		},
 		Open: func(helper.Config) (camerasession.Transport, error) { return transport, nil },
 	})
 	t.Cleanup(hub.Close)
 	source := NewCamera(hub)
-	// RTC does not subscribe to size changes; local preview does.
 	frames, release := (camera{source: source}).Frames()
 	t.Cleanup(release)
 	select {

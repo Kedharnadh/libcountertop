@@ -1,4 +1,3 @@
-// Package castpages supplies settings pages for devices with Cast playback.
 package castpages
 
 import (
@@ -81,9 +80,15 @@ func (p *Pages) Sponsor() *shell.Page {
 			acts := make([]func(int), 0, len(youtube.Categories))
 			for _, c := range youtube.Categories {
 				on := slices.Contains(chosen, c)
-				rows = append(rows, widget.Row{Label: say.T("youtube.category." + c), Kind: widget.Toggle, On: on})
+				rows = append(
+					rows,
+					widget.Row{Label: say.T("youtube.category." + c), Kind: widget.Toggle, On: on},
+				)
 				acts = append(acts, func(int) {
-					next := slices.DeleteFunc(slices.Clone(chosen), func(x string) bool { return x == c })
+					next := slices.DeleteFunc(
+						slices.Clone(chosen),
+						func(x string) bool { return x == c },
+					)
 					if !on {
 						next = append(next, c)
 					}
@@ -105,9 +110,19 @@ func (p *Pages) Prime() *shell.Page {
 				state = say.T("cast.prime.registered")
 			}
 			return []widget.Row{
-					{Label: say.T("cast.prime.persist"), Hint: say.T("cast.prime.persist.hint"), Kind: widget.Toggle, On: persist},
+					{
+						Label: say.T("cast.prime.persist"),
+						Hint:  say.T("cast.prime.persist.hint"),
+						Kind:  widget.Toggle,
+						On:    persist,
+					},
 					{Label: say.T("cast.prime.reset"), Kind: widget.Plain, Value: state},
-					{Label: say.T("cast.prime.skipintro"), Hint: say.T("cast.prime.skipintro.hint"), Kind: widget.Toggle, On: skip},
+					{
+						Label: say.T("cast.prime.skipintro"),
+						Hint:  say.T("cast.prime.skipintro.hint"),
+						Kind:  widget.Toggle,
+						On:    skip,
+					},
 				}, []func(int){
 					func(int) { p.options.Receiver.SetPrimePersist(!persist) },
 					func(int) { p.options.Receiver.ResetPrime() },

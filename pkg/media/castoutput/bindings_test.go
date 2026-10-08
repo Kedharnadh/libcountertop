@@ -2,23 +2,31 @@ package castoutput
 
 import (
 	"fmt"
+
 	"github.com/ygelfand/libcountertop/pkg/media/ownership"
 	"github.com/ygelfand/libcountertop/pkg/media/pcm"
 	"github.com/ygelfand/libcountertop/pkg/media/source"
-	"sync"
 )
 
 type fakePlayer struct {
-	mu    sync.Mutex
 	owner *ownership.Owner[source.Source]
 }
 
 var testPlayer *fakePlayer
 
 func newOutput() *Output {
-	p := &fakePlayer{owner: ownership.New[source.Source](func(s source.Source) uint8 { return uint8(s.Kind()) })}
+	p := &fakePlayer{
+		owner: ownership.New[source.Source](func(s source.Source) uint8 { return uint8(s.Kind()) }),
+	}
 	testPlayer = p
-	return New(Options{Queue: &fakeQueue{}, Media: func() Media { return p }, Took: func(pcm.Producer) {}, Gave: func(pcm.Producer) {}})
+	return New(
+		Options{
+			Queue: &fakeQueue{},
+			Media: func() Media { return p },
+			Took:  func(pcm.Producer) {},
+			Gave:  func(pcm.Producer) {},
+		},
+	)
 }
 func (p *fakePlayer) Began(s source.Source)   { p.owner.Begin(s) }
 func (p *fakePlayer) Ended(s source.Source)   { p.owner.End(s) }

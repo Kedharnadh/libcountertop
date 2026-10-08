@@ -17,7 +17,22 @@ const (
 	cymGrid   = 192
 )
 
-var cymModes = [][3]float64{{1, 2, 1}, {1, 3, -1}, {2, 3, 1}, {1, 4, 1}, {2, 4, -1}, {3, 4, 1}, {1, 5, -1}, {3, 5, 1}, {2, 6, 1}, {4, 5, -1}, {3, 7, 1}, {5, 6, 1}, {4, 7, -1}, {5, 8, 1}}
+var cymModes = [][3]float64{
+	{1, 2, 1},
+	{1, 3, -1},
+	{2, 3, 1},
+	{1, 4, 1},
+	{2, 4, -1},
+	{3, 4, 1},
+	{1, 5, -1},
+	{3, 5, 1},
+	{2, 6, 1},
+	{4, 5, -1},
+	{3, 7, 1},
+	{5, 6, 1},
+	{4, 7, -1},
+	{5, 8, 1},
+}
 
 type cymatics struct {
 	st stage
@@ -46,12 +61,28 @@ func (v *cymatics) table(mode int) *cymTable {
 	if v.tables == nil {
 		v.tables = map[int]*cymTable{}
 	}
-	t := &cymTable{make([]float32, cymGrid*cymGrid), make([]float32, cymGrid*cymGrid), make([]float32, cymGrid*cymGrid)}
+	t := &cymTable{
+		make([]float32, cymGrid*cymGrid),
+		make([]float32, cymGrid*cymGrid),
+		make([]float32, cymGrid*cymGrid),
+	}
 	m := cymModes[mode]
 	for j := range cymGrid {
 		for i := range cymGrid {
-			f, dx, dy := cymField(m[0], m[1], m[2], (float64(i)+0.5)/cymGrid*2-1, (float64(j)+0.5)/cymGrid*2-1)
-			t.f[j*cymGrid+i], t.dx[j*cymGrid+i], t.dy[j*cymGrid+i] = float32(f), float32(dx), float32(dy)
+			f, dx, dy := cymField(
+				m[0],
+				m[1],
+				m[2],
+				(float64(i)+0.5)/cymGrid*2-1,
+				(float64(j)+0.5)/cymGrid*2-1,
+			)
+			t.f[j*cymGrid+i], t.dx[j*cymGrid+i], t.dy[j*cymGrid+i] = float32(
+				f,
+			), float32(
+				dx,
+			), float32(
+				dy,
+			)
 		}
 	}
 	v.tables[mode] = t
@@ -87,7 +118,9 @@ func (v *cymatics) advance(f frame) {
 		if wsum > 0.05 {
 			v.centroid = follow(v.centroid, sum/wsum/float64(analysis.Bands-1), 0.6, 0.6, dt)
 		}
-		idx := int(math.Round(math.Min(1, math.Max(0, (v.centroid-0.12)/0.5)) * float64(len(cymModes)-1)))
+		idx := int(
+			math.Round(math.Min(1, math.Max(0, (v.centroid-0.12)/0.5)) * float64(len(cymModes)-1)),
+		)
 		if idx != v.want {
 			v.want, v.wantSince = idx, t
 		}
@@ -128,7 +161,13 @@ func (v *cymatics) advance(f frame) {
 		j := math.Abs(fv)*1.2 + 0.22
 		x += (v.r.next() - 0.5) * shake * j * 4
 		y += (v.r.next() - 0.5) * shake * j * 4
-		v.gx[i], v.gy[i] = math.Max(-0.995, math.Min(x, 0.995)), math.Max(-0.995, math.Min(y, 0.995))
+		v.gx[i], v.gy[i] = math.Max(
+			-0.995,
+			math.Min(x, 0.995),
+		), math.Max(
+			-0.995,
+			math.Min(y, 0.995),
+		)
 	}
 }
 
@@ -168,7 +207,13 @@ func (v *cymatics) paint() *image.RGBA {
 					r, g, b = k, k, k*1.05
 				}
 				o := img.PixOffset(x, y)
-				img.Pix[o], img.Pix[o+1], img.Pix[o+2], img.Pix[o+3] = uint8(255*math.Min(1, r)), uint8(255*math.Min(1, g)), uint8(255*math.Min(1, b)), 255
+				img.Pix[o], img.Pix[o+1], img.Pix[o+2], img.Pix[o+3] = uint8(
+					255*math.Min(1, r),
+				), uint8(
+					255*math.Min(1, g),
+				), uint8(
+					255*math.Min(1, b),
+				), 255
 			}
 		}
 	})
@@ -207,8 +252,20 @@ func (v *cymatics) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 	v.pts = v.pts[:0]
 	for i := range v.gx {
 		k := float32(0.8 + 0.2*math.Sin(float64(i)*1.7))
-		v.pts = append(v.pts, Point{X: float32(cx + v.gx[i]*half), Y: float32(cy + v.gy[i]*half), Size: size,
-			R: 0.95 * k * 0.9, G: 0.87 * k * 0.9, B: 0.7 * k * 0.9, A: 0.9, Disc: true, Over: true})
+		v.pts = append(
+			v.pts,
+			Point{
+				X:    float32(cx + v.gx[i]*half),
+				Y:    float32(cy + v.gy[i]*half),
+				Size: size,
+				R:    0.95 * k * 0.9,
+				G:    0.87 * k * 0.9,
+				B:    0.7 * k * 0.9,
+				A:    0.9,
+				Disc: true,
+				Over: true,
+			},
+		)
 	}
 	if err := g.Points(v.pts); err != nil {
 		return err

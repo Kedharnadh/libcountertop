@@ -5,16 +5,12 @@ import (
 	"testing"
 )
 
-// A search pattern matches against any UUID in a record, at any depth — not against the service
-// class list. Browsing is a search for the public browse group's UUID, and that one is in the
-// browse group list, so matching on classes alone gives a device that answers when asked for by
-// name and is invisible to anything that goes looking.
 func TestARecordsUUIDsAreNotJustItsClasses(t *testing.T) {
 	got := AudioSink(1, "Panel", 0x0019, FeatureSpeaker).UUIDs()
 
 	for _, want := range []uint32{
 		UUIDAudioSink,  // the class list
-		UUIDBrowseRoot, // the browse group, which is how a phone enumerates
+		UUIDBrowseRoot, // the browse group
 		UUIDL2CAP,      // nested two deep in the protocol list
 		UUIDAVDTP,
 		UUIDA2DP, // nested in the profile list
@@ -25,8 +21,6 @@ func TestARecordsUUIDsAreNotJustItsClasses(t *testing.T) {
 	}
 }
 
-// Numbers that are not UUIDs must not come back as them. A channel number or a version collected
-// as a UUID makes a record match searches for services it does not offer.
 func TestNumbersAreNotCollectedAsUUIDs(t *testing.T) {
 	got := AudioSink(1, "Panel", 0x0019, FeatureSpeaker).UUIDs()
 
@@ -48,22 +42,23 @@ func TestTheRemoteControlRecordsCarryTheirClasses(t *testing.T) {
 		}
 	}
 
-	// The controller is not also the target: a device claiming both classes on one record tells a
-	// phone it can be controlled and can control, from the same end.
-	controller := RemoteControl(3, "Panel", 0x0017, 0x001b, UUIDAVRemoteControlController, CategoryPlayer)
+	controller := RemoteControl(
+		3,
+		"Panel",
+		0x0017,
+		0x001b,
+		UUIDAVRemoteControlController,
+		CategoryPlayer,
+	)
 	if slices.Contains(controller.UUIDs(), uint32(UUIDAVRemoteControlTarget)) {
 		t.Error("the controller record claims to be the target as well")
 	}
 
-	// Both records carry the generic class. A phone searching for that rather than for either end
-	// finds nothing without it.
 	if !slices.Contains(controller.UUIDs(), uint32(UUIDAVRemoteControl)) {
 		t.Error("the controller record does not carry the generic remote control class")
 	}
 }
 
-// The browsing channel's number travels with the bit that claims it. A record saying it browses
-// and not saying where is one a phone believes and cannot act on.
 func TestBrowsingIsAdvertisedWithItsChannel(t *testing.T) {
 	plain := RemoteControl(3, "Panel", 0x0017, 0, UUIDAVRemoteControlController, CategoryPlayer)
 
@@ -76,7 +71,14 @@ func TestBrowsingIsAdvertisedWithItsChannel(t *testing.T) {
 		t.Error("a record with no browsing channel published a second protocol list")
 	}
 
-	browsing := RemoteControl(3, "Panel", 0x0017, 0x001b, UUIDAVRemoteControlController, CategoryPlayer)
+	browsing := RemoteControl(
+		3,
+		"Panel",
+		0x0017,
+		0x001b,
+		UUIDAVRemoteControlController,
+		CategoryPlayer,
+	)
 
 	f, ok := browsing.Attribute(AttrFeatures)
 	if !ok {
@@ -91,8 +93,6 @@ func TestBrowsingIsAdvertisedWithItsChannel(t *testing.T) {
 		t.Fatal("browsing is claimed and no channel is published for it")
 	}
 
-	// A list of lists: the extra sequence is what keeps a phone from reading the browsing channel
-	// as a second protocol layered on the control channel.
 	if len(more.Children) != 1 {
 		t.Fatalf("%d protocol descriptor lists, want one", len(more.Children))
 	}
@@ -106,8 +106,6 @@ func TestBrowsingIsAdvertisedWithItsChannel(t *testing.T) {
 	}
 }
 
-// A search for two classes wants something that is both, and answering with something that is only
-// one is how a device shows up and then cannot be used.
 func TestWantsNeedsEveryUUIDInThePattern(t *testing.T) {
 	record := AudioSink(1, "Panel", 0x0019, FeatureSpeaker)
 

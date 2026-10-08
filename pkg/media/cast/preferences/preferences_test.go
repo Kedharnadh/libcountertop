@@ -9,7 +9,13 @@ func TestProviderReadsLiveSettingsAndSavesThroughProduct(t *testing.T) {
 	defer Configure(old)
 	live := Settings{YouTube: YouTube{LiveDelay: 12}, Prime: Prime{Persist: true}}
 	var saved []string
-	Configure(Provider{Read: func() Settings { return live }, RequestIDPrefix: "speaker", SaveScreens: func(d, m, v string) error { saved = []string{d, m, v}; return nil }})
+	Configure(
+		Provider{
+			Read:            func() Settings { return live },
+			RequestIDPrefix: "speaker",
+			SaveScreens:     func(d, m, v string) error { saved = []string{d, m, v}; return nil },
+		},
+	)
 	if Get().YouTube.LiveDelay != 12 || !Get().Prime.Persist {
 		t.Fatal(Get())
 	}

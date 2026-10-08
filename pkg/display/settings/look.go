@@ -16,10 +16,19 @@ func (p *LookPages) Page(slot int) *shell.Page {
 		Title: say.T("look.title"),
 		Build: func() ([]widget.Row, []func(int)) {
 			look := p.options.Preferences.Wake.Read().Slot(slot).Look
-			rows := []widget.Row{{Label: say.T("look.place"), Kind: widget.Chevron, Value: look.Place.Label()}}
+			rows := []widget.Row{
+				{Label: say.T("look.place"), Kind: widget.Chevron, Value: look.Place.Label()},
+			}
 			taps := []func(int){p.open(func() shell.View { return p.Place(slot) })}
 			for _, st := range config.Stages() {
-				rows = append(rows, widget.Row{Label: st.Label(), Kind: widget.Chevron, Value: LookName(look.Kind(st))})
+				rows = append(
+					rows,
+					widget.Row{
+						Label: st.Label(),
+						Kind:  widget.Chevron,
+						Value: LookName(look.Kind(st)),
+					},
+				)
 				taps = append(taps, p.open(func() shell.View { return p.Stage(slot, st) }))
 			}
 			return rows, taps
@@ -44,8 +53,17 @@ func (p *LookPages) Place(slot int) *shell.Page {
 			for _, value := range config.LookPlaces() {
 				rows = append(rows, widget.Row{Label: value.Label(), Chosen: value == now})
 				taps = append(taps, func(int) {
-					if err := p.options.Preferences.Word(slot, func(w *config.WakeWord) { w.Look.Place = value }); err != nil {
-						slog.Error("saving the assistant visual placement failed", "slot", slot+1, "err", err)
+					if err := p.options.Preferences.Word(
+						slot,
+						func(w *config.WakeWord) { w.Look.Place = value },
+					); err != nil {
+						slog.Error(
+							"saving the assistant visual placement failed",
+							"slot",
+							slot+1,
+							"err",
+							err,
+						)
 					}
 				})
 			}
@@ -66,7 +84,15 @@ func (p *LookPages) Stage(slot int, st config.Stage) *shell.Page {
 				w.Look.Responding = kind
 			}
 		}); err != nil {
-			slog.Error("saving the assistant visual failed", "slot", slot+1, "stage", st, "err", err)
+			slog.Error(
+				"saving the assistant visual failed",
+				"slot",
+				slot+1,
+				"stage",
+				st,
+				"err",
+				err,
+			)
 		}
 		p.options.Shell.Pop()
 	}

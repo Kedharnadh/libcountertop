@@ -9,7 +9,6 @@ import (
 	"testing"
 )
 
-// wave builds a RIFF stream: the header, the chunks given, then samples.
 func wave(chunks []byte, samples []byte) []byte {
 	var b bytes.Buffer
 	b.WriteString("RIFF")
@@ -35,7 +34,6 @@ func fmtChunk(channels uint16, rate uint32, bits uint16) []byte {
 	return b.Bytes()
 }
 
-// chunk builds one of any size, which is how anything but fmt and data is skipped.
 func namedChunk(id string, size int) []byte {
 	var b bytes.Buffer
 	b.WriteString(id)
@@ -89,7 +87,10 @@ func TestHeaderRefusesWhatCannotBePlayed(t *testing.T) {
 		{"absurd chunk", append([]byte("RIFF\xff\xff\xff\xffWAVE"), namedChunk("LIST", 4)[:8]...), "LIST"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			err := Header(bufio.NewReader(bytes.NewReader(tc.body)), Format{Rate: 48000, Channels: 2})
+			err := Header(
+				bufio.NewReader(bytes.NewReader(tc.body)),
+				Format{Rate: 48000, Channels: 2},
+			)
 			if err == nil {
 				t.Fatal("played it anyway")
 			}
@@ -100,8 +101,6 @@ func TestHeaderRefusesWhatCannotBePlayed(t *testing.T) {
 	}
 }
 
-// A chunk whose size is a lie is what a truncated download looks like, and the size is what the
-// header allocates from.
 func TestHeaderRefusesAnOversizedChunk(t *testing.T) {
 	var b bytes.Buffer
 	b.WriteString("RIFF\xff\xff\xff\xffWAVE")

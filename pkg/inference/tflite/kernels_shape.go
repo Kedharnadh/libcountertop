@@ -2,9 +2,6 @@ package tflite
 
 import "fmt"
 
-// Ops that compute shapes rather than activations. A converter emits them when it cannot fold a
-// reshape at conversion time, so they carry dimensions and scalars, and their tensors are int32.
-
 func shapeOf(o *OpDesc, in, out []*Tensor) error {
 	x, y := in[0], out[0]
 	if y.Type != Int32 {
@@ -18,7 +15,6 @@ func shapeOf(o *OpDesc, in, out []*Tensor) error {
 	return nil
 }
 
-// fill spreads one value over the shape its first input holds.
 func fill(o *OpDesc, in, out []*Tensor) error {
 	dims, value, y := in[0], in[1], out[0]
 
@@ -43,8 +39,6 @@ func fill(o *OpDesc, in, out []*Tensor) error {
 	return nil
 }
 
-// pack stacks its inputs along a new axis. Every input has the same shape, so the output is that
-// shape with the count inserted.
 func pack(o *OpDesc, in, out []*Tensor) error {
 	y := out[0]
 	if len(in) == 0 {
@@ -66,8 +60,6 @@ func pack(o *OpDesc, in, out []*Tensor) error {
 	shape = append(shape, first.Shape[axis:]...)
 	y.resize(shape)
 
-	// Inputs vary fastest over everything after the new axis, so each contributes one run per
-	// slice of the axes before it.
 	inner, outer := 1, 1
 	for _, d := range first.Shape[axis:] {
 		inner *= d
@@ -92,9 +84,6 @@ func pack(o *OpDesc, in, out []*Tensor) error {
 	return nil
 }
 
-// stridedSlice takes a rectangular region. Only forward strides are handled: the masks a converter
-// emits for a folded reshape are begin, end and shrink, and a negative stride means a reversal that
-// nothing here produces.
 func stridedSlice(o *OpDesc, in, out []*Tensor) error {
 	x, y := in[0], out[0]
 	if o.ellipsisMask != 0 || o.newAxisMask != 0 {
@@ -161,7 +150,6 @@ func stridedSlice(o *OpDesc, in, out []*Tensor) error {
 	return nil
 }
 
-// clamp resolves one of a slice's bounds, which may count from the end.
 func clamp(v, n int) int {
 	if v < 0 {
 		v += n
@@ -169,7 +157,6 @@ func clamp(v, n int) int {
 	return max(0, min(v, n))
 }
 
-// reduceProdI32 is REDUCE_PROD over int32, which is the only shape arithmetic that appears.
 func reduceProdI32(o *OpDesc, in, out []*Tensor) error {
 	x, y := in[0], out[0]
 	if x.Type == Float32 {

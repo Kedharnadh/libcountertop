@@ -9,14 +9,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// sendDecline tells the server the address it offered is already in use.
-//
-// RFC 2131 section 3.1.5. Refusing the address is what protects the network; this is what stops the
-// server offering the same one straight back, which without it turns a real conflict into a loop on
-// the ten second backoff.
-//
-// Broadcast, from 0.0.0.0, because the client has no address — that is the whole point — so there
-// is nothing for a UDP socket to bind to and the frame goes out whole over a packet socket.
 func sendDecline(iface string, addr, server net.IP, why string) error {
 	link, err := net.InterfaceByName(iface)
 	if err != nil {

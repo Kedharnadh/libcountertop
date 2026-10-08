@@ -25,8 +25,6 @@ func TestShiftMovesWhatIsDrawn(t *testing.T) {
 	}
 }
 
-// A page laid out for the whole screen and then moved has to still be told the whole screen, or it
-// would lay itself out for the sliver that is showing.
 func TestShiftKeepsTheSizeOfWhatIsUnderIt(t *testing.T) {
 	img := NewImage(40, 20, back)
 
@@ -49,8 +47,6 @@ func TestShiftFillsAtTheOffset(t *testing.T) {
 	}
 }
 
-// Everything past the edge belongs to the page on the other side of the slide, so it has to be
-// dropped rather than wrapped round.
 func TestShiftPastTheEdgeDrawsNothing(t *testing.T) {
 	img := NewImage(40, 20, back)
 
@@ -64,8 +60,6 @@ func TestShiftPastTheEdgeDrawsNothing(t *testing.T) {
 	}
 }
 
-// Drawing asks what it is allowed to paint so it can skip the rest, and the answer has to be in
-// the coordinates the caller is using rather than the ones underneath.
 func TestShiftMovesTheClipBack(t *testing.T) {
 	img := NewImage(40, 20, back)
 	clipped := clip{Surface: img, at: Rect{X: 10, Y: 5, W: 20, H: 10}}
@@ -77,8 +71,6 @@ func TestShiftMovesTheClipBack(t *testing.T) {
 	}
 }
 
-// Most of a page part way through a slide is past the edge of the screen. Saying so is what keeps
-// it from rasterizing text nobody will see, which is the whole cost of drawing two pages at once.
 func TestShiftOfAnUnclippedSurfaceIsBoundedByItsEdges(t *testing.T) {
 	img := NewImage(40, 20, back)
 
@@ -89,8 +81,6 @@ func TestShiftOfAnUnclippedSurfaceIsBoundedByItsEdges(t *testing.T) {
 	}
 }
 
-// clip is a surface that is only accepting part of itself, which the panel is mid-frame and an
-// image never is.
 type clip struct {
 	Surface
 	at Rect

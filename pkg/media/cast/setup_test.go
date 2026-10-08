@@ -7,7 +7,11 @@ import (
 
 var kitchen = Device{ID: "1b0cf94a40f35185c64b074179c1caa8", Name: "Kitchen", Model: "Panel"}
 
-func answer(t *testing.T, r *Receiver, request string) (envelope map[string]any, data map[string]any) {
+func answer(
+	t *testing.T,
+	r *Receiver,
+	request string,
+) (envelope map[string]any, data map[string]any) {
 	t.Helper()
 	out, err := r.Receive(from(SenderID, NSSetup, request))
 	if err != nil || len(out) != 1 {
@@ -48,13 +52,23 @@ func TestEurekaInfoWithNoParamsIsTheFlatSet(t *testing.T) {
 }
 
 func TestEurekaInfoWithParamsIsOnlyThosePaths(t *testing.T) {
-	_, data := answer(t, eurekaReceiver(), `{"type":"eureka_info","request_id":8,"data":{"params":[`+
-		`"version","name","multizone","device_info.ssdp_udn","device_info.manufacturer",`+
-		`"device_info.product_name","build_info.build_type","build_info.cast_build_revision",`+
-		`"build_info.system_build_number","device_info.capabilities.multiplexed_connections_supported",`+
-		`"device_info.cloud_device_id"]}}`)
+	_, data := answer(
+		t,
+		eurekaReceiver(),
+		`{"type":"eureka_info","request_id":8,"data":{"params":[`+
+			`"version","name","multizone","device_info.ssdp_udn","device_info.manufacturer",`+
+			`"device_info.product_name","build_info.build_type","build_info.cast_build_revision",`+
+			`"build_info.system_build_number","device_info.capabilities.multiplexed_connections_supported",`+
+			`"device_info.cloud_device_id"]}}`,
+	)
 
-	want := map[string]bool{"version": true, "name": true, "multizone": true, "device_info": true, "build_info": true}
+	want := map[string]bool{
+		"version":     true,
+		"name":        true,
+		"multizone":   true,
+		"device_info": true,
+		"build_info":  true,
+	}
 	for k := range data {
 		if !want[k] {
 			t.Errorf("%s came back without being asked for", k)
@@ -84,7 +98,11 @@ func TestEurekaInfoWithParamsIsOnlyThosePaths(t *testing.T) {
 }
 
 func TestParamsMayBeACommaSeparatedString(t *testing.T) {
-	_, data := answer(t, eurekaReceiver(), `{"type":"eureka_info","request_id":9,"data":{"params":"name,build_info.build_type"}}`)
+	_, data := answer(
+		t,
+		eurekaReceiver(),
+		`{"type":"eureka_info","request_id":9,"data":{"params":"name,build_info.build_type"}}`,
+	)
 	if data["name"] != "Kitchen" || len(data) != 2 {
 		t.Errorf("the data is %v", data)
 	}
@@ -104,7 +122,9 @@ func TestOtherSetupRequestsAreReportedAndUnanswered(t *testing.T) {
 	var unspoken [][2]string
 	r.Unspoken = func(namespace, kind string) { unspoken = append(unspoken, [2]string{namespace, kind}) }
 
-	out, err := r.Receive(from(SenderID, NSSetup, `{"type":"set_eureka_info","request_id":8,"data":{"name":"x"}}`))
+	out, err := r.Receive(
+		from(SenderID, NSSetup, `{"type":"set_eureka_info","request_id":8,"data":{"name":"x"}}`),
+	)
 	if err != nil || len(out) != 0 {
 		t.Fatalf("%d answers, %v", len(out), err)
 	}

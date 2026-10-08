@@ -76,17 +76,39 @@ func (v *synthwave) backdrop(back *image.RGBA) {
 	W, H, u := float64(v.st.w), float64(v.st.h), v.st.u
 	hz := H * 0.6
 	fx.LinearRect(back, image.Rect(0, 0, v.st.w, int(hz)), 0, 0, 0, float32(hz), []fx.Stop{
-		{At: 0, C: hex(0x060217, 1)}, {At: 0.5, C: hex(0x1a0736, 1)}, {At: 0.82, C: hex(0x46104e, 1)}, {At: 1, C: hex(0x8c1f5c, 1)},
+		{
+			At: 0,
+			C:  hex(0x060217, 1),
+		},
+		{At: 0.5, C: hex(0x1a0736, 1)},
+		{At: 0.82, C: hex(0x46104e, 1)},
+		{At: 1, C: hex(0x8c1f5c, 1)},
 	}, false)
 	r := seeded(88)
 	for range 190 {
 		b := 0.2 + r.next()*r.next()*0.8
 		sz := (0.5 + r.next()*1.1) * u
-		fx.Square(back, float32(r.next()*W), float32(math.Pow(r.next(), 1.6)*hz*0.7), float32(math.Max(sz, 0.6)), nrgba([3]float64{255, 230, 255}, b), false)
+		fx.Square(
+			back,
+			float32(r.next()*W),
+			float32(math.Pow(r.next(), 1.6)*hz*0.7),
+			float32(math.Max(sz, 0.6)),
+			nrgba([3]float64{255, 230, 255}, b),
+			false,
+		)
 	}
-	fx.LinearRect(back, image.Rect(0, int(hz), v.st.w, v.st.h), 0, float32(hz), 0, float32(H), []fx.Stop{
-		{At: 0, C: hex(0x1a0530, 1)}, {At: 1, C: hex(0x050109, 1)},
-	}, false)
+	fx.LinearRect(
+		back,
+		image.Rect(0, int(hz), v.st.w, v.st.h),
+		0,
+		float32(hz),
+		0,
+		float32(H),
+		[]fx.Stop{
+			{At: 0, C: hex(0x1a0530, 1)}, {At: 1, C: hex(0x050109, 1)},
+		},
+		false,
+	)
 }
 
 func (v *synthwave) groundLines(back *image.RGBA) {

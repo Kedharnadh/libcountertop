@@ -6,9 +6,6 @@ import (
 	"math"
 )
 
-// Tensor is a buffer plus its current shape. Data is NHWC row-major and flat; Shape describes
-// how to read it. Integer tensors decode into I32 whatever their declared width, because in
-// these models they only ever carry shapes, axes and permutations.
 type Tensor struct {
 	Name  string
 	Type  TensorType
@@ -26,10 +23,8 @@ func count(shape []int) int {
 	return n
 }
 
-// Count is the number of elements the current shape describes.
 func (t *Tensor) Count() int { return count(t.Shape) }
 
-// Dim is the size of an axis, counting from the end for negative i.
 func (t *Tensor) Dim(i int) int {
 	if i < 0 {
 		i += len(t.Shape)
@@ -57,15 +52,12 @@ func (t *Tensor) resize(shape []int) {
 	}
 }
 
-// Interpreter runs one subgraph. It is not safe for concurrent use: tensors are reused between
-// invocations so that steady-state inference does not allocate.
 type Interpreter struct {
 	model   *Model
 	graph   *Subgraph
 	tensors []*Tensor
 }
 
-// New prepares the model's first subgraph for execution.
 func New(m *Model) (*Interpreter, error) {
 	g := m.Subgraphs[0]
 	in := &Interpreter{model: m, graph: g, tensors: make([]*Tensor, len(g.Tensors))}
@@ -82,7 +74,12 @@ func New(m *Model) (*Interpreter, error) {
 			switch d.Type {
 			case Float32, Int32, Int64, Bool:
 			default:
-				return nil, fmt.Errorf("tflite: tensor %d (%s) has unsupported type %s", i, d.Name, d.Type)
+				return nil, fmt.Errorf(
+					"tflite: tensor %d (%s) has unsupported type %s",
+					i,
+					d.Name,
+					d.Type,
+				)
 			}
 			t.resize(t.Shape)
 		}
@@ -130,22 +127,16 @@ func decode(t *Tensor, raw []byte) error {
 	return nil
 }
 
-// Tensor returns a tensor by graph index.
 func (in *Interpreter) Tensor(i int) *Tensor { return in.tensors[i] }
 
-// Input returns the i'th subgraph input.
 func (in *Interpreter) Input(i int) *Tensor { return in.tensors[in.graph.Inputs[i]] }
 
-// Output returns the i'th subgraph output.
 func (in *Interpreter) Output(i int) *Tensor { return in.tensors[in.graph.Outputs[i]] }
 
-// ResizeInput sets an input's shape. Every other shape follows from it during Invoke, so this is
-// the only place a caller has to think about dynamic dimensions.
 func (in *Interpreter) ResizeInput(i int, shape []int) {
 	in.Input(i).resize(shape)
 }
 
-// Invoke runs every operator in order, recomputing shapes as it goes.
 func (in *Interpreter) Invoke() error {
 	for i, o := range in.graph.Ops {
 		ins := make([]*Tensor, len(o.Inputs))
@@ -196,8 +187,7 @@ func activate(v float32, a Activation) float32 {
 	return v
 }
 
-// padFor is TFLite's padding split for SAME: the total padding is distributed with the smaller
-// half before the data.
+// TFLite's SAME padding puts the smaller half before the data.
 func padFor(stride, dilation, in, filter, out int) int {
 	effective := (filter-1)*dilation + 1
 	p := ((out-1)*stride + effective - in) / 2

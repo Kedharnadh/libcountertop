@@ -110,6 +110,44 @@ func TestSendStopsAfterFailureAndKeepsPartialOutput(t *testing.T) {
 		t.Fatalf("Send error = %v", err)
 	}
 	if out.String() != "step completed\n" || calls.Load() != 1 {
-		t.Errorf("partial output or sequencing lost: output=%q calls=%d", out.String(), calls.Load())
+		t.Errorf(
+			"partial output or sequencing lost: output=%q calls=%d",
+			out.String(),
+			calls.Load(),
+		)
+	}
+}
+
+func TestOutputThatLooksLikeATerminatorStaysOutput(t *testing.T) {
+	answers := map[string]struct {
+		out string
+		err error
+	}{
+		"first":  {out: "ok\nerror: not really\n"},
+		"second": {out: "after", err: errors.New("one\ntwo")},
+		"third":  {out: "last"},
+	}
+	ours, theirs := net.Pipe()
+	t.Cleanup(func() { _ = ours.Close() })
+	go Serve(context.Background(), theirs, func(_ context.Context, args []string) (string, error) {
+		a := answers[args[0]]
+		return a.out, a.err
+	})
+	_ = ours.SetDeadline(time.Now().Add(2 * time.Second))
+	in := bufio.NewScanner(ours)
+	for _, tc := range []struct{ cmd, out, err string }{
+		{"first", "ok\nerror: not really\n", ""},
+		{"second", "after\n", "one\ntwo"},
+		{"third", "last\n", ""},
+	} {
+		go func() { _, _ = fmt.Fprintln(ours, tc.cmd) }()
+		var out bytes.Buffer
+		err := Answer(in, &out)
+		if out.String() != tc.out {
+			t.Errorf("%s: output %q, want %q", tc.cmd, out.String(), tc.out)
+		}
+		if got := fmt.Sprint(err); (tc.err == "" && err != nil) || (tc.err != "" && got != tc.err) {
+			t.Errorf("%s: error %v, want %q", tc.cmd, err, tc.err)
+		}
 	}
 }

@@ -54,8 +54,6 @@ func TestTheFragmentFlagsRoundTrip(t *testing.T) {
 	}
 }
 
-// Contributing sources sit between the fixed header and the payload. Not skipping them reads the
-// last source as the A2DP header and the rest of it as audio.
 func TestContributingSourcesAreSkipped(t *testing.T) {
 	packet := make([]byte, rtpHeader+8+1+3)
 	packet[0] = rtpVersion<<6 | 2 // two contributing sources
@@ -75,7 +73,6 @@ func TestContributingSourcesAreSkipped(t *testing.T) {
 }
 
 func TestAnExtensionHeaderIsSkipped(t *testing.T) {
-	// One extension word: four bytes of extension header, then one word of it.
 	packet := make([]byte, rtpHeader+4+4+1+2)
 	packet[0] = rtpVersion<<6 | 0x10
 	packet[rtpHeader+3] = 1 // the extension is one word long
@@ -121,7 +118,9 @@ func TestAWholePacketPassesStraightThrough(t *testing.T) {
 func TestFragmentsAreJoinedInOrder(t *testing.T) {
 	var r Reassembler
 
-	if got := r.Push(Media{Fragmented: true, Start: true, Count: 3, Payload: []byte{1, 2}}); got != nil {
+	if got := r.Push(
+		Media{Fragmented: true, Start: true, Count: 3, Payload: []byte{1, 2}},
+	); got != nil {
 		t.Errorf("the start fragment produced %v", got)
 	}
 	if got := r.Push(Media{Fragmented: true, Count: 2, Payload: []byte{3, 4}}); got != nil {
@@ -134,33 +133,32 @@ func TestFragmentsAreJoinedInOrder(t *testing.T) {
 	}
 }
 
-// A run that ends early has a hole in it. Handing it over decodes to a burst of noise, which
-// through a speaker is worse than a frame that never arrives.
 func TestARunThatEndsEarlyIsDropped(t *testing.T) {
 	var r Reassembler
 
 	r.Push(Media{Fragmented: true, Start: true, Count: 4, Payload: []byte{1, 2}})
 	r.Push(Media{Fragmented: true, Count: 3, Payload: []byte{3, 4}})
 
-	if got := r.Push(Media{Fragmented: true, Last: true, Count: 2, Payload: []byte{5}}); got != nil {
+	if got := r.Push(
+		Media{Fragmented: true, Last: true, Count: 2, Payload: []byte{5}},
+	); got != nil {
 		t.Errorf("a run one fragment short came back as %v", got)
 	}
 }
 
-// A fragment arriving with no start is a run this side joined halfway through, so there is no way
-// to tell which frame the bytes belong to.
 func TestAFragmentWithNoStartIsDropped(t *testing.T) {
 	var r Reassembler
 
 	if got := r.Push(Media{Fragmented: true, Count: 2, Payload: []byte{1, 2}}); got != nil {
 		t.Errorf("came back %v", got)
 	}
-	if got := r.Push(Media{Fragmented: true, Last: true, Count: 1, Payload: []byte{3}}); got != nil {
+	if got := r.Push(
+		Media{Fragmented: true, Last: true, Count: 1, Payload: []byte{3}},
+	); got != nil {
 		t.Errorf("came back %v", got)
 	}
 }
 
-// A new start abandons whatever was in hand rather than joining onto it.
 func TestAnAbandonedRunDoesNotLeakIntoTheNext(t *testing.T) {
 	var r Reassembler
 
@@ -173,14 +171,15 @@ func TestAnAbandonedRunDoesNotLeakIntoTheNext(t *testing.T) {
 	}
 }
 
-// A whole packet in the middle of a run means the run is never finishing.
 func TestAWholePacketClearsAPartialRun(t *testing.T) {
 	var r Reassembler
 
 	r.Push(Media{Fragmented: true, Start: true, Count: 3, Payload: []byte{0xaa}})
 	r.Push(Media{Count: 1, Payload: []byte{1, 2}})
 
-	if got := r.Push(Media{Fragmented: true, Last: true, Count: 1, Payload: []byte{3}}); got != nil {
+	if got := r.Push(
+		Media{Fragmented: true, Last: true, Count: 1, Payload: []byte{3}},
+	); got != nil {
 		t.Errorf("the abandoned run came back as %v", got)
 	}
 }

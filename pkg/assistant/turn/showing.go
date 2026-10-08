@@ -1,7 +1,5 @@
 package turn
 
-// Phase is what a turn is doing, for whatever shows it. The conversation's own phase is its
-// business; this is the part of it worth looking at.
 type Phase int
 
 const (
@@ -23,13 +21,6 @@ func (p Phase) String() string {
 	return "idle"
 }
 
-// Showing is a turn as something to look at: the phase, the slot whose assistant it belongs to, and
-// the words either side of it.
-//
-// Said is what Home Assistant heard, which arrives when the talker stops rather than while they are
-// speaking — the device does not transcribe, so this is the earliest the words exist. Reply is what
-// it is about to say, and arrives before the audio does, which is what makes revealing it in time
-// with the speech possible at all.
 type Showing struct {
 	Phase Phase
 	Slot  int

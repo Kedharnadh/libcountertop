@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
+
 	widget "github.com/ygelfand/libcountertop/pkg/display/model"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
@@ -20,17 +21,42 @@ func (view *Renderer) Body(w *gogui.Window) gogui.View {
 	ha := view.options.Client
 	device := map[string]any{"Name": view.options.Name()}
 	on := view.options.Engine.Enabled()
-	master := view.options.UI.Row("enabled", "home", widget.Row{Label: say.T("home.enabled"), Kind: widget.Toggle, On: on},
-		func(int) { view.options.Engine.SetEnabled(!on) }, false)
+	master := view.options.UI.Row(
+		"enabled",
+		"home",
+		widget.Row{Label: say.T("home.enabled"), Kind: widget.Toggle, On: on},
+		func(int) { view.options.Engine.SetEnabled(!on) },
+		false,
+	)
 	switch {
 	case !on:
 		return Column([]gogui.View{master})
 	case !ha.Connected():
-		return Column([]gogui.View{master, view.blocked(w, say.T("home.unconnected"), say.F("home.unconnected.hint", device), nil)})
+		return Column(
+			[]gogui.View{
+				master,
+				view.blocked(
+					w,
+					say.T("home.unconnected"),
+					say.F("home.unconnected.hint", device),
+					nil,
+				),
+			},
+		)
 	case ha.Access() == homeassistant.Unknown:
 		return Column([]gogui.View{master, view.blocked(w, say.T("home.checking"), "", nil)})
 	case ha.Access() == homeassistant.Refused:
-		return Column([]gogui.View{master, view.blocked(w, say.T("home.refused"), say.F("home.refused.hint", device), func(int) { ha.Probe() })})
+		return Column(
+			[]gogui.View{
+				master,
+				view.blocked(
+					w,
+					say.T("home.refused"),
+					say.F("home.refused.hint", device),
+					func(int) { ha.Probe() },
+				),
+			},
+		)
 	}
 
 	views := []gogui.View{master}
@@ -61,14 +87,28 @@ func (view *Renderer) blocked(w *gogui.Window, title, hint string, retry func(in
 	big := t.TextStyleDef
 	big.Size *= 1.3
 	views := []gogui.View{
-		gogui.Svg(gogui.SvgCfg{ID: "esphome", SvgData: view.options.Logo, Width: side, Height: side}),
+		gogui.Svg(
+			gogui.SvgCfg{ID: "esphome", SvgData: view.options.Logo, Width: side, Height: side},
+		),
 		gogui.Label(title, big),
 	}
 	if hint != "" {
-		views = append(views, gogui.Text(gogui.TextCfg{Text: hint, TextStyle: secondary(), Mode: gogui.TextModeWrap}))
+		views = append(
+			views,
+			gogui.Text(gogui.TextCfg{Text: hint, TextStyle: secondary(), Mode: gogui.TextModeWrap}),
+		)
 	}
 	if retry != nil {
-		views = append(views, view.options.UI.Row("retry", "home", widget.Row{Glyph: gogui.IconSync, Label: say.T("home.check")}, retry, true))
+		views = append(
+			views,
+			view.options.UI.Row(
+				"retry",
+				"home",
+				widget.Row{Glyph: gogui.IconSync, Label: say.T("home.check")},
+				retry,
+				true,
+			),
+		)
 	}
 	return gogui.Column(gogui.ContainerCfg{
 		Sizing:  gogui.FillFit,
@@ -93,7 +133,14 @@ func Separator() gogui.View {
 }
 
 func Column(views []gogui.View) gogui.View {
-	return gogui.Column(gogui.ContainerCfg{Sizing: gogui.FillFit, Padding: gogui.NoPadding, Spacing: gogui.SpacingTight, Content: views})
+	return gogui.Column(
+		gogui.ContainerCfg{
+			Sizing:  gogui.FillFit,
+			Padding: gogui.NoPadding,
+			Spacing: gogui.SpacingTight,
+			Content: views,
+		},
+	)
 }
 
 func (view *Renderer) Picker(p *homecontrol.Picker) gogui.View {
@@ -110,12 +157,35 @@ func (view *Renderer) Picker(p *homecontrol.Picker) gogui.View {
 	switch {
 	case s.Err != nil:
 		body = []gogui.View{
-			view.options.UI.Row("failed", "picker", widget.Row{Label: say.T("home.failed"), Hint: view.failure(s.Err)}, nil, false),
-			view.options.UI.Row("retry", "picker", widget.Row{Glyph: gogui.IconSync, Label: say.T("home.retry")}, func(int) { p.Retry() }, true),
+			view.options.UI.Row(
+				"failed",
+				"picker",
+				widget.Row{Label: say.T("home.failed"), Hint: view.failure(s.Err)},
+				nil,
+				false,
+			),
+			view.options.UI.Row(
+				"retry",
+				"picker",
+				widget.Row{Glyph: gogui.IconSync, Label: say.T("home.retry")},
+				func(int) { p.Retry() },
+				true,
+			),
 		}
 		return Column(append([]gogui.View{search}, body...))
 	case s.Loading:
-		return Column([]gogui.View{search, view.options.UI.Row("loading", "picker", widget.Row{Label: say.T("home.loading")}, nil, false)})
+		return Column(
+			[]gogui.View{
+				search,
+				view.options.UI.Row(
+					"loading",
+					"picker",
+					widget.Row{Label: say.T("home.loading")},
+					nil,
+					false,
+				),
+			},
+		)
 	}
 
 	var strip []gogui.View
@@ -124,17 +194,35 @@ func (view *Renderer) Picker(p *homecontrol.Picker) gogui.View {
 		label string
 	}{{homecontrol.TabLabels, say.T("home.tab.labels")}, {homecontrol.TabManual, say.T("home.tab.manual")}} {
 		st := gogui.CurrentTheme().Cfg.TextStyleDef
-		cfg := gogui.ContainerCfg{ID: "home-tab-" + string(it.tab), Padding: gogui.PaddingMedium, VAlign: gogui.VAlignMiddle}
+		cfg := gogui.ContainerCfg{
+			ID:      "home-tab-" + string(it.tab),
+			Padding: gogui.PaddingMedium,
+			VAlign:  gogui.VAlignMiddle,
+		}
 		view.options.UI.Toolkit.Tab(&cfg, &st, widgets.Chosen(s.Tab == it.tab))
 		cfg.Content = []gogui.View{gogui.Label(it.label, st)}
 		pick := it.tab
-		strip = append(strip, view.options.UI.Toolkit.Pressable(gogui.Row, cfg, func(gogui.EventCtx) { p.SetTab(pick) }))
+		strip = append(
+			strip,
+			view.options.UI.Toolkit.Pressable(
+				gogui.Row,
+				cfg,
+				func(gogui.EventCtx) { p.SetTab(pick) },
+			),
+		)
 	}
 	shown := view.labelsTab(p, s)
 	if s.Tab == homecontrol.TabManual {
 		shown = view.manualTab(p, s)
 	}
-	tabs := gogui.Row(gogui.ContainerCfg{Sizing: gogui.FillFit, Padding: gogui.NoPadding, Spacing: gogui.SpacingSmall, Content: strip})
+	tabs := gogui.Row(
+		gogui.ContainerCfg{
+			Sizing:  gogui.FillFit,
+			Padding: gogui.NoPadding,
+			Spacing: gogui.SpacingSmall,
+			Content: strip,
+		},
+	)
 	return Column([]gogui.View{search, tabs, shown})
 }
 
@@ -151,7 +239,17 @@ func (view *Renderer) failure(err error) string {
 
 func (view *Renderer) labelsTab(p *homecontrol.Picker, s homecontrol.Snapshot) gogui.View {
 	if len(s.Labels) == 0 {
-		return Column([]gogui.View{view.options.UI.Row("empty", "labels", widget.Row{Label: say.T("home.empty")}, nil, false)})
+		return Column(
+			[]gogui.View{
+				view.options.UI.Row(
+					"empty",
+					"labels",
+					widget.Row{Label: say.T("home.empty")},
+					nil,
+					false,
+				),
+			},
+		)
 	}
 	var views []gogui.View
 	for i, l := range s.Labels {
@@ -169,7 +267,16 @@ func (view *Renderer) manualTab(p *homecontrol.Picker, s homecontrol.Snapshot) g
 		Kind:  widget.Toggle, On: s.Pick.All, Chosen: s.Pick.All,
 	}, func(int) { p.ToggleAll() }, false)}
 	if len(s.Areas) == 0 {
-		views = append(views, view.options.UI.Row("empty", "manual", widget.Row{Label: say.T("home.empty")}, nil, false))
+		views = append(
+			views,
+			view.options.UI.Row(
+				"empty",
+				"manual",
+				widget.Row{Label: say.T("home.empty")},
+				nil,
+				false,
+			),
+		)
 	}
 	for i, a := range s.Areas {
 		views = append(views, view.areaHeader(p, s, i, a))
@@ -194,7 +301,12 @@ func (view *Renderer) manualTab(p *homecontrol.Picker, s homecontrol.Snapshot) g
 	return Column(views)
 }
 
-func (view *Renderer) areaHeader(p *homecontrol.Picker, s homecontrol.Snapshot, i int, a homecontrol.AreaRow) gogui.View {
+func (view *Renderer) areaHeader(
+	p *homecontrol.Picker,
+	s homecontrol.Snapshot,
+	i int,
+	a homecontrol.AreaRow,
+) gogui.View {
 	t := gogui.CurrentTheme().Cfg
 	name := a.Name
 	if a.ID == "" {
@@ -213,10 +325,22 @@ func (view *Renderer) areaHeader(p *homecontrol.Picker, s homecontrol.Snapshot, 
 		Spacing: gogui.SpacingMedium,
 		Content: []gogui.View{
 			icon(glyph, t.ColorTextSecondary),
-			gogui.Column(gogui.ContainerCfg{Sizing: gogui.FillFit, Padding: gogui.NoPadding, Content: []gogui.View{
-				gogui.Label(name, gogui.TextStyle{}),
-				gogui.Label(say.F("home.area.count", map[string]any{"N": a.Included, "Of": len(a.Entities)}), secondary()),
-			}}),
+			gogui.Column(
+				gogui.ContainerCfg{
+					Sizing:  gogui.FillFit,
+					Padding: gogui.NoPadding,
+					Content: []gogui.View{
+						gogui.Label(name, gogui.TextStyle{}),
+						gogui.Label(
+							say.F(
+								"home.area.count",
+								map[string]any{"N": a.Included, "Of": len(a.Entities)},
+							),
+							secondary(),
+						),
+					},
+				},
+			),
 		},
 	}, func(gogui.EventCtx) { p.Expand(a.ID) })
 

@@ -7,23 +7,14 @@ import (
 
 func init() { register(Words, words{}) }
 
-// words says the time the way somebody asked would say it.
-//
-// The slowest face to read, and that is the choice being offered rather than a fault in it: a clock
-// that has to be read instead of glanced at is a different object in a room, and somebody who wants
-// the minute exactly has five other faces.
-//
-// The English is in phrase.go. This file sets it.
 type words struct{}
 
-// The block, against the box.
 const (
 	wordsWidthShare  = 0.86
 	wordsHeightShare = 0.62
 	wordsLineOfBox   = 0.26
 )
 
-// Against the line, so the face keeps its proportions at any size.
 const (
 	wordsLineGap = 0.12
 	wordsDateOf  = 0.26
@@ -55,8 +46,6 @@ func (words) Draw(s ui.Surface, in ui.Rect, r Reading, palette theme.Theme) {
 	tall := lineH*len(said) + gap*(len(said)-1) + under + dateH
 	top := in.Y + (in.H-tall)/2
 
-	// Left aligned to the widest line rather than each line centered: the phrase is a sentence, and
-	// a sentence that steps in and out at both ends reads as a poster instead.
 	var widest int
 	for _, line := range said {
 		w, _ := font.Measure(line)
@@ -75,7 +64,6 @@ func (words) Draw(s ui.Surface, in ui.Rect, r Reading, palette theme.Theme) {
 	}
 }
 
-// wordsFit is the largest size at which the longest line fits the width and they all fit the height.
 func wordsFit(in ui.Rect, said []string) int {
 	longest := ""
 	for _, line := range said {

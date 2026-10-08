@@ -5,19 +5,19 @@ import (
 	"net"
 
 	"github.com/libp2p/zeroconf/v2"
+
 	core "github.com/ygelfand/libcountertop/pkg/audio/sendspin"
 	network "github.com/ygelfand/libcountertop/pkg/network/advertise"
 )
 
-// What a server browses for. The path is required by the spec — it is how a server knows where to
-// point its WebSocket once mDNS has told it the address.
+// The path record is required by the Sendspin spec.
 const (
 	service = core.Service
 	domain  = core.Domain
 	path    = core.Path
 )
 
-// advertise publishes the room under this device's own host name; zeroconf falls back to loopback without addresses.
+// zeroconf falls back to loopback without addresses.
 func advertise(ctx context.Context, name string, port int) {
 	network.Advertise(ctx, "sendspin", func(ips []net.IP) (func(), error) {
 		srv, err := zeroconf.RegisterProxy(

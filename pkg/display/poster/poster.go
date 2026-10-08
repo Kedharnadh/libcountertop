@@ -1,4 +1,3 @@
-// Package poster puts a picture from Immich behind the dashboard.
 package poster
 
 import (
@@ -13,6 +12,7 @@ import (
 
 	esphome "github.com/ygelfand/go-esphome-device"
 	"github.com/ygelfand/go-esphome-device/api"
+
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/hook"
 	"github.com/ygelfand/libcountertop/pkg/media/immich"
@@ -181,7 +181,6 @@ func settle(state *atomic.Bool, lux float64, ok bool) bool {
 	return state.Load()
 }
 
-// Backdrop is the picture for a w×h screen with the clock at box, and a key that changes whenever it does.
 func (p *Poster) Backdrop(w, h int, box image.Rectangle, bg theme.Color) (*image.RGBA, string) {
 	if p.Dark() {
 		return nil, "dark"
@@ -241,32 +240,56 @@ func pick(found []immich.Asset, last string) string {
 
 func (p *Poster) build() {
 	base := func(id, name, icon string) esphome.Base {
-		return esphome.Base{ObjectID: id, Name: name, Icon: icon, Category: esphome.CategoryConfig, DeviceID: p.options.DeviceID}
+		return esphome.Base{
+			ObjectID: id,
+			Name:     name,
+			Icon:     icon,
+			Category: esphome.CategoryConfig,
+			DeviceID: p.options.DeviceID,
+		}
 	}
 	p.on = &esphome.Switch{Base: base("poster", "Poster", "mdi:image-frame")}
 	p.on.OnCommand = p.SetEnabled
 
-	p.every = &esphome.Select{Base: base("poster_every", "Poster changes", "mdi:image-sync"), Options: labels(config.PosterEveries())}
+	p.every = &esphome.Select{
+		Base:    base("poster_every", "Poster changes", "mdi:image-sync"),
+		Options: labels(config.PosterEveries()),
+	}
 	p.every.OnCommand = func(label string) {
 		if v, ok := byLabel(config.PosterEveries(), label); ok {
 			p.SetEvery(v)
 		}
 	}
 
-	p.server = &esphome.Text{Base: base("poster_server", "Immich server", "mdi:server"), MaxLength: 255}
+	p.server = &esphome.Text{
+		Base:      base("poster_server", "Immich server", "mdi:server"),
+		MaxLength: 255,
+	}
 	p.server.OnCommand = p.SetServer
-	p.key = &esphome.Text{Base: base("poster_key", "Immich API key", "mdi:key"), MaxLength: 255, Mode: api.TextMode_TEXT_MODE_PASSWORD}
+	p.key = &esphome.Text{
+		Base:      base("poster_key", "Immich API key", "mdi:key"),
+		MaxLength: 255,
+		Mode:      api.TextMode_TEXT_MODE_PASSWORD,
+	}
 	p.key.OnCommand = p.SetKey
-	p.albums = &esphome.Text{Base: base("poster_albums", "Poster albums", "mdi:image-album"), MaxLength: 255}
+	p.albums = &esphome.Text{
+		Base:      base("poster_albums", "Poster albums", "mdi:image-album"),
+		MaxLength: 255,
+	}
 	p.albums.OnCommand = p.SetAlbums
-	p.tags = &esphome.Text{Base: base("poster_tags", "Poster tags", "mdi:tag-multiple"), MaxLength: 255}
+	p.tags = &esphome.Text{
+		Base:      base("poster_tags", "Poster tags", "mdi:tag-multiple"),
+		MaxLength: 255,
+	}
 	p.tags.OnCommand = p.SetTags
 
 	p.next = &esphome.Button{Base: base("poster_next", "Next poster", "mdi:skip-next")}
 	p.next.OnPress = p.Next
 
-	p.showing = &esphome.TextSensor{Base: esphome.Base{ObjectID: "poster_showing", Name: "Poster showing", Icon: "mdi:image",
-		Category: esphome.CategoryDiagnostic, DeviceID: p.options.DeviceID}}
+	p.showing = &esphome.TextSensor{
+		Base: esphome.Base{ObjectID: "poster_showing", Name: "Poster showing", Icon: "mdi:image",
+			Category: esphome.CategoryDiagnostic, DeviceID: p.options.DeviceID},
+	}
 }
 
 func (p *Poster) saved(what string, err error) {
@@ -283,7 +306,6 @@ func (p *Poster) SetEnabled(on bool) {
 }
 
 func (p *Poster) SetEvery(v config.PosterEvery) {
-
 	defer func() { p.Restore(p.options.Settings.Read()) }()
 	if err := p.options.Settings.Update(func(c *config.Poster) { c.Every = v }); err != nil {
 		slog.Error("saving a setting failed", "setting", "poster every", "err", err)
@@ -306,10 +328,8 @@ func (p *Poster) SetTags(v string) {
 	p.saved("poster tags", p.options.Settings.Update(func(c *config.Poster) { c.Tags = v }))
 }
 
-// Touch reports how long the panel has been left alone.
 type Touch interface{ Since() time.Duration }
 
-// Dependencies supplies settings, physical activity and the ambient sensor.
 type Dependencies struct {
 	Settings storage.Section[config.Poster]
 	Touch    Touch

@@ -13,18 +13,26 @@ import (
 	esphome "github.com/ygelfand/go-esphome-device"
 )
 
-// served stands in for Home Assistant's custom_wake_words directory, which it serves statically: the
-// config at one path and the model beside it.
-func served(t *testing.T, config string, model []byte) (*httptest.Server, esphome.ExternalWakeWord) {
+func served(
+	t *testing.T,
+	config string,
+	model []byte,
+) (*httptest.Server, esphome.ExternalWakeWord) {
 	t.Helper()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/esphome/wake_words/test.json", func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(config))
-	})
-	mux.HandleFunc("/api/esphome/wake_words/test_model.tflite", func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write(model)
-	})
+	mux.HandleFunc(
+		"/api/esphome/wake_words/test.json",
+		func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(config))
+		},
+	)
+	mux.HandleFunc(
+		"/api/esphome/wake_words/test_model.tflite",
+		func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write(model)
+		},
+	)
 
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -56,7 +64,6 @@ func TestAdoptWritesTheModelAndItsManifest(t *testing.T) {
 	if m.ID != "test" {
 		t.Errorf("id = %q", m.ID)
 	}
-	// The offer names it, not the config: Home Assistant's own label is what the user picked.
 	if m.Phrase != "Hey Test" {
 		t.Errorf("phrase = %q, want the offered one", m.Phrase)
 	}
@@ -73,8 +80,6 @@ func TestAdoptWritesTheModelAndItsManifest(t *testing.T) {
 	}
 }
 
-// A truncated or swapped model must be refused: running one would fail later, somewhere harder to
-// read than here.
 func TestAdoptRefusesAWrongHash(t *testing.T) {
 	dir := t.TempDir()
 	_, offer := served(t, testConfig, []byte("the model"))
@@ -107,7 +112,6 @@ func TestAdoptNeedsTheConfigToNameAModel(t *testing.T) {
 	}
 }
 
-// Have is what keeps a device from downloading the same model on every reconnect.
 func TestHaveRecognisesWhatIsInstalled(t *testing.T) {
 	dir := t.TempDir()
 	model := []byte("this is not really a model")
@@ -123,7 +127,6 @@ func TestHaveRecognisesWhatIsInstalled(t *testing.T) {
 		t.Error("an adopted model is not recognized")
 	}
 
-	// The same id offered with different contents is a different model.
 	offer.Hash = "1111111111111111111111111111111111111111111111111111111111111111"
 	if Have(dir, offer) {
 		t.Error("a model with another hash counts as installed")

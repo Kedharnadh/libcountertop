@@ -10,7 +10,11 @@ const SetupPort = 8008
 
 const IconPath = "/setup/icon.png"
 
-func SetupHandler(eureka func() Eureka, icon func() []byte, seen func(r *http.Request, status int)) http.Handler {
+func SetupHandler(
+	eureka func() Eureka,
+	icon func() []byte,
+	seen func(r *http.Request, status int),
+) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		status := http.StatusNotFound
 		defer func() {

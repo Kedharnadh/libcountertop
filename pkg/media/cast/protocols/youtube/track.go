@@ -13,22 +13,21 @@ import (
 	"time"
 
 	"github.com/pion/opus"
+
 	"github.com/ygelfand/libcountertop/pkg/media/cast/preferences"
 	"github.com/ygelfand/libcountertop/pkg/media/hls"
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
 	"github.com/ygelfand/libcountertop/pkg/media/webm"
 )
 
-// rate and channels are what the output takes.
 const (
 	rate     = 48000
 	channels = 2
 )
 
-// maxFrame is the most samples per channel one Opus packet can carry: 120 ms at 48 kHz.
+// One Opus packet carries at most 120 ms per channel: 5760 samples at 48 kHz.
 const maxFrame = 5760
 
-// track is one video playing, as the output reads it.
 type track struct {
 	info   Track
 	stream io.ReadCloser
@@ -65,8 +64,13 @@ var (
 	_ playback.Live     = (*track)(nil)
 )
 
-// openTrack resolves a video and readies its audio to start at at.
-func openTrack(ctx context.Context, r *Resolver, st *station, id string, at time.Duration) (*track, error) {
+func openTrack(
+	ctx context.Context,
+	r *Resolver,
+	st *station,
+	id string,
+	at time.Duration,
+) (*track, error) {
 	if st != nil && st.theme == ThemeTV {
 		return openTV(ctx, st, id, at)
 	}
@@ -89,13 +93,31 @@ func openTrack(ctx context.Context, r *Resolver, st *station, id string, at time
 	return t, nil
 }
 
-func openLive(ctx context.Context, r *Resolver, st *station, l *Live, at time.Duration) (*track, error) {
+func openLive(
+	ctx context.Context,
+	r *Resolver,
+	st *station,
+	l *Live,
+	at time.Duration,
+) (*track, error) {
 	lead := time.Duration(preferences.Get().YouTube.LiveDelay) * time.Second
 	var from time.Time
 	if wallClock(at) {
 		from = time.Unix(0, int64(at))
 	}
-	s, err := hls.Open(ctx, l.HLS, hls.Options{HTTP: r.http, Ask: ask, Tallest: r.limits().Tallest, Fastest: r.limits().Fastest, Lead: lead, From: from, Resample: r.Resample})
+	s, err := hls.Open(
+		ctx,
+		l.HLS,
+		hls.Options{
+			HTTP:     r.http,
+			Ask:      ask,
+			Tallest:  r.limits().Tallest,
+			Fastest:  r.limits().Fastest,
+			Lead:     lead,
+			From:     from,
+			Resample: r.Resample,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("youtube: %s: %w", l.Track.ID, err)
 	}
@@ -103,7 +125,17 @@ func openLive(ctx context.Context, r *Resolver, st *station, l *Live, at time.Du
 	if oldest, _, ok := s.Window(); ok {
 		t.base = oldest
 	}
-	slog.Debug("youtube live", "video", l.Track.ID, "from", from, "base", t.base, "size", fmt.Sprintf("%dx%d", s.Width, s.Height))
+	slog.Debug(
+		"youtube live",
+		"video",
+		l.Track.ID,
+		"from",
+		from,
+		"base",
+		t.base,
+		"size",
+		fmt.Sprintf("%dx%d", s.Width, s.Height),
+	)
 	return t, nil
 }
 
@@ -111,7 +143,19 @@ func openTV(ctx context.Context, st *station, id string, at time.Duration) (*tra
 	st.mu.Lock()
 	ctt, params := st.ctt, st.params
 	st.mu.Unlock()
-	u, err := openUnplugged(ctx, surfaceEnv{http: st.env.HTTP, surface: st.env.Surface, resample: st.env.Resample, limits: st.resolve.limits()}, id, params, ctt, at)
+	u, err := openUnplugged(
+		ctx,
+		surfaceEnv{
+			http:     st.env.HTTP,
+			surface:  st.env.Surface,
+			resample: st.env.Resample,
+			limits:   st.resolve.limits(),
+		},
+		id,
+		params,
+		ctt,
+		at,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -209,13 +253,38 @@ read:
 	fmt.Fprintf(&b, "picture   %dx%d\n", t.live.Width, t.live.Height)
 	if oldest, edge, ok := t.window(); ok {
 		began := t.live.Began()
-		fmt.Fprintf(&b, "window    %v long, oldest %s, edge %s\n", edge.Sub(oldest).Round(time.Second), oldest.Format(time.TimeOnly), edge.Format(time.TimeOnly))
-		fmt.Fprintf(&b, "began     %s, %v behind the edge, position %v\n", began.Format(time.TimeOnly), edge.Sub(began).Round(time.Second), t.Start().Round(time.Second))
+		fmt.Fprintf(
+			&b,
+			"window    %v long, oldest %s, edge %s\n",
+			edge.Sub(oldest).Round(time.Second),
+			oldest.Format(time.TimeOnly),
+			edge.Format(time.TimeOnly),
+		)
+		fmt.Fprintf(
+			&b,
+			"began     %s, %v behind the edge, position %v\n",
+			began.Format(time.TimeOnly),
+			edge.Sub(began).Round(time.Second),
+			t.Start().Round(time.Second),
+		)
 	} else {
 		fmt.Fprintf(&b, "window    none\n")
 	}
-	fmt.Fprintf(&b, "audio     %v decoded (at the source rate), err %v\n", time.Duration(samples)*time.Second/rate, aerr)
-	fmt.Fprintf(&b, "frames    %d, %d bytes, %v to %v, err %v\n", f.n, f.bytes, f.first, f.last, f.err)
+	fmt.Fprintf(
+		&b,
+		"audio     %v decoded (at the source rate), err %v\n",
+		time.Duration(samples)*time.Second/rate,
+		aerr,
+	)
+	fmt.Fprintf(
+		&b,
+		"frames    %d, %d bytes, %v to %v, err %v\n",
+		f.n,
+		f.bytes,
+		f.first,
+		f.last,
+		f.err,
+	)
 	return b.String(), nil
 }
 
@@ -233,7 +302,19 @@ func newTrack(info Track, stream io.ReadCloser, st *station, at time.Duration) (
 			return nil, fmt.Errorf("youtube: %s: %w", info.ID, err)
 		}
 		off, cue, ok := demux.Cue(int64(at))
-		slog.Debug("youtube audio cue", "video", info.ID, "want", at, "cue", time.Duration(cue), "at", off, "found", ok)
+		slog.Debug(
+			"youtube audio cue",
+			"video",
+			info.ID,
+			"want",
+			at,
+			"cue",
+			time.Duration(cue),
+			"at",
+			off,
+			"found",
+			ok,
+		)
 		if ok {
 			s.From(off)
 			demux.Restart(stream, off)
@@ -254,7 +335,6 @@ func newTrack(info Track, stream io.ReadCloser, st *station, at time.Duration) (
 	return t, nil
 }
 
-// Read decodes packets until pcm is full or there are none left.
 func (t *track) Read(ctx context.Context, pcm []int16) (int, error) {
 	if err := ctx.Err(); err != nil {
 		return 0, err
@@ -319,7 +399,6 @@ func (t *track) readLive(read func([]int16) (int, error), pcm []int16) (int, err
 	return n, err
 }
 
-// decode fills left with the next packet's samples, skipping whatever comes before the start.
 func (t *track) decode() error {
 	for {
 		f, err := t.demux.Next()
@@ -353,7 +432,6 @@ func (t *track) decode() error {
 	}
 }
 
-// elapsed is how far the track has handed over.
 func (t *track) elapsed() time.Duration {
 	start := t.Start()
 	t.mu.Lock()

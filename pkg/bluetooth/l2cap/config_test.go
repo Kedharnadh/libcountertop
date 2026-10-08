@@ -26,8 +26,6 @@ func TestAnMTUOptionGoesOutAndComesBack(t *testing.T) {
 	}
 }
 
-// The top bit of the type says the sender is only suggesting, and it has to come off before the
-// type means anything.
 func TestTheHintBitIsNotPartOfTheType(t *testing.T) {
 	raw := []byte{OptionFlush | OptionHint, 0x02, 0xff, 0xff}
 
@@ -81,8 +79,6 @@ func TestReadingAConfigurationRequest(t *testing.T) {
 	}
 }
 
-// Silence is the default, not zero. A channel configured with no mtu option carries 672, and
-// reading that as nothing closes a channel that is working.
 func TestAConfigurationWithNoMTUIsTheDefault(t *testing.T) {
 	c := Configure{DestinationCID: 0x0040}
 
@@ -91,8 +87,6 @@ func TestAConfigurationWithNoMTUIsTheDefault(t *testing.T) {
 	}
 }
 
-// Options too numerous for one command arrive over several, and the flag has to survive the round
-// trip or the far end waits for a continuation that never comes.
 func TestAContinuedConfigurationSaysSo(t *testing.T) {
 	want := Configure{
 		DestinationCID: 0x0040,
@@ -109,8 +103,6 @@ func TestAContinuedConfigurationSaysSo(t *testing.T) {
 	}
 }
 
-// An option that has to be answered and cannot be is reported; a hint is skipped. Refusing a hint
-// is how a configuration round never finishes.
 func TestUnknownOptionsAreReportedAndHintsAreNot(t *testing.T) {
 	c := Configure{
 		Options: []Option{
@@ -152,9 +144,7 @@ func TestAConfigurationResponseCarriesItsResult(t *testing.T) {
 	}
 }
 
-// The whole round, the way a phone opening an audio channel does it.
 func TestAWholeConfigurationRound(t *testing.T) {
-	// The phone asks for a channel and says how large a packet it will send.
 	asked := Configure{DestinationCID: 0x0040, Options: []Option{MTUOption(895)}}.Command(1)
 
 	req, err := ParseConfigure(asked)
@@ -165,7 +155,6 @@ func TestAWholeConfigurationRound(t *testing.T) {
 		t.Fatalf("an mtu came back as unknown: %x", unknown)
 	}
 
-	// We accept it and say so with the number it knows the channel by.
 	answer := Configured{SourceCID: 0x0041, Result: ConfigSuccess}.Command(asked.ID)
 	if answer.ID != asked.ID {
 		t.Error("the answer did not carry the question's identifier")

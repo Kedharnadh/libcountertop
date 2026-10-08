@@ -2,17 +2,7 @@ package tflite
 
 import "fmt"
 
-// Stream evaluates a model incrementally along the time axis.
-//
-// It applies to a graph that is a chain of operators, each of which either transforms a row on
-// its own or reads a fixed window of rows with no padding along time. Every openWakeWord
-// embedding layer qualifies: its time convolutions are VALID with separable 3x1 filters, and the
-// only padded axis is frequency, which lives inside a row. Under those conditions feeding rows
-// through per-stage carry buffers computes the same dot products, in the same order, as running
-// the whole window, so the results are identical rather than merely close.
-//
-// Where the windowed model recomputes 76 rows to emit one, this recomputes only what the new
-// rows touch.
+// openWakeWord embedding time convolutions are VALID with 3x1 filters; only frequency is padded.
 type Stream struct {
 	stages []stage
 	warmup int
@@ -25,8 +15,6 @@ type stage struct {
 	consts []*Tensor
 	out    *Tensor
 
-	// need is how many input rows one output row reads, consume how many are retired per output
-	// row. Row-local operators are (1, 1).
 	need    int
 	consume int
 
@@ -37,8 +25,6 @@ type stage struct {
 	pending []float32
 }
 
-// NewStream prepares incremental evaluation of a model. window is the input row count the model
-// was built for, and the shape of every intermediate tensor is derived from it.
 func NewStream(m *Model, window []int) (*Stream, error) {
 	in, err := New(m)
 	if err != nil {
@@ -102,11 +88,14 @@ func NewStream(m *Model, window []int) (*Stream, error) {
 			}
 
 		default:
-			// Everything else has to be row-local, which for a binary operator means its other
-			// operand cannot span rows.
 			for _, c := range st.consts {
 				if c != nil && len(c.Shape) == 4 && c.Shape[1] > 1 {
-					return nil, fmt.Errorf("tflite: op %d (%s) reads %d rows of a constant", i, o.Op, c.Shape[1])
+					return nil, fmt.Errorf(
+						"tflite: op %d (%s) reads %d rows of a constant",
+						i,
+						o.Op,
+						c.Shape[1],
+					)
 				}
 			}
 			if _, ok := kernels[o.Op]; !ok {
@@ -131,11 +120,8 @@ func NewStream(m *Model, window []int) (*Stream, error) {
 	return s, nil
 }
 
-// Warmup is the number of rows to feed before the first output row appears.
 func (s *Stream) Warmup() int { return s.warmup }
 
-// Write feeds rows and returns whatever came out, flat and oldest first. The returned slice is
-// reused by the next call.
 func (s *Stream) Write(rows []float32) ([]float32, error) {
 	cur := rows
 	for i := range s.stages {
@@ -151,7 +137,6 @@ func (s *Stream) Write(rows []float32) ([]float32, error) {
 	return cur, nil
 }
 
-// Reset drops all buffered history.
 func (s *Stream) Reset() {
 	for i := range s.stages {
 		s.stages[i].pending = s.stages[i].pending[:0]
@@ -160,7 +145,11 @@ func (s *Stream) Reset() {
 
 func (st *stage) run(rows []float32) ([]float32, error) {
 	if len(rows)%st.rowSize != 0 {
-		return nil, fmt.Errorf("got %d values, not a whole number of %d-value rows", len(rows), st.rowSize)
+		return nil, fmt.Errorf(
+			"got %d values, not a whole number of %d-value rows",
+			len(rows),
+			st.rowSize,
+		)
 	}
 	st.pending = append(st.pending, rows...)
 
@@ -176,7 +165,11 @@ func (st *stage) run(rows []float32) ([]float32, error) {
 		Shape: []int{1, used, st.width, st.channels},
 		F32:   st.pending[:used*st.rowSize],
 	}
-	if err := kernels[st.op.Op](st.op, append([]*Tensor{in}, st.consts...), []*Tensor{st.out}); err != nil {
+	if err := kernels[st.op.Op](
+		st.op,
+		append([]*Tensor{in}, st.consts...),
+		[]*Tensor{st.out},
+	); err != nil {
 		return nil, err
 	}
 	if got := st.out.Shape[1]; got != emit {

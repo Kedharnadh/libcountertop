@@ -12,12 +12,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
 
-// Group runs a set of services and keeps them running.
-//
-// Services are started in the order they were added and stopped in reverse, which is the only
-// ordering there is: there is no dependency graph, because the order is short, fixed, and easier to
-// read as a list than to derive. Anything that needs to wait for another service waits on a signal
-// of its own rather than on being constructed later.
 type Group struct {
 	mu       sync.Mutex
 	entries  []*entry
@@ -38,13 +32,11 @@ type entry struct {
 
 func New() *Group { return &Group{} }
 
-// Add registers a service. Adding after Run has begun is refused loudly.
 func (g *Group) Add(svc Service, opts ...Option) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
 	if g.started {
-		// Adding after Run would silently never start, which is worse than saying so.
 		slog.Error("service added after the group started", "service", svc.Name())
 		return
 	}
@@ -53,10 +45,12 @@ func (g *Group) Add(svc Service, opts ...Option) {
 	for _, o := range opts {
 		o(&p)
 	}
-	g.entries = append(g.entries, &entry{svc: svc, policy: p, state: StateWaiting, since: time.Now()})
+	g.entries = append(
+		g.entries,
+		&entry{svc: svc, policy: p, state: StateWaiting, since: time.Now()},
+	)
 }
 
-// Status is what every service is doing.
 func (g *Group) Status() []Status {
 	g.mu.Lock()
 	entries := make([]*entry, len(g.entries))
@@ -70,11 +64,6 @@ func (g *Group) Status() []Status {
 	return out
 }
 
-// Run starts everything and blocks until ctx is canceled and every service has stopped.
-//
-// A required service that cannot be acquired is fatal: Run returns its error without starting what
-// follows, because a device missing something it cannot work without is better off restarting than
-// limping. Anything else that fails is recorded and the rest carry on.
 func (g *Group) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -98,17 +87,20 @@ func (g *Group) Run(ctx context.Context) error {
 			g.stop(started, &wg)
 			return nil
 		}
-		// Acquire before running, in order, so a service that has to take a device off Android does
-		// it while nothing else is competing for it.
 		began := time.Now()
 		acquired := false
 
 		if err := e.start(ctx); err != nil {
 			e.set(StateFailed, err)
 			if e.policy.required {
-				slog.Error("required service unavailable, giving up", "service", e.svc.Name(), "err", err)
+				slog.Error(
+					"required service unavailable, giving up",
+					"service",
+					e.svc.Name(),
+					"err",
+					err,
+				)
 				cancel()
-				// Start may have acquired part of its resources before failing.
 				started = append(started, e)
 				g.stop(started, &wg)
 				return fmt.Errorf("service: %s: %w", e.svc.Name(), err)
@@ -120,9 +112,6 @@ func (g *Group) Run(ctx context.Context) error {
 				continue
 			}
 
-			// Not there yet is not the same as not there. A device node ueventd has still to make
-			// is the ordinary case this early, and giving up here loses the service for the life
-			// of the process however long its restart policy says to keep trying.
 			slog.Error("service unavailable, still asking for it",
 				"service", e.svc.Name(), "err", err)
 		} else {
@@ -145,10 +134,6 @@ func (g *Group) Run(ctx context.Context) error {
 	return nil
 }
 
-// supervise keeps one service alive for as long as its policy says to.
-//
-// acquired says whether it already has its hardware. One that never got it starts by asking again
-// rather than by being run, so a device that turns up a second late is not lost for the whole run.
 func (g *Group) supervise(ctx context.Context, e *entry, acquired bool) {
 	wait := e.policy.backoff
 
@@ -171,9 +156,14 @@ func (g *Group) supervise(ctx context.Context, e *entry, acquired bool) {
 			return
 		}
 		if err == nil {
-			// Finished on its own, which is what a one-shot service does.
 			e.set(StateStopped, nil)
-			slog.Debug("service finished", "service", e.svc.Name(), "ran", ran.Round(time.Millisecond))
+			slog.Debug(
+				"service finished",
+				"service",
+				e.svc.Name(),
+				"ran",
+				ran.Round(time.Millisecond),
+			)
 			return
 		}
 		if !e.policy.restart {
@@ -182,8 +172,6 @@ func (g *Group) supervise(ctx context.Context, e *entry, acquired bool) {
 			return
 		}
 
-		// A service that stayed up a good while is having a bad moment rather than a bad life, so it
-		// starts again from the shortest delay.
 		if ran >= e.policy.steady {
 			wait = e.policy.backoff
 		}
@@ -200,12 +188,6 @@ func (g *Group) supervise(ctx context.Context, e *entry, acquired bool) {
 	}
 }
 
-// reacquire keeps asking for a service's hardware until it has it, and says whether it got there
-// before the group was told to stop.
-//
-// Acquired before it is run, however many attempts that takes. Running one that could not take its
-// device is a service reporting itself up while doing nothing, and a Run that waits on hardware it
-// never got waits forever — never returning, so never restarted.
 func (g *Group) reacquire(ctx context.Context, e *entry, wait *time.Duration) bool {
 	for {
 		select {
@@ -216,9 +198,6 @@ func (g *Group) reacquire(ctx context.Context, e *entry, wait *time.Duration) bo
 		}
 		*wait = grow(*wait, e.policy.maxBackoff)
 
-		// Let go of whatever it was holding before asking for it again: the point of a restart is
-		// usually to re-acquire a device, and holding the old handle would refuse it. What a
-		// restart lets go of is the service's to say, because it is not always everything.
 		e.release()
 
 		err := e.start(ctx)
@@ -227,11 +206,18 @@ func (g *Group) reacquire(ctx context.Context, e *entry, wait *time.Duration) bo
 		}
 
 		e.set(StateRetrying, err)
-		slog.Error("service could not be reacquired", "service", e.svc.Name(), "err", err, "in", *wait)
+		slog.Error(
+			"service could not be reacquired",
+			"service",
+			e.svc.Name(),
+			"err",
+			err,
+			"in",
+			*wait,
+		)
 	}
 }
 
-// grow is the next backoff, capped.
 func grow(wait, max time.Duration) time.Duration {
 	if next := wait * 2; next <= max {
 		return next
@@ -239,7 +225,6 @@ func grow(wait, max time.Duration) time.Duration {
 	return max
 }
 
-// stop waits for the running services to return, then closes them in reverse order.
 func (g *Group) stop(started []*entry, wg *sync.WaitGroup) {
 	g.mu.Lock()
 	g.stopping = true
@@ -251,9 +236,6 @@ func (g *Group) stop(started []*entry, wg *sync.WaitGroup) {
 	}
 }
 
-// run calls a service and turns a panic into an error, so the restart policy covers it. Recovering
-// any further out would take the loop above with it, and the service would be gone for the life of
-// the process rather than restarted.
 func run(ctx context.Context, svc Service) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -265,8 +247,6 @@ func run(ctx context.Context, svc Service) (err error) {
 	return svc.Run(ctx)
 }
 
-// Start and Close stay optional at this level too, which is what lets a component implement only
-// the halves it has.
 func (e *entry) start(ctx context.Context) error {
 	if s, ok := e.svc.(Starter); ok {
 		return s.Start(ctx)
@@ -284,7 +264,6 @@ func (e *entry) close() {
 	}
 }
 
-// release is what a restart does instead of closing, for a service that says the two differ.
 func (e *entry) release() {
 	r, ok := e.svc.(Reacquirer)
 	if !ok {
@@ -311,5 +290,11 @@ func (e *entry) countRestart() {
 func (e *entry) status() Status {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return Status{Name: e.svc.Name(), State: e.state, Err: e.err, Restarts: e.starts, Since: e.since}
+	return Status{
+		Name:     e.svc.Name(),
+		State:    e.state,
+		Err:      e.err,
+		Restarts: e.starts,
+		Since:    e.since,
+	}
 }

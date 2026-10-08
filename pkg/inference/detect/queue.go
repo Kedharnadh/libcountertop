@@ -5,7 +5,6 @@ import (
 	"sync/atomic"
 )
 
-// Queue adapts push capture to the engine's bounded owned-frame source.
 type Queue struct {
 	frames  chan []int16
 	dropped atomic.Uint64

@@ -11,21 +11,13 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/sdp"
 )
 
-// The layers are each tested on their own. What is tested here is that they compose: a phone doing
-// what a phone does, from "what is this device" to samples, driven through the real Sink.
-//
-// Everything crosses the wire as bytes and is parsed back, so the framing is exercised rather than
-// stepped around. A test that passed structs between the layers would not notice a length field
-// written in the wrong endianness, which is the class of mistake this is for.
-
-// phone is the far end, scripted.
 type phone struct {
 	t    *testing.T
 	sink *Sink
 
-	id    byte   // the next signalling command identifier
-	cid   uint16 // the next channel number this side hands out
-	label byte   // the next avdtp transaction label
+	id    byte
+	cid   uint16
+	label byte
 }
 
 func newPhone(t *testing.T) *phone {
@@ -38,7 +30,6 @@ func (p *phone) nextID() byte {
 	return p.id
 }
 
-// wire sends one frame and returns the answers, both directions through Marshal and Parse.
 func (p *phone) wire(f l2cap.Frame) []l2cap.Frame {
 	p.t.Helper()
 
@@ -62,7 +53,6 @@ func (p *phone) wire(f l2cap.Frame) []l2cap.Frame {
 	return out
 }
 
-// commands sends a signalling frame and returns the commands that came back.
 func (p *phone) commands(c ...l2cap.Command) []l2cap.Command {
 	p.t.Helper()
 
@@ -81,13 +71,11 @@ func (p *phone) commands(c ...l2cap.Command) []l2cap.Command {
 	return out
 }
 
-// channel is one open channel, from this side.
 type channel struct {
-	theirs uint16 // what the sink calls it, and what we address
-	ours   uint16 // what we call it, and what the sink addresses
+	theirs uint16
+	ours   uint16
 }
 
-// open runs the whole four-way opening: connect, their configuration, ours.
 func (p *phone) open(psm uint16) channel {
 	p.t.Helper()
 
@@ -109,18 +97,14 @@ func (p *phone) open(psm uint16) channel {
 	}
 	ch.theirs = connected.DestinationCID
 
-	// Their configuration, which we accept as sent.
 	if answers[1].Code != l2cap.CodeConfigRequest {
 		p.t.Fatalf("the second command was %#x, want a configuration request", answers[1].Code)
 	}
-	// Named by the sink's own number. A response tells the other end which of its requests this
-	// answers, so it carries their number and not the responder's.
 	p.commands(l2cap.Configured{
 		SourceCID: ch.theirs,
 		Result:    l2cap.ConfigSuccess,
 	}.Command(answers[1].ID))
 
-	// Then ours, which they answer.
 	answers = p.commands(l2cap.Configure{
 		DestinationCID: ch.theirs,
 		Options:        []l2cap.Option{l2cap.MTUOption(l2cap.MTUDefault)},
@@ -143,7 +127,6 @@ func (p *phone) open(psm uint16) channel {
 	return ch
 }
 
-// close tears a channel down the way a phone leaving does.
 func (p *phone) close(ch channel) {
 	p.t.Helper()
 
@@ -153,7 +136,6 @@ func (p *phone) close(ch channel) {
 	}.Command(l2cap.CodeDisconnectRequest, p.nextID()))
 }
 
-// data sends a payload on an open channel and returns the payloads that came back.
 func (p *phone) data(ch channel, payload []byte) [][]byte {
 	p.t.Helper()
 
@@ -167,8 +149,6 @@ func (p *phone) data(ch channel, payload []byte) [][]byte {
 	return out
 }
 
-// searchAttribute builds the request a phone actually sends: a pattern, a cap, a list of attribute
-// ranges, and an empty continuation.
 func (p *phone) searchAttribute(class uint16, attrs ...sdp.AttrRange) sdp.PDU {
 	p.t.Helper()
 
@@ -194,7 +174,6 @@ func (p *phone) searchAttribute(class uint16, attrs ...sdp.AttrRange) sdp.PDU {
 	return sdp.PDU{ID: sdp.PDUSearchAttributeRequest, Transaction: 1, Params: params}
 }
 
-// ask sends one AVDTP command and returns the answer.
 func (p *phone) ask(ch channel, signal byte, data ...byte) avdtp.Message {
 	p.t.Helper()
 
@@ -220,7 +199,6 @@ func (p *phone) ask(ch channel, signal byte, data ...byte) avdtp.Message {
 	return answer
 }
 
-// frame is a whole SBC frame with a correct check byte, so the sink will decode it.
 func frame(t *testing.T, bitpool int, fill byte) []byte {
 	t.Helper()
 
@@ -252,8 +230,6 @@ func frame(t *testing.T, bitpool int, fill byte) []byte {
 	return out
 }
 
-// The whole thing: a phone finds the sink over SDP, negotiates a stream over AVDTP, and the audio
-// it sends comes out as decodable frames.
 func TestAPhoneFindsTheSinkAndPlaysToIt(t *testing.T) {
 	p := newPhone(t)
 
@@ -263,7 +239,6 @@ func TestAPhoneFindsTheSinkAndPlaysToIt(t *testing.T) {
 	p.sink.Stopped = func(*avdtp.Endpoint) { stopped++ }
 	p.sink.Frame = func(f []byte) { decoded = append(decoded, f) }
 
-	// Find out what this device is.
 	discovery := p.open(l2cap.PSMSDP)
 
 	request := p.searchAttribute(sdp.UUIDAudioSink, sdp.AttrRange{First: 0x0000, Last: 0xffff})
@@ -285,7 +260,6 @@ func TestAPhoneFindsTheSinkAndPlaysToIt(t *testing.T) {
 		t.Fatalf("the record advertises channel %#x, the stack serves %#x", psm, SinkPSM)
 	}
 
-	// Connect to where the record said, and negotiate.
 	signalling := p.open(psm)
 
 	seps, err := avdtp.ParseSEPs(p.ask(signalling, avdtp.SignalDiscover).Data)
@@ -318,7 +292,6 @@ func TestAPhoneFindsTheSinkAndPlaysToIt(t *testing.T) {
 		t.Fatalf("ParseSBC: %v", err)
 	}
 
-	// Pick one of everything, the way a phone does.
 	chosen := avdtp.SBC{
 		Rates:      avdtp.Rate48000,
 		Channels:   avdtp.ChannelJointStereo,
@@ -338,12 +311,14 @@ func TestAPhoneFindsTheSinkAndPlaysToIt(t *testing.T) {
 	if m := p.ask(signalling, avdtp.SignalSetConfig, config...); m.Type != avdtp.ResponseAccept {
 		t.Fatalf("the configuration was refused: %v", m.Data)
 	}
-	if m := p.ask(signalling, avdtp.SignalOpen, avdtp.AddressTo(seid)); m.Type != avdtp.ResponseAccept {
+	if m := p.ask(
+		signalling,
+		avdtp.SignalOpen,
+		avdtp.AddressTo(seid),
+	); m.Type != avdtp.ResponseAccept {
 		t.Fatalf("open was refused: %v", m.Data)
 	}
 
-	// The second channel to the same number is the audio. Which one it is is decided by order and
-	// by nothing in the packets, so opening it is the part worth checking.
 	transport := p.open(SinkPSM)
 	if p.sink.transport != transport.theirs {
 		t.Fatalf("the sink took channel %#x for media, want %#x",
@@ -354,14 +329,17 @@ func TestAPhoneFindsTheSinkAndPlaysToIt(t *testing.T) {
 			p.sink.signalling, signalling.theirs)
 	}
 
-	if m := p.ask(signalling, avdtp.SignalStart, avdtp.AddressTo(seid)); m.Type != avdtp.ResponseAccept {
+	if m := p.ask(
+		signalling,
+		avdtp.SignalStart,
+		avdtp.AddressTo(seid),
+	); m.Type != avdtp.ResponseAccept {
 		t.Fatalf("start was refused: %v", m.Data)
 	}
 	if started != 1 {
 		t.Fatalf("the stream started %d times", started)
 	}
 
-	// Two frames in one packet, which is what an encoder sends.
 	first := frame(t, 35, 0x5a)
 	second := frame(t, 35, 0xa5)
 
@@ -378,22 +356,23 @@ func TestAPhoneFindsTheSinkAndPlaysToIt(t *testing.T) {
 		t.Fatalf("%d frames came out of one packet holding two", len(decoded))
 	}
 
-	// The frames have to come out whole and in order, or what reaches the decoder is noise.
 	for i, want := range [][]byte{first, second} {
 		if string(decoded[i]) != string(want) {
 			t.Errorf("frame %d came out %d bytes, want %d", i, len(decoded[i]), len(want))
 		}
 	}
 
-	// And they have to be decodable, which is the only check that the length arithmetic agreed all
-	// the way from the packet down to the frame.
 	for i, f := range decoded {
 		if _, err := sbc.Unpack(f); err != nil {
 			t.Errorf("frame %d did not decode: %v", i, err)
 		}
 	}
 
-	if m := p.ask(signalling, avdtp.SignalSuspend, avdtp.AddressTo(seid)); m.Type != avdtp.ResponseAccept {
+	if m := p.ask(
+		signalling,
+		avdtp.SignalSuspend,
+		avdtp.AddressTo(seid),
+	); m.Type != avdtp.ResponseAccept {
 		t.Fatalf("suspend was refused: %v", m.Data)
 	}
 	if stopped != 1 {
@@ -401,7 +380,6 @@ func TestAPhoneFindsTheSinkAndPlaysToIt(t *testing.T) {
 	}
 }
 
-// psmFrom digs the channel number out of a search response the way a phone does.
 func psmFrom(t *testing.T, p sdp.PDU) uint16 {
 	t.Helper()
 
@@ -437,8 +415,6 @@ func psmFrom(t *testing.T, p sdp.PDU) uint16 {
 	return 0
 }
 
-// The remote control is a third channel, to its own number, and unlike the AVDTP pair there is
-// only ever one of it.
 func TestThePhoneOpensTheRemoteControlAndPressesPlay(t *testing.T) {
 	p := newPhone(t)
 
@@ -458,7 +434,6 @@ func TestThePhoneOpensTheRemoteControlAndPressesPlay(t *testing.T) {
 			p.sink.control, control.theirs)
 	}
 
-	// A button on the screen goes out as two messages, on the control channel.
 	frames, err := p.sink.Press(avrcp.OpPlay)
 	if err != nil {
 		t.Fatalf("Press: %v", err)
@@ -490,7 +465,6 @@ func TestThePhoneOpensTheRemoteControlAndPressesPlay(t *testing.T) {
 		}
 	}
 
-	// The phone setting the volume, which is the half of the profile this device is the target for.
 	command := avrcp.Transport{
 		Label:   4,
 		Type:    avrcp.MessageCommand,
@@ -514,8 +488,6 @@ func TestThePhoneOpensTheRemoteControlAndPressesPlay(t *testing.T) {
 	}
 }
 
-// A search for the sink alone matches one record. The remote control ones are different classes
-// and answering with them would be answering a question nobody asked.
 func TestASearchForTheSinkMatchesOnlyTheSink(t *testing.T) {
 	p := newPhone(t)
 	discovery := p.open(l2cap.PSMSDP)
@@ -532,8 +504,6 @@ func TestASearchForTheSinkMatchesOnlyTheSink(t *testing.T) {
 	}
 }
 
-// A phone that searches the public browse group is asking what this device offers, and all three
-// have to come back in the one answer. Sending one makes the other two look absent.
 func TestSearchingTheBrowseGroupFindsEverything(t *testing.T) {
 	p := newPhone(t)
 	discovery := p.open(l2cap.PSMSDP)
@@ -550,7 +520,6 @@ func TestSearchingTheBrowseGroupFindsEverything(t *testing.T) {
 	}
 }
 
-// recordsIn is the attribute lists a search response carries.
 func recordsIn(t *testing.T, p sdp.PDU) []sdp.Element {
 	t.Helper()
 
@@ -566,8 +535,6 @@ func recordsIn(t *testing.T, p sdp.PDU) []sdp.Element {
 	return outer.Children
 }
 
-// Both remote control records have to name the channel the stack actually serves, and it is not
-// the audio one.
 func TestTheRemoteControlRecordsNameTheControlChannel(t *testing.T) {
 	records := Records("Panel")
 	if len(records) != 3 {
@@ -590,14 +557,6 @@ func TestTheRemoteControlRecordsNameTheControlChannel(t *testing.T) {
 	}
 }
 
-// Both remote control records claim every category.
-//
-// A phone reading them looks up the generic remote control class and takes the features off the
-// first record carrying it. Both records carry that class, so one claiming fewer categories than
-// the other means what this device is judged capable of depends on which was written first — and
-// a target record saying amplifier alone is what kept a phone on the single-player model.
-//
-// Only the categories. The bits above them mean different things at each end.
 func TestTheRemoteControlRecordsAgreeOnTheirCategories(t *testing.T) {
 	for _, r := range Records("Panel")[1:] {
 		classes, ok := r.Attribute(sdp.AttrServiceClasses)
@@ -605,8 +564,6 @@ func TestTheRemoteControlRecordsAgreeOnTheirCategories(t *testing.T) {
 			t.Fatal("a remote control record has no service classes")
 		}
 
-		// The class list itself, not the record. Every record mentions the generic class in its
-		// profile descriptor, and that is not what a phone matches a class search against.
 		generic := false
 		for _, c := range classes.Children {
 			if v, ok := c.Uint(); ok && v == sdp.UUIDAVRemoteControl {
@@ -634,8 +591,6 @@ func TestTheRemoteControlRecordsAgreeOnTheirCategories(t *testing.T) {
 	}
 }
 
-// Every record needs its own handle: a phone uses one to ask about the same record again, and two
-// records sharing a handle make one of them unreachable.
 func TestEveryRecordHasItsOwnHandle(t *testing.T) {
 	seen := map[uint32]bool{}
 
@@ -656,8 +611,6 @@ func TestEveryRecordHasItsOwnHandle(t *testing.T) {
 	}
 }
 
-// A record that names a channel the stack does not serve is a device a phone finds and cannot use,
-// which looks like broken audio rather than a missing feature.
 func TestTheRecordAdvertisesTheChannelTheStackServes(t *testing.T) {
 	protocols, ok := Record("Panel").Attribute(sdp.AttrProtocols)
 	if !ok {
@@ -673,12 +626,10 @@ func TestTheRecordAdvertisesTheChannelTheStackServes(t *testing.T) {
 	}
 }
 
-// A search for something this device is not gets an empty list rather than the record anyway.
 func TestASearchForSomethingElseMatchesNothing(t *testing.T) {
 	p := newPhone(t)
 	discovery := p.open(l2cap.PSMSDP)
 
-	// A headset, which this is not.
 	request := p.searchAttribute(0x1108, sdp.AttrRange{First: 0x0000, Last: 0xffff})
 
 	answers := p.data(discovery, request.Marshal())
@@ -705,8 +656,6 @@ func TestASearchForSomethingElseMatchesNothing(t *testing.T) {
 	}
 }
 
-// Connecting to a channel nothing serves is refused with the reason that says so. A phone told no
-// moves on; a phone told nothing waits.
 func TestAnUnservedChannelIsRefused(t *testing.T) {
 	p := newPhone(t)
 
@@ -724,8 +673,6 @@ func TestAnUnservedChannelIsRefused(t *testing.T) {
 	}
 }
 
-// Data on a channel that was never opened is an error rather than a panic, because it is what a
-// stale packet after a disconnection looks like.
 func TestDataOnAChannelThatIsNotOpen(t *testing.T) {
 	p := newPhone(t)
 
@@ -734,8 +681,6 @@ func TestDataOnAChannelThatIsNotOpen(t *testing.T) {
 	}
 }
 
-// The far end closes what it opened and nothing else, so the channels this end opened outlive the
-// session unless they are dropped with it.
 func TestASessionEndingDropsWhatThisEndOpened(t *testing.T) {
 	p := newPhone(t)
 
@@ -757,8 +702,6 @@ func TestASessionEndingDropsWhatThisEndOpened(t *testing.T) {
 	}
 }
 
-// A phone that comes back opens new channels. The stream follows those rather than the numbers the
-// last one used, which is what a phone whose first message went nowhere was hitting.
 func TestANewSessionTakesTheNewStreamChannels(t *testing.T) {
 	p := newPhone(t)
 
@@ -778,8 +721,6 @@ func TestANewSessionTakesTheNewStreamChannels(t *testing.T) {
 	}
 }
 
-// A link that goes away leaves nothing behind, or the next phone to connect inherits the last
-// one's stream and the channel numbers it was using.
 func TestForgettingALink(t *testing.T) {
 	p := newPhone(t)
 	p.open(l2cap.PSMSDP)

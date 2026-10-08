@@ -6,11 +6,14 @@ import (
 	"testing"
 )
 
-// put writes a model and, unless the manifest is empty, a sidecar beside it.
 func put(t *testing.T, dir, id, manifest string, bytes int) {
 	t.Helper()
 
-	if err := os.WriteFile(filepath.Join(dir, id+".tflite"), make([]byte, bytes), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(dir, id+".tflite"),
+		make([]byte, bytes),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	if manifest == "" {
@@ -31,8 +34,6 @@ func TestCachedIsWhatNoSlotWants(t *testing.T) {
 	if len(stale) != 2 {
 		t.Fatalf("%d cached, want the two nothing is listening for", len(stale))
 	}
-	// The manifest counts too, so only the two unused models and neither of their sizes is the
-	// selected one's.
 	if bytes != 500 {
 		t.Errorf("cached %d bytes, want 500", bytes)
 	}
@@ -67,8 +68,6 @@ func TestPurgeLeavesWhatIsInUse(t *testing.T) {
 	}
 }
 
-// Nothing selected means everything is cache, which is the whole point of the button: a device left
-// with no wake word should not be holding a directory of models.
 func TestPurgeWithNothingSelected(t *testing.T) {
 	dir := t.TempDir()
 	put(t, dir, "glados", "", 100)
@@ -78,8 +77,6 @@ func TestPurgeWithNothingSelected(t *testing.T) {
 		t.Errorf("deleted %d models, want both", gone)
 	}
 
-	// An empty directory is not an error: a device with no models is the state a new one starts in, and
-	// it still has to reach Home Assistant to be offered its first.
 	left, err := Installed(dir)
 	if err != nil {
 		t.Errorf("Installed on an emptied directory: %v", err)

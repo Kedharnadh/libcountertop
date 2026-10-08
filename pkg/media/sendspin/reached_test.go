@@ -23,7 +23,15 @@ func TestThePositionRunsFromTheServersTimestamp(t *testing.T) {
 	}
 	for _, c := range cases {
 		p := &Player{}
-		p.moved(protocol.ProgressState{TrackProgress: 10_000, TrackDuration: 200_000, PlaybackSpeed: c.speed}, c.stamp, clock)
+		p.moved(
+			protocol.ProgressState{
+				TrackProgress: 10_000,
+				TrackDuration: 200_000,
+				PlaybackSpeed: c.speed,
+			},
+			c.stamp,
+			clock,
+		)
 		if got := p.reached(true); got != c.want {
 			t.Errorf("%s: at %v, want %v", c.name, got, c.want)
 		}

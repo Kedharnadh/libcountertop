@@ -1,10 +1,10 @@
-// Package policy binds the common TLS setting to the shared HTTP transport.
 package policy
 
 import (
 	"log/slog"
 
 	esphome "github.com/ygelfand/go-esphome-device"
+
 	"github.com/ygelfand/libcountertop/pkg/fetch"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
@@ -16,7 +16,17 @@ type Policy struct {
 }
 
 func New(settings storage.Section[schema.Network]) *Policy {
-	p := &Policy{settings: settings, verify: &esphome.Switch{Base: esphome.Base{ObjectID: "verify_certificates", Name: "Verify certificates", Icon: "mdi:certificate", Category: esphome.CategoryConfig}}}
+	p := &Policy{
+		settings: settings,
+		verify: &esphome.Switch{
+			Base: esphome.Base{
+				ObjectID: "verify_certificates",
+				Name:     "Verify certificates",
+				Icon:     "mdi:certificate",
+				Category: esphome.CategoryConfig,
+			},
+		},
+	}
 	p.verify.OnCommand = p.SetVerify
 	return p
 }

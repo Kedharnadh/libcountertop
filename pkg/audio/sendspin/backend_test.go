@@ -18,7 +18,14 @@ func TestBackendControlsRemainLiveAndVolumeIsClamped(t *testing.T) {
 	depth := -20.0
 	volume := 35
 	muted := false
-	o := NewOutput(&fakeSink{}, Controls{Settings: controlSettings{&depth}, Volume: controlVolume{&volume}, Media: controlMedia{&muted}})
+	o := NewOutput(
+		&fakeSink{},
+		Controls{
+			Settings: controlSettings{&depth},
+			Volume:   controlVolume{&volume},
+			Media:    controlMedia{&muted},
+		},
+	)
 	o.Duck(true)
 	if o.gain != ducking.Gain(depth) {
 		t.Fatal(o.gain)

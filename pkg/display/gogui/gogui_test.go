@@ -30,7 +30,10 @@ func (s *sink) Program(slot int, vs, fs string) error {
 func (s *sink) Texture(uint32, int, int, int, int, int, int, []byte) error { return nil }
 
 func (s *sink) Frame(_ int, _ [4]float32, quads []float32, runs []uint32) (uint32, uint32, error) {
-	s.frames = append(s.frames, frame{append([]float32(nil), quads...), append([]uint32(nil), runs...)})
+	s.frames = append(
+		s.frames,
+		frame{append([]float32(nil), quads...), append([]uint32(nil), runs...)},
+	)
 	return 0, 0, nil
 }
 
@@ -75,7 +78,14 @@ func TestAFrameIsOneWellFormedBatch(t *testing.T) {
 	for i := 0; i < len(f.runs); i += runWords {
 		first, count := f.runs[i+6], f.runs[i+7]
 		if count == 0 || first != covered || first+count > n {
-			t.Fatalf("run %d covers %d+%d of %d quads (expected to start at %d)", i/runWords, first, count, n, covered)
+			t.Fatalf(
+				"run %d covers %d+%d of %d quads (expected to start at %d)",
+				i/runWords,
+				first,
+				count,
+				n,
+				covered,
+			)
 		}
 		covered += count
 	}
@@ -100,7 +110,12 @@ type countingSink struct {
 	frames chan int
 }
 
-func (s *countingSink) Frame(rot int, clear [4]float32, quads []float32, runs []uint32) (uint32, uint32, error) {
+func (s *countingSink) Frame(
+	rot int,
+	clear [4]float32,
+	quads []float32,
+	runs []uint32,
+) (uint32, uint32, error) {
 	s.frames <- len(quads) / quadFloats
 	return 0, 0, nil
 }
@@ -211,7 +226,12 @@ func TestAStillViewStopsDrawing(t *testing.T) {
 	s := &countingSink{frames: make(chan int, 1024)}
 	w := gui.SimpleWindow("still", 320, 200, &counter{}, func(w *gui.Window) {
 		w.SetView(func(*gui.Window) gui.View {
-			return gui.Column(gui.ContainerCfg{Sizing: gui.FillFill, Content: []gui.View{gui.Text(gui.TextCfg{Text: "12:00"})}})
+			return gui.Column(
+				gui.ContainerCfg{
+					Sizing:  gui.FillFill,
+					Content: []gui.View{gui.Text(gui.TextCfg{Text: "12:00"})},
+				},
+			)
 		})
 	})
 	r, err := New(s, w)
@@ -220,7 +240,7 @@ func TestAStillViewStopsDrawing(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go r.Run(ctx, w)
+	go func() { _ = r.Run(ctx, w) }()
 	time.Sleep(500 * time.Millisecond)
 	if n := len(s.frames); n > 3 {
 		t.Errorf("%d frames in half a second of a still view", n)

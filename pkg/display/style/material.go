@@ -8,9 +8,15 @@ import (
 
 const Material = "material"
 
-var materialStyle = Style{Name: Material, Palette: "Plum", Family: sans, Kit: material{}, Shape: func(c *gogui.ThemeCfg) {
-	c.Radius, c.RadiusSmall, c.RadiusMedium, c.RadiusLarge = 16, 12, 16, 28
-}}
+var materialStyle = Style{
+	Name:    Material,
+	Palette: "Plum",
+	Family:  sans,
+	Kit:     material{},
+	Shape: func(c *gogui.ThemeCfg) {
+		c.Radius, c.RadiusSmall, c.RadiusMedium, c.RadiusLarge = 16, 12, 16, 28
+	},
+}
 
 type material struct{}
 
@@ -49,9 +55,15 @@ func (material) Panel(cfg *gogui.ContainerCfg) {
 
 func (material) Key(cfg *gogui.ContainerCfg, st *gogui.TextStyle, state State) {
 	t := gogui.CurrentTheme().Cfg
-	cfg.Color, cfg.Radius, st.Color = t.ColorAccent.WithOpacity(0.18), gogui.RadiusPx(cfg.Width/2), t.TextStyleDef.Color
+	cfg.Color, cfg.Radius, st.Color = t.ColorAccent.WithOpacity(
+		0.18,
+	), gogui.RadiusPx(
+		cfg.Width/2,
+	), t.TextStyleDef.Color
 	if state == Chosen {
-		cfg.Color, cfg.Radius, st.Color = t.ColorAccent, gogui.RadiusPx(cfg.Width*0.3), t.ColorBackground
+		cfg.Color, cfg.Radius, st.Color = t.ColorAccent, gogui.RadiusPx(
+			cfg.Width*0.3,
+		), t.ColorBackground
 	}
 	if state == Partial {
 		cfg.Color = mix(cfg.Color, t.ColorBackground, 0.4)
@@ -99,7 +111,11 @@ func tonal(vertical bool, marks []Span, wave bool) func(gogui.SliderLookState) g
 				amp, length := across*0.14, across*1.1
 				var pts []float32
 				for x := float32(0); x <= at-gap; x += 2 {
-					pts = append(pts, x, across/2+amp*float32(math.Sin(float64(x/length*2*math.Pi))))
+					pts = append(
+						pts,
+						x,
+						across/2+amp*float32(math.Sin(float64(x/length*2*math.Pi))),
+					)
 				}
 				if len(pts) >= 4 {
 					dc.Polyline(pts, active, bar*0.35)
@@ -117,7 +133,9 @@ func tonal(vertical bool, marks []Span, wave bool) func(gogui.SliderLookState) g
 			Track: gogui.DrawCanvas(track),
 			Fill:  placeholder(1, 1),
 			Handle: gogui.DrawCanvas(gogui.DrawCanvasCfg{
-				Width: hw, Height: hh, Sizing: gogui.FixedFixed,
+				Width:  hw,
+				Height: hh,
+				Sizing: gogui.FixedFixed,
 				OnDraw: func(dc *gogui.DrawContext) { dc.FilledRoundedRect(0, 0, hw, hh, min(hw, hh)/2, active) },
 			}),
 		}
@@ -126,14 +144,20 @@ func tonal(vertical bool, marks []Span, wave bool) func(gogui.SliderLookState) g
 
 func (material) Progress(cfg *gogui.ProgressBarCfg) {
 	t := gogui.CurrentTheme().Cfg
-	cfg.Radius, cfg.Color, cfg.ColorBar = gogui.RadiusLarge, t.ColorAccent.WithOpacity(0.25), t.ColorAccent
+	cfg.Radius, cfg.Color, cfg.ColorBar = gogui.RadiusLarge, t.ColorAccent.WithOpacity(
+		0.25,
+	), t.ColorAccent
 }
 
 func (material) Field(cfg *gogui.InputCfg) { cfg.Radius = gogui.RadiusLarge }
 
 func (material) Tab(cfg *gogui.ContainerCfg, st *gogui.TextStyle, state State) {
 	t := gogui.CurrentTheme().Cfg
-	cfg.Color, cfg.Radius, st.Color = t.ColorAccent.WithOpacity(0.12), gogui.RadiusPx(max(cfg.Height, Reach())/2), t.TextStyleDef.Color
+	cfg.Color, cfg.Radius, st.Color = t.ColorAccent.WithOpacity(
+		0.12,
+	), gogui.RadiusPx(
+		max(cfg.Height, Reach())/2,
+	), t.TextStyleDef.Color
 	if state == Chosen {
 		cfg.Color, st.Color = t.ColorAccent, t.ColorBackground
 	}

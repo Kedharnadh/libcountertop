@@ -243,7 +243,11 @@ func TestTheIssuedPeerCertificateIsSignedByTheDeviceKey(t *testing.T) {
 	creds := issued(t)
 	device, _ := x509.ParseCertificate(creds.Device)
 	peer := creds.Peer.Leaf
-	if err := device.CheckSignature(peer.SignatureAlgorithm, peer.RawTBSCertificate, peer.Signature); err != nil {
+	if err := device.CheckSignature(
+		peer.SignatureAlgorithm,
+		peer.RawTBSCertificate,
+		peer.Signature,
+	); err != nil {
 		t.Errorf("the peer certificate: %v", err)
 	}
 	if got := creds.NotAfter.Sub(creds.NotBefore); got != PeerLife {

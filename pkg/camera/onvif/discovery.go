@@ -1,5 +1,3 @@
-// Package onvif makes a camera findable and describable the way NVRs expect: WS-Discovery on UDP
-// 3702 and a minimal ONVIF device and media service over HTTP.
 package onvif
 
 import (
@@ -17,13 +15,11 @@ const (
 	maxDatagram   = 65535
 )
 
-// Probe is the part of a WS-Discovery Probe a responder needs.
 type Probe struct {
 	MessageID string
 	Types     string
 }
 
-// ParseProbe reads a Probe. ok is false for anything else, including our own ProbeMatches.
 func ParseProbe(b []byte) (Probe, bool) {
 	var env struct {
 		Header struct {
@@ -39,11 +35,12 @@ func ParseProbe(b []byte) (Probe, bool) {
 	if err := xml.Unmarshal(b, &env); err != nil || env.Body.Probe == nil {
 		return Probe{}, false
 	}
-	return Probe{MessageID: strings.TrimSpace(env.Header.MessageID), Types: env.Body.Probe.Types}, true
+	return Probe{
+		MessageID: strings.TrimSpace(env.Header.MessageID),
+		Types:     env.Body.Probe.Types,
+	}, true
 }
 
-// Wants reports whether a probe's Types would include a network video transmitter. An empty
-// Types asks for everything.
 func (p Probe) Wants() bool {
 	t := strings.TrimSpace(p.Types)
 	if t == "" {
@@ -61,7 +58,6 @@ func (p Probe) Wants() bool {
 	return false
 }
 
-// Matches is the ProbeMatches answering p for a device at uuid whose device service is at xaddr.
 func Matches(p Probe, uuid, xaddr, name string) []byte {
 	return MatchesHardware(p, uuid, xaddr, name, "Countertop")
 }
@@ -95,11 +91,10 @@ func scopeName(s string) string {
 
 func escape(s string) string {
 	var b bytes.Buffer
-	xml.EscapeText(&b, []byte(s))
+	_ = xml.EscapeText(&b, []byte(s))
 	return b.String()
 }
 
-// NewUUID is a random RFC 4122 version 4 UUID.
 func NewUUID() string {
 	var u [16]byte
 	rand.Read(u[:])
@@ -108,7 +103,6 @@ func NewUUID() string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", u[0:4], u[4:6], u[6:8], u[8:10], u[10:16])
 }
 
-// Responder answers WS-Discovery probes until Close.
 type Responder struct {
 	UUID     string
 	Hardware string
@@ -119,7 +113,6 @@ type Responder struct {
 	conn *net.UDPConn
 }
 
-// Listen joins the discovery group on every multicast interface and answers in the background.
 func (r *Responder) Listen() error {
 	group, err := net.ResolveUDPAddr("udp4", discoveryAddr)
 	if err != nil {
@@ -129,7 +122,10 @@ func (r *Responder) Listen() error {
 	if err != nil {
 		return err
 	}
-	c.SetReadBuffer(maxDatagram)
+	if err := c.SetReadBuffer(maxDatagram); err != nil {
+		_ = c.Close()
+		return err
+	}
 	r.mu.Lock()
 	r.conn = c
 	r.mu.Unlock()
@@ -157,8 +153,8 @@ func (r *Responder) serve(c *net.UDPConn) {
 		if err != nil {
 			continue
 		}
-		out.Write(reply)
-		out.Close()
+		_, _ = out.Write(reply)
+		_ = out.Close()
 	}
 }
 
@@ -166,7 +162,7 @@ func (r *Responder) Close() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.conn != nil {
-		r.conn.Close()
+		_ = r.conn.Close()
 		r.conn = nil
 	}
 }

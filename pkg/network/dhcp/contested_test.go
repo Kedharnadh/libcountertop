@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-// instead swaps the check for one the test can see, and puts the real one back after. Declining is
-// swapped out at the same time, so no test puts a packet on the wire.
 func instead(t *testing.T, fn func(string, net.IP) (bool, error)) *int {
 	t.Helper()
 
@@ -24,7 +22,6 @@ func instead(t *testing.T, fn func(string, net.IP) (bool, error)) *int {
 	return &calls
 }
 
-// told counts the declines instead of sending them.
 func told(t *testing.T) *int {
 	t.Helper()
 
@@ -43,9 +40,6 @@ func leaseFor(ip string) *Lease {
 	return &Lease{Address: net.IPNet{IP: net.ParseIP(ip), Mask: net.CIDRMask(24, 32)}}
 }
 
-// A renewal comes back with the address the device has been using all along. Probing for that
-// means listening for an answer this device is the one giving, and costs seconds every time the
-// lease comes round.
 func TestARenewalOfTheSameAddressIsNotProbed(t *testing.T) {
 	calls := instead(t, func(string, net.IP) (bool, error) { return false, nil })
 
@@ -64,7 +58,6 @@ func TestARenewalOfTheSameAddressIsNotProbed(t *testing.T) {
 	}
 }
 
-// A different address is a new one, whoever it came from.
 func TestANewAddressIsProbed(t *testing.T) {
 	calls := instead(t, func(string, net.IP) (bool, error) { return false, nil })
 
@@ -79,11 +72,13 @@ func TestANewAddressIsProbed(t *testing.T) {
 	}
 }
 
-// And the first address of all, where there is nothing held to compare against.
 func TestTheFirstAddressIsProbed(t *testing.T) {
 	calls := instead(t, func(string, net.IP) (bool, error) { return false, nil })
 
-	if _, err := (&Client{}).contested(context.Background(), leaseFor("10.100.101.106")); err != nil {
+	if _, err := (&Client{}).contested(
+		context.Background(),
+		leaseFor("10.100.101.106"),
+	); err != nil {
 		t.Fatal(err)
 	}
 	if *calls != 1 {
@@ -91,12 +86,11 @@ func TestTheFirstAddressIsProbed(t *testing.T) {
 	}
 }
 
-// The whole point: an address somebody else answers for is not taken.
 func TestAnAddressSomebodyElseHoldsIsRefused(t *testing.T) {
 	instead(t, func(string, net.IP) (bool, error) { return true, nil })
 
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // so the ten second wait after a refusal does not hold the test up
+	cancel()
 
 	taken, err := (&Client{}).contested(ctx, leaseFor("10.100.101.106"))
 	if !taken {
@@ -107,8 +101,6 @@ func TestAnAddressSomebodyElseHoldsIsRefused(t *testing.T) {
 	}
 }
 
-// Refusing the address protects the network; telling the server is what stops it offering the same
-// one straight back, which would turn a conflict into a loop on the backoff.
 func TestARefusedAddressIsDeclinedToTheServer(t *testing.T) {
 	instead(t, func(string, net.IP) (bool, error) { return true, nil })
 	sent := told(t)
@@ -124,13 +116,14 @@ func TestARefusedAddressIsDeclinedToTheServer(t *testing.T) {
 	}
 }
 
-// And nothing is sent for an address that was free, which would tell a server to stop handing out
-// an address that is perfectly good.
 func TestAnAddressThatIsFreeIsNotDeclined(t *testing.T) {
 	instead(t, func(string, net.IP) (bool, error) { return false, nil })
 	sent := told(t)
 
-	if _, err := (&Client{}).contested(context.Background(), leaseFor("10.100.101.106")); err != nil {
+	if _, err := (&Client{}).contested(
+		context.Background(),
+		leaseFor("10.100.101.106"),
+	); err != nil {
 		t.Fatal(err)
 	}
 	if *sent != 0 {
@@ -138,14 +131,16 @@ func TestAnAddressThatIsFreeIsNotDeclined(t *testing.T) {
 	}
 }
 
-// A probe that could not run is not evidence, so there is nothing to tell the server either.
 func TestAProbeThatCannotRunDeclinesNothing(t *testing.T) {
 	instead(t, func(string, net.IP) (bool, error) {
 		return false, net.UnknownNetworkError("no packet socket")
 	})
 	sent := told(t)
 
-	if _, err := (&Client{}).contested(context.Background(), leaseFor("10.100.101.106")); err != nil {
+	if _, err := (&Client{}).contested(
+		context.Background(),
+		leaseFor("10.100.101.106"),
+	); err != nil {
 		t.Fatal(err)
 	}
 	if *sent != 0 {
@@ -153,9 +148,6 @@ func TestAProbeThatCannotRunDeclinesNothing(t *testing.T) {
 	}
 }
 
-// The probe failing is not the same as the address being taken. A device that refused every
-// address it could not check would end up with none at all, which is worse than the duplicate
-// this is guarding against.
 func TestAProbeThatCannotRunTakesTheAddress(t *testing.T) {
 	instead(t, func(string, net.IP) (bool, error) {
 		return false, net.UnknownNetworkError("no packet socket")
@@ -170,8 +162,6 @@ func TestAProbeThatCannotRunTakesTheAddress(t *testing.T) {
 	}
 }
 
-// Ten seconds, which is what RFC 5227 asks for: two hosts fighting over one address should not
-// fight fast.
 func TestTheWaitAfterARefusalIsRespected(t *testing.T) {
 	instead(t, func(string, net.IP) (bool, error) { return true, nil })
 

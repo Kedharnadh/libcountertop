@@ -7,28 +7,17 @@ import (
 
 func init() { register(Overlap, overlap{}) }
 
-// overlap is the hour and the minutes as two heavy blocks that run into each other.
-//
-// Barely legible from across a room and entirely the point: a clock somebody reads once an hour by
-// looking properly, rather than one that announces the time whether or not it was asked. Everything
-// else here is drawn so it can be read at a glance; this is the one that is not.
 type overlap struct{}
 
-// Sized against the box.
 const (
 	overlapHeightShare = 0.46
 	overlapWidthShare  = 0.78
 
-	// bite is how far the minutes are pulled back into the hour, as a fraction of a block's height.
-	// Enough that the two read as one shape; not so far that a digit is lost inside another.
 	bite = 0.30
 
-	// shove is how far apart the two sit across the box, so the pair runs down the diagonal rather
-	// than sitting in a column. Of a block's width.
 	shove = 0.18
 )
 
-// Sized against the digits.
 const (
 	overlapSuffixOfLine = 0.20
 	overlapDateOfLine   = 0.13
@@ -44,14 +33,10 @@ func (o overlap) Draw(s ui.Surface, in ui.Rect, r Reading, palette theme.Theme) 
 
 	l, m := overlapArrange(in, hour, minute, r)
 
-	// The hour goes down first and the minutes over it, so where they cross it is the minutes that
-	// survive. Reading the nearer number as the later one is the only thing keeping this a clock.
 	ui.DrawText(s, m.line, l.Hour.X, l.Hour.Y, palette.Muted, palette.Background, hour)
 	ui.DrawText(s, m.line, l.Minute.X, l.Minute.Y, palette.Text, palette.Background, minute)
 
 	if r.Suffix != "" {
-		// In the front color although it belongs to the hour behind. It sits over the hour's last
-		// digit, and drawn in the hour's own muted tone it is grey on grey and cannot be read at all.
 		ui.DrawText(s, m.small, l.Suffix.X, l.Suffix.Y,
 			palette.Text, palette.Background, r.Suffix)
 	}
@@ -61,22 +46,17 @@ func (o overlap) Draw(s ui.Surface, in ui.Rect, r Reading, palette theme.Theme) 
 	}
 }
 
-// overlapLayout is where the pieces land in a box.
 type overlapLayout struct {
 	Hour   ui.Rect
 	Minute ui.Rect
 
-	// Suffix and Date are empty when the reading has neither.
 	Suffix ui.Rect
 	Date   ui.Rect
 }
 
-// overlapArrange places the pieces, so that drawing them and saying where they are cannot disagree.
 func overlapArrange(in ui.Rect, hour, minute string, r Reading) (overlapLayout, overlapped) {
 	m := layoutOverlap(in, hour, minute, r)
 
-	// The pair is placed as one block: its own width is the two lines plus however far they are
-	// shoved apart, and its height is the two less the bite taken out between them.
 	wide := m.wide()
 
 	left := in.X + (in.W-wide)/2
@@ -108,7 +88,6 @@ func overlapArrange(in ui.Rect, hour, minute string, r Reading) (overlapLayout, 
 	return l, m
 }
 
-// overlapped is the face measured.
 type overlapped struct {
 	line, small, date *ui.Font
 
@@ -116,16 +95,13 @@ type overlapped struct {
 	suffixW        int
 	dateW, dateH   int
 
-	// lineH is the line box a row of numerals occupies, and suffixH the suffix's.
 	lineH   int
 	suffixH int
 
 	digit, ascent int
 
-	// between is the drop from the hour's baseline to the minutes', and under the drop to the date.
 	between, under int
 
-	// across is how far the minutes sit to the right of the hour.
 	across int
 }
 
@@ -184,8 +160,6 @@ func measureOverlap(size int, hour, minute string, r Reading) overlapped {
 	m.ascent = m.line.Ascent()
 	m.digit = max(m.ascent-m.line.Descent(), 1)
 
-	// A full block down, less the bite. Positive whatever the bite is set to, so the minutes are
-	// always the lower of the two and the face cannot invert into something unreadable.
 	m.between = max(m.digit-int(float64(m.digit)*bite), 1)
 	m.across = int(float64(max(m.hourW, m.minuteW)) * shove)
 

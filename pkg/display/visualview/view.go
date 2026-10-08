@@ -19,7 +19,6 @@ import (
 
 const shadeEvery = time.Second / 60
 
-// View is the chosen visual across the whole screen. A tap puts it away.
 type View struct {
 	v       Source
 	options Dependencies
@@ -97,7 +96,7 @@ func (w *View) Keep(width, height int) {
 
 func (w *View) close() {
 	if w.layer != nil {
-		w.layer.Close()
+		_ = w.layer.Close()
 		w.layer = nil
 	}
 }
@@ -129,7 +128,8 @@ func (w *View) run(ctx context.Context) {
 		if !w.options.Shell.Visible(w) {
 			return
 		}
-		if fps := w.options.Settings.Read().MaxFPS; fps > 0 && now.Sub(shaded) < time.Second/time.Duration(fps)-2*time.Millisecond {
+		if fps := w.options.Settings.Read().MaxFPS; fps > 0 &&
+			now.Sub(shaded) < time.Second/time.Duration(fps)-2*time.Millisecond {
 			continue
 		}
 		shaded = now
@@ -193,7 +193,6 @@ type Dependencies struct {
 	Settings storage.Section[schema.Visual]
 }
 
-// Close stops drawing and waits for the view's input and GPU resources to be released.
 func (w *View) Close() {
 	w.mu.Lock()
 	stop, done := w.stop, w.done

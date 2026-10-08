@@ -11,18 +11,12 @@ import (
 	"time"
 )
 
-// netd holds the resolver bionic asks over /dev/socket/dnsproxyd, and ConnectivityService inside
-// system_server is what used to tell it anything. Without that every lookup outside the daemon fails,
-// so the lease is handed to netd as well as applied to the interface.
-//
-// The socket is FrameworkListener's: write "<seq> <command> <args>", read back "<code> <seq> <text>"
-// until a code of 200 or more ends the exchange. Both directions are terminated by NUL, not a
-// newline. ndc is a client for exactly this.
+// FrameworkListener: send "<seq> <cmd> <args>\0", read "<code> <seq> <text>\0" until code >= 200.
 const (
 	netdSocket = "/dev/socket/netd"
 	netdReply  = 5 * time.Second
 
-	// netID is what wlan0 is registered under. Android's own networks start at 100.
+	// Android's own netIds start at 100.
 	netID = "100"
 )
 
@@ -42,7 +36,6 @@ func dialNetd() (*netd, error) {
 
 func (n *netd) Close() error { return n.conn.Close() }
 
-// cmd sends one command and waits for the code that ends it.
 func (n *netd) cmd(args ...string) error {
 	if err := n.conn.SetDeadline(time.Now().Add(netdReply)); err != nil {
 		return err
@@ -71,8 +64,6 @@ func (n *netd) cmd(args ...string) error {
 			continue
 		}
 
-		// A reply carries the sequence number of the command it answers, so one that arrives late
-		// is not read as the answer to whatever was asked next.
 		code, err := strconv.Atoi(fields[0])
 		if err != nil || code < 200 {
 			continue
@@ -87,8 +78,6 @@ func (n *netd) cmd(args ...string) error {
 	}
 }
 
-// onLink is the lease's own subnet in CIDR, which is the route to everything reachable without
-// going through the router.
 func onLink(addr net.IPNet) string {
 	ip := addr.IP.To4()
 	if ip == nil || addr.Mask == nil {
@@ -102,7 +91,6 @@ func onLink(addr net.IPNet) string {
 	return subnet.String()
 }
 
-// quote wraps what netd's tokenizer would otherwise split or lose.
 func quote(arg string) string {
 	if arg != "" && !strings.ContainsAny(arg, " \"\\") {
 		return arg
@@ -110,12 +98,6 @@ func quote(arg string) string {
 	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(arg) + `"`
 }
 
-// useNetd gives netd the lease, so everything on the device resolving through bionic follows what
-// the daemon holds. Re-sent on every lease: the servers and the router change with the network.
-//
-// was is the lease this one replaces, or nil at startup. A renewal that keeps the address but
-// changes the router would otherwise leave the old default route in place beside the new one:
-// nothing else removes it, because a kept address keeps everything hanging off it.
 func useNetd(iface string, was, l *Lease) error {
 	n, err := dialNetd()
 	if err != nil {
@@ -126,10 +108,7 @@ func useNetd(iface string, was, l *Lease) error {
 	return configure(n, iface, was, l)
 }
 
-// configure is the conversation itself, apart from dialing, so a test can hold the other end.
 func configure(n *netd, iface string, was, l *Lease) error {
-	// Before adding the new one, so the table never holds two defaults. A router reached across a
-	// restart is not seen, since nothing remembers what the last one was.
 	if was != nil && was.Router != nil && !was.Router.Equal(l.Router) {
 		if err := n.cmd("network", "route", "remove", netID, iface,
 			"0.0.0.0/0", was.Router.String()); err != nil {
@@ -137,15 +116,11 @@ func configure(n *netd, iface string, was, l *Lease) error {
 		}
 	}
 
-	// The network and its routes survive a renewal, so they are already there the second time.
 	setup := [][]string{
 		{"network", "create", netID},
 		{"network", "interface", "add", netID, iface},
 	}
 
-	// The subnet, on link and with no gateway. Without it every reply to a machine on our own
-	// network is sent to the router instead of straight to it, and never arrives — which looks
-	// like a firewall dropping the port and is not one.
 	if subnet := onLink(l.Address); subnet != "" {
 		setup = append(setup, []string{"network", "route", "add", netID, iface, subnet})
 	}
@@ -153,8 +128,6 @@ func configure(n *netd, iface string, was, l *Lease) error {
 		setup = append(setup,
 			[]string{"network", "route", "add", netID, iface, "0.0.0.0/0", l.Router.String()})
 	}
-	// Kept rather than returned: these fail from the second lease on, having already been done.
-	// They are only worth reporting if what follows also fails.
 	var setupErr error
 	for _, cmd := range setup {
 		setupErr = errors.Join(setupErr, n.cmd(cmd...))
@@ -164,12 +137,12 @@ func configure(n *netd, iface string, was, l *Lease) error {
 	for _, ip := range l.DNS {
 		dns = append(dns, ip.String())
 	}
-	// Nothing follows to show the setup mattered, so its errors stay unreported.
 	if len(dns) == 0 {
 		return nil
 	}
 
-	if err := n.cmd(append([]string{"resolver", "setnetdns", netID, l.Domain}, dns...)...); err != nil {
+	if err := n.cmd(
+		append([]string{"resolver", "setnetdns", netID, l.Domain}, dns...)...); err != nil {
 		return errors.Join(setupErr, err)
 	}
 	if err := n.cmd("network", "default", "set", netID); err != nil {

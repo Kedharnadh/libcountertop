@@ -26,11 +26,25 @@ const (
 )
 
 func WeatherLooks() []WeatherLook {
-	return []WeatherLook{WeatherCompact, WeatherStack, WeatherIcon, WeatherWords, WeatherCard, WeatherDetail}
+	return []WeatherLook{
+		WeatherCompact,
+		WeatherStack,
+		WeatherIcon,
+		WeatherWords,
+		WeatherCard,
+		WeatherDetail,
+	}
 }
 
 func (l WeatherLook) Label() string { return say.T("weather.look." + string(l)) }
 
 func DefaultWeather() Weather {
-	return Weather{Look: WeatherCompact, Dashboard: true, Animate: true, Position: PositionTop, Align: AlignRight, Size: SizeSmall}
+	return Weather{
+		Look:      WeatherCompact,
+		Dashboard: true,
+		Animate:   true,
+		Position:  PositionTop,
+		Align:     AlignRight,
+		Size:      SizeSmall,
+	}
 }

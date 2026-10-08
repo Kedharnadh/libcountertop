@@ -18,7 +18,6 @@ type packetizer struct {
 	octets uint32
 }
 
-// packets turns one access unit into RTP packets at timestamp ts, the marker on the last.
 func (p *packetizer) packets(nalus [][]byte, ts uint32) [][]byte {
 	var out [][]byte
 	for i, n := range nalus {

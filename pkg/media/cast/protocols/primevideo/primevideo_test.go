@@ -23,12 +23,18 @@ func (m *memory) Save(v any) error {
 func (m *memory) Clear() error { m.data = nil; return nil }
 
 func message(body string) cast.Message {
-	return cast.Message{Source: "sender-1", Destination: "transport-1", Namespace: NS, Payload: body}
+	return cast.Message{
+		Source:      "sender-1",
+		Destination: "transport-1",
+		Namespace:   NS,
+		Payload:     body,
+	}
 }
 
 func answered(t *testing.T, out []cast.Message) answer {
 	t.Helper()
-	if len(out) != 1 || out[0].Destination != "sender-1" || out[0].Source != "transport-1" || out[0].Namespace != NS {
+	if len(out) != 1 || out[0].Destination != "sender-1" || out[0].Source != "transport-1" ||
+		out[0].Namespace != NS {
 		t.Fatalf("out %+v", out)
 	}
 	var a answer
@@ -47,9 +53,11 @@ func TestRegistration(t *testing.T) {
 		mu.Unlock()
 		switch r.URL.Path {
 		case "/auth/register":
-			w.Write([]byte(`{"response":{"success":{"tokens":{"bearer":{"refresh_token":"rt"}}}}}`))
+			_, _ = w.Write(
+				[]byte(`{"response":{"success":{"tokens":{"bearer":{"refresh_token":"rt"}}}}}`),
+			)
 		case "/auth/token":
-			w.Write([]byte(`{"device_tokens":[{"actor_access_token":{"token":"at"}}]}`))
+			_, _ = w.Write([]byte(`{"device_tokens":[{"actor_access_token":{"token":"at"}}]}`))
 		}
 	}))
 	defer amazon.Close()
@@ -64,15 +72,27 @@ func TestRegistration(t *testing.T) {
 		envelopes: map[string]Envelope{},
 	}
 
-	out, err := p.Receive(nil, message(`{"deviceId":"abcGCAST","messageProtocolVersion":1,"type":"AmIRegistered"}`))
+	out, err := p.Receive(
+		nil,
+		message(`{"deviceId":"abcGCAST","messageProtocolVersion":1,"type":"AmIRegistered"}`),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if a := answered(t, out); a.Type != "AmIRegisteredResponse" || a.Error == nil || a.Error.Code != "NotRegistered" || !strings.Contains(a.Error.Message, "abcGCAST") {
+	if a := answered(
+		t,
+		out,
+	); a.Type != "AmIRegisteredResponse" || a.Error == nil || a.Error.Code != "NotRegistered" ||
+		!strings.Contains(a.Error.Message, "abcGCAST") {
 		t.Fatalf("unregistered %+v", a)
 	}
 
-	out, err = p.Receive(nil, message(`{"type":"Register","deviceId":"abcGCAST","actorId":"actor","marketplaceId":"ATVPDKIKX0DER","preAuthorizedLinkCode":"code"}`))
+	out, err = p.Receive(
+		nil,
+		message(
+			`{"type":"Register","deviceId":"abcGCAST","actorId":"actor","marketplaceId":"ATVPDKIKX0DER","preAuthorizedLinkCode":"code"}`,
+		),
+	)
 	if err != nil || len(out) != 0 {
 		t.Fatalf("register answered at once %+v %v", out, err)
 	}
@@ -86,7 +106,9 @@ func TestRegistration(t *testing.T) {
 	}
 	var saved Registration
 	store.Load(&saved)
-	if saved.Refresh != "rt" || saved.Actor != "actor" || saved.Marketplace != "ATVPDKIKX0DER" || saved.Device != "abcGCAST" || p.access != "at" {
+	if saved.Refresh != "rt" || saved.Actor != "actor" || saved.Marketplace != "ATVPDKIKX0DER" ||
+		saved.Device != "abcGCAST" ||
+		p.access != "at" {
 		t.Fatalf("saved %+v access %q", saved, p.access)
 	}
 	if strings.Join(paths, ",") != "/auth/register,/auth/token" {
@@ -103,8 +125,17 @@ func TestRegistration(t *testing.T) {
 		t.Fatalf("settings %+v %q", a, p.locale)
 	}
 
-	out, _ = p.Receive(nil, message(`{"type":"Preload","contentId":"amzn1.dv.gti.x","playbackEnvelope":{"envelope":"env","correlationId":"c"}}`))
-	if a := answered(t, out); a.Type != "PreloadResponse" || p.envelopes["amzn1.dv.gti.x"].Envelope != "env" {
+	out, _ = p.Receive(
+		nil,
+		message(
+			`{"type":"Preload","contentId":"amzn1.dv.gti.x","playbackEnvelope":{"envelope":"env","correlationId":"c"}}`,
+		),
+	)
+	if a := answered(
+		t,
+		out,
+	); a.Type != "PreloadResponse" ||
+		p.envelopes["amzn1.dv.gti.x"].Envelope != "env" {
 		t.Fatalf("preload %+v", a)
 	}
 }
@@ -112,7 +143,9 @@ func TestRegistration(t *testing.T) {
 func TestRegistrationLastsOneSessionUnlessKept(t *testing.T) {
 	reg := Registration{Actor: "actor", Refresh: "rt", Device: "abcGCAST"}
 	store := &memory{}
-	store.Save(reg)
+	if err := store.Save(reg); err != nil {
+		t.Fatal(err)
+	}
 	keep := false
 	p := &Protocol{
 		kept:      store,

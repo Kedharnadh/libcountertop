@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// header builds the four header bytes for a set of choices, so a test can say what it means rather
-// than a magic number.
 func header(rate, block, mode, alloc, sub, bitpool int) []byte {
 	var f, b, s byte
 	for i, v := range rates {
@@ -62,8 +60,6 @@ func TestReadingAFrameHeader(t *testing.T) {
 	}
 }
 
-// Every combination has to round trip, because a field read one bit over reads the next one wrong
-// and the frame length that follows is then nonsense.
 func TestEveryHeaderCombinationReadsBack(t *testing.T) {
 	for _, rate := range rates {
 		for _, block := range blocks {
@@ -86,8 +82,6 @@ func TestEveryHeaderCombinationReadsBack(t *testing.T) {
 	}
 }
 
-// The three modes pack differently, and a wrong length does not corrupt the frame — it loses the
-// start of the next one, so the stream decodes to noise rather than failing.
 func TestFrameLengthPerMode(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
@@ -114,11 +108,8 @@ func TestFrameLengthPerMode(t *testing.T) {
 	}
 }
 
-// A bitpool past the cap makes the frame length run away, and a decoder that trusts it walks off
-// the end of the stream.
 func TestABitpoolPastTheCapIsRefused(t *testing.T) {
-	// Stereo with eight subbands allows 32*8 = 256, which does not fit a byte, so it cannot be
-	// exceeded. Mono allows 16*8 = 128 and can.
+	// Stereo at eight subbands caps at 256, past a byte; mono caps at 128.
 	if _, err := ParseHeader(header(44100, 16, Mono, Loudness, 8, 129)); err == nil {
 		t.Error("a mono bitpool of 129 was accepted, above the 128 allowed")
 	}
@@ -147,8 +138,6 @@ func TestWhatIsNotAFrameHeader(t *testing.T) {
 	}
 }
 
-// The check byte covers the header and the scale factors but not the syncword or itself, and in
-// joint stereo the span ends mid-byte — which is why it is counted in bits.
 func TestTheCheckByteCoversTheRightSpan(t *testing.T) {
 	raw := header(44100, 16, Stereo, Loudness, 8, 53)
 	h, err := ParseHeader(raw)
@@ -173,7 +162,6 @@ func TestTheCheckByteCoversTheRightSpan(t *testing.T) {
 		t.Fatal("a frame with its own check byte did not validate")
 	}
 
-	// The syncword is outside the span, so changing it must not change the check.
 	moved := make([]byte, len(frame))
 	copy(moved, frame)
 	moved[0] = 0x00
@@ -181,7 +169,6 @@ func TestTheCheckByteCoversTheRightSpan(t *testing.T) {
 		t.Error("the check byte changed when the syncword did, so it is covering it")
 	}
 
-	// A scale factor is inside the span, so changing one must change the check.
 	changed := make([]byte, len(frame))
 	copy(changed, frame)
 	changed[headerBytes] ^= 0xff
@@ -189,7 +176,6 @@ func TestTheCheckByteCoversTheRightSpan(t *testing.T) {
 		t.Error("the check byte did not change when a scale factor did")
 	}
 
-	// And a payload byte past the scale factors is outside it.
 	late := make([]byte, len(frame))
 	copy(late, frame)
 	late[len(late)-1] ^= 0xff
@@ -198,8 +184,6 @@ func TestTheCheckByteCoversTheRightSpan(t *testing.T) {
 	}
 }
 
-// Joint stereo adds one bit per subband before the scale factors, so its span is not a whole number
-// of bytes. A check that rounds to bytes covers the wrong run.
 func TestTheCheckByteInJointStereo(t *testing.T) {
 	raw := header(44100, 16, JointStereo, Loudness, 8, 53)
 	h, _ := ParseHeader(raw)
@@ -215,8 +199,6 @@ func TestTheCheckByteInJointStereo(t *testing.T) {
 		t.Fatalf("CRC: %v", err)
 	}
 
-	// The last scale factor nibble is inside the span and the byte after it is not, which is the
-	// boundary a byte-rounded check gets wrong.
 	last := 2 + h.Subbands/8 + 4*h.Subbands*h.Channels()/8
 	changed := make([]byte, len(frame))
 	copy(changed, frame)
@@ -235,7 +217,6 @@ func TestACheckOnAFrameThatHasNotArrived(t *testing.T) {
 	}
 }
 
-// good is one whole frame with a correct check byte.
 func good(t *testing.T, seed byte) ([]byte, Header) {
 	t.Helper()
 
@@ -261,12 +242,10 @@ func good(t *testing.T, seed byte) ([]byte, Header) {
 	return frame, h
 }
 
-// Picking the stream back up after a gap.
 func TestFindingTheNextFrame(t *testing.T) {
 	first, _ := good(t, 0)
 	second, _ := good(t, 1)
 
-	// Rubbish in front, including a syncword byte that starts nothing.
 	junk := []byte{0x11, Syncword, 0x22, 0x33}
 
 	buf := append(append(append([]byte{}, junk...), first...), second...)
@@ -280,9 +259,6 @@ func TestFindingTheNextFrame(t *testing.T) {
 	}
 }
 
-// The case that caught this: four bytes of junk in front of a real frame, where the junk's own
-// syncword happened to parse as a header whose check byte collided. One in 256 is not rare enough
-// at the rate false syncwords turn up, which is why a candidate also has to be followed by one.
 func TestAFalseSyncwordIsNotMistakenForAFrame(t *testing.T) {
 	first, _ := good(t, 0)
 	second, _ := good(t, 1)
@@ -290,7 +266,6 @@ func TestAFalseSyncwordIsNotMistakenForAFrame(t *testing.T) {
 	junk := []byte{0x11, Syncword, 0x22, 0x33}
 	buf := append(append(append([]byte{}, junk...), first...), second...)
 
-	// The junk really does parse as a header, which is the whole point.
 	if _, err := ParseHeader(buf[1:]); err != nil {
 		t.Skip("the junk no longer parses as a header, so there is nothing to be fooled by")
 	}
@@ -300,8 +275,6 @@ func TestAFalseSyncwordIsNotMistakenForAFrame(t *testing.T) {
 	}
 }
 
-// At the end of a buffer there is no following frame to confirm against, and a real last frame
-// still has to be found.
 func TestTheLastFrameIsStillFound(t *testing.T) {
 	frame, _ := good(t, 7)
 

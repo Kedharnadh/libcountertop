@@ -16,7 +16,8 @@ func TestNeighboursComeOutOfAWatchNextAnswer(t *testing.T) {
 	if prev == nil || prev.ID != "prev1" || prev.Index != 12 {
 		t.Errorf("previous is %+v", prev)
 	}
-	if next == nil || next.ID != "next1" || next.Index != 14 || next.Params != "p" || next.List != "RQx" {
+	if next == nil || next.ID != "next1" || next.Index != 14 || next.Params != "p" ||
+		next.List != "RQx" {
 		t.Errorf("next is %+v", next)
 	}
 	if p, n := parseNeighbours([]byte(`{}`)); p != nil || n != nil {
@@ -24,13 +25,17 @@ func TestNeighboursComeOutOfAWatchNextAnswer(t *testing.T) {
 	}
 }
 
-// Against YouTube itself, so only when asked: COUNTERTOP_LIVE=1.
 func TestTheQueueAroundAMixVideo(t *testing.T) {
 	if os.Getenv("COUNTERTOP_LIVE") == "" {
 		t.Skip("set COUNTERTOP_LIVE=1 to ask YouTube")
 	}
 	c := &http.Client{Timeout: 30 * time.Second}
-	prev, next, err := neighbours(t.Context(), c, Position{Video: "Y7nDX15KJ5M", List: "RDAMVMY7nDX15KJ5M", Index: 0}, nil)
+	prev, next, err := neighbours(
+		t.Context(),
+		c,
+		Position{Video: "Y7nDX15KJ5M", List: "RDAMVMY7nDX15KJ5M", Index: 0},
+		nil,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

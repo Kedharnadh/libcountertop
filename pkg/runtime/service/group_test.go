@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-// fake is a service that does what a test tells it to.
 type fake struct {
 	name string
 
@@ -19,7 +18,6 @@ type fake struct {
 	order    *[]string
 	startErr error
 
-	// run is what Run does. Returning an error looks like breaking.
 	run func(ctx context.Context) error
 }
 
@@ -66,14 +64,11 @@ func (f *fake) counts() (starts, runs, closes int) {
 	return f.starts, f.runs, f.closes
 }
 
-// blocks until canceled, which is what most services do.
 func blocks(ctx context.Context) error {
 	<-ctx.Done()
 	return nil
 }
 
-// Services come up in the order they were added and go down in reverse, because acquiring hardware
-// off Android is order-dependent and releasing it should unwind.
 func TestStartsInOrderAndClosesInReverse(t *testing.T) {
 	var order []string
 	a := &fake{name: "a", order: &order, run: blocks}
@@ -107,8 +102,6 @@ func TestStartsInOrderAndClosesInReverse(t *testing.T) {
 	}
 }
 
-// A required service that cannot be acquired is fatal, and nothing after it is started: the process
-// is better off exiting and being restarted by init than limping.
 func TestRequiredStartFailureIsFatal(t *testing.T) {
 	broken := &fake{name: "broken", startErr: errors.New("no device")}
 	after := &fake{name: "after", run: blocks}
@@ -130,8 +123,6 @@ func TestRequiredStartFailureIsFatal(t *testing.T) {
 	}
 }
 
-// An optional service that cannot be acquired is recorded and the rest carry on, which is how a
-// device with no speaker still answers.
 func TestOptionalStartFailureDegrades(t *testing.T) {
 	broken := &fake{name: "broken", startErr: errors.New("no device")}
 	after := &fake{name: "after", run: blocks}
@@ -156,7 +147,6 @@ func TestOptionalStartFailureDegrades(t *testing.T) {
 	<-done
 }
 
-// The whole point: a service that breaks is closed, acquired again and run again.
 func TestRestartsAfterFailure(t *testing.T) {
 	var attempts int
 	var mu sync.Mutex
@@ -193,7 +183,6 @@ func TestRestartsAfterFailure(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 
-	// Re-acquired each time, not just re-run: the device may have been taken while it was gone.
 	starts, runs, closes := svc.counts()
 	if starts < 3 || runs < 3 || closes < 2 {
 		t.Errorf("starts=%d runs=%d closes=%d, want at least 3/3/2", starts, runs, closes)
@@ -203,7 +192,6 @@ func TestRestartsAfterFailure(t *testing.T) {
 	<-done
 }
 
-// A service with no restart policy that breaks stays broken and says so.
 func TestFailureWithoutRestartStaysFailed(t *testing.T) {
 	svc := &fake{name: "once", run: func(context.Context) error { return errors.New("broke") }}
 
@@ -230,7 +218,6 @@ func TestFailureWithoutRestartStaysFailed(t *testing.T) {
 	}
 }
 
-// A one-shot service returning nil is finished, not broken.
 func TestOneShotStops(t *testing.T) {
 	svc := &fake{name: "splash", run: func(context.Context) error { return nil }}
 
@@ -253,7 +240,6 @@ func TestOneShotStops(t *testing.T) {
 	}
 }
 
-// A service with no Start or Close is still supervised.
 type bare struct{ name string }
 
 func (b bare) Name() string                  { return b.name }
@@ -278,14 +264,10 @@ func TestServiceWithoutStartOrClose(t *testing.T) {
 	}
 }
 
-// A service that cannot take its device back must not be run without it. Run would report itself
-// up while holding nothing, and one that waits on hardware it never got never returns — so it is
-// never restarted either, and the service is stuck for the life of the process.
 func TestNotRunUntilReacquired(t *testing.T) {
 	svc := &fake{name: "device"}
 	svc.run = func(ctx context.Context) error {
 		if _, runs, _ := svc.counts(); runs == 1 {
-			// Break, and make the device unavailable from here on.
 			svc.mu.Lock()
 			svc.startErr = errors.New("device busy")
 			svc.mu.Unlock()
@@ -303,7 +285,6 @@ func TestNotRunUntilReacquired(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { done <- g.Run(ctx) }()
 
-	// Wait for it to have tried, and failed, to re-acquire several times over.
 	deadline := time.Now().Add(2 * time.Second)
 	for {
 		if starts, _, _ := svc.counts(); starts >= 4 {
@@ -326,8 +307,6 @@ func TestNotRunUntilReacquired(t *testing.T) {
 	<-done
 }
 
-// Once the device comes back the service runs again, rather than the retry loop being somewhere it
-// cannot leave.
 func TestRunsOnceReacquired(t *testing.T) {
 	svc := &fake{name: "device"}
 	svc.run = func(ctx context.Context) error {
@@ -349,7 +328,6 @@ func TestRunsOnceReacquired(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { done <- g.Run(ctx) }()
 
-	// Give the device back part way through.
 	giveBack := time.Now().Add(2 * time.Second)
 	for {
 		if starts, _, _ := svc.counts(); starts >= 3 {
@@ -378,7 +356,10 @@ func TestRunsOnceReacquired(t *testing.T) {
 	}
 
 	if _, runs, _ := svc.counts(); runs != 2 {
-		t.Errorf("Run was called %d times, want 2: once before losing the device and once after", runs)
+		t.Errorf(
+			"Run was called %d times, want 2: once before losing the device and once after",
+			runs,
+		)
 	}
 
 	cancel()
@@ -394,7 +375,6 @@ func statusOf(g *Group, name string) Status {
 	return Status{}
 }
 
-// keeper is a service that lets go of less on a restart than on a stop.
 type keeper struct {
 	fake
 
@@ -418,9 +398,6 @@ func (k *keeper) letGo() (releases, closes int) {
 	return k.releases, k.closes
 }
 
-// A restart calls Release, not Close. The DHCP client is the case: its Close hands the lease back
-// and strips the address, so a restart that closed would put the device off the network between
-// two runs of its own loop, and leave it there if the restart then failed.
 func TestARestartReleasesRatherThanCloses(t *testing.T) {
 	broke := make(chan struct{}, 1)
 	svc := &keeper{fake: fake{name: "net", run: func(ctx context.Context) error {
@@ -442,24 +419,24 @@ func TestARestartReleasesRatherThanCloses(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { done <- g.Run(ctx) }()
 
-	// Wait for the restart to have happened: two runs means the first returned and the second began.
 	waitFor(t, func() bool { _, runs, _ := svc.counts(); return runs >= 2 })
 
 	if releases, closes := svc.letGo(); releases != 1 || closes != 0 {
-		t.Errorf("after a restart: %d releases and %d closes, want one release and no close", releases, closes)
+		t.Errorf(
+			"after a restart: %d releases and %d closes, want one release and no close",
+			releases,
+			closes,
+		)
 	}
 
 	cancel()
 	<-done
 
-	// And stopping still closes, because that is when giving the address back is the right thing.
 	if _, closes := svc.letGo(); closes != 1 {
 		t.Errorf("after stopping: %d closes, want one", closes)
 	}
 }
 
-// A service that says nothing about the difference is closed on a restart, which is the right
-// default: letting go of a device is usually the whole point of restarting.
 func TestAServiceWithNoReleaseIsStillClosedOnARestart(t *testing.T) {
 	broke := make(chan struct{}, 1)
 	svc := &fake{name: "card", run: func(ctx context.Context) error {
@@ -491,7 +468,6 @@ func TestAServiceWithNoReleaseIsStillClosedOnARestart(t *testing.T) {
 	<-done
 }
 
-// waitFor blocks until want is true, or fails the test.
 func waitFor(t *testing.T, want func() bool) {
 	t.Helper()
 

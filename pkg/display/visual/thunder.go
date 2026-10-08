@@ -67,7 +67,13 @@ func (v *thunder) paint() *image.RGBA {
 			depth := clamp01((fy - top) / (float64(v.st.h) * 0.2))
 			r, g, b := 0.012+0.01*(1-depth), 0.016+0.012*(1-depth), 0.026+0.016*(1-depth)
 			o := img.PixOffset(x, y)
-			img.Pix[o], img.Pix[o+1], img.Pix[o+2], img.Pix[o+3] = uint8(255*r), uint8(255*g), uint8(255*b), 255
+			img.Pix[o], img.Pix[o+1], img.Pix[o+2], img.Pix[o+3] = uint8(
+				255*r,
+			), uint8(
+				255*g,
+			), uint8(
+				255*b,
+			), 255
 		}
 	}
 	for i := range 14 {
@@ -131,7 +137,11 @@ func (v *thunder) strike(ground bool) {
 	W, H := float64(v.st.w), float64(v.st.h)
 	x0 := W * (0.1 + 0.8*v.r.next())
 	y0 := H * (0.12 + 0.12*v.r.next())
-	b := bolt{life: 0.45 + 0.35*v.r.next(), pulses: 2 + int(v.r.next()*3), width: 0.8 + 0.6*v.r.next()}
+	b := bolt{
+		life:   0.45 + 0.35*v.r.next(),
+		pulses: 2 + int(v.r.next()*3),
+		width:  0.8 + 0.6*v.r.next(),
+	}
 	if !ground {
 		b.fx, b.fy, b.in = x0, y0, 0.6+0.4*v.r.next()
 		v.bolts = append(v.bolts, b)
@@ -238,8 +248,22 @@ func (v *thunder) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 					k := max(1, int(math.Hypot(dx, dy)/step))
 					for j := range k {
 						t := float64(j) / float64(k)
-						v.pts = append(v.pts, Point{X: float32(px[i] + dx*t), Y: float32(py[i] + dy*t), Size: float32(size),
-							R: float32(layer.r), G: float32(layer.g), B: float32(layer.b), A: a, Round: true, Light: true})
+						v.pts = append(
+							v.pts,
+							Point{
+								X:    float32(px[i] + dx*t),
+								Y:    float32(py[i] + dy*t),
+								Size: float32(size),
+								R: float32(
+									layer.r,
+								),
+								G:     float32(layer.g),
+								B:     float32(layer.b),
+								A:     a,
+								Round: true,
+								Light: true,
+							},
+						)
 					}
 				}
 			}
@@ -250,7 +274,22 @@ func (v *thunder) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 	}
 	W, H := float64(v.st.w), float64(v.st.h)
 	ph := func(k float64) float32 { return float32(math.Mod(f.t*k, 1)) }
-	vals := []float32{float32(W), float32(H), ph(0.05), float32(v.flash), float32(v.fx / H), float32(v.fy / H), float32(v.rain), float32(v.wind),
-		ph(0.006), ph(0.011), ph(0.002), ph(0.02), ph(0.004), ph(0.12), ph(0.2)}
+	vals := []float32{
+		float32(W),
+		float32(H),
+		ph(0.05),
+		float32(v.flash),
+		float32(v.fx / H),
+		float32(v.fy / H),
+		float32(v.rain),
+		float32(v.wind),
+		ph(0.006),
+		ph(0.011),
+		ph(0.002),
+		ph(0.02),
+		ph(0.004),
+		ph(0.12),
+		ph(0.2),
+	}
 	return g.Values(vals, float32(0.3+0.5*v.flash), 0.03, 2)
 }

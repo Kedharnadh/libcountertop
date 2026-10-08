@@ -114,7 +114,14 @@ func (v *classicVU) prepare() func(*image.RGBA) {
 	}
 }
 
-func (v *classicVU) panel(img *image.RGBA, bold *opentype.Font, u, title float64, labels [2][2]float64, lamp [2]float64, thinking float64) {
+func (v *classicVU) panel(
+	img *image.RGBA,
+	bold *opentype.Font,
+	u, title float64,
+	labels [2][2]float64,
+	lamp [2]float64,
+	thinking float64,
+) {
 	W, H := float64(v.st.w), float64(v.st.h)
 	fx.Clear(img, hex(0x121417, 1))
 	r := seeded(11)
@@ -127,16 +134,40 @@ func (v *classicVU) panel(img *image.RGBA, bold *opentype.Font, u, title float64
 		fx.Span(img, y, 0, v.st.w, c, false)
 	}
 	fx.LinearRect(img, img.Bounds(), 0, 0, 0, float32(H), []fx.Stop{
-		{At: 0, C: color.NRGBA{255, 255, 255, 9}}, {At: 0.45, C: color.NRGBA{255, 255, 255, 0}}, {At: 0.45, C: color.NRGBA{}}, {At: 1, C: color.NRGBA{0, 0, 0, 77}},
+		{
+			At: 0,
+			C:  color.NRGBA{255, 255, 255, 9},
+		},
+		{At: 0.45, C: color.NRGBA{255, 255, 255, 0}},
+		{At: 0.45, C: color.NRGBA{}},
+		{At: 1, C: color.NRGBA{0, 0, 0, 77}},
 	}, false)
-	fx.Radial(img, float32(W/2), float32(H*0.42), 0, float32(math.Max(W, H)*0.75), []fx.Stop{{At: 0, C: color.NRGBA{}}, {At: 1, C: color.NRGBA{0, 0, 0, 158}}}, false)
+	fx.Radial(
+		img,
+		float32(W/2),
+		float32(H*0.42),
+		0,
+		float32(math.Max(W, H)*0.75),
+		[]fx.Stop{{At: 0, C: color.NRGBA{}}, {At: 1, C: color.NRGBA{0, 0, 0, 158}}},
+		false,
+	)
 
 	for i := range v.m {
 		shadow(img, v.m[i].x, v.m[i].y+8*u, v.mw, v.mh, 16*v.mw/400, 34*u, 0.85)
 	}
 
 	for i, s := range [][2]float64{{0.035, 0.06}, {0.965, 0.06}, {0.035, 0.94}, {0.965, 0.94}} {
-		screw(img, s[0]*W, s[1]*H, 8*u, 0.4+float64(i)*0.9, 1.4*u, hex(0x71757b, 1), hex(0x1f2124, 1), color.NRGBA{0, 0, 0, 204})
+		screw(
+			img,
+			s[0]*W,
+			s[1]*H,
+			8*u,
+			0.4+float64(i)*0.9,
+			1.4*u,
+			hex(0x71757b, 1),
+			hex(0x1f2124, 1),
+			color.NRGBA{0, 0, 0, 204},
+		)
 	}
 
 	engrave := func(txt string, x, y, size float64) {
@@ -151,29 +182,73 @@ func (v *classicVU) panel(img *image.RGBA, bold *opentype.Font, u, title float64
 	engrave("MIC", labels[0][0], labels[0][1], 17*u)
 	engrave("ASSIST", labels[1][0], labels[1][1], 17*u)
 	engrave("THINKING", W/2, thinking, 8.5*u)
-	fx.Radial(img, float32(lamp[0]), float32(lamp[1]), 0, float32(5.5*u), []fx.Stop{{At: 0, C: hex(0x4a3b16, 1)}, {At: 1, C: hex(0x1e1606, 1)}}, false)
+	fx.Radial(
+		img,
+		float32(lamp[0]),
+		float32(lamp[1]),
+		0,
+		float32(5.5*u),
+		[]fx.Stop{{At: 0, C: hex(0x4a3b16, 1)}, {At: 1, C: hex(0x1e1606, 1)}},
+		false,
+	)
 }
 
 func screw(img *image.RGBA, x, y, r, ang, lw float64, hi, lo, slot color.NRGBA) {
-	fx.Radial(img, float32(x), float32(y), 0, float32(r), []fx.Stop{{At: 0, C: hi}, {At: 1, C: lo}}, false)
+	fx.Radial(
+		img,
+		float32(x),
+		float32(y),
+		0,
+		float32(r),
+		[]fx.Stop{{At: 0, C: hi}, {At: 1, C: lo}},
+		false,
+	)
 	c, s := math.Cos(ang)*r*0.7, math.Sin(ang)*r*0.7
-	fx.Polyline(img, []float32{float32(x - c), float32(y - s), float32(x + c), float32(y + s)}, float32(lw), slot, false)
+	fx.Polyline(
+		img,
+		[]float32{float32(x - c), float32(y - s), float32(x + c), float32(y + s)},
+		float32(lw),
+		slot,
+		false,
+	)
 }
 
 func (v *classicVU) face(img *image.RGBA, bold, medium *opentype.Font, X, Y float64) {
 	fu := v.fu
 	fx0, fy0, fw, fh := X+v.fx, Y+v.fy, v.fw, v.fh
 	rounded(img, X, Y, v.mw, v.mh, 16*fu, func(sub *image.RGBA, ox, oy float64) {
-		fx.LinearRect(img, sub.Bounds(), 0, float32(Y), 0, float32(Y+v.mh), []fx.Stop{{At: 0, C: hex(0x34373c, 1)}, {At: 1, C: hex(0x0b0c0e, 1)}}, false)
+		fx.LinearRect(
+			img,
+			sub.Bounds(),
+			0,
+			float32(Y),
+			0,
+			float32(Y+v.mh),
+			[]fx.Stop{{At: 0, C: hex(0x34373c, 1)}, {At: 1, C: hex(0x0b0c0e, 1)}},
+			false,
+		)
 	})
 	rounded(img, fx0, fy0, fw, fh, 8*fu, func(sub *image.RGBA, ox, oy float64) {
 		fx.Radial(sub, float32(X+v.px-ox), float32(fy0+fh*1.15-oy), 0, float32(fw*0.95), []fx.Stop{
-			{At: 0, C: hex(0xfff7e0, 1)}, {At: 0.5, C: hex(0xf7e4b3, 1)}, {At: 0.85, C: hex(0xe6c889, 1)}, {At: 1, C: hex(0xc9a45f, 1)},
+			{
+				At: 0,
+				C:  hex(0xfff7e0, 1),
+			},
+			{At: 0.5, C: hex(0xf7e4b3, 1)},
+			{At: 0.85, C: hex(0xe6c889, 1)},
+			{At: 1, C: hex(0xc9a45f, 1)},
 		}, false)
 		r := seeded(5)
 		for range 900 {
 			c := color.NRGBA{90, 60, 20, uint8((0.015 + r.next()*0.03) * 255)}
-			fx.Square(sub, float32(fx0+r.next()*fw-ox), float32(fy0+r.next()*fh-oy), float32(fu), c, false)
+			fx.Square(
+				sub,
+				float32(fx0+r.next()*fw-ox),
+				float32(fy0+r.next()*fh-oy),
+				float32(fu),
+				c,
+				false,
+			)
 		}
 	})
 
@@ -196,7 +271,13 @@ func (v *classicVU) face(img *image.RGBA, bold, medium *opentype.Font, X, Y floa
 	tick := func(r0, r1, a, w float64, c color.NRGBA) {
 		x0, y0 := at(r0, a)
 		x1, y1 := at(r1, a)
-		fx.Polyline(img, []float32{float32(x0), float32(y0), float32(x1), float32(y1)}, float32(w), c, false)
+		fx.Polyline(
+			img,
+			[]float32{float32(x0), float32(y0), float32(x1), float32(y1)},
+			float32(w),
+			c,
+			false,
+		)
 	}
 	text := func(f *opentype.Font, size float64, c color.NRGBA, s string, x, y float64) {
 		letter(img, f, size, c, s, x, y)
@@ -236,19 +317,59 @@ func (v *classicVU) face(img *image.RGBA, bold, medium *opentype.Font, X, Y floa
 	letterWithin(img, medium, 8*fu, hex(0x15130f, 0.5), plate(v.label), px, fy0+fh*0.77, fw*0.7)
 	text(medium, 7*fu, color.NRGBA{40, 20, 0, 140}, "PEAK", fx0+fw-22*fu, fy0+34*fu)
 
-	fx.Polyline(img, roundRectPts(fx0, fy0, fw, fh, 8*fu), float32(2*fu), color.NRGBA{0, 0, 0, 153}, false)
+	fx.Polyline(
+		img,
+		roundRectPts(fx0, fy0, fw, fh, 8*fu),
+		float32(2*fu),
+		color.NRGBA{0, 0, 0, 153},
+		false,
+	)
 
 	lx, ly, lr := fx0+fw-22*fu, fy0+22*fu, 5*fu
-	fx.Radial(img, float32(lx), float32(ly), 0, float32(lr), []fx.Stop{{At: 0, C: hex(0x6a2a2a, 1)}, {At: 1, C: hex(0x2a0909, 1)}}, false)
+	fx.Radial(
+		img,
+		float32(lx),
+		float32(ly),
+		0,
+		float32(lr),
+		[]fx.Stop{{At: 0, C: hex(0x6a2a2a, 1)}, {At: 1, C: hex(0x2a0909, 1)}},
+		false,
+	)
 
 	cy0 := fy0 + fh*0.855
 	rounded(img, fx0, fy0, fw, fh, 8*fu, func(sub *image.RGBA, ox, oy float64) {
-		fx.LinearRect(img, image.Rect(int(fx0), int(cy0), int(math.Ceil(fx0+fw)), int(math.Ceil(fy0+fh))), 0, float32(cy0), 0, float32(fy0+fh), []fx.Stop{
-			{At: 0, C: hex(0x1b1c1f, 1)}, {At: 1, C: hex(0x050506, 1)},
-		}, false)
-		fx.Span(img, int(cy0), int(fx0), int(math.Ceil(fx0+fw)), color.NRGBA{255, 255, 255, uint8(25 * math.Min(1, 1.2*fu))}, false)
+		fx.LinearRect(
+			img,
+			image.Rect(int(fx0), int(cy0), int(math.Ceil(fx0+fw)), int(math.Ceil(fy0+fh))),
+			0,
+			float32(cy0),
+			0,
+			float32(fy0+fh),
+			[]fx.Stop{
+				{At: 0, C: hex(0x1b1c1f, 1)}, {At: 1, C: hex(0x050506, 1)},
+			},
+			false,
+		)
+		fx.Span(
+			img,
+			int(cy0),
+			int(fx0),
+			int(math.Ceil(fx0+fw)),
+			color.NRGBA{255, 255, 255, uint8(25 * math.Min(1, 1.2*fu))},
+			false,
+		)
 	})
-	screw(img, px, fy0+fh*0.93, 5*fu, -math.Atan2(0.25, 0.75), 1.3*fu, hex(0x8b8f95, 1), hex(0x2a2c2f, 1), hex(0x111111, 1))
+	screw(
+		img,
+		px,
+		fy0+fh*0.93,
+		5*fu,
+		-math.Atan2(0.25, 0.75),
+		1.3*fu,
+		hex(0x8b8f95, 1),
+		hex(0x2a2c2f, 1),
+		hex(0x111111, 1),
+	)
 }
 
 func (v *classicVU) step(x Input) {
@@ -304,7 +425,15 @@ func (v *classicVU) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 
 func (v *classicVU) values() []float32 {
 	u := make([]float32, 24)
-	u[0], u[1], u[2], u[3], u[4] = shadeScale, float32(v.fu), float32(v.fw), float32(v.fh), float32(v.rs)
+	u[0], u[1], u[2], u[3], u[4] = shadeScale, float32(
+		v.fu,
+	), float32(
+		v.fw,
+	), float32(
+		v.fh,
+	), float32(
+		v.rs,
+	)
 	for i, m := range v.m {
 		peak := float32(0)
 		if v.clock-m.peakT < 0.18 {

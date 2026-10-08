@@ -5,13 +5,13 @@ import (
 	"unicode"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
+
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
-// KeyboardSize selects the shared keyboard geometry.
 type KeyboardSize = schema.KeyboardSize
 
 const (
@@ -20,7 +20,6 @@ const (
 	KeyboardLarge    = schema.KeyboardLarge
 )
 
-// KeyboardOptions binds appearance, translations, and the native input backend.
 type KeyboardOptions struct {
 	Size         KeyboardSize
 	Palette      theme.Theme
@@ -37,7 +36,6 @@ var (
 	symbolRows = []string{"1234567890", "-/:;()&@\"", ".,?!'#"}
 )
 
-// Keyboard builds the on-screen keyboard and returns its placement.
 func (editor *Editor) Keyboard(w *gogui.Window, opts KeyboardOptions) (ui.Rect, gogui.View) {
 	pal := opts.Palette
 	vw, vh := w.WindowSize()
@@ -119,7 +117,16 @@ func (editor *Editor) Keyboard(w *gogui.Window, opts KeyboardOptions) (ui.Rect, 
 			line = append(line, key(string(ch), label, unit, plain, typeRune(ch)))
 		}
 		if i == 2 {
-			line = append(line, key("back", gogui.IconArrowLeft, unit*1.5+gap*0.5, special, func() { opts.Press(gogui.KeyBackspace) }))
+			line = append(
+				line,
+				key(
+					"back",
+					gogui.IconArrowLeft,
+					unit*1.5+gap*0.5,
+					special,
+					func() { opts.Press(gogui.KeyBackspace) },
+				),
+			)
 		}
 		lines = append(lines, keyRow(line, gap))
 	}
@@ -129,7 +136,13 @@ func (editor *Editor) Keyboard(w *gogui.Window, opts KeyboardOptions) (ui.Rect, 
 		mode = "abc"
 	}
 	lines = append(lines, keyRow([]gogui.View{
-		key("mode", mode, unit*2+gap, special, func() { editor.Symbols, editor.Shift = !editor.Symbols, false }),
+		key(
+			"mode",
+			mode,
+			unit*2+gap,
+			special,
+			func() { editor.Symbols, editor.Shift = !editor.Symbols, false },
+		),
 		key("space", " ", unit*4+gap*3, plain, func() { opts.Type(' ') }),
 		key("cancel", opts.Cancel, unit*2+gap, special, func() { w.ClearFocus() }),
 		key("save", opts.Save, unit*2+gap, special, func() {

@@ -41,7 +41,13 @@ func (v *rain) scenery(w, h int, seed uint32) *image.RGBA {
 	W, H := float64(w), float64(h)
 	for x := range w {
 		fx := float64(x) / W
-		canopy := 0.6 - 0.07*math.Sin(fx*5.1+ph[0]) - 0.05*math.Sin(fx*11.3+ph[1]) - 0.03*math.Sin(fx*23+ph[2])
+		canopy := 0.6 - 0.07*math.Sin(
+			fx*5.1+ph[0],
+		) - 0.05*math.Sin(
+			fx*11.3+ph[1],
+		) - 0.03*math.Sin(
+			fx*23+ph[2],
+		)
 		canopy -= 0.14 * math.Max(0, math.Sin(fx*2.3+ph[3])) * math.Max(0, math.Sin(fx*7.7+ph[4]))
 		ground := 0.86 + 0.015*math.Sin(fx*3.7+ph[5])
 		for y := range h {
@@ -54,13 +60,23 @@ func (v *rain) scenery(w, h int, seed uint32) *image.RGBA {
 			case fy < ground:
 				k := (fy - canopy) / (ground - canopy)
 				leaf := 0.5 + 0.5*math.Sin(float64(x)*0.21+math.Sin(float64(y)*0.17)*3)
-				c = [3]float64{0.1 + 0.05*leaf - 0.03*k, 0.14 + 0.06*leaf - 0.03*k, 0.11 + 0.04*leaf - 0.03*k}
+				c = [3]float64{
+					0.1 + 0.05*leaf - 0.03*k,
+					0.14 + 0.06*leaf - 0.03*k,
+					0.11 + 0.04*leaf - 0.03*k,
+				}
 			default:
 				k := (fy - ground) / (1 - ground)
 				c = [3]float64{0.24 + 0.08*k, 0.3 + 0.08*k, 0.25 + 0.06*k}
 			}
 			o := img.PixOffset(x, y)
-			img.Pix[o], img.Pix[o+1], img.Pix[o+2], img.Pix[o+3] = uint8(255*c[0]), uint8(255*c[1]), uint8(255*c[2]), 255
+			img.Pix[o], img.Pix[o+1], img.Pix[o+2], img.Pix[o+3] = uint8(
+				255*c[0],
+			), uint8(
+				255*c[1],
+			), uint8(
+				255*c[2],
+			), 255
 		}
 	}
 	return img
@@ -118,7 +134,8 @@ func (v *rain) add(x, y, r float64) {
 	}
 	for i := range v.drops {
 		d := &v.drops[i]
-		if !d.run && math.Abs(d.x-x) < d.r+r && math.Abs(d.y-y) < d.r+r && math.Hypot(d.x-x, d.y-y) < d.r+r {
+		if !d.run && math.Abs(d.x-x) < d.r+r && math.Abs(d.y-y) < d.r+r &&
+			math.Hypot(d.x-x, d.y-y) < d.r+r {
 			d.r = math.Sqrt(d.r*d.r + r*r)
 			return
 		}
@@ -177,7 +194,15 @@ func (v *rain) advance(f frame) {
 				d.trail = 0
 				tr := d.r * (0.18 + 0.1*v.r.next())
 				if v.r.next() < 0.55 {
-					trail = append(trail, raindrop{x: d.x + (v.r.next()-0.5)*d.r*0.4, y: d.y - d.r*1.4, r: tr, dry: true})
+					trail = append(
+						trail,
+						raindrop{
+							x:   d.x + (v.r.next()-0.5)*d.r*0.4,
+							y:   d.y - d.r*1.4,
+							r:   tr,
+							dry: true,
+						},
+					)
 				}
 				d.r = math.Sqrt(math.Max(d.r*d.r-tr*tr*0.6, runAt*runAt*0.3))
 			}
@@ -198,7 +223,8 @@ func (v *rain) advance(f frame) {
 			if i == j || b.r == 0 || b.run {
 				continue
 			}
-			if math.Abs(a.x-b.x) < a.r+b.r && math.Abs(a.y-b.y) < a.r+b.r && b.y > a.y-a.r*0.2 && math.Hypot(a.x-b.x, a.y-b.y) < a.r+b.r*0.6 {
+			if math.Abs(a.x-b.x) < a.r+b.r && math.Abs(a.y-b.y) < a.r+b.r && b.y > a.y-a.r*0.2 &&
+				math.Hypot(a.x-b.x, a.y-b.y) < a.r+b.r*0.6 {
 				a.r = math.Sqrt(a.r*a.r + b.r*b.r)
 				b.r = 0
 			}
@@ -254,16 +280,45 @@ func (v *rain) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 	v.advance(f)
 	v.pts = v.pts[:0]
 	for _, d := range v.drops {
-		v.pts = append(v.pts, Point{X: float32(d.x), Y: float32(d.y), Size: float32(2*d.r + 2), A: 1, Splat: true})
+		v.pts = append(
+			v.pts,
+			Point{X: float32(d.x), Y: float32(d.y), Size: float32(2*d.r + 2), A: 1, Splat: true},
+		)
 		if d.run {
-			v.pts = append(v.pts, Point{X: float32(d.x), Y: float32(d.y - d.r*0.9), Size: float32(1.3*d.r + 2), A: 1, Splat: true})
-			v.pts = append(v.pts, Point{X: float32(d.x), Y: float32(d.y), Size: float32(3*d.r + 4), R: 0.5, A: 1, Feed: true, Round: true})
+			v.pts = append(
+				v.pts,
+				Point{
+					X:     float32(d.x),
+					Y:     float32(d.y - d.r*0.9),
+					Size:  float32(1.3*d.r + 2),
+					A:     1,
+					Splat: true,
+				},
+			)
+			v.pts = append(
+				v.pts,
+				Point{
+					X:     float32(d.x),
+					Y:     float32(d.y),
+					Size:  float32(3*d.r + 4),
+					R:     0.5,
+					A:     1,
+					Feed:  true,
+					Round: true,
+				},
+			)
 		}
 	}
 	if err := g.Points(v.pts); err != nil {
 		return err
 	}
 	W, H := float64(v.st.w), float64(v.st.h)
-	vals := []float32{float32(W), float32(H), float32(v.fog), float32(math.Min(W, H) * 0.06 / W), float32(0.4 + 0.5*f.level)}
+	vals := []float32{
+		float32(W),
+		float32(H),
+		float32(v.fog),
+		float32(math.Min(W, H) * 0.06 / W),
+		float32(0.4 + 0.5*f.level),
+	}
 	return g.Values(vals, float32(0.2+0.2*f.level), 0.01, 1)
 }

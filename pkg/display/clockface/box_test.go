@@ -8,7 +8,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
-// every face there is, so a new one is covered by being registered rather than by being remembered.
 func every() []Kind {
 	out := make([]Kind, 0, len(registered))
 	for name := range registered {
@@ -17,16 +16,9 @@ func every() []Kind {
 	return out
 }
 
-// A face is handed a box and draws in it. Nothing checked that until now.
-//
-// It matters beyond tidiness: the box is what the dashboard clips a narrowed repaint to, and what
-// it will hand out once it shares the screen with anything else (#77). A face that paints outside
-// leaves a mark that whatever owns that space will not paint over.
 func TestEveryFaceStaysInsideTheBoxItIsGiven(t *testing.T) {
 	palette := theme.Default()
 
-	// A box with room around it on all four sides, so an overrun in any direction lands somewhere
-	// it can be seen rather than off the edge of the image.
 	const pad = 60
 	w, h := 1200, 1920
 	in := ui.Rect{X: pad, Y: pad, W: w - 2*pad, H: h - 2*pad}
@@ -54,9 +46,6 @@ func TestEveryFaceStaysInsideTheBoxItIsGiven(t *testing.T) {
 	}
 }
 
-// A box far narrower than it is tall, and one far wider, are what the position and size settings
-// can cut out of a rotated panel. A face that only ever ran against something near square would not
-// have met either.
 func TestEveryFaceStaysInsideAnAwkwardBox(t *testing.T) {
 	palette := theme.Default()
 	r := Read(time.Date(2026, 9, 21, 10, 8, 0, 0, time.UTC), false)

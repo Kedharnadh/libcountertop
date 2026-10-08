@@ -9,8 +9,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 )
 
-// empty starts the cache from nothing, since these are about what it holds rather than what it
-// draws and every other test in the package has been filling it.
 func empty() {
 	iconMu.Lock()
 	defer iconMu.Unlock()
@@ -26,8 +24,6 @@ func held() (entries, bytes int) {
 	return len(iconCache), iconBytes
 }
 
-// The same icon at the same size is rasterized once. This is the whole reason the cache exists and
-// nothing else in the package asserts it.
 func TestTheSameMaskIsNotRasterizedTwice(t *testing.T) {
 	empty()
 
@@ -42,8 +38,6 @@ func TestTheSameMaskIsNotRasterizedTwice(t *testing.T) {
 	}
 }
 
-// A numeral is not square, so the same artwork at the same height and a different width is a
-// different mask. A cache keyed on one side would hand back the wrong shape.
 func TestBothSidesArePartOfTheKey(t *testing.T) {
 	empty()
 
@@ -55,12 +49,9 @@ func TestBothSidesArePartOfTheKey(t *testing.T) {
 	}
 }
 
-// The cache has a ceiling. Without one a clock drawing large numerals accumulates every digit it
-// has ever shown, at every size it has ever been set to, and never gives any of it back.
 func TestTheCacheStaysUnderItsBudget(t *testing.T) {
 	empty()
 
-	// Sizes chosen to overrun several times over: each of these is about a megabyte of coverage.
 	for _, side := range []int{1000, 1010, 1020, 1030, 1040, 1050} {
 		mask(icons.ActionInfoOutline, side, side)
 
@@ -70,12 +61,9 @@ func TestTheCacheStaysUnderItsBudget(t *testing.T) {
 	}
 }
 
-// What it gives back is every size that is not the one on screen. Changing size is what makes the
-// old masks dead, all at once.
 func TestChangingSizeDropsTheOldMasks(t *testing.T) {
 	empty()
 
-	// Four icons at one size, enough that dropping them is measurable.
 	set := []Icon{
 		icons.ActionInfoOutline,
 		icons.ActionSettings,
@@ -91,7 +79,6 @@ func TestChangingSizeDropsTheOldMasks(t *testing.T) {
 		t.Fatalf("the cache holds %d of %d masks", before, len(set))
 	}
 
-	// One at a different size, big enough to push the total past the budget.
 	mask(icons.ActionInfoOutline, 1100, 1100)
 
 	entries, bytes := held()
@@ -112,8 +99,6 @@ func TestChangingSizeDropsTheOldMasks(t *testing.T) {
 	}
 }
 
-// Evicting must not lose what was just asked for, or every draw rasterizes again and the cache is
-// a pure cost.
 func TestTheMaskBeingAskedForSurvivesEviction(t *testing.T) {
 	empty()
 
@@ -130,8 +115,6 @@ func TestTheMaskBeingAskedForSurvivesEviction(t *testing.T) {
 	}
 }
 
-// The budget is counted, not estimated: what is subtracted on the way out has to be what was added
-// on the way in, or it drifts until the cache holds nothing or everything.
 func TestTheByteCountMatchesWhatIsHeld(t *testing.T) {
 	empty()
 
@@ -151,14 +134,10 @@ func TestTheByteCountMatchesWhatIsHeld(t *testing.T) {
 	}
 }
 
-// Drawing still works when the draw is the thing that triggers an eviction. The mask it needs is
-// made after the cache has been emptied under it, which is the order that would otherwise hand back
-// something that had just been deleted.
 func TestDrawingThroughAnEvictionStillPaints(t *testing.T) {
 	empty()
 	palette := theme.Default()
 
-	// Fill to just under the budget at one size, so the next size over tips it.
 	for _, i := range []Icon{icons.ActionInfoOutline, icons.ActionSettings, icons.AlertWarning} {
 		mask(i, 1100, 1100)
 	}
@@ -183,13 +162,10 @@ func TestDrawingThroughAnEvictionStillPaints(t *testing.T) {
 	}
 }
 
-// A mask too big to fit the budget at all is still drawn. It cannot be kept, and the drawing must
-// not depend on it having been.
 func TestAMaskLargerThanTheBudgetIsStillDrawn(t *testing.T) {
 	empty()
 	palette := theme.Default()
 
-	// The surface is the middle of the box the icon fills, where its ink actually is.
 	const side = 2200
 
 	img := NewImage(160, 160, palette.Background)

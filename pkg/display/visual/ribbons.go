@@ -33,15 +33,39 @@ type ribbons struct {
 }
 
 var (
-	ribbonPA = [5][3]float64{{40, 210, 255}, {70, 110, 255}, {30, 255, 190}, {150, 110, 255}, {110, 225, 255}}
-	ribbonPB = [5][3]float64{{255, 60, 170}, {185, 80, 255}, {255, 150, 80}, {255, 95, 215}, {130, 100, 255}}
+	ribbonPA = [5][3]float64{
+		{40, 210, 255},
+		{70, 110, 255},
+		{30, 255, 190},
+		{150, 110, 255},
+		{110, 225, 255},
+	}
+	ribbonPB = [5][3]float64{
+		{255, 60, 170},
+		{185, 80, 255},
+		{255, 150, 80},
+		{255, 95, 215},
+		{130, 100, 255},
+	}
 )
 
 func newRibbons() *ribbons {
 	v := &ribbons{r: seeded(8)}
 	for i := range 5 {
-		v.rb = append(v.rb, band{f: 0.9 + v.r.next()*1.5, sp: 0.7 + v.r.next(), ph: v.r.next() * 2 * math.Pi, ofs: (v.r.next() - 0.5) * 0.6,
-			wid: 0.3 + v.r.next()*0.22, drift: 0.12 + v.r.next()*0.2, b0: i * 5, b1: i*5 + 7, tw: v.r.next() * 2 * math.Pi})
+		v.rb = append(
+			v.rb,
+			band{
+				f:     0.9 + v.r.next()*1.5,
+				sp:    0.7 + v.r.next(),
+				ph:    v.r.next() * 2 * math.Pi,
+				ofs:   (v.r.next() - 0.5) * 0.6,
+				wid:   0.3 + v.r.next()*0.22,
+				drift: 0.12 + v.r.next()*0.2,
+				b0:    i * 5,
+				b1:    i*5 + 7,
+				tw:    v.r.next() * 2 * math.Pi,
+			},
+		)
 	}
 	return v
 }
@@ -89,8 +113,21 @@ func (v *ribbons) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 		ctr := rb.ofs + 0.3*math.Sin(t*rb.drift+float64(i)*1.3)
 		b := 1 + 9*i
 		vals[b], vals[b+1], vals[b+2] = float32(rb.amp/H), float32(rb.f), wrap(rb.ph, 2*math.Pi)
-		vals[b+3], vals[b+4], vals[b+5] = float32(ctr), float32(rb.wid), wrap(t*1.7+rb.tw, 2*math.Pi)
-		vals[b+6], vals[b+7], vals[b+8] = float32(col[0]/255), float32(col[1]/255), float32(col[2]/255)
+		vals[b+3], vals[b+4], vals[b+5] = float32(
+			ctr,
+		), float32(
+			rb.wid,
+		), wrap(
+			t*1.7+rb.tw,
+			2*math.Pi,
+		)
+		vals[b+6], vals[b+7], vals[b+8] = float32(
+			col[0]/255,
+		), float32(
+			col[1]/255,
+		), float32(
+			col[2]/255,
+		)
 		if (f.onset || (lv > 0.5 && v.r.next() < 0.25)) && len(v.dust) < 220 {
 			count := 1
 			if f.onset {
@@ -100,10 +137,22 @@ func (v *ribbons) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 				xn := math.Max(0, math.Min(1, ctr*0.5+0.5+(v.r.next()-0.5)*rb.wid*0.8))
 				tt := xn*2 - 1
 				pin := (1 - tt*tt) * (1 - tt*tt)
-				e := math.Exp(-math.Pow((tt-ctr)/rb.wid, 2)) * pin
+				d0 := (tt - ctr) / rb.wid
+				e := math.Exp(-d0*d0) * pin
 				top := rb.amp * e * math.Sin(rb.f*tt*math.Pi*2+rb.ph)
-				v.dust = append(v.dust, mote{xn * W, cy - top*v.r.next(), (v.r.next() - 0.5) * 40 * u, -(30 + 90*v.r.next()) * u * (0.5 + lv),
-					1.2 + v.r.next()*1.4, 0, (1 + v.r.next()*2) * u, col})
+				v.dust = append(
+					v.dust,
+					mote{
+						xn * W,
+						cy - top*v.r.next(),
+						(v.r.next() - 0.5) * 40 * u,
+						-(30 + 90*v.r.next()) * u * (0.5 + lv),
+						1.2 + v.r.next()*1.4,
+						0,
+						(1 + v.r.next()*2) * u,
+						col,
+					},
+				)
 			}
 		}
 	}
@@ -118,8 +167,21 @@ func (v *ribbons) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 		d.y += d.vy * dt
 		d.vy *= 0.985
 		c := mixc(d.c, [3]float64{255, 255, 255}, 0.5)
-		pts = append(pts, Point{X: float32(d.x + d.s/2), Y: float32(d.y + d.s/2), Size: float32(math.Max(d.s, 1)),
-			R: float32(c[0] / 255), G: float32(c[1] / 255), B: float32(c[2] / 255), A: float32(math.Sin(math.Pi*d.age/d.life) * 0.9), Light: true})
+		pts = append(
+			pts,
+			Point{
+				X:    float32(d.x + d.s/2),
+				Y:    float32(d.y + d.s/2),
+				Size: float32(math.Max(d.s, 1)),
+				R: float32(
+					c[0] / 255,
+				),
+				G:     float32(c[1] / 255),
+				B:     float32(c[2] / 255),
+				A:     float32(math.Sin(math.Pi*d.age/d.life) * 0.9),
+				Light: true,
+			},
+		)
 		kept = append(kept, d)
 	}
 	v.dust = kept
@@ -127,7 +189,13 @@ func (v *ribbons) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 		return err
 	}
 	vals[50], vals[51], vals[52], vals[53] = float32(cy), float32(lv), float32(W), float32(H)
-	vals[54], vals[55], vals[56] = float32(0.05*n/W), float32(u), float32(0.25+0.3*(1-math.Min(1, lv*2)))
+	vals[54], vals[55], vals[56] = float32(
+		0.05*n/W,
+	), float32(
+		u,
+	), float32(
+		0.25+0.3*(1-math.Min(1, lv*2)),
+	)
 	reach := 4 * u
 	for _, rb := range v.rb {
 		reach = math.Max(reach, rb.amp*1.1)

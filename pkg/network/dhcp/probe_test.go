@@ -9,9 +9,6 @@ import (
 
 var otherMAC = net.HardwareAddr{0x02, 0x42, 0xac, 0x11, 0x00, 0x02}
 
-// A probe is an announcement with the sender's address left out. That one field is the whole
-// difference: filled in, it is a claim, and claiming an address before finding out whether it is
-// free is what probing exists to avoid.
 func TestArpProbeClaimsNothing(t *testing.T) {
 	ip := net.IPv4(10, 100, 101, 106)
 	arp := arpProbe(testMAC, ip)[ethHeader:]
@@ -53,8 +50,6 @@ func TestArpProbeRefusesWhatItCannotSend(t *testing.T) {
 	}
 }
 
-// arp builds a frame to feed the reader, so each case can say what it is rather than be a slice of
-// bytes.
 func arp(op uint16, senderMAC net.HardwareAddr, senderIP, targetIP net.IP) []byte {
 	frame := make([]byte, ethHeader+arpPayload)
 
@@ -133,8 +128,6 @@ func TestWhatCountsAsTheAddressBeingTaken(t *testing.T) {
 	}
 }
 
-// The socket is bound to ARP, but a reader that trusts that and indexes anyway is one bad frame
-// from a panic. None of these are evidence of anything either.
 func TestMalformedFramesAreNotEvidence(t *testing.T) {
 	want := net.IPv4(10, 100, 101, 106)
 	good := arp(2, otherMAC, want, net.IPv4zero)
@@ -179,8 +172,6 @@ func TestMalformedFramesAreNotEvidence(t *testing.T) {
 	}
 }
 
-// The address arrives from a lease in whichever form net chose, and a sixteen byte spelling has
-// to compare the same as a four byte one.
 func TestTakenAcceptsEitherSpellingOfTheAddress(t *testing.T) {
 	want := net.IPv4(10, 100, 101, 106)
 	frame := arp(2, otherMAC, want, net.IPv4zero)

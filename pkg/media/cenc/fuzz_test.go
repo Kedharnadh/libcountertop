@@ -18,8 +18,8 @@ func FuzzSegmentsNeverPanic(f *testing.F) {
 		samples, _, _ := ParseFragment(track, seg)
 		for _, s := range samples {
 			track.LengthSize = 4
-			track.AnnexB(s)
+			_, _, _ = track.AnnexB(s)
 		}
-		Parse(seg)
+		_, _, _ = Parse(seg)
 	})
 }

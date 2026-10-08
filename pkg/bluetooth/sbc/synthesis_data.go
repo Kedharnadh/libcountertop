@@ -1,7 +1,5 @@
 package sbc
 
-// The synthesis filterbank's constant tables.
-//
 // Taken from FFmpeg's libavcodec/sbcdec_data.h, which descends from the bluez sbc library:
 //
 //	Copyright (C) 2017       Aurelien Jacobs <aurel@gnuage.org>
@@ -11,18 +9,7 @@ package sbc
 //	Copyright (C) 2005-2006  Brad Midgley <bmidgley@xmission.com>
 //
 //	Licensed under the GNU Lesser General Public License, version 2.1 or later.
-//
-// Copied rather than computed. The prototype window is a normative table in the A2DP
-// specification with no formula that reproduces it, and the matrices here are not the plain cosine
-// either — they are folded to match the loop in synthesis.go, so deriving them would mean deriving
-// the folding as well. A window that is close but not identical gives audio that is quietly wrong
-// rather than obviously broken, which is not worth the risk to save a table.
-//
-// Held as the source writes them, unshifted, so they can be read against it line by line. The
-// shifts the source applies with its SS4/SS8/SN4/SN8 macros are applied once in shifted().
 
-// proto4m0 and proto4m1 are the 40-coefficient window for four subbands, split into the two halves
-// the loop consumes in step.
 var proto4m0 = shifted(12, []uint32{
 	0x00000000, 0xffa6982f, 0xfba93848, 0x0456c7b8,
 	0x005967d1, 0xfffb9ac7, 0xff589157, 0xf9c2a8d8,
@@ -39,7 +26,6 @@ var proto4m1 = shifted(12, []uint32{
 	0x027c1434, 0xf9c2a8d8, 0xff589157, 0xfffb9ac7,
 })
 
-// proto8m0 and proto8m1 are the same for eight subbands, 80 coefficients.
 var proto8m0 = shifted(14, []uint32{
 	0x00000000, 0xfe8d1970, 0xee979f00, 0x11686100,
 	0x0172e690, 0xfff5bd1a, 0xfdf1c8d4, 0xeac182c0,
@@ -66,12 +52,9 @@ var proto8m1 = shifted(14, []uint32{
 	0x0d9daee0, 0xeac182c0, 0xfdf1c8d4, 0xfff5bd1a,
 })
 
-// matrixShift is what the source's SN4 and SN8 macros come to: val >> (11 + 1 + extraBits). C shifts
-// bind looser than the addition, which is worth saying because reading it the other way gives a
-// different number.
+// The source's SN4 and SN8: val >> (11 + 1 + extraBits).
 const matrixShift = 11 + 1 + extraBits
 
-// synMatrix4 is the 8x4 folded cosine matrix for four subbands.
 var synMatrix4 = folded(matrixShift, 4, []uint32{
 	0x05a82798, 0xfa57d868, 0xfa57d868, 0x05a82798,
 	0x030fbc54, 0xf89be510, 0x07641af0, 0xfcf043ac,
@@ -83,7 +66,6 @@ var synMatrix4 = folded(matrixShift, 4, []uint32{
 	0xf89be510, 0xfcf043ac, 0x030fbc54, 0x07641af0,
 })
 
-// synMatrix8 is the 16x8 for eight subbands.
 var synMatrix8 = folded(matrixShift, 8, []uint32{
 	0x05a82798, 0xfa57d868, 0xfa57d868, 0x05a82798, 0x05a82798, 0xfa57d868, 0xfa57d868, 0x05a82798,
 	0x0471ced0, 0xf8275a10, 0x018f8b84, 0x06a6d988, 0xf9592678, 0xfe70747c, 0x07d8a5f0, 0xfb8e3130,
@@ -103,7 +85,6 @@ var synMatrix8 = folded(matrixShift, 8, []uint32{
 	0xf9592678, 0x018f8b84, 0x07d8a5f0, 0x0471ced0, 0xfb8e3130, 0xf8275a10, 0xfe70747c, 0x06a6d988,
 })
 
-// shifted reads the constants as signed and applies the source's scaling, once.
 func shifted(by uint, raw []uint32) []int32 {
 	out := make([]int32, len(raw))
 	for i, v := range raw {
@@ -112,7 +93,6 @@ func shifted(by uint, raw []uint32) []int32 {
 	return out
 }
 
-// folded is the same for a table written flat and used as rows.
 func folded(by uint, wide int, raw []uint32) [][]int32 {
 	flat := shifted(by, raw)
 

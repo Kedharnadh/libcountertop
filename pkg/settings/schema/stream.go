@@ -4,7 +4,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/say"
 )
 
-// Stream is a kind of sound, each with its own level.
 type Stream string
 
 const (
@@ -15,7 +14,6 @@ const (
 	StreamFeedback Stream = "feedback"
 )
 
-// Label is how the setting is shown.
 func (s Stream) Label() string {
 	switch s {
 	case StreamMain:

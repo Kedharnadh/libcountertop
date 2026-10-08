@@ -6,7 +6,6 @@ import (
 	"math"
 )
 
-// Feedback redraws src into dst zoomed by scale and turned by rot about (cx, cy), faded by keep.
 func Feedback(dst, src *image.RGBA, cx, cy, scale, rot, keep float32) {
 	b := dst.Bounds()
 	W, H := b.Dx(), b.Dy()
@@ -38,7 +37,6 @@ func Feedback(dst, src *image.RGBA, cx, cy, scale, rot, keep float32) {
 	}
 }
 
-// Fade scales every pixel by keep, the canvas's translucent black fill over the last frame.
 func Fade(img *image.RGBA, keep float32) {
 	k := uint32(max(min(keep, 1), 0) * 256)
 	p := img.Pix
@@ -49,7 +47,6 @@ func Fade(img *image.RGBA, keep float32) {
 	}
 }
 
-// AddScaled adds src, scaled up to dst's size, onto dst.
 func AddScaled(dst, src *image.RGBA) {
 	b, sb := dst.Bounds(), src.Bounds()
 	W, H, sw, sh := b.Dx(), b.Dy(), sb.Dx(), sb.Dy()
@@ -74,7 +71,6 @@ func AddScaled(dst, src *image.RGBA) {
 	}
 }
 
-// Ring strokes a circle.
 func Ring(img *image.RGBA, cx, cy, r, width float32, c color.NRGBA, additive bool) {
 	n := max(int(r*0.8), 24)
 	pts := make([]float32, 0, (n+1)*2)

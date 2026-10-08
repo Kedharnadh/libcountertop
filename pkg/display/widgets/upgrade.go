@@ -1,11 +1,13 @@
 package widgets
 
 import (
-	gogui "github.com/go-gui-org/go-gui/gui"
-	"github.com/ygelfand/libcountertop/pkg/display/theme"
-	"github.com/ygelfand/libcountertop/pkg/say"
 	"math"
 	"time"
+
+	gogui "github.com/go-gui-org/go-gui/gui"
+
+	"github.com/ygelfand/libcountertop/pkg/display/theme"
+	"github.com/ygelfand/libcountertop/pkg/say"
 )
 
 const UpgradePriority = 200

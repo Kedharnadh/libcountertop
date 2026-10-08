@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	esphome "github.com/ygelfand/go-esphome-device"
+
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
@@ -16,7 +17,6 @@ type Choice struct {
 	Save   func(string) error
 }
 
-// Choices binds translated enum labels to a product's typed config writer.
 func Choices[T interface{ Label() string }](values []T, save func(T) error) Choice {
 	values = slices.Clone(values)
 	labels := make([]string, len(values))
@@ -46,7 +46,6 @@ type controlOptions struct {
 	Redraw                           func()
 }
 
-// Controls owns the stable dashboard entity identities and their command/save/publication flow.
 type Controls struct {
 	preferences                       Preferences
 	mu                                sync.Mutex
@@ -64,12 +63,27 @@ func newControls(options controlOptions) *Controls {
 	}{
 		{"clock_format", "Clock format", "mdi:clock-outline", options.Hours, &c.Format},
 		{"clock_face", "Clock face", "mdi:clock-digital", options.Face, &c.Face},
-		{"clock_position", "Clock position", "mdi:align-vertical-center", options.Position, &c.Position},
+		{
+			"clock_position",
+			"Clock position",
+			"mdi:align-vertical-center",
+			options.Position,
+			&c.Position,
+		},
 		{"clock_size", "Clock size", "mdi:format-size", options.Size, &c.Size},
 		{"clock_color", "Clock color", "mdi:palette-outline", options.Ink, &c.Ink},
 	}
 	for _, binding := range selects {
-		entity := &esphome.Select{Base: esphome.Base{ObjectID: binding.id, Name: binding.name, Icon: binding.icon, Category: esphome.CategoryConfig, DeviceID: options.DeviceID}, Options: slices.Clone(binding.choice.Labels)}
+		entity := &esphome.Select{
+			Base: esphome.Base{
+				ObjectID: binding.id,
+				Name:     binding.name,
+				Icon:     binding.icon,
+				Category: esphome.CategoryConfig,
+				DeviceID: options.DeviceID,
+			},
+			Options: slices.Clone(binding.choice.Labels),
+		}
 		entity.OnCommand = func(label string) {
 			if !slices.Contains(entity.Options, label) {
 				return
@@ -78,7 +92,15 @@ func newControls(options controlOptions) *Controls {
 		}
 		*binding.target = entity
 	}
-	c.Date = &esphome.Switch{Base: esphome.Base{ObjectID: "clock_date", Name: "Clock date", Icon: "mdi:calendar-blank-outline", Category: esphome.CategoryConfig, DeviceID: options.DeviceID}}
+	c.Date = &esphome.Switch{
+		Base: esphome.Base{
+			ObjectID: "clock_date",
+			Name:     "Clock date",
+			Icon:     "mdi:calendar-blank-outline",
+			Category: esphome.CategoryConfig,
+			DeviceID: options.DeviceID,
+		},
+	}
 	c.Date.OnCommand = func(on bool) { c.Commit(c.Date.ObjectID, func() error { return options.Date(on) }) }
 	return c
 }
@@ -102,9 +124,6 @@ func (c *Controls) publish(state State) {
 	c.Date.Set(state.Date)
 }
 
-// Commit publishes a fresh active snapshot, including when a save reports a post-rename error.
-// Persistence runs outside the publication lock; concurrent writers cannot publish an old snapshot
-// after a newer one because Read happens within that lock.
 func (c *Controls) Commit(setting string, save func() error) {
 	before := c.options.Read()
 	err := save()
@@ -133,35 +152,79 @@ type Dependencies struct {
 
 func (p Preferences) State() State {
 	s, c := p.Screen.Read(), p.Clock.Read()
-	return State{Hours: s.Hours.Label(), Face: c.Face.Label(), Position: c.Position.Label(), Size: c.Size.Label(), Ink: c.Ink.Label(), Date: c.Date}
+	return State{
+		Hours:    s.Hours.Label(),
+		Face:     c.Face.Label(),
+		Position: c.Position.Label(),
+		Size:     c.Size.Label(),
+		Ink:      c.Ink.Label(),
+		Date:     c.Date,
+	}
 }
 func NewControls(d Dependencies) *Controls {
 	p := d.Preferences
-	c := newControls(controlOptions{DeviceID: d.DeviceID, Read: p.State, Redraw: d.Display.Redraw,
-		Hours:    Choices(schema.HourFormats(), func(v schema.HourFormat) error { return p.Screen.Update(func(s *schema.Screen) { s.Hours = v }) }),
-		Face:     Choices(schema.Faces(), func(v schema.Face) error { return p.Clock.Update(func(s *schema.Clock) { s.Face = v }) }),
-		Position: Choices(schema.Positions(), func(v schema.Position) error { return p.Clock.Update(func(s *schema.Clock) { s.Position = v }) }),
-		Size:     Choices(schema.Sizes(), func(v schema.Size) error { return p.Clock.Update(func(s *schema.Clock) { s.Size = v }) }),
-		Ink:      Choices(schema.Inks(), func(v schema.Ink) error { return p.Clock.Update(func(s *schema.Clock) { s.Ink = v }) }),
-		Date:     func(v bool) error { return p.Clock.Update(func(s *schema.Clock) { s.Date = v }) }})
+	c := newControls(controlOptions{
+		DeviceID: d.DeviceID,
+		Read:     p.State,
+		Redraw:   d.Display.Redraw,
+		Hours: Choices(
+			schema.HourFormats(),
+			func(v schema.HourFormat) error { return p.Screen.Update(func(s *schema.Screen) { s.Hours = v }) },
+		),
+		Face: Choices(
+			schema.Faces(),
+			func(v schema.Face) error { return p.Clock.Update(func(s *schema.Clock) { s.Face = v }) },
+		),
+		Position: Choices(
+			schema.Positions(),
+			func(v schema.Position) error { return p.Clock.Update(func(s *schema.Clock) { s.Position = v }) },
+		),
+		Size: Choices(
+			schema.Sizes(),
+			func(v schema.Size) error { return p.Clock.Update(func(s *schema.Clock) { s.Size = v }) },
+		),
+		Ink: Choices(
+			schema.Inks(),
+			func(v schema.Ink) error { return p.Clock.Update(func(s *schema.Clock) { s.Ink = v }) },
+		),
+		Date: func(v bool) error { return p.Clock.Update(func(s *schema.Clock) { s.Date = v }) },
+	})
 	c.preferences = p
 	return c
 }
 func (c *Controls) SetHours(v schema.HourFormat) {
-	c.Commit("clock_format", func() error { return c.preferences.Screen.Update(func(s *schema.Screen) { s.Hours = v }) })
+	c.Commit(
+		"clock_format",
+		func() error { return c.preferences.Screen.Update(func(s *schema.Screen) { s.Hours = v }) },
+	)
 }
 func (c *Controls) SetFace(v schema.Face) {
-	c.Commit("clock_face", func() error { return c.preferences.Clock.Update(func(s *schema.Clock) { s.Face = v }) })
+	c.Commit(
+		"clock_face",
+		func() error { return c.preferences.Clock.Update(func(s *schema.Clock) { s.Face = v }) },
+	)
 }
 func (c *Controls) SetPosition(v schema.Position) {
-	c.Commit("clock_position", func() error { return c.preferences.Clock.Update(func(s *schema.Clock) { s.Position = v }) })
+	c.Commit(
+		"clock_position",
+		func() error { return c.preferences.Clock.Update(func(s *schema.Clock) { s.Position = v }) },
+	)
 }
 func (c *Controls) SetSize(v schema.Size) {
-	c.Commit("clock_size", func() error { return c.preferences.Clock.Update(func(s *schema.Clock) { s.Size = v }) })
+	c.Commit(
+		"clock_size",
+		func() error { return c.preferences.Clock.Update(func(s *schema.Clock) { s.Size = v }) },
+	)
 }
 func (c *Controls) SetInk(v schema.Ink) {
-	c.Commit("clock_color", func() error { return c.preferences.Clock.Update(func(s *schema.Clock) { s.Ink = v }) })
+	c.Commit(
+		"clock_color",
+		func() error { return c.preferences.Clock.Update(func(s *schema.Clock) { s.Ink = v }) },
+	)
 }
 func (c *Controls) SetDate(v bool) {
-	c.Commit("clock_date", func() error { return c.preferences.Clock.Update(func(s *schema.Clock) { s.Date = v }) })
+	c.Commit(
+		"clock_date",
+		func() error { return c.preferences.Clock.Update(func(s *schema.Clock) { s.Date = v }) },
+	)
 }

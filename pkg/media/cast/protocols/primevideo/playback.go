@@ -9,11 +9,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/ygelfand/libcountertop/pkg/media/cast/preferences"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/ygelfand/libcountertop/pkg/media/cast/preferences"
 )
 
 const (
@@ -62,7 +63,12 @@ func address(host, path string, query [][2]string) string {
 	return host + path + "?" + v.Encode()
 }
 
-func RefreshEnvelope(ctx context.Context, hc *http.Client, a Account, title, correlation string) (Envelope, error) {
+func RefreshEnvelope(
+	ctx context.Context,
+	hc *http.Client,
+	a Account,
+	title, correlation string,
+) (Envelope, error) {
 	target := address(PlaybackHost, "/playback/tags/getRefreshedPlaybackEnvelope", [][2]string{
 		{"deviceID", a.Device}, {"deviceTypeID", DeviceType}, {"gascEnabled", "true"},
 		{"marketplaceID", a.Marketplace}, {"firmware", "1"}, {"version", "1"}, {"nerid", nerid()},
@@ -90,7 +96,13 @@ func RefreshEnvelope(ctx context.Context, hc *http.Client, a Account, title, cor
 	return Envelope{Envelope: e.Envelope, Correlation: e.Correlation}, nil
 }
 
-func VodResources(ctx context.Context, hc *http.Client, a Account, s Screen, title, envelope string) (Resources, error) {
+func VodResources(
+	ctx context.Context,
+	hc *http.Client,
+	a Account,
+	s Screen,
+	title, envelope string,
+) (Resources, error) {
 	target := address(ZazHost, "/playback/prs/GetVodPlaybackResources", [][2]string{
 		{"deviceID", a.Device}, {"deviceTypeID", DeviceType}, {"gascEnabled", "true"},
 		{"marketplaceID", a.Marketplace}, {"uxLocale", a.Locale}, {"firmware", "1"},
@@ -101,10 +113,13 @@ func VodResources(ctx context.Context, hc *http.Client, a Account, s Screen, tit
 			"deviceCapabilityFamily": "WebPlayer",
 			"playbackEnvelope":       envelope,
 			"capabilityDiscriminators": map[string]any{
-				"operatingSystem":   map[string]string{"name": "Android", "version": "11.0"},
-				"deviceModel":       map[string]string{"name": deviceModel, "version": "UNKNOWN"},
-				"middleware":        map[string]string{"name": "Chrome", "version": "92.0.4515.0"},
-				"nativeApplication": map[string]string{"name": "CAF Receiver SDK", "version": "3.0.0137"},
+				"operatingSystem": map[string]string{"name": "Android", "version": "11.0"},
+				"deviceModel":     map[string]string{"name": deviceModel, "version": "UNKNOWN"},
+				"middleware":      map[string]string{"name": "Chrome", "version": "92.0.4515.0"},
+				"nativeApplication": map[string]string{
+					"name":    "CAF Receiver SDK",
+					"version": "3.0.0137",
+				},
 				"firmware":          map[string]string{"name": "UNKNOWN", "version": firmware},
 				"hfrControlMode":    "Legacy",
 				"displayResolution": map[string]int{"height": s.Height, "width": s.Width},
@@ -113,9 +128,11 @@ func VodResources(ctx context.Context, hc *http.Client, a Account, s Screen, tit
 		"auditPingsRequest":                 map[string]any{},
 		"widevineServiceCertificateRequest": map[string]any{},
 		"playbackDataRequest":               map[string]any{},
-		"timedTextUrlsRequest":              map[string]any{"supportedTimedTextFormats": []string{"TTMLv2", "DFXP"}},
-		"trickplayUrlsRequest":              map[string]any{},
-		"transitionTimecodesRequest":        map[string]any{},
+		"timedTextUrlsRequest": map[string]any{
+			"supportedTimedTextFormats": []string{"TTMLv2", "DFXP"},
+		},
+		"trickplayUrlsRequest":       map[string]any{},
+		"transitionTimecodesRequest": map[string]any{},
 		"vodPlaybackUrlsRequest": map[string]any{
 			"device": map[string]any{
 				"hdcpLevel":                      "1.4",
@@ -132,16 +149,22 @@ func VodResources(ctx context.Context, hc *http.Client, a Account, s Screen, tit
 					"frameRates":                       []string{"Standard"},
 					"stitchType":                       "MultiPeriod",
 					"segmentInfoType":                  "Base",
-					"timedTextRepresentations":         []string{"NotInManifestNorStream", "SeparateStreamInManifest"},
-					"trickplayRepresentations":         []string{"NotInManifestNorStream"},
-					"variableAspectRatio":              "unsupported",
+					"timedTextRepresentations": []string{
+						"NotInManifestNorStream",
+						"SeparateStreamInManifest",
+					},
+					"trickplayRepresentations": []string{"NotInManifestNorStream"},
+					"variableAspectRatio":      "unsupported",
 				}},
 				"displayWidth":  s.Width,
 				"displayHeight": s.Height,
 			},
 			"ads": map[string]any{
-				"sitePageUrl":                       "https://cloudfront.xp-assets.aiv-cdn.net/packages/ATVGCastReceiver-1.0/prod/index.html",
-				"gdpr":                              map[string]any{"enabled": false, "consentMap": map[string]any{}},
+				"sitePageUrl": "https://cloudfront.xp-assets.aiv-cdn.net/packages/ATVGCastReceiver-1.0/prod/index.html",
+				"gdpr": map[string]any{
+					"enabled":    false,
+					"consentMap": map[string]any{},
+				},
 				"mainContentResumeOffsetHintMillis": 0,
 			},
 			"playbackCustomizations": map[string]any{},
@@ -151,7 +174,9 @@ func VodResources(ctx context.Context, hc *http.Client, a Account, s Screen, tit
 			},
 		},
 		"vodXrayMetadataRequest": map[string]string{
-			"xrayDeviceClass": "normal", "xrayPlaybackMode": "playback", "xrayToken": "XRAY_WEB_2023_V2",
+			"xrayDeviceClass":  "normal",
+			"xrayPlaybackMode": "playback",
+			"xrayToken":        "XRAY_WEB_2023_V2",
 		},
 	}
 	var out struct {
@@ -171,7 +196,8 @@ func VodResources(ctx context.Context, hc *http.Client, a Account, s Screen, tit
 	if err := postText(ctx, hc, target, a.Token, body, &out); err != nil {
 		return Resources{}, fmt.Errorf("prime video: playback resources: %w", err)
 	}
-	if out.Vod == nil || out.Vod.Result == nil || out.Vod.Result.URLs == nil || len(out.Vod.Result.URLs.Sets) == 0 {
+	if out.Vod == nil || out.Vod.Result == nil || out.Vod.Result.URLs == nil ||
+		len(out.Vod.Result.URLs.Sets) == 0 {
 		var why string
 		if out.Vod != nil {
 			why = string(out.Vod.Error)
@@ -246,7 +272,13 @@ func Manifest(ctx context.Context, hc *http.Client, target string) ([]byte, erro
 	return data, nil
 }
 
-func License(ctx context.Context, hc *http.Client, a Account, title, envelope, handoff string, challenge []byte) ([]byte, error) {
+func License(
+	ctx context.Context,
+	hc *http.Client,
+	a Account,
+	title, envelope, handoff string,
+	challenge []byte,
+) ([]byte, error) {
 	target := address(ZazHost, "/playback/drm-vod/GetWidevineLicense", [][2]string{
 		{"deviceID", a.Device}, {"deviceTypeID", DeviceType}, {"gascEnabled", "true"},
 		{"marketplaceID", a.Marketplace}, {"uxLocale", a.Locale}, {"firmware", "1"},
@@ -299,11 +331,29 @@ func Fetch(ctx context.Context, hc *http.Client, target string, from, to int64) 
 	return io.ReadAll(io.LimitReader(resp.Body, to-from+1))
 }
 
-func Catalog(ctx context.Context, hc *http.Client, a Account, title string) (name, series string, err error) {
+func Catalog(
+	ctx context.Context,
+	hc *http.Client,
+	a Account,
+	title string,
+) (name, series string, err error) {
 	target := address(PlaybackHost, "/cdp/lumina/playerChromeResources/v1", [][2]string{
-		{"deviceID", a.Device}, {"deviceTypeID", DeviceType}, {"gascEnabled", "true"},
-		{"marketplaceID", a.Marketplace}, {"uxLocale", a.Locale}, {"desiredResources", "catalogMetadataV2"},
-		{"entityId", title}, {"firmware", "1"}, {"widgetScheme", "pvplayer-web-v2"}, {"nerid", nerid()},
+		{"deviceID", a.Device},
+		{"deviceTypeID", DeviceType},
+		{"gascEnabled", "true"},
+		{
+			"marketplaceID",
+			a.Marketplace,
+		},
+		{"uxLocale", a.Locale},
+		{"desiredResources", "catalogMetadataV2"},
+		{
+			"entityId",
+			title,
+		},
+		{"firmware", "1"},
+		{"widgetScheme", "pvplayer-web-v2"},
+		{"nerid", nerid()},
 	})
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {

@@ -22,28 +22,13 @@ import (
 )
 
 const (
-
-	// pace is how often the stream looks to see whether the queue has room.
 	pace = 100 * time.Millisecond
 
-	// chunk is how much is taken off the wire at once, about a sixth of a second.
 	chunk = 32 * 1024
 
-	// stall is how long one read may produce nothing before the track is given up on.
 	stall = 30 * time.Second
 )
 
-// frame is one sample on every channel.
-
-// Stream plays a url through the speaker. Home Assistant converts the source with ffmpeg first, so
-// what arrives is a WAV header followed by samples already at the playback rate: no decoder here,
-// and nothing to resample.
-//
-// It streams rather than downloading. A track runs for minutes and the device has no room for one,
-// so it keeps a second or so ahead of the speaker and reads no faster than it plays.
-//
-// It is the speaker driver's background: a reply or an announcement takes the speaker and this
-// yields, carrying on from where it was rather than starting again.
 type Stream struct {
 	lifecycle sync.Mutex
 	running   bool
@@ -53,51 +38,29 @@ type Stream struct {
 	parent    context.Context
 	changed   func()
 
-	// bg is the queue of things that play for minutes. A track joins it while it has something to
-	// play and leaves when it stops, so whatever it interrupted carries on afterwards.
 	bg Arbitration
 
 	mu    sync.Mutex
 	track *track
 
-	// down is where the arbiter last said this stream stands. It is told in full whenever anything
-	// moves, so it is a copy of the answer rather than a tally of what has happened: nothing here has
-	// to be undone as many times as it was done.
 	down   bool
 	paused bool
 
-	// gate is closed to let the stream carry on, and non-nil for as long as it may not.
 	gate chan struct{}
 
-	// rewind is what was queued but not heard when the speaker was taken away, put back at the
-	// front when playing resumes so the track carries on rather than jumping forward.
 	rewind []int16
 
-	// write is held while samples go into the queue, so taking the queue away cannot be followed by
-	// the stream refilling it behind the sound that displaced it.
 	write sync.Mutex
 
-	// gain is what queue is multiplying by and target is what it is heading for, both under write
-	// alongside the samples they scale. Moving rather than jumping: a step change of 15 dB is a click,
-	// and a ramp over a few tens of milliseconds is what makes it sound deliberate.
 	gain, target float32
 }
 
-// track is one thing being played. Identity is the point: a track that has been replaced knows not
-// to report itself finished.
 type track struct {
-	// item names it in the log, and sounds is what is being generated when it is not a url.
 	item   string
 	sounds []string
 	cancel context.CancelFunc
 }
 
-// NewStream builds the stream and joins the speaker's backgrounds. changed is called whenever what it
-// is doing changes, which is what tells Home Assistant.
-//
-// It joins rather than registers: a track is one of several things that play for minutes, and it only
-// takes the speaker while it has something to play.
-// New constructs a bounded PCM stream using the supplied speaker and arbiter.
 func New(options Options) *Stream {
 	if options.Rate <= 0 {
 		options.Rate = 48000
@@ -111,7 +74,16 @@ func New(options Options) *Stream {
 	if options.DuckDB == nil {
 		options.DuckDB = func() float64 { return ducking.DefaultDB }
 	}
-	return &Stream{options: options, out: options.Sink, bg: options.Arbitration, changed: options.Changed, gain: 1, target: 1, parent: context.Background(), running: true}
+	return &Stream{
+		options: options,
+		out:     options.Sink,
+		bg:      options.Arbitration,
+		changed: options.Changed,
+		gain:    1,
+		target:  1,
+		parent:  context.Background(),
+		running: true,
+	}
 }
 func (m *Stream) Start(ctx context.Context) {
 	m.lifecycle.Lock()
@@ -132,7 +104,6 @@ func (m *Stream) Close() error {
 	return nil
 }
 
-// Duck lowers background music during a voice turn without pausing playback.
 func (m *Stream) Duck(on bool) {
 	if m == nil {
 		return
@@ -146,10 +117,6 @@ func (m *Stream) Duck(on bool) {
 	m.write.Unlock()
 }
 
-// Play starts a url, replacing whatever was playing.
-//
-// It does not take the speaker from a reply or an announcement that is sounding. Those are seconds
-// long and end on their own, and the track waits behind them rather than talking over them.
 func (m *Stream) Play(url string) {
 	if m == nil {
 		slog.Warn("asked to play media with no speaker", "url", url)
@@ -172,9 +139,6 @@ func (m *Stream) Play(url string) {
 	})
 }
 
-// PlayNoise runs generated sound instead of a url, and does not stop until it is stopped: that is the
-// point of it. Everything else about it is a track, so a turn ducks it, the buttons set its level and
-// the media player reports it.
 func (m *Stream) PlayNoise(sounds ...string) {
 	if m == nil {
 		slog.Warn("asked to play noise with no speaker", "sounds", sounds)
@@ -203,8 +167,6 @@ func (m *Stream) PlayNoise(sounds ...string) {
 	})
 }
 
-// Noise is what is being generated, empty when what is playing came from somewhere else. It is what
-// keeps the entities honest when a track or a stop displaces the noise.
 func (m *Stream) Noise() []string {
 	if m == nil {
 		return nil
@@ -218,7 +180,6 @@ func (m *Stream) Noise() []string {
 	return slices.Clone(m.track.sounds)
 }
 
-// start makes a track the one being played, dropping whatever was.
 func (m *Stream) start(t *track) (*track, context.Context) {
 	m.lifecycle.Lock()
 	m.mu.Lock()
@@ -242,8 +203,6 @@ func (m *Stream) start(t *track) (*track, context.Context) {
 	return t, ctx
 }
 
-// Pause stops the track where it is. What was queued but not heard is kept, so resuming does not
-// skip it.
 func (m *Stream) Pause() {
 	if m == nil {
 		return
@@ -258,15 +217,12 @@ func (m *Stream) Pause() {
 	m.regate()
 	m.mu.Unlock()
 
-	// Asked of the arbiter rather than of this stream's own standing: what is queued is only ours to
-	// put aside while nothing else is being heard.
 	if m.bg.Owns(m) {
 		m.keep()
 	}
 	m.changed()
 }
 
-// Unpause carries on from where Pause stopped.
 func (m *Stream) Unpause() {
 	if m == nil {
 		return
@@ -284,7 +240,6 @@ func (m *Stream) Unpause() {
 	m.changed()
 }
 
-// Stop ends the track. There is nothing to come back to afterwards.
 func (m *Stream) Stop() {
 	if m == nil {
 		return
@@ -306,8 +261,6 @@ func (m *Stream) Stop() {
 	m.changed()
 }
 
-// Stand implements speaker.Producer: the arbiter says whether this stream may be heard. The same
-// standing arriving twice is the arbiter repeating itself, not a second thing wanting the speaker.
 func (m *Stream) Stand(down bool) {
 	if m == nil {
 		return
@@ -324,16 +277,11 @@ func (m *Stream) Stand(down bool) {
 	}
 	m.mu.Unlock()
 
-	// Only on the way down, and only with a track: what is queued is this stream's to put aside then,
-	// and taking it at any other time would be taking someone else's.
 	if take {
 		m.keep()
 	}
 }
 
-// Playing reports whether a track is loaded and not paused, which is what Home Assistant is told.
-// A track that is only waiting for a reply to finish is still playing: it is going to carry on
-// without anyone asking it to.
 func (m *Stream) Playing() (playing, paused bool) {
 	if m == nil {
 		return false, false
@@ -344,10 +292,6 @@ func (m *Stream) Playing() (playing, paused bool) {
 	return m.track != nil && !m.paused, m.track != nil && m.paused
 }
 
-// block and unblock hold and release the stream. Both want mu.
-// regate opens the gate when nothing wants this stream quiet and closes it when anything does. Every
-// reason is a state of its own, so this can be worked out again at any time rather than having to be
-// arrived at by the right sequence of steps. Called with mu held.
 func (m *Stream) regate() {
 	if m.down || m.paused {
 		m.block()
@@ -369,8 +313,6 @@ func (m *Stream) unblock() {
 	}
 }
 
-// flush throws away audio that is ours to throw away. While something else holds the speaker the
-// queue belongs to it, and emptying it would cut off a reply.
 func (m *Stream) flush() {
 	if !m.bg.Owns(m) {
 		return
@@ -381,15 +323,12 @@ func (m *Stream) flush() {
 	m.out.Drain()
 }
 
-// keep empties the queue and remembers what was in it. Taken rather than dropped: this is the
-// middle of a song, and what has not been heard is where playing has to start again from.
 func (m *Stream) keep() {
 	m.write.Lock()
 	defer m.write.Unlock()
 
 	kept := m.out.Take()
 	if len(kept) == 0 {
-		// Anything already stashed is still what has not been heard.
 		return
 	}
 
@@ -398,7 +337,6 @@ func (m *Stream) keep() {
 	m.mu.Unlock()
 }
 
-// replay puts back what Suspend took, once the speaker is ours again.
 func (m *Stream) replay() {
 	m.write.Lock()
 	defer m.write.Unlock()
@@ -415,7 +353,6 @@ func (m *Stream) replay() {
 	m.out.Play(back)
 }
 
-// finished clears the track once it has played out, unless it has already been replaced.
 func (m *Stream) finished(t *track) {
 	m.mu.Lock()
 	if m.track != t {
@@ -438,11 +375,7 @@ func (t *track) stop() {
 	}
 }
 
-// run fetches the url and feeds it to the speaker as it arrives.
 func (m *Stream) run(ctx context.Context, t *track, url string) error {
-	// No timeout on the client: a track takes as long as it takes. What is bounded is a single read,
-	// because a wedged connection otherwise holds the track open for as long as the kernel keeps
-	// retrying — minutes of a player reporting that it is playing while nothing comes out.
 	fetch, giveUp := context.WithCancel(ctx)
 	defer giveUp()
 
@@ -475,8 +408,6 @@ func (m *Stream) run(ctx context.Context, t *track, url string) error {
 			return err
 		}
 
-		// Armed only around the read: a track waiting for a turn to finish is not stalled, and
-		// counting that time would end it for being interrupted.
 		watchdog := time.AfterFunc(stall, giveUp)
 		n, err := io.ReadFull(body, buf)
 		watchdog.Stop()
@@ -497,7 +428,6 @@ func (m *Stream) run(ctx context.Context, t *track, url string) error {
 	}
 }
 
-// wait holds the stream until it may play and the queue has room for more.
 func (m *Stream) wait(ctx context.Context) error {
 	for {
 		m.mu.Lock()
@@ -526,8 +456,6 @@ func (m *Stream) wait(ctx context.Context) error {
 	}
 }
 
-// settle waits for what has been queued to play out, so the track is not reported finished while
-// the last of it is still sounding.
 func (m *Stream) settle(ctx context.Context) error {
 	for {
 		if err := m.wait(ctx); err != nil {
@@ -545,10 +473,6 @@ func (m *Stream) settle(ctx context.Context) error {
 	}
 }
 
-// generate feeds the speaker from a generator instead of a socket, for as long as the track lasts.
-// Both channels get the same samples: one enclosure, one driver.
-//
-// The buffer is filled again each time round, so queue is free to scale it in place on its way out.
 func (m *Stream) generate(ctx context.Context, t *track, fill noise.Fill) error {
 	mono := make([]float32, chunk/(m.options.Channels*2))
 	samples := make([]int16, len(mono)*m.options.Channels)
@@ -577,13 +501,6 @@ func (m *Stream) feed(t *track, pcm []byte) {
 	m.queue(t, samples)
 }
 
-// queue hands samples over, unless the speaker was taken away in the meantime or this is no longer
-// the track being played.
-//
-// The track has to be checked as well as the gate. Stopping opens the gate to release the goroutine
-// waiting on it, and what that goroutine does next is read whatever the socket already holds — so
-// without this it can put a chunk of a track that has been stopped into a queue that was just
-// flushed, and the speaker plays it.
 func (m *Stream) queue(t *track, samples []int16) {
 	m.write.Lock()
 	defer m.write.Unlock()
@@ -599,9 +516,6 @@ func (m *Stream) queue(t *track, samples []int16) {
 	m.out.Play(samples)
 }
 
-// Requeue ducks what is already queued, which is up to a second of music the room would otherwise hear
-// at full volume before anything scaled on its way in. Only the track is in there: a chime is mixed in
-// after ducking, and so keeps its own level rather than fading with what is underneath it.
 func (m *Stream) Requeue() {
 	m.write.Lock()
 	defer m.write.Unlock()
@@ -609,11 +523,6 @@ func (m *Stream) Requeue() {
 	m.out.Adjust(m.attenuate)
 }
 
-// attenuate applies the duck, moving towards the target rather than jumping to it. Wants write, which
-// queue already holds.
-//
-// It rewrites the caller's slice, which is only ever a buffer feed just decoded. What replay puts back
-// has been through here already and must not be scaled twice.
 func (m *Stream) attenuate(samples []int16) {
 	if m.gain == 1 && m.target == 1 {
 		return
@@ -631,12 +540,7 @@ func (m *Stream) attenuate(samples []int16) {
 	}
 }
 
-// header reads past the WAV header and leaves the reader on the first sample.
-//
-// Home Assistant streams the file as ffmpeg produces it, which means the sizes in the header were
-// written before the length was known: the data chunk runs until the connection ends, whatever it
-// claims. The format is worth checking, though — the wrong rate or channel count is a track played
-// at the wrong speed rather than an error anyone would see.
+// Home Assistant streams ffmpeg's WAV with header sizes written before the length was known.
 func Header(r *bufio.Reader, format Format) error {
 	var riff [12]byte
 	if _, err := io.ReadFull(r, riff[:]); err != nil {
@@ -658,8 +562,6 @@ func Header(r *bufio.Reader, format Format) error {
 			return nil
 		}
 
-		// Everything before the samples is a handful of bytes. A size larger than that is a stream
-		// that is not what it says it is, and allocating from it is how that becomes our problem.
 		if size > chunk {
 			return fmt.Errorf("%q chunk is %d bytes", id, size)
 		}
@@ -676,7 +578,6 @@ func Header(r *bufio.Reader, format Format) error {
 	}
 }
 
-// supported checks a fmt chunk against what the codec takes.
 func supported(fmtChunk []byte, format Format) error {
 	if len(fmtChunk) < 16 {
 		return fmt.Errorf("short fmt chunk: %d bytes", len(fmtChunk))
@@ -692,7 +593,6 @@ func supported(fmtChunk []byte, format Format) error {
 	return nil
 }
 
-// Sink is the PCM queue owned by the platform speaker.
 type Sink interface {
 	Play([]int16)
 	Take() []int16
@@ -703,7 +603,6 @@ type Sink interface {
 
 type Producer = background.Producer
 
-// Arbitration binds the platform's existing background speaker arbiter.
 type Arbitration interface {
 	Took(Producer)
 	Gave(Producer)

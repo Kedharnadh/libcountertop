@@ -10,17 +10,12 @@ import (
 	"time"
 )
 
-// Scanned is what the supplicant can see, strongest first, one entry per name. Several access
-// points share a name in any real building, and a name is what a person picks.
 func Scanned(ctx context.Context, c Conn) ([]Network, error) {
-	// FAIL-BUSY is the supplicant saying it is already scanning, which Android's framework has it
-	// doing on its own schedule. The results this waits for are the ones that scan produces.
+	// FAIL-BUSY: the supplicant is already scanning.
 	if out, err := c.Cmd("scan"); err != nil && !strings.Contains(out, "FAIL-BUSY") {
 		return nil, err
 	}
 
-	// Results arrive over a few seconds, so the list is read until it stops growing. An empty read
-	// is a scan still running rather than an answer, so it keeps waiting.
 	var best map[string]Network
 	for range 4 {
 		select {
@@ -52,7 +47,6 @@ func Scanned(ctx context.Context, c Conn) ([]Network, error) {
 	return networks, nil
 }
 
-// Configured is the names the supplicant already has.
 func Configured(c Conn) ([]string, error) {
 	out, err := c.Cmd("list_networks")
 	if err != nil {
@@ -61,8 +55,6 @@ func Configured(c Conn) ([]string, error) {
 	return ParseNetworks(out), nil
 }
 
-// Remove forgets every network with this name, so re-joining does not stack duplicates and a failed
-// attempt does not stay behind to be retried forever.
 func Remove(c Conn, ssid string) error {
 	out, err := c.Cmd("list_networks")
 	if err != nil {
@@ -83,10 +75,7 @@ func Remove(c Conn, ssid string) error {
 	return err
 }
 
-// Add configures a network and returns the supplicant's id for it, without enabling it.
-//
-// scan_ssid is set for every network, which costs an active probe and is what makes a hidden one
-// joinable at all — the only way onto those, since a scan never names them.
+// scan_ssid=1 is required to join a hidden network.
 func Add(c Conn, ssid, passphrase string) (string, error) {
 	out, err := c.Cmd("add_network")
 	if err != nil {
@@ -98,13 +87,10 @@ func Add(c Conn, ssid, passphrase string) (string, error) {
 		return "", fmt.Errorf("wpa: add_network said %q", strings.TrimSpace(out))
 	}
 
-	// Both values go over as hex, which wpa_supplicant takes unquoted. A name or passphrase written
-	// as a quoted string would cross two parsers on the way — the device shell, then
-	// wpa_supplicant's own — and every character that means something to either has to be reasoned
-	// about. Hex has no special characters, so there is nothing to reason about.
+	// wpa_supplicant takes ssid and psk as unquoted hex.
 	set := [][]string{{"ssid", hex.EncodeToString([]byte(ssid))}, {"scan_ssid", "1"}}
-	switch {
-	case passphrase == "":
+	switch passphrase {
+	case "":
 		set = append(set, []string{"key_mgmt", "NONE"})
 	default:
 		psk, err := Key(ssid, passphrase)
@@ -124,7 +110,6 @@ func Add(c Conn, ssid, passphrase string) (string, error) {
 	return id, nil
 }
 
-// Join adds a network and selects it. An empty passphrase means an open network.
 func Join(c Conn, ssid, passphrase string) error {
 	if err := Remove(c, ssid); err != nil {
 		return err
@@ -142,17 +127,11 @@ func Join(c Conn, ssid, passphrase string) error {
 		}
 	}
 
-	// The supplicant writes its own configuration, so the network survives a reboot and the daemon
-	// comes up on it. Assigning an address is somebody else's job.
 	_, err = c.Cmd("save_config")
 	return err
 }
 
-// Reconnect asks the supplicant to join a network it already has: one nothing is driving sits at
-// DISCONNECTED until something asks.
-//
-// REASSOCIATE rather than RECONNECT: RECONNECT only acts on a supplicant that was told to
-// DISCONNECT, and answers OK either way.
+// RECONNECT only acts after DISCONNECT and answers OK either way.
 func Reconnect(c Conn) error {
 	for _, cmd := range [][]string{{"enable_network", "all"}, {"reassociate"}} {
 		if _, err := c.Cmd(cmd...); err != nil {
@@ -162,7 +141,6 @@ func Reconnect(c Conn) error {
 	return nil
 }
 
-// WPS joins by push button, for a router that has one: no name to pick and no passphrase to type.
 func WPS(c Conn) error {
 	if _, err := c.Cmd("wps_pbc"); err != nil {
 		return err
@@ -171,7 +149,6 @@ func WPS(c Conn) error {
 	return err
 }
 
-// Status reads the current connection.
 func Status(c Conn) (State, error) {
 	out, err := c.Cmd("status")
 	if err != nil {
@@ -180,8 +157,6 @@ func Status(c Conn) (State, error) {
 	return ParseStatus(out), nil
 }
 
-// Wait blocks until the supplicant has joined this network. An empty ssid waits for any network,
-// which is all a WPS join can ask for.
 func Wait(ctx context.Context, c Conn, ssid string) (State, error) {
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()

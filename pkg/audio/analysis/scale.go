@@ -4,7 +4,6 @@ import (
 	"math"
 )
 
-// Scale multiplies samples in place, clamping rather than wrapping.
 func Scale(samples []int16, by float32) {
 	if by == 1 {
 		return

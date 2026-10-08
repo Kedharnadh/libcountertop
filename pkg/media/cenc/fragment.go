@@ -347,7 +347,13 @@ func (f *fragment) resolve(t Track, file []byte) ([]Sample, error) {
 	}
 	at := func(ticks int64) time.Duration {
 		s := int64(scale)
-		return time.Duration(ticks/s)*time.Second + time.Duration(ticks%s)*time.Second/time.Duration(s)
+		return time.Duration(
+			ticks/s,
+		)*time.Second + time.Duration(
+			ticks%s,
+		)*time.Second/time.Duration(
+			s,
+		)
 	}
 	aux := f.auxRecords(t, file)
 	out := make([]Sample, 0, len(f.samples))
@@ -444,7 +450,13 @@ func subsamples(b []byte) []Subsample {
 	b = b[2:]
 	out := make([]Subsample, 0, n)
 	for i := 0; i < n && len(b) >= 6; i++ {
-		out = append(out, Subsample{Clear: uint32(binary.BigEndian.Uint16(b)), Encrypted: binary.BigEndian.Uint32(b[2:])})
+		out = append(
+			out,
+			Subsample{
+				Clear:     uint32(binary.BigEndian.Uint16(b)),
+				Encrypted: binary.BigEndian.Uint32(b[2:]),
+			},
+		)
 		b = b[6:]
 	}
 	return out

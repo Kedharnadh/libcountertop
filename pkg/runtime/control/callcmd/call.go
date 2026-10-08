@@ -27,19 +27,50 @@ func State(controller *call.Calls, _ []string) (string, error) {
 	if !ok {
 		return "idle", nil
 	}
-	out := fmt.Sprintf("%s\t%s\t%s\tvideo=%v\tmuted=%v\tcamera_off=%v\t%s", c.State, c.Peer.Name, c.ID, c.Video, c.Muted, c.CameraOff, time.Since(c.Since).Round(time.Second))
+	out := fmt.Sprintf(
+		"%s\t%s\t%s\tvideo=%v\tmuted=%v\tcamera_off=%v\t%s",
+		c.State,
+		c.Peer.Name,
+		c.ID,
+		c.Video,
+		c.Muted,
+		c.CameraOff,
+		time.Since(c.Since).Round(time.Second),
+	)
 	st, ok := controller.Stats()
 	if !ok {
 		return out, nil
 	}
 	l := st.Link
-	out += fmt.Sprintf("\naudio\tsent=%d recv=%d lost=%d encode=%s", l.AudioSent, l.AudioRecv, l.AudioLost, l.EncodeAverage())
-	out += fmt.Sprintf("\nvideo\tsent=%d recv=%d keys=%d waiting=%d key_requests=%d key_asked=%d", l.VideoSent, l.VideoRecv, l.VideoKeys, l.VideoWaiting, l.KeysRequested, l.KeysAsked)
+	out += fmt.Sprintf(
+		"\naudio\tsent=%d recv=%d lost=%d encode=%s",
+		l.AudioSent,
+		l.AudioRecv,
+		l.AudioLost,
+		l.EncodeAverage(),
+	)
+	out += fmt.Sprintf(
+		"\nvideo\tsent=%d recv=%d keys=%d waiting=%d key_requests=%d key_asked=%d",
+		l.VideoSent,
+		l.VideoRecv,
+		l.VideoKeys,
+		l.VideoWaiting,
+		l.KeysRequested,
+		l.KeysAsked,
+	)
 	for _, side := range []struct {
 		name string
 		s    call.LayerStats
 	}{{"remote", st.Remote}, {"self", st.Self}} {
-		out += fmt.Sprintf("\n%s\topen=%v %dx%d frames=%d failed=%v", side.name, side.s.Open, side.s.Width, side.s.Height, side.s.Frames, side.s.Failed)
+		out += fmt.Sprintf(
+			"\n%s\topen=%v %dx%d frames=%d failed=%v",
+			side.name,
+			side.s.Open,
+			side.s.Width,
+			side.s.Height,
+			side.s.Frames,
+			side.s.Failed,
+		)
 	}
 	return out, nil
 }

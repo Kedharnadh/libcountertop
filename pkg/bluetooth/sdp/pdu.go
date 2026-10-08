@@ -6,14 +6,6 @@ import (
 	"slices"
 )
 
-// The requests a phone sends and the answers it expects.
-//
-// Only one matters in practice. A phone looking for an audio sink sends
-// ServiceSearchAttributeRequest — search and read in one round trip — and everything else in the
-// protocol exists for clients that want to do it in two. Both are answered anyway, because a phone
-// that asks a legal question and gets nothing back waits rather than moving on.
-
-// What a PDU is.
 const (
 	PDUError                   = 0x01
 	PDUServiceSearchRequest    = 0x02
@@ -24,7 +16,6 @@ const (
 	PDUSearchAttributeResponse = 0x07
 )
 
-// Why a request could not be answered.
 const (
 	ErrorBadVersion      = 0x0001
 	ErrorBadRecordHandle = 0x0002
@@ -34,20 +25,18 @@ const (
 	ErrorNoResources     = 0x0006
 )
 
-// pduHeader is the id, the transaction and the parameter length.
+// ID, transaction, parameter length.
 const pduHeader = 5
 
-// PDU is one message, either way.
 type PDU struct {
 	ID byte
 
-	// Transaction pairs an answer with its question, and a phone may have several outstanding.
+	// Pairs a response with its request.
 	Transaction uint16
 
 	Params []byte
 }
 
-// ParsePDU reads one message.
 func ParsePDU(buf []byte) (PDU, error) {
 	if len(buf) < pduHeader {
 		return PDU{}, ErrShort
@@ -65,7 +54,6 @@ func ParsePDU(buf []byte) (PDU, error) {
 	}, nil
 }
 
-// Marshal writes it.
 func (p PDU) Marshal() []byte {
 	out := make([]byte, pduHeader+len(p.Params))
 	out[0] = p.ID
@@ -75,7 +63,6 @@ func (p PDU) Marshal() []byte {
 	return out
 }
 
-// Error is the answer to a request that cannot be served.
 func Error(transaction uint16, reason uint16) PDU {
 	params := make([]byte, 2)
 	binary.BigEndian.PutUint16(params, reason)
@@ -83,31 +70,23 @@ func Error(transaction uint16, reason uint16) PDU {
 	return PDU{ID: PDUError, Transaction: transaction, Params: params}
 }
 
-// Search is what a phone is looking for and how much it will take back.
 type Search struct {
-	// Pattern is the service classes it wants, as UUIDs. A record matches when it carries all of
-	// them, not any — an audio sink searched for by both AudioSink and A2DP has to have both.
+	// A record matches when it carries all of them, not any.
 	Pattern []uint32
 
-	// MaxCount for a search, MaxBytes for an attribute read. Only one is meaningful per request.
+	// MaxCount for a search, MaxBytes for an attribute read.
 	MaxCount uint16
 	MaxBytes uint16
 
-	// Attributes is what to return, as identifiers or inclusive ranges.
 	Attributes []AttrRange
 
-	// Continuation is what was left over last time, echoed back. Empty on a first request.
 	Continuation []byte
 }
 
-// AttrRange is one attribute or a span of them.
 type AttrRange struct{ First, Last uint16 }
 
-// Contains reports whether an identifier falls in the range.
 func (r AttrRange) Contains(id uint16) bool { return id >= r.First && id <= r.Last }
 
-// Element writes the range the way an attribute list carries it: two bytes for a single identifier
-// and four for a span, because the width is what says which it is.
 func (r AttrRange) Element() Element {
 	if r.First == r.Last {
 		return Uint16(r.First)
@@ -115,11 +94,7 @@ func (r AttrRange) Element() Element {
 	return Uint32(uint32(r.First)<<16 | uint32(r.Last))
 }
 
-// ParseSearchAttribute reads a ServiceSearchAttributeRequest, which is the one phones send.
-//
-// Its shape: a sequence of UUIDs, a two byte cap, a sequence of attribute identifiers or ranges,
-// then a continuation blob. The two sequences are data elements and the cap between them is not,
-// which is the part that catches a parser written from the diagram rather than the text.
+// UUID sequence, two-byte cap, attribute ID sequence, continuation.
 func ParseSearchAttribute(params []byte) (Search, error) {
 	var s Search
 
@@ -170,7 +145,7 @@ func ParseSearchAttribute(params []byte) (Search, error) {
 	}
 	params = params[used:]
 
-	// What is left is the continuation, which carries its own length byte.
+	// The continuation carries its own length byte.
 	if len(params) < 1 {
 		return s, ErrShort
 	}
@@ -183,11 +158,6 @@ func ParseSearchAttribute(params []byte) (Search, error) {
 	return s, nil
 }
 
-// Wants reports whether a record's service classes satisfy the search.
-//
-// All of the pattern has to be present, not any of it. A phone that searches for both AudioSink and
-// A2DP is asking for something that is both, and answering with something that is only one of them
-// is how a device shows up and then cannot be used.
 func (s Search) Wants(classes []uint32) bool {
 	for _, want := range s.Pattern {
 		if !slices.Contains(classes, want) {
@@ -197,7 +167,6 @@ func (s Search) Wants(classes []uint32) bool {
 	return true
 }
 
-// Selected is the attributes of a record this search asked for, in identifier order.
 func (s Search) Selected(r Record) Record {
 	var out Record
 	for _, a := range r {
@@ -211,11 +180,7 @@ func (s Search) Selected(r Record) Record {
 	return out
 }
 
-// SearchAttributeResponse is the answer: the attribute lists of every matching record, wrapped in
-// one more sequence, with a length in front and a continuation behind.
-//
-// The outer sequence is there even for a single record, and leaving it off is the mistake that
-// produces a phone which sees the device and finds no services on it.
+// The outer sequence is required even for a single record.
 func SearchAttributeResponse(transaction uint16, records []Record) (PDU, error) {
 	lists := make([]Element, 0, len(records))
 	for _, r := range records {
@@ -231,8 +196,6 @@ func SearchAttributeResponse(transaction uint16, records []Record) (PDU, error) 
 	binary.BigEndian.PutUint16(params, uint16(len(body)))
 	params = append(params, body...)
 
-	// No continuation: everything fitted. A response too large for one PDU is a case this does not
-	// handle yet, and a record this small will not reach it.
 	params = append(params, 0)
 
 	return PDU{ID: PDUSearchAttributeResponse, Transaction: transaction, Params: params}, nil

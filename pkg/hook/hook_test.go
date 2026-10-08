@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// The reason this exists: a callback field holds one listener, and the second thing to want the same
-// event silently replaces the first.
 func TestEveryListenerHears(t *testing.T) {
 	var h Hook[int]
 
@@ -43,14 +41,11 @@ func TestCancelStopsOneListener(t *testing.T) {
 	}
 }
 
-// A hook nobody is listening to is the normal state of most hardware, and must not panic.
 func TestEmitWithNoListeners(t *testing.T) {
 	var h Hook[int]
 	h.Emit(1)
 }
 
-// The lock must not be held while listeners run, or one that subscribes or cancels from inside a
-// handler deadlocks the reader that emitted.
 func TestListenerMaySubscribeFromInside(t *testing.T) {
 	var h Hook[int]
 

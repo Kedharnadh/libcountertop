@@ -4,16 +4,13 @@ import (
 	"github.com/Sendspin/sendspin-go/pkg/protocol"
 )
 
-// track is what the group is playing, as the metadata role reports it.
 type track struct {
 	Title  string
 	Artist string
 	Album  string
 }
 
-// merge applies one metadata update. The wire is tristate and all three cases mean something
-// different: a key that is absent leaves what was there, a key that is null clears it, and a key with
-// a value sets it. Treating absent as empty would blank the title on every progress update.
+// The wire is tristate: an absent key leaves, null clears, a value sets.
 func (t track) merge(m *protocol.MetadataState) track {
 	t.Title = field(m, "title", m.Title, t.Title)
 	t.Artist = field(m, "artist", m.Artist, t.Artist)

@@ -29,7 +29,13 @@ func TestSegmentsAsksByHashPrefixAndKeepsWhatWasAskedFor(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	got, err := Segments(context.Background(), srv.Client(), srv.URL, "dQw4w9WgXcQ", []string{"sponsor"})
+	got, err := Segments(
+		context.Background(),
+		srv.Client(),
+		srv.URL,
+		"dQw4w9WgXcQ",
+		[]string{"sponsor"},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,11 +44,15 @@ func TestSegmentsAsksByHashPrefixAndKeepsWhatWasAskedFor(t *testing.T) {
 		t.Errorf("asked %s, want the hash prefix /5f6b", asked.URL.Path)
 	}
 	q := asked.URL.Query()
-	if !slices.Equal(q["category"], []string{"sponsor"}) || q.Get("actionType") != "skip" || q.Get("service") != "YouTube" {
+	if !slices.Equal(q["category"], []string{"sponsor"}) || q.Get("actionType") != "skip" ||
+		q.Get("service") != "YouTube" {
 		t.Errorf("asked with %v", q)
 	}
 
-	want := []Segment{{0, 4 * time.Second, "sponsor"}, {30 * time.Second, 50 * time.Second, "sponsor"}}
+	want := []Segment{
+		{0, 4 * time.Second, "sponsor"},
+		{30 * time.Second, 50 * time.Second, "sponsor"},
+	}
 	if !slices.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -64,7 +74,14 @@ func TestNoCategoriesAsksNothing(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if got, err := Segments(context.Background(), srv.Client(), srv.URL, "x", nil); err != nil || got != nil {
+	if got, err := Segments(
+		context.Background(),
+		srv.Client(),
+		srv.URL,
+		"x",
+		nil,
+	); err != nil ||
+		got != nil {
 		t.Errorf("got %v, %v", got, err)
 	}
 }
@@ -99,7 +116,12 @@ func TestStartingInsideASegmentPlaysIt(t *testing.T) {
 }
 
 func TestASegmentAtTheStartIsSkippedFromTheBeginning(t *testing.T) {
-	if s, ok := inside([]Segment{{From: 0, To: 8 * time.Second}}, 0, 0); !ok || s.To != 8*time.Second {
+	if s, ok := inside(
+		[]Segment{{From: 0, To: 8 * time.Second}},
+		0,
+		0,
+	); !ok ||
+		s.To != 8*time.Second {
 		t.Errorf("an intro at 0: %v %v", s, ok)
 	}
 }
@@ -112,8 +134,16 @@ func TestATrackWaitingOnAJumpHandsOverNothing(t *testing.T) {
 }
 
 func TestSegmentsBecomeMarksInSponsorBlockColours(t *testing.T) {
-	got := marks([]Segment{{From: time.Second, To: 2 * time.Second, Category: "sponsor"}, {From: 5 * time.Second, To: 6 * time.Second, Category: "intro"}})
-	want := []playback.Mark{{From: time.Second, To: 2 * time.Second, RGB: 0x00d400}, {From: 5 * time.Second, To: 6 * time.Second, RGB: 0x00ffff}}
+	got := marks(
+		[]Segment{
+			{From: time.Second, To: 2 * time.Second, Category: "sponsor"},
+			{From: 5 * time.Second, To: 6 * time.Second, Category: "intro"},
+		},
+	)
+	want := []playback.Mark{
+		{From: time.Second, To: 2 * time.Second, RGB: 0x00d400},
+		{From: 5 * time.Second, To: 6 * time.Second, RGB: 0x00ffff},
+	}
 	if !slices.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
@@ -121,7 +151,15 @@ func TestSegmentsBecomeMarksInSponsorBlockColours(t *testing.T) {
 
 func TestCategoriesAreCleanedUp(t *testing.T) {
 	got := ParseCategories(" Sponsor, selfpromo,sponsr  intro,sponsor\tmusic_offtopic ")
-	if want := []string{"sponsor", "selfpromo", "intro", "music_offtopic"}; !slices.Equal(got, want) {
+	if want := []string{
+		"sponsor",
+		"selfpromo",
+		"intro",
+		"music_offtopic",
+	}; !slices.Equal(
+		got,
+		want,
+	) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	if got := ParseCategories(""); got != nil {

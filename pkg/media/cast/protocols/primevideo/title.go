@@ -125,7 +125,17 @@ func (t *title) period(ctx context.Context, n int, part Part, rep Rep, video, fi
 	if k := len(frags); k > 0 {
 		covered = frags[k-1].At + frags[k-1].Duration - frags[0].At
 	}
-	slog.Debug("prime video index", "period", n, "video", video, "fragments", len(frags), "covers", covered.Round(time.Second))
+	slog.Debug(
+		"prime video index",
+		"period",
+		n,
+		"video",
+		video,
+		"fragments",
+		len(frags),
+		"covers",
+		covered.Round(time.Second),
+	)
 	if err := t.p.License(ctx, track.PSSH); err != nil {
 		return err
 	}
@@ -186,12 +196,23 @@ func (t *title) index(ctx context.Context, rep Rep) ([]cenc.Fragment, error) {
 		refs, err = cenc.ParseIndexAt(b, 0)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("prime video: index at %s %v: %w (%s)", rep.IndexURL, rep.Index, err, cenc.Boxes(b))
+		return nil, fmt.Errorf(
+			"prime video: index at %s %v: %w (%s)",
+			rep.IndexURL,
+			rep.Index,
+			err,
+			cenc.Boxes(b),
+		)
 	}
 	return t.expand(ctx, rep.URL, refs, 0)
 }
 
-func (t *title) expand(ctx context.Context, media string, refs []cenc.Fragment, depth int) ([]cenc.Fragment, error) {
+func (t *title) expand(
+	ctx context.Context,
+	media string,
+	refs []cenc.Fragment,
+	depth int,
+) ([]cenc.Fragment, error) {
 	var out []cenc.Fragment
 	for _, r := range refs {
 		if !r.Index {
@@ -207,7 +228,13 @@ func (t *title) expand(ctx context.Context, media string, refs []cenc.Fragment, 
 		}
 		nested, err := cenc.ParseIndex(b, r.Offset)
 		if err != nil {
-			return nil, fmt.Errorf("prime video: index reference at %d+%d is not an index: %w (%s)", r.Offset, r.Size, err, cenc.Boxes(b))
+			return nil, fmt.Errorf(
+				"prime video: index reference at %d+%d is not an index: %w (%s)",
+				r.Offset,
+				r.Size,
+				err,
+				cenc.Boxes(b),
+			)
 		}
 		more, err := t.expand(ctx, media, nested, depth+1)
 		if err != nil {
@@ -277,7 +304,9 @@ func (t *title) Waiting(w bool) {
 	go t.proto.buffering(t, w)
 }
 
-var isoDuration = regexp.MustCompile(`^PT(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?$`)
+var isoDuration = regexp.MustCompile(
+	`^PT(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?$`,
+)
 
 func ParseDuration(s string) time.Duration {
 	m := isoDuration.FindStringSubmatch(s)
@@ -297,9 +326,26 @@ func ParseDuration(s string) time.Duration {
 
 func logTitle(t *title) {
 	m := t.main()
-	slog.Info("prime video playing", "title", t.id,
-		"video", fmt.Sprintf("%dx%d@%dk %s", m.Video.Width, m.Video.Height, m.Video.Bandwidth/1000, m.Video.Codecs),
-		"audio", fmt.Sprintf("%s %dk %s", m.Audio.Lang, m.Audio.Bandwidth/1000, m.Audio.Codecs),
-		"length", t.length.Round(time.Second), "from", t.from.Round(time.Second), "periods", len(t.parts))
+	slog.Info(
+		"prime video playing",
+		"title",
+		t.id,
+		"video",
+		fmt.Sprintf(
+			"%dx%d@%dk %s",
+			m.Video.Width,
+			m.Video.Height,
+			m.Video.Bandwidth/1000,
+			m.Video.Codecs,
+		),
+		"audio",
+		fmt.Sprintf("%s %dk %s", m.Audio.Lang, m.Audio.Bandwidth/1000, m.Audio.Codecs),
+		"length",
+		t.length.Round(time.Second),
+		"from",
+		t.from.Round(time.Second),
+		"periods",
+		len(t.parts),
+	)
 	slog.Debug("prime video periods", "title", t.id, "parts", Describe(t.parts))
 }

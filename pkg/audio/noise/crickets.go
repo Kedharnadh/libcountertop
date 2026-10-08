@@ -15,8 +15,6 @@ const (
 	crickets = 3
 )
 
-// Levelled by its peak: this is mostly silence, and bringing the average up to where a steady sound
-// sits would mean chirps at nearly full scale.
 var cricketSound = Sound{
 	Name: NameCrickets,
 	Peak: 0.18562,
@@ -62,7 +60,6 @@ func (c *cricket) next(g *Gen) float32 {
 		return 0
 	}
 
-	// Raised sine, so a chirp opens and closes instead of clicking at both ends.
 	at := 1 - float32(c.left)/float32(c.chirp)
 	return c.tone.run(g.white() * float32(math.Sin(math.Pi*float64(at))))
 }

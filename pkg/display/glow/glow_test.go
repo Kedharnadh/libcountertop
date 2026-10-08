@@ -29,7 +29,15 @@ func TestClearFillsEveryPixel(t *testing.T) {
 func TestRadialRunsFromCentreToEdge(t *testing.T) {
 	img := image.NewRGBA(image.Rect(0, 0, 101, 101))
 	Clear(img, color.NRGBA{0, 0, 0, 255})
-	Radial(img, 50.5, 50.5, 0, 50, []Stop{{0, color.NRGBA{255, 0, 0, 255}}, {1, color.NRGBA{255, 0, 0, 0}}}, false)
+	Radial(
+		img,
+		50.5,
+		50.5,
+		0,
+		50,
+		[]Stop{{0, color.NRGBA{255, 0, 0, 255}}, {1, color.NRGBA{255, 0, 0, 0}}},
+		false,
+	)
 	if r, _, _ := at(img, 50, 50); r < 250 {
 		t.Errorf("centre red %d, want full", r)
 	}

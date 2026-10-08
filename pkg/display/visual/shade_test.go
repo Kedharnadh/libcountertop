@@ -46,7 +46,8 @@ func TestClassicVUShadesFromItsBackdrop(t *testing.T) {
 	if err := v.Shade(g, true, in, x); err != nil {
 		t.Fatal(err)
 	}
-	if g.programs != 1 || g.textures != 1 || g.tex != image.Rect(0, 0, 960*shadeScale, 600*shadeScale) {
+	if g.programs != 1 || g.textures != 1 ||
+		g.tex != image.Rect(0, 0, 960*shadeScale, 600*shadeScale) {
 		t.Fatalf("programs %d, textures %d at %v", g.programs, g.textures, g.tex)
 	}
 	if len(g.u) != 24 || g.u[0] != shadeScale || g.u[1] <= 0 {
@@ -84,7 +85,13 @@ func TestAuroraShadesWithItsGlowAndKeepsPhasesSmall(t *testing.T) {
 		t.Fatal(err)
 	}
 	if g.programs != 1 || g.textures != 3 || g.passes != Light|Pre || g.amount != 0.9 {
-		t.Fatalf("programs %d, textures %d, passes %d, glow %v", g.programs, g.textures, g.passes, g.amount)
+		t.Fatalf(
+			"programs %d, textures %d, passes %d, glow %v",
+			g.programs,
+			g.textures,
+			g.passes,
+			g.amount,
+		)
 	}
 	v.(*aurora).ph = 1e7
 	x.Now = 90 * time.Hour
@@ -281,7 +288,12 @@ func TestOrbShadesPointsAndPlexus(t *testing.T) {
 func TestDigitalVUShadesItsColumns(t *testing.T) {
 	v := New(DigitalVU)
 	g := &fakeGL{}
-	if err := v.Shade(g, true, ui.Rect{W: 960, H: 600}, Input{Now: time.Second, Dt: time.Second / 30}); err != nil {
+	if err := v.Shade(
+		g,
+		true,
+		ui.Rect{W: 960, H: 600},
+		Input{Now: time.Second, Dt: time.Second / 30},
+	); err != nil {
 		t.Fatal(err)
 	}
 	if g.passes != Light || len(g.u) != 73 {
@@ -292,7 +304,12 @@ func TestDigitalVUShadesItsColumns(t *testing.T) {
 func TestPhosphorShadesItsBeam(t *testing.T) {
 	v := New(Phosphor)
 	g := &fakeGL{}
-	if err := v.Shade(g, true, ui.Rect{W: 960, H: 600}, Input{Now: time.Second, Dt: time.Second / 30}); err != nil {
+	if err := v.Shade(
+		g,
+		true,
+		ui.Rect{W: 960, H: 600},
+		Input{Now: time.Second, Dt: time.Second / 30},
+	); err != nil {
 		t.Fatal(err)
 	}
 	if g.passes != Light|Feed|Lines || g.textures != 2 || len(g.segments) == 0 {
@@ -303,7 +320,12 @@ func TestPhosphorShadesItsBeam(t *testing.T) {
 func TestPulsarUploadsItsRidges(t *testing.T) {
 	v := New(Pulsar)
 	g := &fakeGL{}
-	if err := v.Shade(g, true, ui.Rect{W: 960, H: 600}, Input{Now: time.Second, Dt: time.Second / 30}); err != nil {
+	if err := v.Shade(
+		g,
+		true,
+		ui.Rect{W: 960, H: 600},
+		Input{Now: time.Second, Dt: time.Second / 30},
+	); err != nil {
 		t.Fatal(err)
 	}
 	if g.passes != Light || g.textures != 2 || g.tex != image.Rect(0, 0, pulsarP, pulsarN+2) {
@@ -354,7 +376,14 @@ func TestLightCyclesShadeWallsAsQuads(t *testing.T) {
 		}
 		x.Now += time.Second / 30
 	}
-	if g.textures != 1 || g.passes != Light|Lines || len(g.quads) < 20 || len(g.segments) != 2*len(g.quads)+2 {
-		t.Fatalf("textures %d, passes %d, quads %d, segments %d", g.textures, g.passes, len(g.quads), len(g.segments))
+	if g.textures != 1 || g.passes != Light|Lines || len(g.quads) < 20 ||
+		len(g.segments) != 2*len(g.quads)+2 {
+		t.Fatalf(
+			"textures %d, passes %d, quads %d, segments %d",
+			g.textures,
+			g.passes,
+			len(g.quads),
+			len(g.segments),
+		)
 	}
 }

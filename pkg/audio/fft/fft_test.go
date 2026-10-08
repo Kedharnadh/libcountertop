@@ -26,8 +26,6 @@ func TestRoundTrips(t *testing.T) {
 	}
 }
 
-// The transform has to agree with the definition, not just with its own inverse: a wrong twiddle
-// sign inverts cleanly and still puts the bands in the wrong place.
 func TestMatchesTheDefinition(t *testing.T) {
 	const n = 16
 

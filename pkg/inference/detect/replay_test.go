@@ -13,8 +13,6 @@ import (
 	assets "github.com/ygelfand/libcountertop/pkg/inference/wakeassets"
 )
 
-// COUNTERTOP_REPLAY is a 16 kHz 16-bit WAV, as `daemon ctl audio record echo` writes it; COUNTERTOP_REPLAY_CHANNEL picks
-// which channel is scored (default the last, what listeners got). Reports only.
 func TestReplayStopScores(t *testing.T) {
 	path := os.Getenv("COUNTERTOP_REPLAY")
 	if path == "" {

@@ -9,7 +9,6 @@ import (
 	"time"
 )
 
-// pdu is an L2CAP PDU of n payload bytes on a channel, which is what reassembly measures against.
 func pdu(cid uint16, n int) []byte {
 	out := make([]byte, l2capHeader+n)
 	binary.LittleEndian.PutUint16(out, uint16(n))
@@ -50,8 +49,6 @@ func TestFramingAnACLPacketAndReadingItBack(t *testing.T) {
 	}
 }
 
-// The handle is twelve bits and the flags are the other four of the same word, so a handle near the
-// top is where they run into each other.
 func TestAHighHandleDoesNotSpillIntoTheFlags(t *testing.T) {
 	frames, err := aclFrames(0x0fff, pdu(0x0040, 4), 64)
 	if err != nil {
@@ -66,7 +63,11 @@ func TestAHighHandleDoesNotSpillIntoTheFlags(t *testing.T) {
 		t.Errorf("handle came back %#x, want 0xfff", got.Handle)
 	}
 	if got.Boundary != boundaryStart || got.Broadcast != 0 {
-		t.Errorf("flags came back boundary %#x broadcast %#x, want zero", got.Boundary, got.Broadcast)
+		t.Errorf(
+			"flags came back boundary %#x broadcast %#x, want zero",
+			got.Boundary,
+			got.Broadcast,
+		)
 	}
 }
 
@@ -76,8 +77,6 @@ func TestAHandleWiderThanTwelveBitsIsRefused(t *testing.T) {
 	}
 }
 
-// A message larger than the controller's packet takes several, and only the first says it starts
-// one. The far end puts them back together by that flag alone.
 func TestALongMessageIsCutIntoPacketsAndPutBackTogether(t *testing.T) {
 	for _, mtu := range []int{1, 7, 27, 64, 339, 1021} {
 		want := pdu(0x0040, 700)
@@ -122,8 +121,6 @@ func TestALongMessageIsCutIntoPacketsAndPutBackTogether(t *testing.T) {
 	}
 }
 
-// Two connections sending at once interleave on the wire, and neither may end up with the other's
-// bytes.
 func TestTwoConnectionsReassembleApart(t *testing.T) {
 	one, two := pdu(0x0040, 200), pdu(0x0041, 200)
 
@@ -168,8 +165,6 @@ func TestTwoConnectionsReassembleApart(t *testing.T) {
 	}
 }
 
-// A first fragment is allowed to be shorter than the L2CAP header, which is the case that catches a
-// reassembler that reads the length before it has one.
 func TestAFirstFragmentShorterThanTheL2CAPHeader(t *testing.T) {
 	want := pdu(0x0040, 40)
 
@@ -200,12 +195,12 @@ func TestAFirstFragmentShorterThanTheL2CAPHeader(t *testing.T) {
 	}
 }
 
-// A controller that does not follow the protocol is an error rather than something to paper over:
-// stitching two messages together and handing the result up is worse than saying so.
 func TestFragmentsThatDoNotMakeSense(t *testing.T) {
 	t.Run("continuing nothing", func(t *testing.T) {
 		r := newReassembler()
-		if _, err := r.add(aclPacket{Handle: 1, Boundary: boundaryContinue, Data: []byte{1}}); err == nil {
+		if _, err := r.add(
+			aclPacket{Handle: 1, Boundary: boundaryContinue, Data: []byte{1}},
+		); err == nil {
 			t.Error("a continuation with nothing before it was accepted")
 		}
 	})
@@ -214,10 +209,14 @@ func TestFragmentsThatDoNotMakeSense(t *testing.T) {
 		r := newReassembler()
 		half := pdu(0x0040, 40)[:10]
 
-		if _, err := r.add(aclPacket{Handle: 1, Boundary: boundaryFlushable, Data: half}); err != nil {
+		if _, err := r.add(
+			aclPacket{Handle: 1, Boundary: boundaryFlushable, Data: half},
+		); err != nil {
 			t.Fatalf("the first fragment: %v", err)
 		}
-		if _, err := r.add(aclPacket{Handle: 1, Boundary: boundaryFlushable, Data: half}); err == nil {
+		if _, err := r.add(
+			aclPacket{Handle: 1, Boundary: boundaryFlushable, Data: half},
+		); err == nil {
 			t.Error("a second start while one was outstanding was accepted")
 		}
 		if r.pending() != 0 {
@@ -229,14 +228,14 @@ func TestFragmentsThatDoNotMakeSense(t *testing.T) {
 		r := newReassembler()
 		long := append(pdu(0x0040, 4), 0xff, 0xff)
 
-		if _, err := r.add(aclPacket{Handle: 1, Boundary: boundaryFlushable, Data: long}); err == nil {
+		if _, err := r.add(
+			aclPacket{Handle: 1, Boundary: boundaryFlushable, Data: long},
+		); err == nil {
 			t.Error("a pdu longer than its own length was accepted")
 		}
 	})
 }
 
-// A link that goes away leaves whatever it was half way through, and the next connection to get
-// that handle must not inherit it.
 func TestForgettingAConnectionDropsItsHalfMessage(t *testing.T) {
 	r := newReassembler()
 	half := pdu(0x0040, 40)[:10]
@@ -342,8 +341,6 @@ func TestCompletedPacketsThatDoNotAddUp(t *testing.T) {
 	}
 }
 
-// The whole point of counting: the host stops when the controller is full and goes again when it is
-// not. Writing past this is not refused, it is dropped.
 func TestCreditStopsAtTheControllersBufferCount(t *testing.T) {
 	c, err := newCredit(1021, 3)
 	if err != nil {
@@ -360,7 +357,6 @@ func TestCreditStopsAtTheControllersBufferCount(t *testing.T) {
 		t.Errorf("%d buffers free after taking all three", c.available())
 	}
 
-	// A fourth has to wait rather than go through.
 	tight, stop := context.WithTimeout(ctx, 50*time.Millisecond)
 	defer stop()
 
@@ -384,7 +380,6 @@ func TestCreditComesBackAndUnblocksAWaiter(t *testing.T) {
 		waited <- c.take(got)
 	}()
 
-	// Nothing should get through until the controller says so.
 	select {
 	case err := <-waited:
 		t.Fatalf("a buffer was taken while none were free: %v", err)
@@ -405,8 +400,6 @@ func TestCreditComesBackAndUnblocksAWaiter(t *testing.T) {
 	}
 }
 
-// A controller that hands back more than it has is miscounting, and believing it would let the host
-// write past what the hardware holds.
 func TestMoreCreditThanTheControllerHasIsRefusedAndCapped(t *testing.T) {
 	c, _ := newCredit(1021, 4)
 

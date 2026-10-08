@@ -2,13 +2,6 @@ package avdtp
 
 import "fmt"
 
-// Capabilities are what an endpoint can do, and what a phone picks from.
-//
-// A sink advertises two: that it can carry media at all, and which codec settings it accepts. The
-// phone answers with one configuration chosen out of those, and the pair have to agree exactly —
-// a configuration naming something that was never offered is the refusal every stack sends.
-
-// The categories a capability can be.
 const (
 	CatMediaTransport = 0x01
 	CatReporting      = 0x02
@@ -20,13 +13,11 @@ const (
 	CatDelayReporting = 0x08
 )
 
-// Capability is one entry in the list.
 type Capability struct {
 	Category byte
 	Data     []byte
 }
 
-// Marshal writes the category, the length, and the body.
 func (c Capability) Marshal() []byte {
 	out := make([]byte, 2+len(c.Data))
 	out[0] = c.Category
@@ -35,7 +26,6 @@ func (c Capability) Marshal() []byte {
 	return out
 }
 
-// ParseCapabilities reads a run of them.
 func ParseCapabilities(buf []byte) ([]Capability, error) {
 	var out []Capability
 
@@ -57,7 +47,6 @@ func ParseCapabilities(buf []byte) ([]Capability, error) {
 	return out, nil
 }
 
-// MarshalCapabilities writes a list.
 func MarshalCapabilities(caps []Capability) []byte {
 	var out []byte
 	for _, c := range caps {
@@ -66,7 +55,6 @@ func MarshalCapabilities(caps []Capability) []byte {
 	return out
 }
 
-// Find is the capability of a category, and whether it is there.
 func Find(caps []Capability, category byte) (Capability, bool) {
 	for _, c := range caps {
 		if c.Category == category {
@@ -76,10 +64,9 @@ func Find(caps []Capability, category byte) (Capability, bool) {
 	return Capability{}, false
 }
 
-// CodecSBC is the one codec every A2DP device has to support, and the only one this needs.
+// SBC is mandatory for every A2DP device.
 const CodecSBC = 0x00
 
-// The sampling rates an SBC capability can offer, as the bits they are written with.
 const (
 	Rate16000 = 1 << 7
 	Rate32000 = 1 << 6
@@ -87,8 +74,6 @@ const (
 	Rate48000 = 1 << 4
 )
 
-// How the two channels are carried. Joint stereo is what a phone picks when it can, because it
-// spends the fewest bits for the same result.
 const (
 	ChannelMono        = 1 << 3
 	ChannelDualChannel = 1 << 2
@@ -96,7 +81,6 @@ const (
 	ChannelJointStereo = 1 << 0
 )
 
-// How many samples go in a block.
 const (
 	Block4  = 1 << 7
 	Block8  = 1 << 6
@@ -104,23 +88,16 @@ const (
 	Block16 = 1 << 4
 )
 
-// How many subbands the spectrum is split into.
 const (
 	Subbands4 = 1 << 3
 	Subbands8 = 1 << 2
 )
 
-// How bits are shared out between subbands.
 const (
 	AllocationSNR      = 1 << 1
 	AllocationLoudness = 1 << 0
 )
 
-// SBC is the codec capability, unpacked.
-//
-// Offered, every field is a set of bits saying what is acceptable. Configured, each has exactly one
-// bit set — the phone's choice. That is the same four bytes meaning two different things depending
-// on which direction it travelled, which is worth knowing before reading one.
 type SBC struct {
 	Rates      byte
 	Channels   byte
@@ -132,10 +109,9 @@ type SBC struct {
 	MaxBitpool byte
 }
 
-// sbcBytes is the codec-specific part: two packed bytes and the two bitpool bounds.
+// Two packed bytes, then min and max bitpool.
 const sbcBytes = 4
 
-// Capability wraps it as a media codec capability, which is how it goes on the wire.
 func (s SBC) Capability() Capability {
 	return Capability{
 		Category: CatMediaCodec,
@@ -150,7 +126,6 @@ func (s SBC) Capability() Capability {
 	}
 }
 
-// ParseSBC reads a media codec capability as SBC.
 func ParseSBC(c Capability) (SBC, error) {
 	if c.Category != CatMediaCodec {
 		return SBC{}, fmt.Errorf("avdtp: category %#x is not a media codec", c.Category)
@@ -174,10 +149,7 @@ func ParseSBC(c Capability) (SBC, error) {
 	}, nil
 }
 
-// SinkSBC is what this device offers: everything SBC allows, so a phone can pick whatever suits it.
-//
-// Offering the lot rather than a preference. A sink that advertises narrowly makes the phone encode
-// to something it is worse at, and the bitpool bounds are the spec's own defaults.
+// The bitpool bounds are the A2DP specification defaults.
 func SinkSBC() SBC {
 	return SBC{
 		Rates:      Rate44100 | Rate48000,
@@ -190,7 +162,6 @@ func SinkSBC() SBC {
 	}
 }
 
-// SinkCapabilities is the whole list an endpoint answers a GetCapabilities with.
 func SinkCapabilities() []Capability {
 	return []Capability{
 		{Category: CatMediaTransport},
@@ -198,23 +169,12 @@ func SinkCapabilities() []Capability {
 	}
 }
 
-// one reports whether exactly one bit is set, which is what a configuration must have where an
-// offer may have several.
 func one(v byte) bool { return v != 0 && v&(v-1) == 0 }
 
-// Chosen reports whether this is a configuration rather than an offer: exactly one option picked in
-// each field.
-//
-// Worth checking before acting on one. A phone that leaves two rates set has not chosen, and
-// guessing which it meant is how a stream runs at the wrong speed and sounds slow.
 func (s SBC) Chosen() bool {
 	return one(s.Rates) && one(s.Channels) && one(s.Blocks) && one(s.Subbands) && one(s.Allocation)
 }
 
-// Within reports whether every option this configuration picked was offered.
-//
-// The refusal every stack sends is for a configuration naming something never advertised, so this
-// is the check before accepting one.
 func (s SBC) Within(offer SBC) bool {
 	return s.Rates&offer.Rates == s.Rates &&
 		s.Channels&offer.Channels == s.Channels &&
@@ -225,7 +185,6 @@ func (s SBC) Within(offer SBC) bool {
 		s.MinBitpool >= offer.MinBitpool
 }
 
-// Rate is the sampling rate a configuration picked, in hertz.
 func (s SBC) Rate() (int, bool) {
 	switch s.Rates {
 	case Rate16000:

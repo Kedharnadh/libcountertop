@@ -33,8 +33,28 @@ func TestFFmpegPlaysIt(t *testing.T) {
 		t.Skip("no ffmpeg")
 	}
 	file := filepath.Join(t.TempDir(), "src.h264")
-	gen := exec.Command("ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=320x240:rate=15", "-frames:v", "45",
-		"-c:v", "libx264", "-g", "15", "-bf", "0", "-x264-params", "aud=1", "-f", "h264", file)
+	gen := exec.Command(
+		"ffmpeg",
+		"-v",
+		"error",
+		"-f",
+		"lavfi",
+		"-i",
+		"testsrc=size=320x240:rate=15",
+		"-frames:v",
+		"45",
+		"-c:v",
+		"libx264",
+		"-g",
+		"15",
+		"-bf",
+		"0",
+		"-x264-params",
+		"aud=1",
+		"-f",
+		"h264",
+		file,
+	)
 	if out, err := gen.CombinedOutput(); err != nil {
 		t.Skipf("ffmpeg cannot make H.264 here: %v %s", err, out)
 	}
@@ -54,7 +74,7 @@ func TestFFmpegPlaysIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	go srv.Serve(ln)
+	go func() { _ = srv.Serve(ln) }()
 	defer srv.Close()
 
 	ctx, stop := context.WithCancel(context.Background())

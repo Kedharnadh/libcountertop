@@ -2,7 +2,6 @@ package cast
 
 import "testing"
 
-// The device's own volume reaches every sender, and a level they already have sends nothing.
 func TestTheDeviceVolumeIsReportedOnlyWhenItMoved(t *testing.T) {
 	r := NewReceiver("Kitchen")
 	for _, s := range []string{"sender-a", "sender-b"} {
@@ -28,7 +27,6 @@ func TestTheDeviceVolumeIsReportedOnlyWhenItMoved(t *testing.T) {
 	}
 }
 
-// What a sender loads and what it says on a namespace nobody answers are both reported.
 func TestLoadsAndUnspokenNamespacesAreReported(t *testing.T) {
 	r := NewReceiver("Kitchen")
 
@@ -38,9 +36,18 @@ func TestLoadsAndUnspokenNamespacesAreReported(t *testing.T) {
 	r.Unspoken = func(namespace, kind string) { unspoken = append(unspoken, [2]string{namespace, kind}) }
 
 	answered(t, r, from(SenderID, NSReceiver, `{"type":"LAUNCH","requestId":1,"appId":"C35B0678"}`))
-	r.Receive(from(SenderID, NSMedia,
-		`{"type":"LOAD","requestId":2,"media":{"contentId":"http://ma.local/flow/1.flac","contentType":"audio/flac","streamType":"BUFFERED"}}`))
-	r.Receive(from(SenderID, "urn:x-cast:io.music-assistant.cast", `{"type":"STATUS"}`))
+	if _, err := r.Receive(from(
+		SenderID,
+		NSMedia,
+		`{"type":"LOAD","requestId":2,"media":{"contentId":"http://ma.local/flow/1.flac","contentType":"audio/flac","streamType":"BUFFERED"}}`,
+	)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Receive(
+		from(SenderID, "urn:x-cast:io.music-assistant.cast", `{"type":"STATUS"}`),
+	); err != nil {
+		t.Fatal(err)
+	}
 
 	if len(loaded) != 1 || loaded[0].ContentType != "audio/flac" {
 		t.Errorf("the load reported was %+v", loaded)

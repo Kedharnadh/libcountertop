@@ -15,13 +15,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/pair"
 )
 
-// The loop that carries a link, driven over a socketpair with no controller behind it.
-//
-// What it has to get right is all bookkeeping: a PDU split into fragments arrives as one, a reply
-// goes out as fragments the controller will take, buffers are not overrun, and a link ending lets
-// go of what was kept for it. None of that needs a radio, and none of it is visible from above.
-
-// deciding is a Classic that records what it was asked and says what it was told to.
 type deciding struct {
 	mu sync.Mutex
 
@@ -29,10 +22,8 @@ type deciding struct {
 	pdus   [][]byte
 	gone   []uint16
 
-	// reply is what Data answers with, if anything.
 	reply [][]byte
 
-	// commands is what Event answers with, if anything.
 	commands []pair.Command
 }
 
@@ -65,7 +56,6 @@ func (d *deciding) saw() (int, int, int) {
 	return len(d.events), len(d.pdus), len(d.gone)
 }
 
-// aclOf is one ACL packet on a handle, carrying body.
 func aclOf(h Handle, boundary byte, body []byte) []byte {
 	out := []byte{typeACL}
 	out = binary.LittleEndian.AppendUint16(out, uint16(h)|uint16(boundary)<<12)
@@ -73,8 +63,7 @@ func aclOf(h Handle, boundary byte, body []byte) []byte {
 	return append(out, body...)
 }
 
-// bufferSize is the controller answering Read Buffer Size: status, ACL length, SCO length, ACL
-// count, SCO count.
+// Status, ACL length, SCO length, ACL count, SCO count.
 func bufferSize(size, total int) []byte {
 	out := []byte{typeEvent, eventCommandComplete, 0x0b, 0x01}
 	out = binary.LittleEndian.AppendUint16(out, hciReadBufferSize)
@@ -85,7 +74,6 @@ func bufferSize(size, total int) []byte {
 	return binary.LittleEndian.AppendUint16(out, 0)
 }
 
-// serving starts the loop against a socketpair and returns what it decides with, and a stop.
 func serving(t *testing.T, d *deciding, size, total int) (chip *os.File, stop func()) {
 	t.Helper()
 
@@ -99,9 +87,6 @@ func serving(t *testing.T, d *deciding, size, total int) (chip *os.File, stop fu
 		Serve(ctx, Reader(ctx, p), d)
 	}()
 
-	// The loop asks what the controller holds before anything else, and a controller answers when
-	// asked rather than beforehand. Answering early raced the reader: the event can arrive before
-	// anything is waiting on it.
 	asked(t, chip, hciReadBufferSize)
 	if _, err := chip.Write(bufferSize(size, total)); err != nil {
 		t.Fatal(err)
@@ -110,7 +95,6 @@ func serving(t *testing.T, d *deciding, size, total int) (chip *os.File, stop fu
 	return chip, func() { cancel(); <-done }
 }
 
-// asked waits for one command to arrive on the chip side and checks it is the one expected.
 func asked(t *testing.T, chip *os.File, opcode uint16) {
 	t.Helper()
 
@@ -140,9 +124,7 @@ func TestALinkCarriesAWholePDUFromItsFragments(t *testing.T) {
 	chip, stop := serving(t, d, 64, 4)
 	defer stop()
 
-	// One 40 byte PDU: an L2CAP header saying 36 bytes of payload on channel 0x40, then the
-	// payload. How long the whole message is only the PDU says — a fragment says how long the
-	// fragment is.
+	// An L2CAP header saying 36 bytes of payload on channel 0x40.
 	body := append([]byte{0x24, 0x00, 0x40, 0x00}, make([]byte, 36)...)
 	for i := range body[4:] {
 		body[4+i] = byte(i)
@@ -183,15 +165,11 @@ func TestAnEventReachesWhoeverDecides(t *testing.T) {
 	}
 }
 
-// A link ending both tells the decider and drops what was being reassembled for it, or half a PDU
-// from a phone that has gone waits for a continuation that never comes.
 func TestALinkEndingIsPassedOnAndForgotten(t *testing.T) {
 	d := &deciding{}
 	chip, stop := serving(t, d, 64, 4)
 	defer stop()
 
-	// A whole fragment carrying half a PDU: the header says 36 bytes of payload and only 16 are
-	// here, so it waits. Then the link goes.
 	half := append([]byte{0x24, 0x00, 0x40, 0x00}, make([]byte, 16)...)
 	chip.Write(aclOf(7, boundaryFlushable, half))
 
@@ -208,8 +186,6 @@ func TestALinkEndingIsPassedOnAndForgotten(t *testing.T) {
 	}
 }
 
-// The controller holds a fixed number of packets. Writing past that is what makes one stop
-// answering rather than refuse, so a reply longer than the buffers waits for them to come back.
 func TestSendingWaitsForTheControllerToCatchUp(t *testing.T) {
 	// 200 bytes over 32 byte packets is seven fragments, against two buffers.
 	d := &deciding{reply: [][]byte{make([]byte, 200)}}
@@ -223,8 +199,6 @@ func TestSendingWaitsForTheControllerToCatchUp(t *testing.T) {
 	chip.Write(aclOf(1, boundaryFlushable, []byte{0x00, 0x00, 0x40, 0x00}))
 	settles(t, func() bool { _, pdus, _ := d.saw(); return pdus == 1 })
 
-	// Two buffers, so two fragments go and the rest wait. Nothing else can arrive until some come
-	// back, which is the whole point.
 	settles(t, func() bool { return sent.n() >= 2 })
 
 	before := sent.n()
@@ -234,7 +208,6 @@ func TestSendingWaitsForTheControllerToCatchUp(t *testing.T) {
 		t.Errorf("%d packets went out with no buffers free, was %d", now, before)
 	}
 
-	// Hand back exactly what the remaining five fragments need, one at a time.
 	for range 5 {
 		chip.Write([]byte{typeEvent, eventCompletedPackets, 0x05, 0x01, 0x01, 0x00, 0x01, 0x00})
 		time.Sleep(5 * time.Millisecond)
@@ -243,11 +216,6 @@ func TestSendingWaitsForTheControllerToCatchUp(t *testing.T) {
 	settles(t, func() bool { return sent.n() >= 7 })
 }
 
-// counter counts the ACL packets going out.
-//
-// By framing rather than by bytes, since a socket hands over whatever has arrived rather than one
-// packet at a time — and it has to step over the commands on the same line, which are a different
-// shape and would otherwise be read as data.
 type counter struct {
 	mu   sync.Mutex
 	seen int
@@ -279,7 +247,6 @@ func (c *counter) Write(b []byte) (int, error) {
 			n = header + int(c.held[3])
 
 		default:
-			// A sleep byte or something unrecognised: step over it rather than stalling.
 			c.held = c.held[1:]
 			continue
 		}
@@ -301,7 +268,6 @@ func (c *counter) n() int {
 	return c.seen
 }
 
-// settles blocks until want is true, or fails the test.
 func settles(t *testing.T, want func() bool) {
 	t.Helper()
 

@@ -7,8 +7,6 @@ import (
 
 var device = Addr{0x11, 0x22, 0x33, 0x44, 0x55, 0x66}
 
-// An address is stored the way it goes on the wire and printed the way people write it. Getting
-// that backwards makes a phone that paired yesterday a stranger today.
 func TestAnAddressPrintsTheWayItIsWritten(t *testing.T) {
 	if got := device.String(); got != "66:55:44:33:22:11" {
 		t.Errorf("came back %q", got)
@@ -21,7 +19,6 @@ func TestAnAddressTooShortToBeOne(t *testing.T) {
 	}
 }
 
-// only is the one command an event should have produced.
 func only(t *testing.T, m *Manager, e Event) Command {
 	t.Helper()
 
@@ -35,7 +32,6 @@ func only(t *testing.T, m *Manager, e Event) Command {
 	return out[0]
 }
 
-// quiet runs an event that should produce nothing and should not fail.
 func quiet(t *testing.T, m *Manager, e Event) {
 	t.Helper()
 
@@ -64,8 +60,6 @@ func notification(a Addr, key Key, kind byte) Event {
 	return Event{Code: EventLinkKeyNotification, Params: append(params, kind)}
 }
 
-// The whole thing, in the order a controller sends it: a phone nobody has seen before connects,
-// pairs, and is remembered.
 func TestAPhoneConnectsAndIsRemembered(t *testing.T) {
 	keys := Memory{}
 	m := New(keys)
@@ -73,7 +67,6 @@ func TestAPhoneConnectsAndIsRemembered(t *testing.T) {
 	var bonded int
 	m.Bonded = func(*Peer) { bonded++ }
 
-	// It asks to connect and is let in as the peripheral.
 	accept := only(t, m, connectionRequest(device, LinkACL))
 	if accept.Opcode != OpAcceptConnection {
 		t.Fatalf("answered a connection request with %#04x", accept.Opcode)
@@ -92,13 +85,11 @@ func TestAPhoneConnectsAndIsRemembered(t *testing.T) {
 		t.Errorf("handle %#x, want 0x0c", p.Handle)
 	}
 
-	// Never seen before, so there is no key and saying so is what starts the pairing.
 	negative := only(t, m, Event{Code: EventLinkKeyRequest, Params: device[:]})
 	if negative.Opcode != OpLinkKeyNegative {
 		t.Fatalf("answered a link key request for an unknown phone with %#04x", negative.Opcode)
 	}
 
-	// What can this device do about confirming? Nothing, so Just Works.
 	capability := only(t, m, Event{Code: EventIOCapabilityRequest, Params: device[:]})
 	if capability.Opcode != OpIOCapabilityReply {
 		t.Fatalf("answered an io capability request with %#04x", capability.Opcode)
@@ -110,7 +101,6 @@ func TestAPhoneConnectsAndIsRemembered(t *testing.T) {
 		t.Errorf("asked for %#02x, want general bonding or no key is generated", got)
 	}
 
-	// The number nobody sees.
 	confirm := only(t, m, Event{
 		Code:   EventUserConfirmation,
 		Params: append(append([]byte(nil), device[:]...), 0x39, 0x30, 0x00, 0x00),
@@ -119,7 +109,6 @@ func TestAPhoneConnectsAndIsRemembered(t *testing.T) {
 		t.Fatalf("answered a confirmation request with %#04x", confirm.Opcode)
 	}
 
-	// The key, which has to be written down.
 	key := Key{9: 0xab}
 	quiet(t, m, notification(device, key, KeyUnauthenticatedP256))
 	quiet(t, m, Event{
@@ -143,7 +132,6 @@ func TestAPhoneConnectsAndIsRemembered(t *testing.T) {
 	}
 }
 
-// The second time it connects there is a key, and offering it is what makes reconnecting silent.
 func TestAKnownPhoneIsNotAskedToPairAgain(t *testing.T) {
 	key := Key{0: 0x01, 15: 0xff}
 	m := New(Memory{device: key})
@@ -163,8 +151,6 @@ func TestAKnownPhoneIsNotAskedToPairAgain(t *testing.T) {
 	}
 }
 
-// The debug key is a value published in the spec so traffic can be decrypted during development.
-// Saving it leaves the link readable by anyone who knows it, which is everyone.
 func TestTheDebugKeyIsNotSaved(t *testing.T) {
 	keys := Memory{}
 	m := New(keys)
@@ -177,8 +163,6 @@ func TestTheDebugKeyIsNotSaved(t *testing.T) {
 	}
 }
 
-// A pairing that fails leaves no key. Keeping one means every future connection offers something
-// the phone rejects, and it never gets the chance to pair again.
 func TestAFailedPairingDropsTheKey(t *testing.T) {
 	keys := Memory{device: Key{0: 0xaa}}
 	m := New(keys)
@@ -198,7 +182,6 @@ func TestAFailedPairingDropsTheKey(t *testing.T) {
 	}
 }
 
-// Walking out of the room is not unpairing. The bond is what makes walking back in silent.
 func TestDisconnectingDoesNotUnpair(t *testing.T) {
 	keys := Memory{}
 	m := New(keys)
@@ -206,7 +189,9 @@ func TestDisconnectingDoesNotUnpair(t *testing.T) {
 	var lost int
 	m.Lost = func(*Peer) { lost++ }
 
-	m.Handle(connectionRequest(device, LinkACL))
+	if _, err := m.Handle(connectionRequest(device, LinkACL)); err != nil {
+		t.Fatal(err)
+	}
 	quiet(t, m, connectionComplete(device, 0x0c, 0))
 	quiet(t, m, notification(device, Key{0: 0x7f}, KeyAuthenticatedP256))
 
@@ -228,7 +213,6 @@ func TestDisconnectingDoesNotUnpair(t *testing.T) {
 	}
 }
 
-// A connection that never came up leaves nothing behind.
 func TestAConnectionThatFailed(t *testing.T) {
 	m := New(nil)
 
@@ -240,8 +224,6 @@ func TestAConnectionThatFailed(t *testing.T) {
 	}
 }
 
-// SCO is a voice call, which is a different profile. Accepting it gives a link that carries
-// nothing this device knows how to answer.
 func TestASCOConnectionIsRefused(t *testing.T) {
 	m := New(nil)
 
@@ -267,8 +249,6 @@ func TestAConnectionCanBeRefused(t *testing.T) {
 	}
 }
 
-// With a screen this device could do numeric comparison, which is the difference between Just
-// Works and a link that is actually authenticated.
 func TestNumericComparisonCanBeRefused(t *testing.T) {
 	m := New(nil)
 	m.IO = DisplayYesNo
@@ -296,22 +276,30 @@ func TestNumericComparisonCanBeRefused(t *testing.T) {
 	}
 }
 
-// Both of these mean the phone thinks somebody can type. Refusing makes it fall back to what it
-// can do; silence makes it hang.
 func TestLegacyPairingAndPasskeysAreRefusedRatherThanIgnored(t *testing.T) {
 	m := New(nil)
 
-	if got := only(t, m, Event{Code: EventPINCodeRequest, Params: device[:]}); got.Opcode != OpPINCodeNegative {
+	if got := only(
+		t,
+		m,
+		Event{Code: EventPINCodeRequest, Params: device[:]},
+	); got.Opcode != OpPINCodeNegative {
 		t.Errorf("a pin request was answered with %#04x", got.Opcode)
 	}
-	if got := only(t, m, Event{Code: EventUserPasskeyRequest, Params: device[:]}); got.Opcode != OpPasskeyNegative {
+	if got := only(
+		t,
+		m,
+		Event{Code: EventUserPasskeyRequest, Params: device[:]},
+	); got.Opcode != OpPasskeyNegative {
 		t.Errorf("a passkey request was answered with %#04x", got.Opcode)
 	}
 }
 
 func TestEncryptionIsTracked(t *testing.T) {
 	m := New(nil)
-	m.Handle(connectionRequest(device, LinkACL))
+	if _, err := m.Handle(connectionRequest(device, LinkACL)); err != nil {
+		t.Fatal(err)
+	}
 	quiet(t, m, connectionComplete(device, 0x0c, 0))
 
 	quiet(t, m, Event{Code: EventEncryptionChange, Params: []byte{0x00, 0x0c, 0x00, 0x01}})
@@ -325,10 +313,11 @@ func TestEncryptionIsTracked(t *testing.T) {
 	}
 }
 
-// The top four bits of a handle are reserved. Leaving them in gives a number matching no link.
 func TestTheReservedBitsOfAHandleAreMasked(t *testing.T) {
 	m := New(nil)
-	m.Handle(connectionRequest(device, LinkACL))
+	if _, err := m.Handle(connectionRequest(device, LinkACL)); err != nil {
+		t.Fatal(err)
+	}
 
 	quiet(t, m, connectionComplete(device, 0xf00c, 0))
 
@@ -340,8 +329,6 @@ func TestTheReservedBitsOfAHandleAreMasked(t *testing.T) {
 	}
 }
 
-// An event for a link that is not ours is not an error. Most of what a controller sends belongs to
-// somebody else, and treating that as a fault makes every link look broken.
 func TestAnEventForSomebodyElse(t *testing.T) {
 	m := New(nil)
 
@@ -350,8 +337,6 @@ func TestAnEventForSomebodyElse(t *testing.T) {
 	quiet(t, m, Event{Code: 0x22, Params: []byte{1, 2, 3}})
 }
 
-// Every event that leads with an address is answered, so a truncated one has to be caught rather
-// than read past the end.
 func TestTruncatedEventsAreRefused(t *testing.T) {
 	m := New(nil)
 
@@ -374,8 +359,6 @@ func TestTruncatedEventsAreRefused(t *testing.T) {
 	}
 }
 
-// A store that cannot write is a device with a read-only filesystem, which has to be reported
-// rather than leaving the caller thinking a phone was remembered.
 func TestAStoreThatCannotSaveIsReported(t *testing.T) {
 	m := New(broken{})
 
@@ -395,7 +378,9 @@ func (broken) Forget(Addr) error    { return errBroken }
 func TestForgettingAPhone(t *testing.T) {
 	keys := Memory{device: Key{0: 1}}
 	m := New(keys)
-	m.Handle(connectionRequest(device, LinkACL))
+	if _, err := m.Handle(connectionRequest(device, LinkACL)); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := m.Forget(device); err != nil {
 		t.Fatalf("Forget: %v", err)
@@ -412,8 +397,12 @@ func TestPeersComeBackInAStableOrder(t *testing.T) {
 	m := New(nil)
 	other := Addr{0x01}
 
-	m.Handle(connectionRequest(other, LinkACL))
-	m.Handle(connectionRequest(device, LinkACL))
+	if _, err := m.Handle(connectionRequest(other, LinkACL)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Handle(connectionRequest(device, LinkACL)); err != nil {
+		t.Fatal(err)
+	}
 
 	got := m.Peers()
 	if len(got) != 2 {
@@ -424,7 +413,6 @@ func TestPeersComeBackInAStableOrder(t *testing.T) {
 	}
 }
 
-// A phone is asked what it calls itself, and the answer is 248 bytes however short the name.
 func TestAskingWhatAPhoneIsCalled(t *testing.T) {
 	a := Addr{1, 2, 3, 4, 5, 6}
 
@@ -455,8 +443,6 @@ func TestAskingWhatAPhoneIsCalled(t *testing.T) {
 	}
 }
 
-// A connection complete carries its address behind a status and a handle, where a request leads
-// with one. Reading it from the front asks about six bytes of something else.
 func TestWhereAConnectionCompleteCarriesItsAddress(t *testing.T) {
 	a := Addr{1, 2, 3, 4, 5, 6}
 

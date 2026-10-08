@@ -5,8 +5,6 @@ import (
 	"time"
 )
 
-// anchored fixes the frame/time origin directly, so the tests are about placement rather than about
-// what the clock filter happened to converge to.
 const tailFrames = int64(DefaultHardwareTail * Rate / time.Second)
 
 func anchored(t *testing.T) *Output {
@@ -31,7 +29,6 @@ func tone(n int, v int16) []int16 {
 	return s
 }
 
-// microsFor is the server timestamp that lands audio n frames after the anchor.
 func microsFor(n int64) int64 { return n * 1e6 / Rate }
 
 func rendered(o *Output, from uint64, n int) []int16 {
@@ -40,7 +37,6 @@ func rendered(o *Output, from uint64, n int) []int16 {
 	return buf
 }
 
-// The whole point: the same timestamp lands on the same frame no matter when it arrived.
 func TestAChunkLandsOnTheFrameItsTimestampAsksFor(t *testing.T) {
 	o := anchored(t)
 	o.write(microsFor(480), tone(10, 500))
@@ -53,7 +49,6 @@ func TestAChunkLandsOnTheFrameItsTimestampAsksFor(t *testing.T) {
 	}
 }
 
-// Arriving out of order must not matter, which is what makes a jitter burst recoverable.
 func TestOrderOfArrivalDoesNotMoveAudio(t *testing.T) {
 	o := anchored(t)
 	o.write(microsFor(480), tone(10, 700))
@@ -67,7 +62,6 @@ func TestOrderOfArrivalDoesNotMoveAudio(t *testing.T) {
 	}
 }
 
-// A gap between chunks is silence at the frames nobody filled, not audio pulled earlier.
 func TestAGapPlaysAsSilenceRatherThanShiftingWhatFollows(t *testing.T) {
 	o := anchored(t)
 	o.write(microsFor(0), tone(10, 400))
@@ -81,8 +75,6 @@ func TestAGapPlaysAsSilenceRatherThanShiftingWhatFollows(t *testing.T) {
 	}
 }
 
-// Audio whose frame has already gone is dropped, not played late. Playing it is what leaves a room
-// permanently behind the others.
 func TestAudioThatArrivesAfterItsFrameIsDropped(t *testing.T) {
 	o := anchored(t)
 	rendered(o, 5000, 10)
@@ -97,7 +89,6 @@ func TestAudioThatArrivesAfterItsFrameIsDropped(t *testing.T) {
 	}
 }
 
-// Only the part of a chunk that is still due gets played.
 func TestAPartlyLateChunkKeepsTheFramesStillToCome(t *testing.T) {
 	o := anchored(t)
 	rendered(o, 1005, 1)
@@ -109,7 +100,6 @@ func TestAPartlyLateChunkKeepsTheFramesStillToCome(t *testing.T) {
 	}
 }
 
-// An underrun re-asks for the same frames, so dropping what has passed cannot be a consume.
 func TestRenderingTheSameFrameTwiceGivesTheSameAudio(t *testing.T) {
 	o := anchored(t)
 	o.write(microsFor(0), tone(10, 250))
@@ -122,7 +112,6 @@ func TestRenderingTheSameFrameTwiceGivesTheSameAudio(t *testing.T) {
 	}
 }
 
-// A timestamp we cannot believe must not turn into an allocation.
 func TestAbsurdlyDistantAudioIsRefused(t *testing.T) {
 	o := anchored(t)
 	o.write(microsFor(holdMax+Rate), tone(10, 100))
@@ -155,7 +144,6 @@ func TestSuspendedPlaysNothing(t *testing.T) {
 	}
 }
 
-// A flush ends the timeline: what comes next anchors again rather than against the old stream.
 func TestFlushDropsTheAnchor(t *testing.T) {
 	o := anchored(t)
 	o.write(microsFor(0), tone(10, 100))
@@ -169,7 +157,6 @@ func TestFlushDropsTheAnchor(t *testing.T) {
 	}
 }
 
-// ramp is audio whose frames can be told apart, so a repeated or skipped one shows.
 func ramp(n int) []int16 {
 	s := frames(n)
 	for i := range s {
@@ -178,12 +165,8 @@ func ramp(n int) []int16 {
 	return s
 }
 
-// heard is the write position at which the anchor frame is the one being heard: the tail further on.
 const heard = 1000 + uint64(tailFrames)
 
-// listening anchors a room and queues a ramp from the anchor to well past the write position, as a
-// running stream has, then puts the card where the anchor frame is being heard, so that only the
-// server clock decides what the correction sees.
 func listening(t *testing.T) *Output {
 	t.Helper()
 	o := anchored(t)
@@ -192,14 +175,9 @@ func listening(t *testing.T) *Output {
 	return o
 }
 
-// A room whose speaker runs fast finds itself rendering frames the server clock has not reached yet.
-// The renderer should repeat frames until the two agree, moving the anchor with them.
 func TestDriftCorrectionRepeatsFramesWhenEarly(t *testing.T) {
 	o := listening(t)
 
-	// The server clock says a frame well outside the deadband is due where the card is hearing 1000.
-	// Sized against the band rather than fixed, so that the band can be retuned without rewriting what
-	// this is asking: correct until the two are inside it, and no further.
 	early := int64(4 * driftBand)
 	o.now = func() int64 { return microsFor(-early) }
 	for range 8 * driftBand {
@@ -215,7 +193,6 @@ func TestDriftCorrectionRepeatsFramesWhenEarly(t *testing.T) {
 	if got := len(o.pcm) / Channels; got != 4800+int(o.corrected) {
 		t.Fatalf("queue holds %d frames, want %d", got, 4800+int(o.corrected))
 	}
-	// Everything repeated is the frame at the head; the original run follows intact.
 	first := int16(heard - 1000)
 	for i := range int(o.corrected) + 1 {
 		if o.pcm[i*Channels] != first {
@@ -247,16 +224,12 @@ func TestDriftCorrectionSkipsFramesWhenLate(t *testing.T) {
 	}
 }
 
-// A large error at the start of a stream is a misplaced anchor, and is put right in one step of
-// silence rather than a frame at a time.
 func TestDriftCorrectionSnapsLargeErrors(t *testing.T) {
 	o := listening(t)
 	o.now = func() int64 { return microsFor(-2400) }
 	for range 800 {
 		o.Render(heard, frames(1))
 	}
-	// The snap takes out the bulk of it and the fine correction walks the rest in, stopping once it is
-	// inside the band, so what is left over is the band's width rather than nothing.
 	if o.corrected < 2400-2*driftBand || o.corrected > 2400+driftBand {
 		t.Fatalf("corrected %d frames, want about 2400", o.corrected)
 	}
@@ -268,7 +241,6 @@ func TestDriftCorrectionSnapsLargeErrors(t *testing.T) {
 	}
 }
 
-// Inside the band nothing moves: correcting jitter would be worse than the jitter.
 func TestDriftCorrectionLeavesSmallErrorsAlone(t *testing.T) {
 	o := listening(t)
 	o.now = func() int64 { return microsFor(-10) }

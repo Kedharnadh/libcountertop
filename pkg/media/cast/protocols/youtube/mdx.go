@@ -1,5 +1,3 @@
-// Package youtube is YouTube's receiver protocol: MDX on the cast channel, which hands the sender a
-// lounge screen, and the lounge itself, where the phone sends its queue through YouTube's servers.
 package youtube
 
 import (
@@ -10,14 +8,12 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/media/cast"
 )
 
-// The namespaces a running YouTube receiver reports.
 const (
 	NSMDX          = "urn:x-cast:com.google.youtube.mdx"
 	NSCAC          = "urn:x-cast:com.google.cast.cac"
 	NSDebugOverlay = "urn:x-cast:com.google.cast.debugoverlay"
 )
 
-// Name is what the app table calls this protocol.
 const Name = "youtube"
 
 const (
@@ -25,8 +21,6 @@ const (
 	typeStatus    = "mdxSessionStatus"
 )
 
-// Protocol answers the cast side of YouTube for the applications that name it, and keeps the
-// lounge screens they pair through.
 type Protocol struct {
 	screens func(app string) (screen, device string, ok bool)
 	keeper  *screens
@@ -36,13 +30,11 @@ func init() {
 	cast.Define(Name, func(env cast.Env) cast.Protocol { return New(env) })
 }
 
-// New is the protocol, with its screens loaded from the config.
 func New(env cast.Env) *Protocol {
 	k := newScreens(env)
 	return &Protocol{screens: k.screen, keeper: k}
 }
 
-// Run keeps the lounge screens bound until ctx ends.
 func (p *Protocol) Run(ctx context.Context) {
 	if p.keeper != nil {
 		p.keeper.run(ctx)
@@ -63,7 +55,6 @@ type statusData struct {
 	DeviceID string `json:"deviceId"`
 }
 
-// Receive answers getMdxSessionStatus with the application's lounge screen.
 func (p *Protocol) Receive(app *cast.Application, m cast.Message) ([]cast.Message, error) {
 	if m.Namespace != NSMDX {
 		return nil, cast.ErrUnspoken
@@ -85,7 +76,9 @@ func (p *Protocol) Receive(app *cast.Application, m cast.Message) ([]cast.Messag
 	if !ok {
 		return nil, cast.ErrUnspoken
 	}
-	body, err := json.Marshal(sessionStatus{Type: typeStatus, Data: statusData{ScreenID: screen, DeviceID: device}})
+	body, err := json.Marshal(
+		sessionStatus{Type: typeStatus, Data: statusData{ScreenID: screen, DeviceID: device}},
+	)
 	if err != nil {
 		return nil, err
 	}

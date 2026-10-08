@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-// square stands in for a cover that arrived.
 func square() []byte { return []byte{0xff, 0xd8, 0xff, 0xd9} }
 
 func held(s *Sink, handle string) bool {
@@ -13,10 +12,6 @@ func held(s *Sink, handle string) bool {
 	return raw != nil
 }
 
-// One image at a time. An image arrives over as many answers as it takes and none of them says
-// which image it is, so a second fetch started over the first assembles the two into each other.
-
-// connected puts the conversation where a fetch can start, with nothing on the link to send over.
 func connected(t *testing.T) *Sink {
 	t.Helper()
 	s := testSink()
@@ -30,7 +25,6 @@ func connected(t *testing.T) *Sink {
 	return s
 }
 
-// waiting is the handles still to be fetched, and busy the one in flight.
 func waiting(s *Sink) (busy string, want []string) {
 	s.art.mu.Lock()
 	defer s.art.mu.Unlock()
@@ -62,7 +56,6 @@ func TestOneFetchAtATime(t *testing.T) {
 	}
 }
 
-// What is playing is fetched before what is merely next, once whatever is in flight has finished.
 func TestTheOneBeingPlayedGoesNext(t *testing.T) {
 	s := connected(t)
 
@@ -81,7 +74,6 @@ func TestTheOneBeingPlayedGoesNext(t *testing.T) {
 	}
 }
 
-// A handle already held is not fetched again, and neither is one already waiting.
 func TestNothingIsFetchedTwice(t *testing.T) {
 	s := connected(t)
 
@@ -102,7 +94,6 @@ func TestNothingIsFetchedTwice(t *testing.T) {
 	}
 }
 
-// A fetch that produced nothing still ends, or the queue stops there.
 func TestARefusedImageDoesNotWedgeTheQueue(t *testing.T) {
 	s := connected(t)
 
@@ -118,7 +109,6 @@ func TestARefusedImageDoesNotWedgeTheQueue(t *testing.T) {
 	}
 }
 
-// A fetch that is never answered must not hold the queue for the life of the link.
 func TestAFetchThatIsNeverAnsweredLetsGo(t *testing.T) {
 	s := connected(t)
 
@@ -161,7 +151,6 @@ func TestWhatIsNotWantedIsDropped(t *testing.T) {
 	}
 }
 
-// Wanting one again keeps it, so a queue going round does not fetch the same covers forever.
 func TestWantingOneAgainKeepsIt(t *testing.T) {
 	s := connected(t)
 

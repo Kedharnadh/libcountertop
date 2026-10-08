@@ -5,11 +5,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
-// A seven segment digit, kept apart from the face that arranges them: which bars a digit lights is
-// a fact about seven segment displays, not a decision this device makes.
-
-// lit says which of the seven segments each digit turns on, in the order a b c d e f g: top,
-// top right, bottom right, bottom, bottom left, top left, middle.
+// Segment order a b c d e f g: top, top right, bottom right, bottom, bottom left, top left, middle.
 var lit = map[rune][7]bool{
 	'0': {true, true, true, true, true, true, false},
 	'1': {false, true, true, false, false, false, false},
@@ -23,8 +19,6 @@ var lit = map[rune][7]bool{
 	'9': {true, true, true, true, false, true, true},
 }
 
-// drawDigit paints all seven segments, the off ones included: the ghost of a bar that is not lit is
-// what makes this a display with lamps in it rather than a typeface.
 func Lit(c rune) [7]bool { return lit[c] }
 
 func drawDigit(s ui.Surface, at ui.Rect, c rune, on, off theme.Color) {
@@ -39,13 +33,10 @@ func drawDigit(s ui.Surface, at ui.Rect, c rune, on, off theme.Color) {
 	}
 }
 
-// bars is where the seven segments of one digit go, in the order lit lists them.
 func Bars(at ui.Rect) [7]ui.Rect {
 	thick := max(int(float64(at.H)*barThick), 2)
 	notch := max(int(float64(at.H)*barNotch), 1)
 
-	// Each bar is inset from the corners by the notch, so two meeting at a corner leave a seam
-	// rather than merging into an L.
 	long := at.W - thick - notch*2
 	tall := (at.H-thick)/2 - notch*2
 
@@ -62,8 +53,6 @@ func Bars(at ui.Rect) [7]ui.Rect {
 	}
 }
 
-// drawColon is the two dots, which are always lit: a colon that could be off would be read as a
-// segment rather than as punctuation.
 func drawColon(s ui.Surface, x, top, height int, on theme.Color) {
 	dot := max(int(float64(height)*barThick), 2)
 	span := int(float64(height) * colonGap)

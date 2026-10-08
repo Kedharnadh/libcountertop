@@ -6,7 +6,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 )
 
-// DrawImageFit centers an image within r while preserving its aspect ratio.
 func DrawImageFit(s Surface, img image.Image, r Rect, on theme.Color) {
 	if img == nil || r.W <= 0 || r.H <= 0 {
 		return

@@ -15,8 +15,7 @@ var pinkNoise = Sound{
 	},
 }
 
-// pink is Paul Kellett's filter, which holds to a 3 dB slope within a twentieth of a dB from 9 Hz up.
-// The coefficients were derived at 44.1 kHz and tilt a hair at 48, far below anything audible in noise.
+// Paul Kellett's pink filter: within 0.05 dB of 3 dB/octave from 9 Hz up, derived at 44.1 kHz.
 type pink struct{ b [7]float32 }
 
 func (p *pink) next(g *Gen) float32 {

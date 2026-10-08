@@ -13,20 +13,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// watchPoll is how long a read waits before the loop looks at ctx again. It is not a timeout on
-// anything: conflicts are rare and the socket is usually silent, so this only decides how quickly
-// the watch notices it has been asked to stop.
 const watchPoll = time.Second
 
-// watching answers for the address until ctx ends, and calls lost the moment it is given up.
-//
-// RFC 5227 section 2.4: a host using an address that another host claims defends it once by
-// announcing, and if the argument continues inside DEFEND_INTERVAL it stops using the address
-// instead of fighting. Two machines that both defend forever fill the segment and neither is
-// reachable, which is worse for everyone than one of them going without.
-//
-// The defence goes out on the socket that heard the conflict, which is already bound to the right
-// interface and is one frame rather than the three an announcement sends.
 func watching(ctx context.Context, iface string, ip net.IP, lost func()) error {
 	link, err := net.InterfaceByName(iface)
 	if err != nil {
@@ -75,9 +63,8 @@ func watching(ctx context.Context, iface string, ip net.IP, lost func()) error {
 
 		n, _, err := unix.Recvfrom(fd, buf, 0)
 		if err != nil {
-			// The poll expiring is how this loop breathes; anything else is the socket going wrong
-			// and is worth saying, because a watch that has quietly stopped defends nothing.
-			if errors.Is(err, unix.EAGAIN) || errors.Is(err, unix.EWOULDBLOCK) || errors.Is(err, unix.EINTR) {
+			if errors.Is(err, unix.EAGAIN) || errors.Is(err, unix.EWOULDBLOCK) ||
+				errors.Is(err, unix.EINTR) {
 				continue
 			}
 			return fmt.Errorf("dhcp: watching %s: %w", ip, err)

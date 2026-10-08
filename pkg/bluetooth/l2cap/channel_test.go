@@ -2,7 +2,6 @@ package l2cap
 
 import "testing"
 
-// answer runs one command through a manager and gives back what it said.
 func answer(t *testing.T, m *Manager, commands ...Command) []Command {
 	t.Helper()
 
@@ -13,7 +12,6 @@ func answer(t *testing.T, m *Manager, commands ...Command) []Command {
 	return out
 }
 
-// only is the single command expected back, failing if there is not exactly one.
 func only(t *testing.T, out []Command) Command {
 	t.Helper()
 
@@ -23,15 +21,12 @@ func only(t *testing.T, out []Command) Command {
 	return out[0]
 }
 
-// The whole of opening a channel, the way a phone does it: connect, both ends configure, open.
 func TestAPhoneOpensAChannel(t *testing.T) {
 	m := NewManager(895)
 	m.Serve(PSMAVDTP)
 
-	// It asks for the audio protocol, naming the number it will know the channel by.
 	out := answer(t, m, Connect{PSM: PSMAVDTP, SourceCID: 0x0041}.Command(1))
 
-	// An acceptance, and our own configuration request alongside it.
 	if len(out) != 2 {
 		t.Fatalf("%d commands came back, want an acceptance and a configuration", len(out))
 	}
@@ -65,12 +60,10 @@ func TestAPhoneOpensAChannel(t *testing.T) {
 		t.Errorf("we asked for an mtu of %d, want 895", ours.MTU())
 	}
 
-	// Not open yet: only one end has configured.
 	if ch := m.Channel(local); ch == nil || ch.State != Configuring {
 		t.Fatalf("the channel is %v after one side configured", ch.State)
 	}
 
-	// They configure us.
 	res := only(t, answer(t, m, Configure{
 		DestinationCID: local,
 		Options:        []Option{MTUOption(672)},
@@ -86,13 +79,10 @@ func TestAPhoneOpensAChannel(t *testing.T) {
 		t.Errorf("the answer carried identifier %d, want the question's 2", res.ID)
 	}
 
-	// Still not open: they have not answered ours.
 	if ch := m.Channel(local); ch.State != Configuring {
 		t.Fatalf("the channel opened before both ends configured")
 	}
 
-	// They answer ours, naming the channel by our number rather than theirs — a response says
-	// which of our requests it belongs to, and ours is the only number we could look that up by.
 	answer(t, m, Configured{SourceCID: local, Result: ConfigSuccess}.Command(out[1].ID))
 
 	ch := m.Channel(local)
@@ -110,8 +100,6 @@ func TestAPhoneOpensAChannel(t *testing.T) {
 	}
 }
 
-// A protocol nothing serves is refused with the reason that says so. Told no, a phone moves on;
-// told nothing, it waits.
 func TestAProtocolNobodyServesIsRefused(t *testing.T) {
 	m := NewManager(672)
 	m.Serve(PSMAVDTP)
@@ -133,8 +121,6 @@ func TestAProtocolNobodyServesIsRefused(t *testing.T) {
 	}
 }
 
-// Two channels at once is the ordinary case — SDP to find the device, AVDTP to stream — and they
-// must not be given the same number.
 func TestTwoChannelsGetDifferentNumbers(t *testing.T) {
 	m := NewManager(672)
 	m.Serve(PSMSDP)
@@ -142,7 +128,9 @@ func TestTwoChannelsGetDifferentNumbers(t *testing.T) {
 
 	first, _ := ParseConnected(answer(t, m, Connect{PSM: PSMSDP, SourceCID: 0x0041}.Command(1))[0])
 
-	second, _ := ParseConnected(answer(t, m, Connect{PSM: PSMAVDTP, SourceCID: 0x0042}.Command(2))[0])
+	second, _ := ParseConnected(
+		answer(t, m, Connect{PSM: PSMAVDTP, SourceCID: 0x0042}.Command(2))[0],
+	)
 
 	if first.DestinationCID == second.DestinationCID {
 		t.Fatalf("both channels were given %#x", first.DestinationCID)
@@ -155,13 +143,13 @@ func TestTwoChannelsGetDifferentNumbers(t *testing.T) {
 	}
 }
 
-// Configuration in two parts, which is what happens when the options do not fit one command. The
-// flag has to come back or the far end waits for an acknowledgement it never gets.
 func TestAConfigurationThatArrivesInTwoParts(t *testing.T) {
 	m := NewManager(672)
 	m.Serve(PSMAVDTP)
 
-	opened, _ := ParseConnected(answer(t, m, Connect{PSM: PSMAVDTP, SourceCID: 0x0041}.Command(1))[0])
+	opened, _ := ParseConnected(
+		answer(t, m, Connect{PSM: PSMAVDTP, SourceCID: 0x0041}.Command(1))[0],
+	)
 	local := opened.DestinationCID
 
 	part := only(t, answer(t, m, Configure{
@@ -184,13 +172,13 @@ func TestAConfigurationThatArrivesInTwoParts(t *testing.T) {
 	}
 }
 
-// An option that has to be answered and cannot be is named back, which is what lets the far end try
-// again without it.
 func TestAnUnknownOptionIsNamedRatherThanIgnored(t *testing.T) {
 	m := NewManager(672)
 	m.Serve(PSMAVDTP)
 
-	opened, _ := ParseConnected(answer(t, m, Connect{PSM: PSMAVDTP, SourceCID: 0x0041}.Command(1))[0])
+	opened, _ := ParseConnected(
+		answer(t, m, Connect{PSM: PSMAVDTP, SourceCID: 0x0041}.Command(1))[0],
+	)
 
 	out := only(t, answer(t, m, Configure{
 		DestinationCID: opened.DestinationCID,
@@ -209,12 +197,13 @@ func TestAnUnknownOptionIsNamedRatherThanIgnored(t *testing.T) {
 	}
 }
 
-// A hint may be skipped, and refusing one is how a configuration round never finishes.
 func TestAHintedOptionDoesNotRefuseTheRound(t *testing.T) {
 	m := NewManager(672)
 	m.Serve(PSMAVDTP)
 
-	opened, _ := ParseConnected(answer(t, m, Connect{PSM: PSMAVDTP, SourceCID: 0x0041}.Command(1))[0])
+	opened, _ := ParseConnected(
+		answer(t, m, Connect{PSM: PSMAVDTP, SourceCID: 0x0041}.Command(1))[0],
+	)
 
 	out := only(t, answer(t, m, Configure{
 		DestinationCID: opened.DestinationCID,
@@ -230,7 +219,9 @@ func TestClosingAChannel(t *testing.T) {
 	m := NewManager(672)
 	m.Serve(PSMAVDTP)
 
-	opened, _ := ParseConnected(answer(t, m, Connect{PSM: PSMAVDTP, SourceCID: 0x0041}.Command(1))[0])
+	opened, _ := ParseConnected(
+		answer(t, m, Connect{PSM: PSMAVDTP, SourceCID: 0x0041}.Command(1))[0],
+	)
 	local := opened.DestinationCID
 
 	out := only(t, answer(t, m, Disconnect{
@@ -249,8 +240,6 @@ func TestClosingAChannel(t *testing.T) {
 	}
 }
 
-// Everything is answered, including what makes no sense, because a far end waiting on a reply it
-// will never get is worse than one told no.
 func TestNonsenseIsAnsweredRatherThanIgnored(t *testing.T) {
 	m := NewManager(672)
 
@@ -285,8 +274,6 @@ func TestEchoIsAnswered(t *testing.T) {
 	}
 }
 
-// Nothing here has extended features worth reporting, and "not supported" is a legal answer where
-// silence is not.
 func TestInformationIsAnsweredWithNotSupported(t *testing.T) {
 	m := NewManager(672)
 
@@ -299,8 +286,6 @@ func TestInformationIsAnsweredWithNotSupported(t *testing.T) {
 	}
 }
 
-// A link that drops takes its channels with it. Nothing is sent, because there is nothing left to
-// send it over.
 func TestForgettingALink(t *testing.T) {
 	m := NewManager(672)
 	m.Serve(PSMAVDTP)

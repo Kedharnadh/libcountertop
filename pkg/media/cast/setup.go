@@ -6,10 +6,8 @@ import (
 	"strings"
 )
 
-// NSSetup carries eureka_info, the device description the setup HTTP endpoint also serves.
 const NSSetup = "urn:x-cast:com.google.cast.setup"
 
-// TypeEurekaInfo asks for the device description.
 const TypeEurekaInfo = "eureka_info"
 
 // What a stock Lenovo Smart Display 10 on 1.56.285116 reports.
@@ -20,10 +18,8 @@ const (
 	BuildType     = 2
 )
 
-// SetupDone is setup_state once setup has finished.
 const SetupDone = 60
 
-// Eureka is the device description, the non-personal subset of what a stock device reports.
 type Eureka struct {
 	Name              string  `json:"name"`
 	Version           int     `json:"version"`
@@ -81,11 +77,9 @@ type Multizone struct {
 	MultichannelStatus   int     `json:"multichannel_status"`
 }
 
-// groups are the nested parts, which a stock device only returns when they are asked for by path.
+// A stock device returns these only when asked for by path.
 var groups = []string{"device_info", "build_info", "multizone"}
 
-// NewEureka is the description of a device that has finished setup, with the cast build a stock one
-// has.
 func NewEureka(d Device, manufacturer, system string) Eureka {
 	return Eureka{
 		Name:              d.Name,
@@ -113,12 +107,10 @@ func NewEureka(d Device, manufacturer, system string) Eureka {
 	}
 }
 
-// Select is the description as a stock device answers: every flat field when nothing is named, and
-// only the named dotted paths, nested, when something is. A path it does not have is left out.
 func (e Eureka) Select(params []string) map[string]any {
 	raw, _ := json.Marshal(e)
 	var all map[string]any
-	json.Unmarshal(raw, &all)
+	_ = json.Unmarshal(raw, &all)
 
 	if len(params) == 0 {
 		for _, g := range groups {
@@ -157,12 +149,19 @@ func copyPath(from, to map[string]any, path []string) {
 	}
 }
 
-// UDN is the device id as a dashed UUID, which is how ssdp_udn and the mDNS host spell it.
+// ssdp_udn and the mDNS host spell the id as a dashed UUID.
 func (d Device) UDN() string {
 	if len(d.ID) != 32 {
 		return d.ID
 	}
-	return fmt.Sprintf("%s-%s-%s-%s-%s", d.ID[0:8], d.ID[8:12], d.ID[12:16], d.ID[16:20], d.ID[20:32])
+	return fmt.Sprintf(
+		"%s-%s-%s-%s-%s",
+		d.ID[0:8],
+		d.ID[8:12],
+		d.ID[12:16],
+		d.ID[16:20],
+		d.ID[20:32],
+	)
 }
 
 type setupRequest struct {
@@ -179,8 +178,6 @@ type setupResponse struct {
 	Data           any    `json:"data"`
 }
 
-// params reads the paths a request names, as a list or as the comma-separated string the HTTP
-// endpoint takes.
 func params(data json.RawMessage) []string {
 	var asList struct {
 		Params []string `json:"params"`

@@ -13,7 +13,6 @@ const (
 	dotShare   = 0.22
 )
 
-// Raster provides a progress fallback when the native go-gui layer cannot open.
 func Raster(s ui.Surface, p theme.Theme, progress []startup.Progress, version, skip string) {
 	progress = startup.Display(progress)
 	w, h := s.Size()
@@ -33,7 +32,6 @@ func Raster(s ui.Surface, p theme.Theme, progress []startup.Progress, version, s
 	}
 }
 
-// Version places the build in the bottom-right corner.
 func Version(s ui.Surface, p theme.Theme, version string) {
 	w, h := s.Size()
 	f := ui.MustLoad(ui.Regular, max(int(float64(min(w, h))*0.024), 1))
@@ -41,7 +39,6 @@ func Version(s ui.Surface, p theme.Theme, version string) {
 	ui.DrawText(s, f, w-tw-th, h-2*th, p.Muted, p.Background, version)
 }
 
-// rows draws the list, each name with what it is waiting for under it.
 func rows(s ui.Surface, in ui.Rect, t theme.Theme, progress []startup.Progress) {
 	row, per, colW := rowLayout(in, len(progress))
 
@@ -70,7 +67,6 @@ func rows(s ui.Surface, in ui.Rect, t theme.Theme, progress []startup.Progress) 
 		label, says := ui.Fit(name, at.Name, room), ui.Fit(doing, at.Doing, room)
 		saying := says != ""
 
-		// Both lines are placed as one block, so the second never lands on the first's descenders.
 		_, nameH := name.Measure(label)
 		_, doingH := doing.Measure(says)
 

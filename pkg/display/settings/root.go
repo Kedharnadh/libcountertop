@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
+
 	"github.com/ygelfand/libcountertop/pkg/audio/volume"
 	widget "github.com/ygelfand/libcountertop/pkg/display/model"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
@@ -13,7 +14,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
 
-// Section is an optional settings page supplied by a device capability.
 type Section struct {
 	Label, Glyph string
 	Page         func() shell.View
@@ -32,21 +32,38 @@ type RootDependencies struct {
 	Sections                                         func() []Section
 }
 
-// RootPage composes the common settings navigation. Pages are created only when opened.
 func RootPage(o RootDependencies) *shell.Page {
 	return &shell.Page{Title: say.T("settings.title"), Build: func() ([]widget.Row, []func(int)) {
 		rows := []widget.Row{}
 		acts := []func(int){}
 		add := func(glyph, label, value string, page func() shell.View) {
-			rows = append(rows, widget.Row{Glyph: glyph, Label: say.T(label), Kind: widget.Chevron, Value: value})
+			rows = append(
+				rows,
+				widget.Row{Glyph: glyph, Label: say.T(label), Kind: widget.Chevron, Value: value},
+			)
 			acts = append(acts, func(int) { o.Shell.Push(page()) })
 		}
 		add(gogui.IconGlobe, "settings.network", o.Network.Network(), o.NetworkPage)
 		add(gogui.IconPlug, "settings.features", "", o.FeaturesPage)
-		add(gogui.IconSunnyO, "settings.display", ThemeSays(o.Screen.Read().Theme), func() shell.View { return o.Basic.Display() })
+		add(
+			gogui.IconSunnyO,
+			"settings.display",
+			ThemeSays(o.Screen.Read().Theme),
+			func() shell.View { return o.Basic.Display() },
+		)
 		add(gogui.IconHome, "home.title", "", func() shell.View { return o.Home.Page() })
-		add(gogui.IconSpeaker, "settings.volume", fmt.Sprintf("%d%%", o.Volume.Level()), o.VolumePage)
-		add(gogui.IconComment, "settings.assistants", o.Assistants.Phrases(), func() shell.View { return o.Assistants.Page() })
+		add(
+			gogui.IconSpeaker,
+			"settings.volume",
+			fmt.Sprintf("%d%%", o.Volume.Level()),
+			o.VolumePage,
+		)
+		add(
+			gogui.IconComment,
+			"settings.assistants",
+			o.Assistants.Phrases(),
+			func() shell.View { return o.Assistants.Page() },
+		)
 		if o.Sections != nil {
 			for _, s := range o.Sections() {
 				add(s.Glyph, s.Label, "", s.Page)

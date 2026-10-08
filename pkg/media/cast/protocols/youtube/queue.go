@@ -16,10 +16,8 @@ const (
 	tvUserAgent = "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36; SMART-TV; Tizen 4.0,gzip(gfe)"
 )
 
-// nextURL is YouTube's watch-next endpoint.
 var nextURL = "https://www.youtube.com/youtubei/v1/next"
 
-// Entry is a video in the phone's queue.
 type Entry struct {
 	ID     string
 	Title  string
@@ -29,7 +27,6 @@ type Entry struct {
 	Params string
 }
 
-// Position is where in the phone's queue a video is: the list, its index there, and its params.
 type Position struct {
 	Video  string
 	List   string
@@ -37,16 +34,24 @@ type Position struct {
 	Params string
 }
 
-// neighbours asks YouTube what comes either side of a video in the phone's queue. The phone's device
-// id is what lets it see a remote queue at all.
-func neighbours(ctx context.Context, c *http.Client, at Position, phones []string) (prev, next *Entry, err error) {
+func neighbours(
+	ctx context.Context,
+	c *http.Client,
+	at Position,
+	phones []string,
+) (prev, next *Entry, err error) {
 	devices := make([]map[string]string, 0, len(phones))
 	for _, p := range phones {
 		devices = append(devices, map[string]string{"deviceId": p})
 	}
 	body := map[string]any{
 		"context": map[string]any{
-			"client": map[string]string{"clientName": tvClient, "clientVersion": tvVersion, "hl": "en", "gl": "US"},
+			"client": map[string]string{
+				"clientName":    tvClient,
+				"clientVersion": tvVersion,
+				"hl":            "en",
+				"gl":            "US",
+			},
 		},
 		"videoId":           at.Video,
 		"enableMdxAutoplay": true,
@@ -124,7 +129,6 @@ type nextResponse struct {
 	} `json:"contents"`
 }
 
-// parseNeighbours takes the previous and next videos out of a watch-next answer.
 func parseNeighbours(data []byte) (prev, next *Entry) {
 	var r nextResponse
 	if json.Unmarshal(data, &r) != nil {

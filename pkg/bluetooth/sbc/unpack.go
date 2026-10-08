@@ -2,22 +2,12 @@ package sbc
 
 import "fmt"
 
-// Unpacking a frame: the scale factors, the coded samples, and turning those back into subband
-// values. What comes out still has to go through the synthesis filterbank to be audio.
-//
-// Checked against ffmpeg's libavcodec/sbcdec.c, which descends from the bluez reference. Two things
-// in here are easy to get subtly wrong and were confirmed rather than assumed: joint stereo
-// contributes nrof_subbands bits to the CRC while carrying only nrof_subbands-1 join flags, and the
-// dequantisation is exact integer arithmetic that must not be rewritten in floating point.
-
-// bits reads a bitstream most significant bit first, which is how SBC is packed.
+// SBC packs MSB first.
 type bitReader struct {
 	buf []byte
 	at  int // in bits
 }
 
-// read takes n bits. Running off the end is an error rather than zeros: a frame that says it holds
-// more than it does would otherwise decode to silence and look like a quiet passage.
 func (r *bitReader) read(n int) (uint32, error) {
 	if r.at+n > len(r.buf)*8 {
 		return 0, ErrShort
@@ -34,33 +24,27 @@ func (r *bitReader) read(n int) (uint32, error) {
 	return v, nil
 }
 
-// align moves to the next byte boundary, which is where a frame ends.
 func (r *bitReader) align() {
 	if r.at&7 != 0 {
 		r.at += 8 - r.at&7
 	}
 }
 
-// Frame is one decoded frame, before synthesis.
 type Frame struct {
 	Header Header
 
-	// Join says which subbands have their two channels carried as sum and difference. Only joint
-	// stereo sets any.
 	Join uint32
 
-	// Scale is the exponent per channel and subband, laid out channel-major.
+	// Channel-major.
 	Scale []int
 
-	// Samples are the subband values, indexed block, channel, subband.
+	// Indexed block, channel, subband.
 	Samples [][][]int32
 }
 
-// extraBits is the headroom the reference decoder carries through dequantisation so the synthesis
-// filterbank has precision to work with. Keeping the same number keeps the output identical.
+// The reference decoder's headroom.
 const extraBits = 2
 
-// Unpack reads a whole frame.
 func Unpack(frame []byte) (*Frame, error) {
 	h, err := ParseHeader(frame)
 	if err != nil {
@@ -76,8 +60,7 @@ func Unpack(frame []byte) (*Frame, error) {
 	f := &Frame{Header: h}
 	r := &bitReader{buf: frame[:h.Length()], at: headerBytes * 8}
 
-	// Joint stereo says which subbands are carried as sum and difference. There are
-	// nrof_subbands-1 flags and nrof_subbands bits: the last is reserved and read past.
+	// nrof_subbands-1 join flags in nrof_subbands bits; the last is reserved.
 	if h.Joint() {
 		for sb := range h.Subbands - 1 {
 			v, err := r.read(1)
@@ -112,11 +95,7 @@ func Unpack(frame []byte) (*Frame, error) {
 	return f, nil
 }
 
-// readSamples pulls the coded values out and turns them back into subband samples.
-//
-// The dequantisation is the reference's exact integer expression and is left in that shape on
-// purpose. It looks like it could be simplified or done in floating point; both change the result
-// in the low bits, and the low bits are what the test vectors check.
+// The reference's exact integer dequantisation; the test vectors check the low bits.
 func (f *Frame) readSamples(r *bitReader, bits [][]int) error {
 	h := f.Header
 
@@ -157,11 +136,6 @@ func (f *Frame) readSamples(r *bitReader, bits [][]int) error {
 	return nil
 }
 
-// unjoin turns the subbands that were sent as sum and difference back into two channels.
-//
-// Joint stereo is the default a phone picks, so this runs on almost every real stream. Skipping it
-// does not fail — it produces audio where one channel is the mix and the other is the difference,
-// which sounds like a broken stereo image rather than an error.
 func (f *Frame) unjoin() {
 	if !f.Header.Joint() {
 		return

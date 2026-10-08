@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	esphome "github.com/ygelfand/go-esphome-device"
+
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
@@ -15,8 +16,24 @@ type Feedback struct {
 	choice   *esphome.Select
 }
 
-func NewFeedback(settings storage.Section[schema.Feedback], player Player, deviceID uint32) *Feedback {
-	f := &Feedback{settings: settings, player: player, choice: &esphome.Select{Base: esphome.Base{ObjectID: "device_chime", Name: "Device chime", Icon: "mdi:bell-ring-outline", Category: esphome.CategoryConfig, DeviceID: deviceID}}}
+func NewFeedback(
+	settings storage.Section[schema.Feedback],
+	player Player,
+	deviceID uint32,
+) *Feedback {
+	f := &Feedback{
+		settings: settings,
+		player:   player,
+		choice: &esphome.Select{
+			Base: esphome.Base{
+				ObjectID: "device_chime",
+				Name:     "Device chime",
+				Icon:     "mdi:bell-ring-outline",
+				Category: esphome.CategoryConfig,
+				DeviceID: deviceID,
+			},
+		},
+	}
 	for _, c := range schema.Chimes() {
 		f.choice.Options = append(f.choice.Options, c.Label())
 	}

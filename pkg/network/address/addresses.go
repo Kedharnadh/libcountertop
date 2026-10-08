@@ -1,4 +1,3 @@
-// Package address reads and compares routable interface addresses.
 package address
 
 import (
@@ -7,11 +6,6 @@ import (
 	"strings"
 )
 
-// Addresses is every address something else on the network could reach the device at. Loopback and
-// link-local are left out: neither is an answer to "where is it".
-//
-// Not a Reader: this comes from the network stack rather than from a file under Root, so there is
-// nothing for a test to point somewhere else.
 func Addresses() []net.IP {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
@@ -28,7 +22,6 @@ func Addresses() []net.IP {
 	return ips
 }
 
-// AddressKey is a set of addresses as one comparable string, so a change is one comparison.
 func AddressKey(ips []net.IP) string {
 	out := make([]string, 0, len(ips))
 	for _, ip := range ips {

@@ -2,13 +2,14 @@ package widgets
 
 import (
 	"fmt"
+
 	gogui "github.com/go-gui-org/go-gui/gui"
+
 	"github.com/ygelfand/libcountertop/pkg/display/interaction"
 	"github.com/ygelfand/libcountertop/pkg/display/model"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 )
 
-// RowRenderer supplies editing and preview behavior for a settings row.
 type RowRenderer struct {
 	Field   func(string, model.Row) gogui.View
 	Preview func(string, model.Row) gogui.View
@@ -27,13 +28,20 @@ func icon(glyph string, c gogui.Color) gogui.View {
 	return gogui.Label(glyph, st)
 }
 
-// Row renders a styled settings row.
-func (kit *Toolkit) Row(id, page string, r model.Row, tap func(int), glyphs bool, render RowRenderer) gogui.View {
+func (kit *Toolkit) Row(
+	id, page string,
+	r model.Row,
+	tap func(int),
+	glyphs bool,
+	render RowRenderer,
+) gogui.View {
 	label := []gogui.View{gogui.Label(r.Label, gogui.TextStyle{})}
 	if r.Hint != "" {
 		label = append(label, gogui.Label(r.Hint, secondary()))
 	}
-	head := gogui.Column(gogui.ContainerCfg{Sizing: gogui.FillFit, Padding: gogui.NoPadding, Content: label})
+	head := gogui.Column(
+		gogui.ContainerCfg{Sizing: gogui.FillFit, Padding: gogui.NoPadding, Content: label},
+	)
 
 	content := []gogui.View{head}
 	if glyphs {
@@ -65,7 +73,12 @@ func (kit *Toolkit) Row(id, page string, r model.Row, tap func(int), glyphs bool
 			Content: []gogui.View{gogui.Label(says, secondary())},
 		}))
 		level := gogui.SliderCfg{
-			ID: id + "-slider", Value: float32(r.Level), Min: 0, Max: 100, Sizing: gogui.FillFit, Height: style.Reach(),
+			ID:     id + "-slider",
+			Value:  float32(r.Level),
+			Min:    0,
+			Max:    100,
+			Sizing: gogui.FillFit,
+			Height: style.Reach(),
 			OnChange: func(v float32, e gogui.EventCtx) {
 				level := int(v + 0.5)
 				if snap != nil {
@@ -84,7 +97,10 @@ func (kit *Toolkit) Row(id, page string, r model.Row, tap func(int), glyphs bool
 		if r.Value != "" {
 			content = append(content, gogui.Label(r.Value, secondary()))
 		}
-		content = append(content, icon(gogui.IconArrowRight, gogui.CurrentTheme().Cfg.ColorTextSecondary))
+		content = append(
+			content,
+			icon(gogui.IconArrowRight, gogui.CurrentTheme().Cfg.ColorTextSecondary),
+		)
 		onClick = interaction.Tapped(tap, 0)
 	default:
 		if r.Value != "" {
@@ -112,11 +128,24 @@ func (kit *Toolkit) Row(id, page string, r model.Row, tap func(int), glyphs bool
 	return kit.Pressable(gogui.Row, cfg, onClick)
 }
 
-// Tile renders a selectable preview card.
-func (kit *Toolkit) Tile(id, label string, selected bool, content []gogui.View, tap func(int)) gogui.View {
+func (kit *Toolkit) Tile(
+	id, label string,
+	selected bool,
+	content []gogui.View,
+	tap func(int),
+) gogui.View {
 	t := gogui.CurrentTheme().Cfg
 	content = append(content, gogui.Label(label, gogui.TextStyle{}))
-	cfg := gogui.ContainerCfg{ID: id, HAlign: gogui.HAlignCenter, Padding: gogui.PaddingSmall, Spacing: gogui.SpacingSmall, Radius: gogui.RadiusMedium, SizeBorder: gogui.BorderPx(3), Clip: true, Content: content}
+	cfg := gogui.ContainerCfg{
+		ID:         id,
+		HAlign:     gogui.HAlignCenter,
+		Padding:    gogui.PaddingSmall,
+		Spacing:    gogui.SpacingSmall,
+		Radius:     gogui.RadiusMedium,
+		SizeBorder: gogui.BorderPx(3),
+		Clip:       true,
+		Content:    content,
+	}
 	if selected {
 		cfg.ColorBorder = t.ColorAccent
 	}

@@ -15,7 +15,13 @@ import (
 var lit = []homeassistant.Entity{
 	{ID: "light.k1", Name: "Kitchen Center", State: "on", AreaID: "kitchen", Area: "Kitchen"},
 	{ID: "light.k2", Name: "Kitchen Ring", State: "off", AreaID: "kitchen", Area: "Kitchen"},
-	{ID: "light.k3", Name: "Kitchen Strip", State: "unavailable", AreaID: "kitchen", Area: "Kitchen"},
+	{
+		ID:     "light.k3",
+		Name:   "Kitchen Strip",
+		State:  "unavailable",
+		AreaID: "kitchen",
+		Area:   "Kitchen",
+	},
 	{ID: "light.l1", Name: "Loft Ring", State: "off", AreaID: "loft", Area: "Loft"},
 }
 
@@ -36,7 +42,10 @@ func testBoard(t *testing.T) (*Board, chan sent) {
 	t.Cleanup(e.Close)
 	calls := make(chan sent, 4)
 	c := &cache{
-		got: map[string]*result{"lights": {entities: lit, at: time.Now()}, "switches": {entities: plugs, at: time.Now()}},
+		got: map[string]*result{
+			"lights":   {entities: lit, at: time.Now()},
+			"switches": {entities: plugs, at: time.Now()},
+		},
 		fetch: func(context.Context, homeassistant.Filter) ([]homeassistant.Entity, []homeassistant.Label, error) {
 			return lit, nil, nil
 		},
