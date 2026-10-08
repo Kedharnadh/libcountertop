@@ -2,6 +2,7 @@ package widgets
 
 import (
 	"fmt"
+
 	gogui "github.com/go-gui-org/go-gui/gui"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 )
@@ -14,8 +15,7 @@ type VolumeOptions struct {
 	Current                 VolumeChoice
 	Open, Left              bool
 	Choices                 []VolumeChoice
-	Set                     func(int)
-	Pick                    func(string)
+	Set                     func(string, int)
 	Linger, Expand, Dismiss func()
 	Grip                    func(gogui.View) gogui.View
 }
@@ -24,79 +24,104 @@ func (kit *Toolkit) VolumeCard(w *gogui.Window, options VolumeOptions) gogui.Vie
 	t := gogui.CurrentTheme()
 	vw, vh := w.WindowSize()
 	stream, open := options.Current, options.Open
-	level := options.Current.Level
 	outerPadding := t.PaddingLarge.Top + t.PaddingLarge.Bottom
 	cardPadding := t.PaddingMedium.Top + t.PaddingMedium.Bottom
 	inside := max(0, float32(vh)-outerPadding-cardPadding)
 	rowHeight := style.Reach()
 	titleHeight := t.TextStyleTitle.Size * 1.5
-	fixed := titleHeight + rowHeight + 2*t.SpacingMedium
-	meterHeight := max(0, min(float32(vh)*0.45, inside-fixed))
-	bodyHeight := min(inside, fixed+meterHeight)
+	fixed := titleHeight + rowHeight + 3*t.SpacingMedium + 1
+	meterHeight := max(0, inside-fixed)
+	bodyHeight := inside
 
-	meter := gogui.SliderCfg{
-		ID:        "volume-card",
-		Vertical:  true,
-		Value:     float32(100 - level),
-		Color:     t.Cfg.ColorAccent,
-		ColorLeft: t.Cfg.ColorInterior,
-		Max:       100,
-		Width:     style.Reach(),
-		Size:      style.Reach() * 0.3,
-		ThumbSize: style.Reach() * 0.65,
-		Height:    meterHeight,
-		OnChange: func(v float32, e gogui.EventCtx) {
-			options.Set(100 - int(v+0.5))
-			options.Linger()
-			e.Window.InvalidateLayout()
-		},
-	}
-	capsule := []gogui.View{
-		gogui.Label(fmt.Sprintf("%d", level), t.TextStyleTitle),
-		options.Grip(kit.Slider(meter)),
-		kit.Pressable(gogui.Row, gogui.ContainerCfg{
-			ID:      "volume-stream",
-			Height:  rowHeight,
-			Sizing:  gogui.FitFixed,
-			Padding: gogui.PaddingSmall,
-			Radius:  gogui.RadiusMedium,
-			Content: []gogui.View{gogui.Label(stream.Label, secondary())},
-		}, func(gogui.EventCtx) { options.Expand() }),
-	}
-	content := capsule
-	if open {
-		var choices []gogui.View
-		for _, s := range options.Choices {
-			if s.Key == stream.Key {
-				continue
+	bar := func(choice VolumeChoice, current bool) gogui.View {
+		meter := gogui.SliderCfg{
+			ID:        "volume-slider-" + choice.Key,
+			Vertical:  true,
+			Value:     float32(100 - choice.Level),
+			Color:     t.Cfg.ColorAccent,
+			ColorLeft: t.Cfg.ColorInterior,
+			Max:       100,
+			Width:     style.Reach(),
+			Size:      style.Reach() * 0.3,
+			ThumbSize: style.Reach() * 0.65,
+			Height:    meterHeight,
+			Sizing:    gogui.FixedFixed,
+			OnChange: func(v float32, e gogui.EventCtx) {
+				options.Set(choice.Key, 100-int(v+0.5))
+				options.Linger()
+				e.Window.InvalidateLayout()
+			},
+		}
+		arrow := gogui.IconArrowLeft
+		if options.Left {
+			arrow = gogui.IconArrowRight
+		}
+		if open {
+			if options.Left {
+				arrow = gogui.IconArrowLeft
+			} else {
+				arrow = gogui.IconArrowRight
 			}
-			pick := s
-			choices = append(choices, kit.Pressable(gogui.Row, gogui.ContainerCfg{
-				ID:      "volume-pick-" + s.Key,
+		}
+		icon := t.TextStyleIconMedium
+		icon.Color = secondary().Color
+		label := []gogui.View{gogui.Label(choice.Label, secondary())}
+		if current {
+			label = append([]gogui.View{gogui.Label(arrow, icon)}, label...)
+		}
+		capsule := []gogui.View{
+			gogui.Label(fmt.Sprintf("%d", choice.Level), t.TextStyleTitle),
+			options.Grip(kit.Slider(meter)),
+			gogui.Separator(gogui.SeparatorCfg{Size: 1}),
+			gogui.Row(gogui.ContainerCfg{
+				ID:      "volume-label-" + choice.Key,
 				Height:  rowHeight,
 				Sizing:  gogui.FitFixed,
 				Padding: gogui.PaddingSmall,
 				Radius:  gogui.RadiusMedium,
-				Content: []gogui.View{gogui.Label(s.Label, gogui.TextStyle{})},
-			}, func(gogui.EventCtx) { options.Pick(pick.Key) }))
+				VAlign:  gogui.VAlignMiddle,
+				Spacing: gogui.SpacingSmall,
+				Content: label,
+				OnClick: func(e gogui.EventCtx) {
+					if current {
+						options.Expand()
+					}
+					options.Linger()
+					e.Window.InvalidateLayout()
+					e.Consume()
+				},
+			}),
 		}
-		content = []gogui.View{gogui.Row(gogui.ContainerCfg{
-			Padding: gogui.NoPadding, Spacing: gogui.SpacingMedium, VAlign: gogui.VAlignMiddle,
-			Content: []gogui.View{
-				gogui.Column(gogui.ContainerCfg{Padding: gogui.NoPadding, Spacing: gogui.SpacingMedium, HAlign: gogui.HAlignCenter, Content: capsule}),
-				gogui.Column(gogui.ContainerCfg{ID: "volume-choices", Height: bodyHeight, Sizing: gogui.FitFixed, Scrollable: true, Padding: gogui.NoPadding, Spacing: gogui.SpacingSmall, Content: choices}),
-			},
-		})}
+		return gogui.Column(gogui.ContainerCfg{ID: "volume-bar-" + choice.Key, Height: bodyHeight, Sizing: gogui.FitFixed, Padding: gogui.NoPadding, Spacing: gogui.SpacingMedium, HAlign: gogui.HAlignCenter, Content: capsule})
 	}
+	control := bar(stream, true)
+	columns := []gogui.View{control}
+	if open {
+		columns = nil
+		for _, s := range options.Choices {
+			if s.Key == stream.Key {
+				continue
+			}
+			columns = append(columns, bar(s, false))
+		}
+		if options.Left {
+			columns = append([]gogui.View{control}, columns...)
+		} else {
+			columns = append(columns, control)
+		}
+	}
+	content := []gogui.View{gogui.Row(gogui.ContainerCfg{
+		Padding: gogui.NoPadding, Spacing: gogui.SpacingMedium, VAlign: gogui.VAlignMiddle,
+		Content: columns,
+	})}
 
 	card := gogui.Column(kit.Panel(gogui.ContainerCfg{
-		ID:         "volume",
-		Height:     bodyHeight + cardPadding,
-		Sizing:     gogui.FitFixed,
-		Scrollable: true,
-		Padding:    gogui.PaddingMedium,
-		Spacing:    gogui.SpacingMedium,
-		HAlign:     gogui.HAlignCenter,
+		ID:      "volume",
+		Height:  bodyHeight + cardPadding,
+		Sizing:  gogui.FitFixed,
+		Padding: gogui.PaddingMedium,
+		Spacing: gogui.SpacingMedium,
+		HAlign:  gogui.HAlignCenter,
 		OnClick: func(e gogui.EventCtx) {
 			options.Linger()
 			e.Consume()
