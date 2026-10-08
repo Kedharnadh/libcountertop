@@ -6,7 +6,7 @@ import (
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
-	widget "github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
@@ -24,7 +24,7 @@ func (view *Renderer) Body(w *gogui.Window) gogui.View {
 	master := view.options.UI.Row(
 		"enabled",
 		"home",
-		widget.Row{Label: say.T("home.enabled"), Kind: widget.Toggle, On: on},
+		menu.Row{Label: say.T("home.enabled"), Kind: menu.Toggle, On: on},
 		func(int) { view.options.Engine.SetEnabled(!on) },
 		false,
 	)
@@ -62,7 +62,7 @@ func (view *Renderer) Body(w *gogui.Window) gogui.View {
 	views := []gogui.View{master}
 	for i, s := range view.options.Engine.Selections() {
 		views = append(views, view.options.UI.Row(fmt.Sprintf("sel-%d", i), "home",
-			widget.Row{Label: s.Name(), Kind: widget.Chevron, Value: homecontrol.Summary(s.Pick())},
+			menu.Row{Label: s.Name(), Kind: menu.Chevron, Value: homecontrol.Summary(s.Pick())},
 			func(int) { view.options.Shell.Push(view.options.Engine.SelectionPage(s)) }, false))
 	}
 	wc := view.options.Weather.Read()
@@ -71,11 +71,11 @@ func (view *Renderer) Body(w *gogui.Window) gogui.View {
 		says = wc.Entity
 	}
 	views = append(views, view.options.UI.Row("weather", "home",
-		widget.Row{Label: say.T("weather.title"), Kind: widget.Chevron, Value: says},
+		menu.Row{Label: say.T("weather.title"), Kind: menu.Chevron, Value: says},
 		func(int) { view.options.Shell.Push(view.options.WeatherPage()) }, false))
 	views = append(views, Separator())
 	views = append(views, view.options.UI.Row("refresh", "home",
-		widget.Row{Label: say.T("home.refresh")},
+		menu.Row{Label: say.T("home.refresh")},
 		func(int) { view.options.Engine.Refresh() }, false))
 	return Column(views)
 }
@@ -104,7 +104,7 @@ func (view *Renderer) blocked(w *gogui.Window, title, hint string, retry func(in
 			view.options.UI.Row(
 				"retry",
 				"home",
-				widget.Row{Glyph: gogui.IconSync, Label: say.T("home.check")},
+				menu.Row{Glyph: gogui.IconSync, Label: say.T("home.check")},
 				retry,
 				true,
 			),
@@ -160,14 +160,14 @@ func (view *Renderer) Picker(p *homecontrol.Picker) gogui.View {
 			view.options.UI.Row(
 				"failed",
 				"picker",
-				widget.Row{Label: say.T("home.failed"), Hint: view.failure(s.Err)},
+				menu.Row{Label: say.T("home.failed"), Hint: view.failure(s.Err)},
 				nil,
 				false,
 			),
 			view.options.UI.Row(
 				"retry",
 				"picker",
-				widget.Row{Glyph: gogui.IconSync, Label: say.T("home.retry")},
+				menu.Row{Glyph: gogui.IconSync, Label: say.T("home.retry")},
 				func(int) { p.Retry() },
 				true,
 			),
@@ -180,7 +180,7 @@ func (view *Renderer) Picker(p *homecontrol.Picker) gogui.View {
 				view.options.UI.Row(
 					"loading",
 					"picker",
-					widget.Row{Label: say.T("home.loading")},
+					menu.Row{Label: say.T("home.loading")},
 					nil,
 					false,
 				),
@@ -244,7 +244,7 @@ func (view *Renderer) labelsTab(p *homecontrol.Picker, s homecontrol.Snapshot) g
 				view.options.UI.Row(
 					"empty",
 					"labels",
-					widget.Row{Label: say.T("home.empty")},
+					menu.Row{Label: say.T("home.empty")},
 					nil,
 					false,
 				),
@@ -253,18 +253,18 @@ func (view *Renderer) labelsTab(p *homecontrol.Picker, s homecontrol.Snapshot) g
 	}
 	var views []gogui.View
 	for i, l := range s.Labels {
-		views = append(views, view.options.UI.Row(fmt.Sprintf("label-%d", i), "labels", widget.Row{
+		views = append(views, view.options.UI.Row(fmt.Sprintf("label-%d", i), "labels", menu.Row{
 			Label: l.Name, Hint: say.F("home.label.count", map[string]any{"N": l.Count}),
-			Kind: widget.Toggle, On: l.On, Chosen: l.On,
+			Kind: menu.Toggle, On: l.On, Chosen: l.On,
 		}, func(int) { p.ToggleLabel(l.ID) }, false))
 	}
 	return Column(views)
 }
 
 func (view *Renderer) manualTab(p *homecontrol.Picker, s homecontrol.Snapshot) gogui.View {
-	views := []gogui.View{view.options.UI.Row("all", "manual", widget.Row{
+	views := []gogui.View{view.options.UI.Row("all", "manual", menu.Row{
 		Label: say.T("home.everything." + p.Sel.Key),
-		Kind:  widget.Toggle, On: s.Pick.All, Chosen: s.Pick.All,
+		Kind:  menu.Toggle, On: s.Pick.All, Chosen: s.Pick.All,
 	}, func(int) { p.ToggleAll() }, false)}
 	if len(s.Areas) == 0 {
 		views = append(
@@ -272,7 +272,7 @@ func (view *Renderer) manualTab(p *homecontrol.Picker, s homecontrol.Snapshot) g
 			view.options.UI.Row(
 				"empty",
 				"manual",
-				widget.Row{Label: say.T("home.empty")},
+				menu.Row{Label: say.T("home.empty")},
 				nil,
 				false,
 			),
@@ -288,8 +288,8 @@ func (view *Renderer) manualTab(p *homecontrol.Picker, s homecontrol.Snapshot) g
 			if name == "" {
 				name = e.ID
 			}
-			row := view.options.UI.Row(fmt.Sprintf("entity-%d-%d", i, j), "manual", widget.Row{
-				Label: name, Kind: widget.Toggle, On: e.On, Chosen: e.Included, Dim: !e.Available(),
+			row := view.options.UI.Row(fmt.Sprintf("entity-%d-%d", i, j), "manual", menu.Row{
+				Label: name, Kind: menu.Toggle, On: e.On, Chosen: e.Included, Dim: !e.Available(),
 			}, func(int) { p.ToggleEntity(e.ID) }, false)
 			views = append(views, gogui.Row(gogui.ContainerCfg{
 				Sizing:  gogui.FillFit,

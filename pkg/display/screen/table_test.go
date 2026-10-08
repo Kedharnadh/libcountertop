@@ -53,7 +53,7 @@ func TestEveryRowIsNamed(t *testing.T) {
 func TestAnUnsetSizeReadsAsTheBoardsSize(t *testing.T) {
 	tb := NewTable(func() string { return schema.UISizeMini })
 	c := schema.DefaultScreen()
-	if got := tb.Row("size").Read(&c); got != schema.UISizeMini {
+	if got := tb.MustRow("size").Read(&c); got != schema.UISizeMini {
 		t.Errorf("an unset size reads %q, want %q", got, schema.UISizeMini)
 	}
 }

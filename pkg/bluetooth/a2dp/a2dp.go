@@ -21,8 +21,8 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/pair"
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/sbc"
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/sdp"
+	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 	"github.com/ygelfand/libcountertop/pkg/media/pcm"
-	media "github.com/ygelfand/libcountertop/pkg/media/source"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
@@ -597,9 +597,9 @@ type Queue interface {
 	Adjust(func([]int16))
 }
 type Media interface {
-	Began(media.Source)
-	Ended(media.Source)
-	Release(media.Source)
+	Began(nowplaying.Source)
+	Ended(nowplaying.Source)
+	Release(nowplaying.Source)
 	Changed()
 }
 type Dependencies struct {

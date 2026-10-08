@@ -12,7 +12,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	videoplayer "github.com/ygelfand/libcountertop/pkg/display/videopage"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
-	media "github.com/ygelfand/libcountertop/pkg/media/source"
+	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 	"github.com/ygelfand/libcountertop/pkg/say"
 )
 
@@ -23,14 +23,14 @@ const (
 
 type scrub struct {
 	mu    sync.Mutex
-	sk    media.Seeker
+	sk    nowplaying.Seeker
 	to    time.Duration
 	held  bool
 	until time.Time
 	timer *time.Timer
 }
 
-func (s *scrub) move(sk media.Seeker, to time.Duration) {
+func (s *scrub) move(sk nowplaying.Seeker, to time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sk, s.to, s.held = sk, to, true
@@ -127,7 +127,7 @@ func (p *Renderer) Body(w *gogui.Window) gogui.View {
 	words := []gogui.View{
 		gogui.Text(
 			gogui.TextCfg{
-				Text:      media.Heading(now),
+				Text:      nowplaying.Heading(now),
 				TextStyle: t.TextStyleTitle,
 				Mode:      gogui.TextModeWrap,
 			},
@@ -144,7 +144,7 @@ func (p *Renderer) Body(w *gogui.Window) gogui.View {
 	}
 	var controls []gogui.View
 	if now.Length > 0 {
-		sk, _ := p.options.Player.Transport().(media.Seeker)
+		sk, _ := p.options.Player.Transport().(nowplaying.Seeker)
 		controls = append(controls, p.progress(w, now, sk, secondary(), nil))
 	}
 	controls = append(controls, p.transport(now), p.loudness())
@@ -266,8 +266,8 @@ func clockLabel(
 
 func (p *Renderer) progress(
 	w *gogui.Window,
-	now media.Now,
-	sk media.Seeker,
+	now nowplaying.Now,
+	sk nowplaying.Seeker,
 	st gogui.TextStyle,
 	marks []videoplayer.Mark,
 ) gogui.View {
@@ -305,28 +305,28 @@ func (p *Renderer) progress(
 
 type control struct {
 	glyph   string
-	do      func(media.Controller)
-	need    media.Controls
+	do      func(nowplaying.Controller)
+	need    nowplaying.Controls
 	primary bool
 }
 
-func (p *Renderer) transport(now media.Now) gogui.View {
-	middle := control{glyph: gogui.IconPlay, do: media.Controller.Play, primary: true}
+func (p *Renderer) transport(now nowplaying.Now) gogui.View {
+	middle := control{glyph: gogui.IconPlay, do: nowplaying.Controller.Play, primary: true}
 	if now.Playing && !now.Paused {
 		middle = control{
 			glyph:   gogui.IconPause,
-			do:      media.Controller.Pause,
-			need:    media.CanPause,
+			do:      nowplaying.Controller.Pause,
+			need:    nowplaying.CanPause,
 			primary: true,
 		}
 	}
 	t := gogui.CurrentTheme()
 	var shown []gogui.View
 	for i, b := range []control{
-		{glyph: gogui.IconFastBackward, do: media.Controller.Previous, need: media.CanPrevious},
+		{glyph: gogui.IconFastBackward, do: nowplaying.Controller.Previous, need: nowplaying.CanPrevious},
 		middle,
-		{glyph: gogui.IconStop, do: media.Controller.Stop, need: media.CanStop},
-		{glyph: gogui.IconFastForward, do: media.Controller.Next, need: media.CanNext},
+		{glyph: gogui.IconStop, do: nowplaying.Controller.Stop, need: nowplaying.CanStop},
+		{glyph: gogui.IconFastForward, do: nowplaying.Controller.Next, need: nowplaying.CanNext},
 	} {
 		if b.need != 0 && !now.Can.Has(b.need) {
 			continue
@@ -380,7 +380,7 @@ func (p *Renderer) loudness() gogui.View {
 	})
 }
 
-func (p *Renderer) queue(now media.Now) gogui.View {
+func (p *Renderer) queue(now nowplaying.Now) gogui.View {
 	rows := []gogui.View{gogui.Label(say.T("player.next"), secondary())}
 	for i, tr := range now.Queue {
 		play := tr.Play
@@ -476,7 +476,7 @@ func (p *Renderer) Mini(w *gogui.Window) gogui.View {
 		)
 	}
 
-	words := []gogui.View{gogui.Label(media.Heading(now), gogui.TextStyle{})}
+	words := []gogui.View{gogui.Label(nowplaying.Heading(now), gogui.TextStyle{})}
 	if now.Artist != "" {
 		words = append(words, gogui.Label(now.Artist, secondary()))
 	}
@@ -496,7 +496,7 @@ func (p *Renderer) Mini(w *gogui.Window) gogui.View {
 		}
 	}
 	controls := []control{middle}
-	if now.Can.Has(media.CanNext) {
+	if now.Can.Has(nowplaying.CanNext) {
 		controls = append(
 			controls,
 			control{

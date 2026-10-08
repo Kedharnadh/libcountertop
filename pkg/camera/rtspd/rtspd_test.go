@@ -4,16 +4,16 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ygelfand/libcountertop/pkg/camera/helper"
+	"github.com/ygelfand/libcountertop/pkg/camera/camerafeed"
 	"github.com/ygelfand/libcountertop/pkg/camera/onvif"
 	"github.com/ygelfand/libcountertop/pkg/camera/session"
 )
 
 type sizes []session.Size
 
-func (sizes) Join(int) (*session.Session, <-chan helper.Frame, error) { return nil, nil, nil }
-func (sizes) Leave(*session.Session, <-chan helper.Frame)             {}
-func (s sizes) Sizes() []session.Size                                 { return s }
+func (sizes) Join(int) (*session.Session, <-chan camerafeed.Frame, error) { return nil, nil, nil }
+func (sizes) Leave(*session.Session, <-chan camerafeed.Frame)             {}
+func (s sizes) Sizes() []session.Size                                     { return s }
 
 func TestEachServedStreamIsAProfile(t *testing.T) {
 	s := New(Options{

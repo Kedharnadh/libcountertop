@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ygelfand/libcountertop/pkg/camera/helper"
+	"github.com/ygelfand/libcountertop/pkg/camera/camerafeed"
 )
 
 var ErrMuted = errors.New("livecam: the camera is off while the microphones are muted")
@@ -25,7 +25,7 @@ type Picture struct {
 }
 
 type Transport interface {
-	Next(time.Duration) (helper.Frame, error)
+	Next(time.Duration) (camerafeed.Frame, error)
 	AskStill() error
 	AskKey() error
 	SetParams(string) error
@@ -33,13 +33,13 @@ type Transport interface {
 }
 
 type Snapshot struct {
-	Config     helper.Config
+	Config     camerafeed.Config
 	Key        string
 	StillExtra time.Duration
 }
 type Options struct {
 	Snapshot                   func() Snapshot
-	Open                       func(helper.Config) (Transport, error)
+	Open                       func(camerafeed.Config) (Transport, error)
 	Muted                      func() bool
 	Recover                    func(error)
 	RestartError               error
@@ -56,9 +56,9 @@ type Session struct {
 	hub      *Hub
 	stream   Transport
 	snapshot Snapshot
-	out      [2][]chan helper.Frame
+	out      [2][]chan camerafeed.Frame
 	config   [2][]byte
-	stills   []chan helper.Frame
+	stills   []chan camerafeed.Frame
 	users    int
 	err      error
 	done     chan struct{}
@@ -165,7 +165,7 @@ func (h *Hub) retire(s *Session, cause error) {
 	}
 	_ = s.stream.Close()
 }
-func (h *Hub) Join(at int) (*Session, <-chan helper.Frame, error) {
+func (h *Hub) Join(at int) (*Session, <-chan camerafeed.Frame, error) {
 	if at < 0 || at >= 2 {
 		return nil, nil, fmt.Errorf("livecam: invalid stream %d", at)
 	}
@@ -179,15 +179,15 @@ func (h *Hub) Join(at int) (*Session, <-chan helper.Frame, error) {
 		h.release(s)
 		return nil, nil, fmt.Errorf("livecam: stream %d is unavailable", at)
 	}
-	ch := make(chan helper.Frame, h.options.Depth)
+	ch := make(chan camerafeed.Frame, h.options.Depth)
 	if s.config[at] != nil {
-		ch <- helper.Frame{Data: s.config[at], Config: true}
+		ch <- camerafeed.Frame{Data: s.config[at], Config: true}
 	}
 	s.out[at] = append(s.out[at], ch)
 	return s, ch, nil
 }
 
-func (h *Hub) Leave(s *Session, frames <-chan helper.Frame) {
+func (h *Hub) Leave(s *Session, frames <-chan camerafeed.Frame) {
 	if s == nil || s.hub != h {
 		return
 	}
@@ -198,7 +198,7 @@ func (h *Hub) Leave(s *Session, frames <-chan helper.Frame) {
 		before := len(s.out[at])
 		s.out[at] = slices.DeleteFunc(
 			s.out[at],
-			func(ch chan helper.Frame) bool { return ch == frames },
+			func(ch chan camerafeed.Frame) bool { return ch == frames },
 		)
 		found = found || len(s.out[at]) != before
 	}
@@ -241,7 +241,7 @@ func (h *Hub) Still(within time.Duration) (Picture, error) {
 			return Picture{}, s.Err()
 		}
 	}
-	got := make(chan helper.Frame, 1)
+	got := make(chan camerafeed.Frame, 1)
 	h.mu.Lock()
 	if s.err != nil || h.cur != s {
 		h.mu.Unlock()
@@ -254,7 +254,10 @@ func (h *Hub) Still(within time.Duration) (Picture, error) {
 	h.mu.Unlock()
 	defer func() {
 		h.mu.Lock()
-		s.stills = slices.DeleteFunc(s.stills, func(ch chan helper.Frame) bool { return ch == got })
+		s.stills = slices.DeleteFunc(
+			s.stills,
+			func(ch chan camerafeed.Frame) bool { return ch == got },
+		)
 		h.mu.Unlock()
 	}()
 	if err != nil {
@@ -316,7 +319,7 @@ func (h *Hub) read(s *Session) {
 	for {
 		frame, err := s.stream.Next(h.options.Wait)
 		if err != nil {
-			if helper.Timeout(err) {
+			if camerafeed.Timeout(err) {
 				err = fmt.Errorf("livecam: no frame from the camera within %s", h.options.Wait)
 			}
 			h.mu.Lock()

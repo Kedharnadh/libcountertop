@@ -247,13 +247,25 @@ const (
 	FeedFloat
 )
 
-type GL interface {
-	Texture(unit int, img *image.RGBA) error
+type Programs interface {
 	Program(src string, passes Passes) error
 	Values(u []float32, amount, radius float32, passes int) error
+}
+
+type Textures interface {
+	Texture(unit int, img *image.RGBA) error
+}
+
+type Geometry interface {
 	Points(p []Point) error
 	Lines(s []Segment) error
 	Quads(q []Quad) error
+}
+
+type GL interface {
+	Programs
+	Textures
+	Geometry
 }
 
 type Quad struct {

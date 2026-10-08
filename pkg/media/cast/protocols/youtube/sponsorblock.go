@@ -15,7 +15,6 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/ygelfand/libcountertop/pkg/media/cast/preferences"
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
 )
 
@@ -146,7 +145,7 @@ func (s *station) segments(ctx context.Context, r *Resolver, id string) []Segmen
 	}
 	s.mu.Unlock()
 
-	segs, err := Segments(ctx, r.http, SponsorBlockURL, id, preferences.Get().YouTube.Skip)
+	segs, err := Segments(ctx, r.http, SponsorBlockURL, id, r.Preferences.Settings().YouTube.Skip)
 	if err != nil {
 		slog.Warn("youtube sponsorblock", "video", id, "err", err)
 		return nil

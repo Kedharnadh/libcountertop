@@ -36,7 +36,7 @@ type screens struct {
 const Idle = 10 * time.Minute
 
 func newScreens(opts cast.Env) *screens {
-	s := &screens{opts: opts, id: preferences.Get().YouTube}
+	s := &screens{opts: opts, id: opts.Preferences.Settings().YouTube}
 	if s.id.Device == "" {
 		s.id.Device = uuid()
 		s.save()
@@ -77,7 +77,7 @@ func (s *screens) save() {
 	s.mu.Lock()
 	id := s.id
 	s.mu.Unlock()
-	if err := preferences.SaveScreens(id.Device, id.Music, id.Video); err != nil {
+	if err := s.opts.Preferences.SaveScreens(id.Device, id.Music, id.Video); err != nil {
 		slog.Warn("saving the youtube screens", "err", err)
 	}
 }
@@ -87,7 +87,7 @@ func (s *screens) run(ctx context.Context) {
 	s.ctx = ctx
 	s.stations = map[string]*station{}
 	s.live = map[string]bool{}
-	onDemand := preferences.Get().YouTube.OnDemand
+	onDemand := s.opts.Preferences.Settings().YouTube.OnDemand
 	for _, theme := range []string{ThemeMusic, ThemeYouTube, ThemeTV} {
 		s.stations[theme] = newStation(ctx, theme, s.opts)
 	}

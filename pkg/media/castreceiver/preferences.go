@@ -8,7 +8,7 @@ import (
 
 func Preferences(requestIDPrefix string, s storage.Section[schema.Cast]) preferences.Provider {
 	return preferences.Provider{
-		RequestIDPrefix: requestIDPrefix,
+		Prefix: requestIDPrefix,
 		Read: func() preferences.Settings {
 			c := s.Read()
 			return preferences.Settings{
@@ -23,7 +23,7 @@ func Preferences(requestIDPrefix string, s storage.Section[schema.Cast]) prefere
 				Prime: preferences.Prime{Persist: c.Prime.Persist, SkipIntro: c.Prime.SkipIntro},
 			}
 		},
-		SaveScreens: func(device, music, video string) error {
+		Save: func(device, music, video string) error {
 			return schema.NewCastWriter(s).Screens(device, music, video)
 		},
 	}

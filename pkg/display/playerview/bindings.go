@@ -11,13 +11,13 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	videoplayer "github.com/ygelfand/libcountertop/pkg/display/videopage"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
-	media "github.com/ygelfand/libcountertop/pkg/media/source"
+	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 )
 
 type Player interface {
-	Now() media.Now
+	Now() nowplaying.Now
 	Named() string
-	Transport() media.Controller
+	Transport() nowplaying.Controller
 	Open()
 }
 type Dependencies struct {

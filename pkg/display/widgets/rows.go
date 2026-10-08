@@ -6,13 +6,13 @@ import (
 	gogui "github.com/go-gui-org/go-gui/gui"
 
 	"github.com/ygelfand/libcountertop/pkg/display/interaction"
-	"github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 )
 
 type RowRenderer struct {
-	Field   func(string, model.Row) gogui.View
-	Preview func(string, model.Row) gogui.View
+	Field   func(string, menu.Row) gogui.View
+	Preview func(string, menu.Row) gogui.View
 	Grip    func(gogui.View) gogui.View
 }
 
@@ -30,7 +30,7 @@ func icon(glyph string, c gogui.Color) gogui.View {
 
 func (kit *Toolkit) Row(
 	id, page string,
-	r model.Row,
+	r menu.Row,
 	tap func(int),
 	glyphs bool,
 	render RowRenderer,
@@ -59,10 +59,10 @@ func (kit *Toolkit) Row(
 	}
 	var onClick func(gogui.EventCtx)
 	switch r.Kind {
-	case model.Toggle:
+	case menu.Toggle:
 		content = append(content, kit.controls().Toggle(id+"-switch", r.On))
 		onClick = interaction.Tapped(tap, 0)
-	case model.Slider:
+	case menu.Slider:
 		snap := r.Snap
 		says := r.Value
 		if says == "" {
@@ -91,9 +91,9 @@ func (kit *Toolkit) Row(
 			},
 		}
 		content = append(content, render.Grip(kit.Slider(level)))
-	case model.Field:
+	case menu.Field:
 		content = append(content, render.Field(page+"/"+id, r))
-	case model.Chevron:
+	case menu.Chevron:
 		if r.Value != "" {
 			content = append(content, gogui.Label(r.Value, secondary()))
 		}
@@ -124,7 +124,7 @@ func (kit *Toolkit) Row(
 		Disabled: r.Dim,
 		Content:  content,
 	}
-	kit.ListRow(&cfg, Chosen(r.Kind == model.Toggle && r.Chosen))
+	kit.ListRow(&cfg, Chosen(r.Kind == menu.Toggle && r.Chosen))
 	return kit.Pressable(gogui.Row, cfg, onClick)
 }
 

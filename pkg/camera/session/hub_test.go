@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ygelfand/libcountertop/pkg/camera/helper"
+	"github.com/ygelfand/libcountertop/pkg/camera/camerafeed"
 )
 
 type fakeTransport struct {
-	frames chan helper.Frame
+	frames chan camerafeed.Frame
 	closed chan struct{}
 	once   sync.Once
 	asks   chan struct{}
@@ -21,17 +21,17 @@ type fakeTransport struct {
 
 func fakeStream() *fakeTransport {
 	return &fakeTransport{
-		frames: make(chan helper.Frame, 128),
+		frames: make(chan camerafeed.Frame, 128),
 		closed: make(chan struct{}),
 		asks:   make(chan struct{}, 16),
 	}
 }
-func (f *fakeTransport) Next(time.Duration) (helper.Frame, error) {
+func (f *fakeTransport) Next(time.Duration) (camerafeed.Frame, error) {
 	select {
 	case frame := <-f.frames:
 		return frame, nil
 	case <-f.closed:
-		return helper.Frame{}, net.ErrClosed
+		return camerafeed.Frame{}, net.ErrClosed
 	}
 }
 func (f *fakeTransport) AskStill() error        { f.asks <- struct{}{}; return nil }
@@ -44,8 +44,11 @@ func newFakeHub(t *testing.T, linger time.Duration) (*Hub, **fakeTransport, *ato
 	var current *fakeTransport
 	var opens atomic.Int32
 	h := New(Options{Snapshot: func() Snapshot {
-		return Snapshot{Config: helper.Config{Width: 640, Height: 480, SubWidth: 320}, Key: "one"}
-	}, Open: func(helper.Config) (Transport, error) { current = fakeStream(); opens.Add(1); return current, nil }, Linger: linger, Poll: time.Hour})
+		return Snapshot{
+			Config: camerafeed.Config{Width: 640, Height: 480, SubWidth: 320},
+			Key:    "one",
+		}
+	}, Open: func(camerafeed.Config) (Transport, error) { current = fakeStream(); opens.Add(1); return current, nil }, Linger: linger, Poll: time.Hour})
 	t.Cleanup(h.Close)
 	return h, &current, &opens
 }
@@ -103,7 +106,7 @@ func TestStillTimeoutIsRemovedAndTheNextRequestCanComplete(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("new still was suppressed")
 	}
-	(*current).frames <- helper.Frame{Still: true, Data: []byte{1, 2, 3, 4}, Width: 2, Height: 1}
+	(*current).frames <- camerafeed.Frame{Still: true, Data: []byte{1, 2, 3, 4}, Width: 2, Height: 1}
 	if err := <-done; err != nil {
 		t.Fatal(err)
 	}
@@ -114,10 +117,14 @@ func TestConfigurationReplacementAndMuteRetireTheCorrectSession(t *testing.T) {
 	var streams []*fakeTransport
 	h := New(
 		Options{
-			Snapshot: func() Snapshot { return Snapshot{Config: helper.Config{Width: 640}, Key: fmt.Sprint(shape.Load())} },
+			Snapshot: func() Snapshot { return Snapshot{Config: camerafeed.Config{Width: 640}, Key: fmt.Sprint(shape.Load())} },
 			Muted:    muted.Load,
-			Open:     func(helper.Config) (Transport, error) { f := fakeStream(); streams = append(streams, f); return f, nil },
-			Poll:     time.Hour,
+			Open: func(camerafeed.Config) (Transport, error) {
+				f := fakeStream()
+				streams = append(streams, f)
+				return f, nil
+			},
+			Poll: time.Hour,
 		},
 	)
 	defer h.Close()
@@ -154,7 +161,7 @@ func TestSubscribersReceiveCachedHeadersAndOneSlowSubscriberDoesNotBlockAnother(
 	if err != nil {
 		t.Fatal(err)
 	}
-	(*current).frames <- helper.Frame{Data: []byte{7}, Config: true}
+	(*current).frames <- camerafeed.Frame{Data: []byte{7}, Config: true}
 	select {
 	case <-first:
 	case <-time.After(time.Second):
@@ -173,7 +180,7 @@ func TestSubscribersReceiveCachedHeadersAndOneSlowSubscriberDoesNotBlockAnother(
 		t.Fatal("cached header not delivered")
 	}
 	for range 100 {
-		(*current).frames <- helper.Frame{Data: []byte{9}}
+		(*current).frames <- camerafeed.Frame{Data: []byte{9}}
 	}
 	select {
 	case frame := <-second:

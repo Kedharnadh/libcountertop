@@ -6,14 +6,14 @@ import (
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
-	"github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
 type PageRenderer struct {
-	Row     func(string, string, model.Row, func(int), bool) gogui.View
-	Tile    func(*gogui.Window, string, string, model.Cell, func(int)) gogui.View
+	Row     func(string, string, menu.Row, func(int), bool) gogui.View
+	Tile    func(*gogui.Window, string, string, menu.Cell, func(int)) gogui.View
 	Preview func(*gogui.Window, func(ui.Rect) bool) gogui.View
 	Beside  func(*gogui.Window, gogui.View, gogui.View) gogui.View
 }
@@ -23,7 +23,7 @@ func PageBody(w *gogui.Window, p *shell.Page, render PageRenderer) gogui.View {
 	switch {
 	case p.Build != nil:
 		rows, taps := p.Build()
-		glyphs := slices.ContainsFunc(rows, func(r model.Row) bool { return r.Glyph != "" })
+		glyphs := slices.ContainsFunc(rows, func(r menu.Row) bool { return r.Glyph != "" })
 		for i, r := range rows {
 			var tap func(int)
 			if i < len(taps) {

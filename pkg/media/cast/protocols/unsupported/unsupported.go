@@ -7,7 +7,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
 )
 
-type Protocol struct{ out playback.Output }
+type Protocol struct{ out playback.Attendant }
 
 func init() {
 	cast.Define(

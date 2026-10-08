@@ -10,8 +10,9 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// RFC 5227 1.1: ANNOUNCE_NUM 2, ANNOUNCE_INTERVAL 2 s.
 const (
-	announceCount = 3
+	announceCount = 2
 	announceEvery = 2 * time.Second
 )
 

@@ -7,7 +7,7 @@ import (
 
 	face "github.com/ygelfand/libcountertop/pkg/display/clockface"
 	"github.com/ygelfand/libcountertop/pkg/display/dashboard"
-	widget "github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
@@ -24,28 +24,47 @@ type IdleState struct {
 	Visual  config.Visual
 	Weather config.Weather
 }
-type IdleActions interface {
-	SetAfter(config.Delay)
-	SetKind(int, string)
-	SetSource(int, config.Source)
-	SetFace(config.Face)
+type Placement interface {
 	SetPosition(config.Position)
 	SetAlign(config.Align)
 	SetSize(config.Size)
 }
-type WeatherActions interface {
-	Title(string) string
+type IdleSlots interface {
+	SetKind(int, string)
+	SetSource(int, config.Source)
+}
+type IdleClock interface {
+	SetAfter(config.Delay)
+	SetFace(config.Face)
+}
+type IdleActions interface {
+	IdleClock
+	IdleSlots
+	Placement
+}
+type WeatherCatalog interface {
 	Fetch()
 	Offered() ([]ha.Entity, error, bool)
+}
+type WeatherEntity interface {
+	Title(string) string
+	SetEntity(string)
+}
+type WeatherPlaces interface {
 	SetDashboard(bool)
 	SetIdle(bool)
+}
+type WeatherRendering interface {
 	SetAnimate(bool)
 	SetThemed(bool)
-	SetPosition(config.Position)
-	SetAlign(config.Align)
-	SetSize(config.Size)
-	SetEntity(string)
 	SetLook(config.WeatherLook)
+}
+type WeatherActions interface {
+	WeatherCatalog
+	WeatherEntity
+	WeatherPlaces
+	WeatherRendering
+	Placement
 }
 type MediaIdle interface{ SetIdle(config.Delay) }
 type VisualLabel interface{ SetLabel(string) }
@@ -88,50 +107,50 @@ func IdleKindLabel(kind string) string {
 func (p *IdlePages) Page() *shell.Page {
 	return &shell.Page{
 		Title: say.T("idle.title"),
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			c := p.options.Preferences.IdleState().Idle
 			i := p.options.Idle
-			return []widget.Row{
-					{Label: say.T("idle.after"), Kind: widget.Chevron, Value: c.After.Label()},
+			return []menu.Row{
+					{Label: say.T("idle.after"), Kind: menu.Chevron, Value: c.After.Label()},
 					{
 						Label: say.T("idle.media"),
 						Hint:  say.T("idle.media.hint"),
-						Kind:  widget.Slider,
+						Kind:  menu.Slider,
 						Level: MediaLevel(c.Media),
 						Snap:  MediaSnap,
 						Value: c.Media.Label(),
 					},
 					{
 						Label: say.T("idle.visual1"),
-						Kind:  widget.Chevron,
+						Kind:  menu.Chevron,
 						Value: IdleKindLabel(c.First.Kind),
 					},
 					{
 						Label: say.T("idle.source1"),
-						Kind:  widget.Chevron,
+						Kind:  menu.Chevron,
 						Value: c.First.Source.Label(),
 					},
 					{
 						Label: say.T("idle.visual2"),
-						Kind:  widget.Chevron,
+						Kind:  menu.Chevron,
 						Value: IdleKindLabel(c.Second.Kind),
 					},
 					{
 						Label: say.T("idle.source2"),
-						Kind:  widget.Chevron,
+						Kind:  menu.Chevron,
 						Value: c.Second.Source.Label(),
 					},
-					{Label: say.T("idle.face"), Kind: widget.Chevron, Value: c.Face.Label()},
+					{Label: say.T("idle.face"), Kind: menu.Chevron, Value: c.Face.Label()},
 					{
 						Label: say.T("idle.vertical"),
-						Kind:  widget.Chevron,
+						Kind:  menu.Chevron,
 						Value: c.Position.Label(),
 					},
-					{Label: say.T("idle.horizontal"), Kind: widget.Chevron, Value: c.Align.Label()},
-					{Label: say.T("idle.size"), Kind: widget.Chevron, Value: c.Size.Label()},
+					{Label: say.T("idle.horizontal"), Kind: menu.Chevron, Value: c.Align.Label()},
+					{Label: say.T("idle.size"), Kind: menu.Chevron, Value: c.Size.Label()},
 					{
 						Label: say.T("idle.label"),
-						Kind:  widget.Field,
+						Kind:  menu.Field,
 						Value: p.options.Preferences.IdleState().Visual.Label,
 						Save:  p.options.Visuals.SetLabel,
 					},
@@ -259,31 +278,31 @@ func (p *IdlePages) Placed(change func(*config.Idle)) func(ui.Surface, ui.Rect, 
 func (p *IdlePages) Weather() *shell.Page {
 	return &shell.Page{
 		Title: say.T("weather.title"),
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			c := p.options.Preferences.IdleState().Weather
-			return []widget.Row{
+			return []menu.Row{
 					{
 						Label: say.T("weather.entity"),
-						Kind:  widget.Chevron,
+						Kind:  menu.Chevron,
 						Value: p.options.Weather.Title(c.Entity),
 					},
-					{Label: say.T("weather.dashboard"), Kind: widget.Toggle, On: c.Dashboard},
-					{Label: say.T("weather.idle"), Kind: widget.Toggle, On: c.Idle},
-					{Label: say.T("weather.look"), Kind: widget.Chevron, Value: c.Look.Label()},
-					{Label: say.T("weather.animate"), Kind: widget.Toggle, On: c.Animate},
+					{Label: say.T("weather.dashboard"), Kind: menu.Toggle, On: c.Dashboard},
+					{Label: say.T("weather.idle"), Kind: menu.Toggle, On: c.Idle},
+					{Label: say.T("weather.look"), Kind: menu.Chevron, Value: c.Look.Label()},
+					{Label: say.T("weather.animate"), Kind: menu.Toggle, On: c.Animate},
 					{
 						Label: say.T("weather.themed"),
 						Hint:  say.T("weather.themed.hint"),
-						Kind:  widget.Toggle,
+						Kind:  menu.Toggle,
 						On:    c.Themed,
 					},
 					{
 						Label: say.T("idle.vertical"),
-						Kind:  widget.Chevron,
+						Kind:  menu.Chevron,
 						Value: c.Position.Label(),
 					},
-					{Label: say.T("idle.horizontal"), Kind: widget.Chevron, Value: c.Align.Label()},
-					{Label: say.T("weather.size"), Kind: widget.Chevron, Value: c.Size.Label()},
+					{Label: say.T("idle.horizontal"), Kind: menu.Chevron, Value: c.Align.Label()},
+					{Label: say.T("weather.size"), Kind: menu.Chevron, Value: c.Size.Label()},
 				}, []func(int){
 					func(int) {
 						p.options.Weather.Fetch()
@@ -323,13 +342,13 @@ func (p *IdlePages) Weather() *shell.Page {
 func (p *IdlePages) WeatherEntities() *shell.Page {
 	return &shell.Page{
 		Title: say.T("weather.entity"),
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			list, err, fetched := p.options.Weather.Offered()
 			switch {
 			case !fetched:
-				return []widget.Row{{Label: say.T("home.loading")}}, []func(int){nil}
+				return []menu.Row{{Label: say.T("home.loading")}}, []func(int){nil}
 			case err != nil:
-				return []widget.Row{
+				return []menu.Row{
 						{Label: say.T("home.failed"), Hint: err.Error()},
 						{Label: say.T("home.retry")},
 					},
@@ -338,13 +357,13 @@ func (p *IdlePages) WeatherEntities() *shell.Page {
 						func(int) { p.options.Weather.Fetch() },
 					}
 			case len(list) == 0:
-				return []widget.Row{{Label: say.T("weather.none")}}, []func(int){nil}
+				return []menu.Row{{Label: say.T("weather.none")}}, []func(int){nil}
 			}
 			now := p.options.Preferences.IdleState().Weather.Entity
-			rows := make([]widget.Row, 0, len(list))
+			rows := make([]menu.Row, 0, len(list))
 			taps := make([]func(int), 0, len(list))
 			for _, e := range list {
-				rows = append(rows, widget.Row{Label: e.Name, Hint: e.ID, Chosen: e.ID == now})
+				rows = append(rows, menu.Row{Label: e.Name, Hint: e.ID, Chosen: e.ID == now})
 				taps = append(taps, func(int) { p.options.Weather.SetEntity(e.ID) })
 			}
 			return rows, taps
@@ -355,12 +374,12 @@ func (p *IdlePages) WeatherEntities() *shell.Page {
 func (p *IdlePages) WeatherLooks() *shell.Page {
 	return &shell.Page{
 		Title: say.T("weather.look"),
-		Tiles: func() ([]widget.Cell, []func(int)) {
+		Tiles: func() ([]menu.Cell, []func(int)) {
 			now := p.options.Preferences.IdleState().Weather.Look
-			var cells []widget.Cell
+			var cells []menu.Cell
 			var taps []func(int)
 			for _, l := range config.WeatherLooks() {
-				cells = append(cells, widget.Cell{Label: l.Label(), Chosen: l == now, Weather: l})
+				cells = append(cells, menu.Cell{Label: l.Label(), Chosen: l == now, Weather: l})
 				taps = append(taps, func(int) { p.options.Weather.SetLook(l) })
 			}
 			return cells, taps

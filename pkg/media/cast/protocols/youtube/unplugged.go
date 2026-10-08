@@ -452,7 +452,7 @@ func (u *unplugged) heartbeat(ctx context.Context, token, data, interval string)
 		u.licMu.Lock()
 		ctt := u.ctt
 		u.licMu.Unlock()
-		at := strconv.FormatInt(time.Now().Add(-liveLead()).UnixMilli(), 10)
+		at := strconv.FormatInt(time.Now().Add(-liveLead(u.prefs)).UnixMilli(), 10)
 		body := map[string]any{
 			"videoId":             u.id,
 			"sequenceNumber":      seq,
@@ -561,6 +561,7 @@ type unplugged struct {
 	album         string
 	mark          string
 	changed       func()
+	prefs         preferences.Provider
 
 	cancel context.CancelFunc
 
@@ -593,7 +594,7 @@ func openUnplugged(
 	u := &unplugged{
 		hc: env.http, ctt: ctt, id: id, cpn: nonce(),
 		session: a.HeartbeatParams.DRMSessionID, params: a.StreamingData.DRMParams,
-		Width: video.Width, Height: video.Height,
+		Width: video.Width, Height: video.Height, prefs: env.prefs,
 	}
 	u.p, err = sealed.Open("youtube tv", surf, cert, u.licensed, env.resample)
 	if err != nil {
@@ -624,7 +625,7 @@ func openUnplugged(
 		return nil, err
 	}
 	oldest, _ := strconv.ParseInt(a.PlayerConfig.Live.MinDvrSequence, 10, 64)
-	start := tvStart(head, oldest, at, time.Now())
+	start := tvStart(head, oldest, liveLead(u.prefs), at, time.Now())
 	go func() { u.fail(u.follow(run, video.URL, start, true)) }()
 	go func() { u.fail(u.follow(run, audio.URL, start, false)) }()
 	go u.guide(run)
@@ -792,8 +793,8 @@ func (u *unplugged) Close() { u.shut() }
 
 const tvSegment = 5 * time.Second
 
-func tvStart(head, oldest int64, at time.Duration, now time.Time) int64 {
-	lead := max(int64(liveLead()/tvSegment), 1)
+func tvStart(head, oldest int64, delay, at time.Duration, now time.Time) int64 {
+	lead := max(int64(delay/tvSegment), 1)
 	start := head - lead
 	if wallClock(at) {
 		if back := int64(now.Sub(time.Unix(0, 0).Add(at)) / tvSegment); back > lead {
@@ -803,8 +804,8 @@ func tvStart(head, oldest int64, at time.Duration, now time.Time) int64 {
 	return start
 }
 
-func liveLead() time.Duration {
-	return time.Duration(preferences.Get().YouTube.LiveDelay) * time.Second
+func liveLead(p preferences.Provider) time.Duration {
+	return time.Duration(p.Settings().YouTube.LiveDelay) * time.Second
 }
 
 type surfaceEnv struct {
@@ -812,6 +813,7 @@ type surfaceEnv struct {
 	surface  func() *surface.Client
 	resample func(from int) func([]int16) []int16
 	limits   playback.Target
+	prefs    preferences.Provider
 }
 
 func within(v, most int) bool { return most <= 0 || v <= most }

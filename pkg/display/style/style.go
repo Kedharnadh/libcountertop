@@ -91,17 +91,33 @@ const (
 	Chosen
 )
 
-type Kit interface {
+type Inputs interface {
 	Toggle(id string, on bool) gogui.View
+	Field(cfg *gogui.InputCfg)
+}
+
+type Gauges interface {
 	Slider(cfg *gogui.SliderCfg)
 	Seek(marks []Span) func(gogui.SliderLookState) gogui.SliderParts
 	Progress(cfg *gogui.ProgressBarCfg)
-	Field(cfg *gogui.InputCfg)
-	Panel(cfg *gogui.ContainerCfg)
+}
+
+type Buttons interface {
 	Key(cfg *gogui.ContainerCfg, st *gogui.TextStyle, state State)
 	Tab(cfg *gogui.ContainerCfg, st *gogui.TextStyle, state State)
+}
+
+type Surfaces interface {
+	Panel(cfg *gogui.ContainerCfg)
 	Tile(cfg *gogui.ContainerCfg, state State)
 	Row(cfg *gogui.ContainerCfg, state State)
+}
+
+type Kit interface {
+	Inputs
+	Gauges
+	Buttons
+	Surfaces
 }
 
 type Span struct {

@@ -38,7 +38,7 @@ func rows(table func() *Table, uiSize func() string) []Setting {
 			Kind: setting.Number, Min: 0, Max: 100, Unit: "%", Slider: true,
 			Read: func(s *schema.Screen) string { return strconv.Itoa(s.Backlight) },
 			Write: func(s *schema.Screen, v string) error {
-				n, err := table().Row("backlight").Number(v)
+				n, err := table().MustRow("backlight").Number(v)
 				if err != nil {
 					return err
 				}
@@ -58,7 +58,7 @@ func rows(table func() *Table, uiSize func() string) []Setting {
 			Write: func(s *schema.Screen, v string) error {
 				on, ok := setting.Boolean(v)
 				if !ok {
-					return table().Row("auto").Bad(v, "on or off")
+					return table().MustRow("auto").Bad(v, "on or off")
 				}
 				s.Mode = schema.ModeManual
 				if on {
@@ -80,7 +80,7 @@ func rows(table func() *Table, uiSize func() string) []Setting {
 			},
 			Write: func(s *schema.Screen, v string) error {
 				if !slices.Contains(style.Names(), v) {
-					return table().Row("style").Bad(v, "")
+					return table().MustRow("style").Bad(v, "")
 				}
 				s.Style = v
 				return nil
@@ -99,7 +99,7 @@ func rows(table func() *Table, uiSize func() string) []Setting {
 			},
 			Write: func(s *schema.Screen, v string) error {
 				if !slices.Contains(schema.ScreenSizes(), v) {
-					return table().Row("size").Bad(v, "")
+					return table().MustRow("size").Bad(v, "")
 				}
 				s.Size = v
 				return nil
@@ -113,7 +113,7 @@ func rows(table func() *Table, uiSize func() string) []Setting {
 			Read: func(s *schema.Screen) string { return s.Theme },
 			Write: func(s *schema.Screen, v string) error {
 				if _, ok := theme.ByName(v); !ok && v != style.ThemeDefault {
-					return table().Row("theme").Bad(v, "")
+					return table().MustRow("theme").Bad(v, "")
 				}
 				s.Theme = v
 				return nil
@@ -132,7 +132,7 @@ func rows(table func() *Table, uiSize func() string) []Setting {
 						return nil
 					}
 				}
-				return table().Row("drawer").Bad(v, "")
+				return table().MustRow("drawer").Bad(v, "")
 			},
 		},
 	}

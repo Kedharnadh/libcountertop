@@ -4,7 +4,7 @@ import (
 	gogui "github.com/go-gui-org/go-gui/gui"
 
 	"github.com/ygelfand/libcountertop/pkg/display/interaction"
-	"github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -50,11 +50,11 @@ func (u *UI) HoldStill(e gogui.EventCtx)   { u.Gestures.HoldStill(e) }
 func (u *UI) Input(cfg gogui.InputCfg, save func()) gogui.View {
 	return u.Editor.Field(u.Kit(), cfg, save)
 }
-func (u *UI) Field(id string, r model.Row) gogui.View { return u.Editor.Row(u.Kit(), id, r) }
-func (u *UI) Row(id, page string, r model.Row, tap func(int), glyphs bool) gogui.View {
+func (u *UI) Field(id string, r menu.Row) gogui.View { return u.Editor.Row(u.Kit(), id, r) }
+func (u *UI) Row(id, page string, r menu.Row, tap func(int), glyphs bool) gogui.View {
 	return u.Toolkit.Row(id, page, r, tap, glyphs, RowRenderer{
-		Field:   func(id string, r model.Row) gogui.View { return u.Editor.Row(u.Kit(), id, r) },
-		Preview: func(page string, r model.Row) gogui.View { return RowPreview(page, r, u.Palette()) },
+		Field:   func(id string, r menu.Row) gogui.View { return u.Editor.Row(u.Kit(), id, r) },
+		Preview: func(page string, r menu.Row) gogui.View { return RowPreview(page, r, u.Palette()) },
 		Grip:    u.Grip,
 	})
 }

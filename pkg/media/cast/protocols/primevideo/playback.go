@@ -13,8 +13,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-
-	"github.com/ygelfand/libcountertop/pkg/media/cast/preferences"
 )
 
 const (
@@ -29,6 +27,8 @@ type Account struct {
 	Device      string
 	Marketplace string
 	Locale      string
+
+	RequestIDPrefix string
 }
 
 type Screen struct {
@@ -49,10 +49,10 @@ type URLSet struct {
 	URL string `json:"url"`
 }
 
-func nerid() string {
+func (a Account) nerid() string {
 	var b [8]byte
 	rand.Read(b[:])
-	return preferences.RequestIDPrefix() + hex.EncodeToString(b[:])
+	return a.RequestIDPrefix + hex.EncodeToString(b[:])
 }
 
 func address(host, path string, query [][2]string) string {
@@ -71,7 +71,7 @@ func RefreshEnvelope(
 ) (Envelope, error) {
 	target := address(PlaybackHost, "/playback/tags/getRefreshedPlaybackEnvelope", [][2]string{
 		{"deviceID", a.Device}, {"deviceTypeID", DeviceType}, {"gascEnabled", "true"},
-		{"marketplaceID", a.Marketplace}, {"firmware", "1"}, {"version", "1"}, {"nerid", nerid()},
+		{"marketplaceID", a.Marketplace}, {"firmware", "1"}, {"version", "1"}, {"nerid", a.nerid()},
 	})
 	body := map[string]any{
 		"deviceId": a.Device, "deviceTypeId": DeviceType,
@@ -106,7 +106,7 @@ func VodResources(
 	target := address(ZazHost, "/playback/prs/GetVodPlaybackResources", [][2]string{
 		{"deviceID", a.Device}, {"deviceTypeID", DeviceType}, {"gascEnabled", "true"},
 		{"marketplaceID", a.Marketplace}, {"uxLocale", a.Locale}, {"firmware", "1"},
-		{"titleId", title}, {"nerid", nerid()},
+		{"titleId", title}, {"nerid", a.nerid()},
 	})
 	body := map[string]any{
 		"globalParameters": map[string]any{
@@ -282,7 +282,7 @@ func License(
 	target := address(ZazHost, "/playback/drm-vod/GetWidevineLicense", [][2]string{
 		{"deviceID", a.Device}, {"deviceTypeID", DeviceType}, {"gascEnabled", "true"},
 		{"marketplaceID", a.Marketplace}, {"uxLocale", a.Locale}, {"firmware", "1"},
-		{"titleId", title}, {"nerid", nerid()},
+		{"titleId", title}, {"nerid", a.nerid()},
 	})
 	body := map[string]any{
 		"includeHdcpTestKey": true,
@@ -353,7 +353,7 @@ func Catalog(
 		},
 		{"firmware", "1"},
 		{"widgetScheme", "pvplayer-web-v2"},
-		{"nerid", nerid()},
+		{"nerid", a.nerid()},
 	})
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {

@@ -6,20 +6,20 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/audio/sound"
 	"github.com/ygelfand/libcountertop/pkg/audio/tone"
-	"github.com/ygelfand/libcountertop/pkg/media/source"
+	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 )
 
 type (
-	Now    = source.Now
-	Kind   = source.Kind
-	Source = source.Source
+	Now    = nowplaying.Now
+	Kind   = nowplaying.Kind
+	Source = nowplaying.Source
 )
 
 const (
-	FromBluetooth = source.FromBluetooth
-	FromGroup     = source.FromGroup
-	FromCast      = source.FromCast
-	CanPause      = source.CanPause
+	FromBluetooth = nowplaying.FromBluetooth
+	FromGroup     = nowplaying.FromGroup
+	FromCast      = nowplaying.FromCast
+	CanPause      = nowplaying.CanPause
 )
 
 type speaker struct{}

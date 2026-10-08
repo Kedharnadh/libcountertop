@@ -11,9 +11,9 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/audio/sound"
 	"github.com/ygelfand/libcountertop/pkg/audio/upsample"
 	"github.com/ygelfand/libcountertop/pkg/hook"
+	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 	"github.com/ygelfand/libcountertop/pkg/media/ownership"
 	"github.com/ygelfand/libcountertop/pkg/media/pcm"
-	"github.com/ygelfand/libcountertop/pkg/media/source"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
 
@@ -39,7 +39,7 @@ type Options[P Speaker] struct {
 }
 
 type Player[P Speaker] struct {
-	Begun hook.Hook[source.Source]
+	Begun hook.Hook[nowplaying.Source]
 
 	mp     *esphome.MediaPlayer
 	stream *pcm.Stream
@@ -49,7 +49,7 @@ type Player[P Speaker] struct {
 
 	speaking atomic.Bool
 
-	owner *ownership.Owner[source.Source]
+	owner *ownership.Owner[nowplaying.Source]
 	queue *queue[P]
 }
 
@@ -85,9 +85,9 @@ func New[P Speaker](o Options[P]) *Player[P] {
 		sound:  o.Sound,
 		volume: o.Volume,
 		notify: o.Changed,
-		owner: ownership.New(func(s source.Source) uint8 {
+		owner: ownership.New(func(s nowplaying.Source) uint8 {
 			if s == nil {
-				return uint8(source.FromQueue)
+				return uint8(nowplaying.FromQueue)
 			}
 			return uint8(s.Kind())
 		}),
@@ -217,7 +217,7 @@ func (p *Player[P]) state() esphome.MediaPlayerState {
 	}
 }
 
-func (p *Player[P]) Began(s source.Source) {
+func (p *Player[P]) Began(s nowplaying.Source) {
 	replaced, fresh, displaced := p.owner.Begin(s)
 	p.Changed()
 	if fresh {
@@ -228,9 +228,9 @@ func (p *Player[P]) Began(s source.Source) {
 	}
 }
 
-func (p *Player[P]) Ended(s source.Source) { p.owner.End(s) }
+func (p *Player[P]) Ended(s nowplaying.Source) { p.owner.End(s) }
 
-func (p *Player[P]) External(s source.Source) {
+func (p *Player[P]) External(s nowplaying.Source) {
 	if s == nil {
 		p.owner.Clear()
 	} else {
@@ -239,7 +239,7 @@ func (p *Player[P]) External(s source.Source) {
 	p.Changed()
 }
 
-func (p *Player[P]) Release(s source.Source) {
+func (p *Player[P]) Release(s nowplaying.Source) {
 	if p.owner.Release(s) {
 		p.Changed()
 	}
@@ -247,7 +247,7 @@ func (p *Player[P]) Release(s source.Source) {
 
 func (p *Player[P]) ResetSession() { p.owner.ResetSession() }
 
-func (p *Player[P]) Holder() source.Source { return p.source() }
+func (p *Player[P]) Holder() nowplaying.Source { return p.source() }
 
 func (p *Player[P]) Sourced() (string, bool) {
 	s, held := p.owner.Get()
@@ -257,25 +257,25 @@ func (p *Player[P]) Sourced() (string, bool) {
 	return "the local queue", false
 }
 
-func (p *Player[P]) Transport() source.Controller {
+func (p *Player[P]) Transport() nowplaying.Controller {
 	if s := p.source(); s != nil {
 		return s
 	}
 	return p.queue
 }
 
-func (p *Player[P]) Now() source.Now {
+func (p *Player[P]) Now() nowplaying.Now {
 	if s := p.source(); s != nil {
 		return s.Now()
 	}
 	return p.queued()
 }
 
-func (p *Player[P]) From() source.Kind {
+func (p *Player[P]) From() nowplaying.Kind {
 	if s := p.source(); s != nil {
 		return s.Kind()
 	}
-	return source.FromQueue
+	return nowplaying.FromQueue
 }
 
 func (p *Player[P]) Named() string {
@@ -329,27 +329,31 @@ func (p *Player[P]) Stop() {
 	p.Changed()
 }
 
-func (p *Player[P]) source() source.Source { s, _ := p.owner.Get(); return s }
+func (p *Player[P]) source() nowplaying.Source { s, _ := p.owner.Get(); return s }
 
-func (p *Player[P]) external() source.Source {
-	if s := p.source(); s != source.Source(p.queue) {
+func (p *Player[P]) external() nowplaying.Source {
+	if s := p.source(); s != nowplaying.Source(p.queue) {
 		return s
 	}
 	return nil
 }
 
-func (p *Player[P]) queued() source.Now {
+func (p *Player[P]) queued() nowplaying.Now {
 	playing, paused := p.stream.Playing()
-	return source.Now{Playing: playing, Paused: paused, Can: source.CanPause | source.CanStop}
+	return nowplaying.Now{
+		Playing: playing,
+		Paused:  paused,
+		Can:     nowplaying.CanPause | nowplaying.CanStop,
+	}
 }
 
 type queue[P Speaker] struct{ p *Player[P] }
 
-func (q *queue[P]) Play()             { q.p.stream.Unpause() }
-func (q *queue[P]) Pause()            { q.p.stream.Pause() }
-func (q *queue[P]) Stop()             { q.p.stream.Stop(); q.p.Changed() }
-func (q *queue[P]) Next()             {}
-func (q *queue[P]) Previous()         {}
-func (q *queue[P]) Now() source.Now   { return q.p.queued() }
-func (q *queue[P]) Kind() source.Kind { return source.FromQueue }
-func (q *queue[P]) Label() string     { return "" }
+func (q *queue[P]) Play()                 { q.p.stream.Unpause() }
+func (q *queue[P]) Pause()                { q.p.stream.Pause() }
+func (q *queue[P]) Stop()                 { q.p.stream.Stop(); q.p.Changed() }
+func (q *queue[P]) Next()                 {}
+func (q *queue[P]) Previous()             {}
+func (q *queue[P]) Now() nowplaying.Now   { return q.p.queued() }
+func (q *queue[P]) Kind() nowplaying.Kind { return nowplaying.FromQueue }
+func (q *queue[P]) Label() string         { return "" }

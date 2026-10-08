@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/ygelfand/libcountertop/pkg/camera/helper"
+	"github.com/ygelfand/libcountertop/pkg/camera/camerafeed"
 	camerasession "github.com/ygelfand/libcountertop/pkg/camera/session"
 	"github.com/ygelfand/libcountertop/pkg/media/rtc"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
@@ -74,7 +74,7 @@ func (c *Camera) Frames(at int, sized func(Size)) (<-chan rtc.Frame, func()) {
 func pump(
 	ctx context.Context,
 	s *camerasession.Session,
-	frames <-chan helper.Frame,
+	frames <-chan camerafeed.Frame,
 	out chan<- rtc.Frame,
 ) {
 	var config []byte

@@ -4,11 +4,11 @@ import (
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
-	media "github.com/ygelfand/libcountertop/pkg/media/source"
+	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 )
 
 type Controls interface {
-	media.Source
+	nowplaying.Source
 	Seek(to time.Duration)
 	CanSeek() bool
 }

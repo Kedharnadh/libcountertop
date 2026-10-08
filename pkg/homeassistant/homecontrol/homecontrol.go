@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	widget "github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant"
 	"github.com/ygelfand/libcountertop/pkg/say"
@@ -114,15 +114,15 @@ func (e *Engine) SetCombined(on bool) {
 func (e *Engine) SelectionPage(s Selection) *shell.Page {
 	return &shell.Page{
 		Title: s.Name(),
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			on, from := s.Controlled(), s.GroupFrom()
-			rows := []widget.Row{
-				{Label: say.T("home.enable"), Kind: widget.Toggle, On: on},
-				{Label: say.T("home.devices"), Kind: widget.Chevron, Value: Summary(s.Pick())},
+			rows := []menu.Row{
+				{Label: say.T("home.enable"), Kind: menu.Toggle, On: on},
+				{Label: say.T("home.devices"), Kind: menu.Chevron, Value: Summary(s.Pick())},
 				{
 					Label: say.T("home.group"),
 					Hint:  groupHint(from),
-					Kind:  widget.Slider,
+					Kind:  menu.Slider,
 					Level: groupLevel(from),
 					Snap:  groupSnap,
 					Value: strconv.Itoa(from),
@@ -137,7 +137,7 @@ func (e *Engine) SelectionPage(s Selection) *shell.Page {
 				combine := e.options.Settings.Read().Combine
 				rows = append(
 					rows,
-					widget.Row{Label: say.T("home.combine"), Kind: widget.Toggle, On: combine},
+					menu.Row{Label: say.T("home.combine"), Kind: menu.Toggle, On: combine},
 				)
 				taps = append(taps, func(int) { e.SetCombined(!combine) })
 			}

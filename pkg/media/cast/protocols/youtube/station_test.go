@@ -206,7 +206,7 @@ func TestTheStationPublishesToCast(t *testing.T) {
 	s := newStation(
 		context.Background(),
 		ThemeTV,
-		cast.Env{Publish: func(_ cast.Playing, p *cast.Published) { got = append(got, p) }},
+		cast.Env{Publish: func(_ cast.Controls, p *cast.Published) { got = append(got, p) }},
 	)
 	s.list, s.index = "PL1", 2
 	s.reportLoading("vid", 0)

@@ -4,7 +4,7 @@ import (
 	"image"
 	"log/slog"
 
-	widget "github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/visual"
 	"github.com/ygelfand/libcountertop/pkg/say"
@@ -14,18 +14,18 @@ import (
 func (p *LookPages) Page(slot int) *shell.Page {
 	return &shell.Page{
 		Title: say.T("look.title"),
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			look := p.options.Preferences.Wake.Read().Slot(slot).Look
-			rows := []widget.Row{
-				{Label: say.T("look.place"), Kind: widget.Chevron, Value: look.Place.Label()},
+			rows := []menu.Row{
+				{Label: say.T("look.place"), Kind: menu.Chevron, Value: look.Place.Label()},
 			}
 			taps := []func(int){p.open(func() shell.View { return p.Place(slot) })}
 			for _, st := range config.Stages() {
 				rows = append(
 					rows,
-					widget.Row{
+					menu.Row{
 						Label: st.Label(),
-						Kind:  widget.Chevron,
+						Kind:  menu.Chevron,
 						Value: LookName(look.Kind(st)),
 					},
 				)
@@ -46,12 +46,12 @@ func LookName(kind string) string {
 func (p *LookPages) Place(slot int) *shell.Page {
 	return &shell.Page{
 		Title: say.T("look.place"),
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			now := p.options.Preferences.Wake.Read().Slot(slot).Look.Place
-			var rows []widget.Row
+			var rows []menu.Row
 			var taps []func(int)
 			for _, value := range config.LookPlaces() {
-				rows = append(rows, widget.Row{Label: value.Label(), Chosen: value == now})
+				rows = append(rows, menu.Row{Label: value.Label(), Chosen: value == now})
 				taps = append(taps, func(int) {
 					if err := p.options.Preferences.Word(
 						slot,

@@ -6,7 +6,7 @@ import (
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
-	widget "github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
@@ -85,28 +85,28 @@ const (
 func (p *BasicPages) Debug() *shell.Page {
 	return &shell.Page{
 		Title: say.T("debug.title"),
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			fps, seed := p.state().Visual.MaxFPS, p.state().Visual.Seed
 			adb := p.options.Access.ADB()
-			return []widget.Row{
+			return []menu.Row{
 					{
 						Glyph: gogui.IconTerminal,
 						Label: say.T("system.adb"),
 						Hint:  say.T("system.adb.hint"),
-						Kind:  widget.Toggle,
+						Kind:  menu.Toggle,
 						On:    adb,
 					},
-					{Label: say.T("debug.visuals"), Kind: widget.Chevron},
+					{Label: say.T("debug.visuals"), Kind: menu.Chevron},
 					{
 						Label: say.T("debug.fps"),
-						Kind:  widget.Slider,
+						Kind:  menu.Slider,
 						Level: FpsLevel(fps),
 						Snap:  FpsSnap,
 						Value: FpsSays(fps),
 					},
 					{
 						Label: say.T("debug.seed"),
-						Kind:  widget.Slider,
+						Kind:  menu.Slider,
 						Level: SeedLevel(seed),
 						Value: SeedSays(seed),
 					},
@@ -160,14 +160,14 @@ func FpsSays(fps int) string {
 func (p *BasicPages) Style() *shell.Page {
 	return &shell.Page{
 		Title: say.T("style.title"),
-		Tiles: func() ([]widget.Cell, []func(int)) {
+		Tiles: func() ([]menu.Cell, []func(int)) {
 			now := style.ByName(p.state().Screen.Style).Name
-			var cells []widget.Cell
+			var cells []menu.Cell
 			var taps []func(int)
 			for _, name := range style.Names() {
 				cells = append(
 					cells,
-					widget.Cell{Label: say.T("style." + name), Chosen: name == now, Style: name},
+					menu.Cell{Label: say.T("style." + name), Chosen: name == now, Style: name},
 				)
 				taps = append(taps, func(int) {
 					if err := p.setStyle(name); err != nil {
@@ -184,11 +184,11 @@ func (p *BasicPages) Theme() *shell.Page {
 	return &shell.Page{
 		Title: say.T("theme.title"),
 
-		Tiles: func() ([]widget.Cell, []func(int)) {
+		Tiles: func() ([]menu.Cell, []func(int)) {
 			now := p.state().Screen.Theme
 			follow, _ := theme.ByName(style.Theme(p.state().Screen.Style, style.ThemeDefault))
 
-			cells := []widget.Cell{
+			cells := []menu.Cell{
 				{
 					Label:   say.T("theme.default"),
 					Chosen:  now == style.ThemeDefault,
@@ -198,7 +198,7 @@ func (p *BasicPages) Theme() *shell.Page {
 			acts := []func(int){p.useTheme(style.ThemeDefault)}
 
 			for _, t := range theme.All {
-				cells = append(cells, widget.Cell{
+				cells = append(cells, menu.Cell{
 					Label:   t.Name,
 					Chosen:  t.Name == now,
 					Paint:   Swatch(t),
@@ -244,15 +244,15 @@ func ThemeSays(name string) string {
 func (p *BasicPages) Language() *shell.Page {
 	return &shell.Page{
 		Title: say.T("settings.language"),
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			now := say.Chosen()
 
 			var (
-				rows []widget.Row
+				rows []menu.Row
 				acts []func(int)
 			)
 			for _, tag := range say.Languages() {
-				rows = append(rows, widget.Row{Label: say.Name(tag), Chosen: tag == now})
+				rows = append(rows, menu.Row{Label: say.Name(tag), Chosen: tag == now})
 				acts = append(acts, func(int) { p.setLanguage(tag) })
 			}
 			return rows, acts
@@ -263,20 +263,20 @@ func (p *BasicPages) Language() *shell.Page {
 func (p *BasicPages) Zone() *shell.Page {
 	return &shell.Page{
 		Title: say.T("zone.title"),
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			now := p.options.Zone.ChosenZone()
 
-			rows := []widget.Row{{Label: "Home Assistant", Chosen: now == ""}}
+			rows := []menu.Row{{Label: "Home Assistant", Chosen: now == ""}}
 			acts := []func(int){p.useZone("")}
 
 			for _, z := range tz.In("") {
-				rows = append(rows, widget.Row{Label: z.Name, Chosen: z.Name == now})
+				rows = append(rows, menu.Row{Label: z.Name, Chosen: z.Name == now})
 				acts = append(acts, p.useZone(z.Name))
 			}
 
 			for _, region := range tz.Regions() {
-				rows = append(rows, widget.Row{
-					Label: region, Kind: widget.Chevron, Value: ChosenIn(region, now),
+				rows = append(rows, menu.Row{
+					Label: region, Kind: menu.Chevron, Value: ChosenIn(region, now),
 				})
 				acts = append(acts, p.open(func() shell.View { return p.Region(region) }))
 			}
@@ -295,15 +295,15 @@ func ChosenIn(region, now string) string {
 func (p *BasicPages) Region(region string) *shell.Page {
 	return &shell.Page{
 		Title: region,
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			now := p.options.Zone.ChosenZone()
 
 			var (
-				rows []widget.Row
+				rows []menu.Row
 				acts []func(int)
 			)
 			for _, z := range tz.In(region) {
-				rows = append(rows, widget.Row{
+				rows = append(rows, menu.Row{
 					Label: z.Name[len(region)+1:], Chosen: z.Name == now,
 				})
 				acts = append(acts, p.useZone(z.Name))

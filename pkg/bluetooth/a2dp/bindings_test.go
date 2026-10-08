@@ -2,7 +2,7 @@ package a2dp
 
 import (
 	"github.com/ygelfand/libcountertop/pkg/audio/background"
-	mediasource "github.com/ygelfand/libcountertop/pkg/media/source"
+	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
@@ -15,10 +15,10 @@ func (q *fakeQueue) Adjust(f func([]int16)) { f(q.samples) }
 
 type fakeMedia struct{}
 
-func (fakeMedia) Began(mediasource.Source)   {}
-func (fakeMedia) Ended(mediasource.Source)   {}
-func (fakeMedia) Release(mediasource.Source) {}
-func (fakeMedia) Changed()                   {}
+func (fakeMedia) Began(nowplaying.Source)   {}
+func (fakeMedia) Ended(nowplaying.Source)   {}
+func (fakeMedia) Release(nowplaying.Source) {}
+func (fakeMedia) Changed()                  {}
 
 type fakeSettings struct{}
 

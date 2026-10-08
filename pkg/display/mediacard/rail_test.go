@@ -5,7 +5,7 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/display/drawer"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
-	media "github.com/ygelfand/libcountertop/pkg/media/source"
+	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 )
 
 func TestTheRailOpensTheCardWithNothingPlaying(t *testing.T) {
@@ -26,7 +26,7 @@ func TestTheRailOpensTheCardWithNothingPlaying(t *testing.T) {
 func TestTheRailOpensWhatIsPlaying(t *testing.T) {
 	stack := shell.New()
 	defer stack.Close()
-	src := &testSource{now: media.Now{Playing: true}}
+	src := &testSource{now: nowplaying.Now{Playing: true}}
 	c := New(Dependencies{Player: testPlayer{src}, Idle: testIdle{}, Shell: stack})
 	c.Began(src)
 

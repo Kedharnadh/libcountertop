@@ -52,22 +52,33 @@ type Live interface {
 	Live(ctx context.Context) (Picture, error)
 }
 
-type Output interface {
+type Attendant interface {
+	Attend(s *Session)
+	Failed(err error)
+}
+
+type Player interface {
 	Play(src Source)
 	Stop(src Source)
 	Handoff(src Source)
+}
 
+type Pauser interface {
 	Pause(src Source)
 	Resume(src Source)
+}
 
+type Clock interface {
 	Position(src Source) (at time.Duration, paused bool)
-
 	Behind(src Source) time.Duration
+}
 
+type Output interface {
+	Attendant
+	Player
+	Pauser
+	Clock
 	Changed(src Source)
-
-	Attend(s *Session)
-	Failed(err error)
 }
 
 type Session struct {
@@ -76,19 +87,32 @@ type Session struct {
 	Pictured bool
 }
 
-type Source interface {
+type Stream interface {
 	Read(ctx context.Context, pcm []int16) (int, error)
-
 	Start() time.Duration
+}
 
+type Described interface {
 	Showing() Showing
 	Label() string
+}
 
+type Transport interface {
 	Play()
 	Pause()
 	Stop()
+}
+
+type Skipper interface {
 	Next()
 	Previous()
+}
+
+type Source interface {
+	Stream
+	Described
+	Transport
+	Skipper
 }
 
 type Showing struct {

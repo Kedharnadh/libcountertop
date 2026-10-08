@@ -64,27 +64,43 @@ type Settings struct {
 	Weather schema.Weather
 }
 
-type Stage interface {
-	Look(assistant.Showing) (custom, full bool)
+type Placer interface {
 	Above(ui.Rect, assistant.Showing)
 	Below(ui.Rect, assistant.Showing)
 	Unstage()
+}
+
+type Staging interface {
 	Staged() bool
 	StagedFull() bool
+}
+
+type Stage interface {
+	Placer
+	Staging
+	Look(assistant.Showing) (custom, full bool)
 }
 
 type Weather interface {
 	Now() (weather.Reading, bool)
 }
 
-type Volume interface {
-	Card() shell.View
+type Mixer interface {
 	Picked() (schema.Stream, bool)
 	Level(schema.Stream) int
 	Set(schema.Stream, int)
+}
+
+type Popup interface {
 	Linger()
 	Expand()
 	Dismiss()
+}
+
+type Volume interface {
+	Mixer
+	Popup
+	Card() shell.View
 }
 
 type Marks struct {

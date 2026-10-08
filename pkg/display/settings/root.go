@@ -6,7 +6,7 @@ import (
 	gogui "github.com/go-gui-org/go-gui/gui"
 
 	"github.com/ygelfand/libcountertop/pkg/audio/volume"
-	widget "github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant/homecontrol"
 	"github.com/ygelfand/libcountertop/pkg/say"
@@ -33,13 +33,13 @@ type RootDependencies struct {
 }
 
 func RootPage(o RootDependencies) *shell.Page {
-	return &shell.Page{Title: say.T("settings.title"), Build: func() ([]widget.Row, []func(int)) {
-		rows := []widget.Row{}
+	return &shell.Page{Title: say.T("settings.title"), Build: func() ([]menu.Row, []func(int)) {
+		rows := []menu.Row{}
 		acts := []func(int){}
 		add := func(glyph, label, value string, page func() shell.View) {
 			rows = append(
 				rows,
-				widget.Row{Glyph: glyph, Label: say.T(label), Kind: widget.Chevron, Value: value},
+				menu.Row{Glyph: glyph, Label: say.T(label), Kind: menu.Chevron, Value: value},
 			)
 			acts = append(acts, func(int) { o.Shell.Push(page()) })
 		}

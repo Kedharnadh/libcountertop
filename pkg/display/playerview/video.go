@@ -11,7 +11,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/interaction"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	videoplayer "github.com/ygelfand/libcountertop/pkg/display/videopage"
-	media "github.com/ygelfand/libcountertop/pkg/media/source"
+	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 	"github.com/ygelfand/libcountertop/pkg/say"
 )
 
@@ -249,7 +249,7 @@ func (pv *Renderer) videoBand(
 		),
 	}
 	if now.Length > 0 {
-		var sk media.Seeker = c
+		var sk nowplaying.Seeker = c
 		var marks []videoplayer.Mark
 		if mk, ok := c.(videoplayer.Marked); ok {
 			marks = mk.Marks()
@@ -275,7 +275,11 @@ func (pv *Renderer) videoBand(
 	})
 }
 
-func (pv *Renderer) live(now media.Now, c videoplayer.Controls, st gogui.TextStyle) gogui.View {
+func (pv *Renderer) live(
+	now nowplaying.Now,
+	c videoplayer.Controls,
+	st gogui.TextStyle,
+) gogui.View {
 	fill := Color(pv.options.UI.Palette().Danger)
 	var content []gogui.View
 	if behind := now.Length - now.Elapsed; behind > now.LiveWithin {
@@ -312,7 +316,7 @@ func (pv *Renderer) live(now media.Now, c videoplayer.Controls, st gogui.TextSty
 
 func (pv *Renderer) videoTransport(
 	p *videoplayer.Page,
-	now media.Now,
+	now nowplaying.Now,
 	c videoplayer.Controls,
 ) gogui.View {
 	type control struct {
@@ -327,7 +331,7 @@ func (pv *Renderer) videoTransport(
 		middle = control{glyph: gogui.IconPause, do: c.Pause, primary: true}
 	}
 	var shown []control
-	if now.Can.Has(media.CanPrevious) {
+	if now.Can.Has(nowplaying.CanPrevious) {
 		shown = append(shown, control{glyph: gogui.IconStepBackward, do: c.Previous})
 	}
 	if c.CanSeek() {
@@ -347,10 +351,10 @@ func (pv *Renderer) videoTransport(
 			},
 		)
 	}
-	if now.Can.Has(media.CanNext) {
+	if now.Can.Has(nowplaying.CanNext) {
 		shown = append(shown, control{glyph: gogui.IconStepForward, do: c.Next})
 	}
-	if now.Can.Has(media.CanStop) {
+	if now.Can.Has(nowplaying.CanStop) {
 		shown = append(shown, control{glyph: gogui.IconStop, do: func() {
 			c.Stop()
 			pv.options.Shell.Remove(p)

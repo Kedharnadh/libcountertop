@@ -48,8 +48,9 @@ type track struct {
 	skips   []Segment
 	jumping bool
 
-	live *hls.Stream
-	base time.Time
+	live  *hls.Stream
+	base  time.Time
+	prefs preferences.Provider
 
 	tv *unplugged
 }
@@ -100,7 +101,7 @@ func openLive(
 	l *Live,
 	at time.Duration,
 ) (*track, error) {
-	lead := time.Duration(preferences.Get().YouTube.LiveDelay) * time.Second
+	lead := liveLead(r.Preferences)
 	var from time.Time
 	if wallClock(at) {
 		from = time.Unix(0, int64(at))
@@ -121,7 +122,7 @@ func openLive(
 	if err != nil {
 		return nil, fmt.Errorf("youtube: %s: %w", l.Track.ID, err)
 	}
-	t := &track{info: l.Track, station: st, live: s}
+	t := &track{info: l.Track, station: st, live: s, prefs: r.Preferences}
 	if oldest, _, ok := s.Window(); ok {
 		t.base = oldest
 	}
@@ -150,6 +151,7 @@ func openTV(ctx context.Context, st *station, id string, at time.Duration) (*tra
 			surface:  st.env.Surface,
 			resample: st.env.Resample,
 			limits:   st.resolve.limits(),
+			prefs:    st.env.Preferences,
 		},
 		id,
 		params,
@@ -542,7 +544,7 @@ func (t *track) Showing() playback.Showing {
 	}
 	if oldest, edge, ok := t.window(); ok && edge.Sub(oldest) >= rewindLeast && !t.base.IsZero() {
 		s.Length = edge.Sub(t.base)
-		s.LiveWithin = time.Duration(preferences.Get().YouTube.LiveDelay)*time.Second + liveSlack
+		s.LiveWithin = liveLead(t.prefs) + liveSlack
 	}
 	if t.station != nil {
 		s.HasPrevious, s.HasNext = t.station.around()

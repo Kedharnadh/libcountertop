@@ -9,7 +9,7 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/display/geometry"
 	"github.com/ygelfand/libcountertop/pkg/display/homeview"
-	"github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/navigation"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
@@ -39,7 +39,7 @@ func (cv *View) callBody(w *gogui.Window) gogui.View {
 	if c.State == call.Talking {
 		level := cv.o.Voice.Level()
 		controls = append([]gogui.View{cv.o.UI.Row("call-volume", "call",
-			model.Row{Label: say.T("call.volume"), Kind: model.Slider, Level: level},
+			menu.Row{Label: say.T("call.volume"), Kind: menu.Slider, Level: level},
 			func(l int) { cv.o.Voice.Set(l) }, false)}, controls...)
 	}
 	bottomFor := func(width float32) gogui.View {
@@ -375,14 +375,14 @@ func (cv *View) profileBody(w *gogui.Window, prof *call.Profile) gogui.View {
 	if p.Video() {
 		capable = say.T("call.yes")
 	}
-	details := []model.Row{
-		{Label: say.T("call.model"), Kind: model.Plain, Value: p.Model},
-		{Label: say.T("call.address"), Kind: model.Plain, Value: strings.Join(addrs, ", ")},
-		{Label: say.T("call.version"), Kind: model.Plain, Value: p.Version},
-		{Label: say.T("call.video"), Kind: model.Plain, Value: capable},
+	details := []menu.Row{
+		{Label: say.T("call.model"), Kind: menu.Plain, Value: p.Model},
+		{Label: say.T("call.address"), Kind: menu.Plain, Value: strings.Join(addrs, ", ")},
+		{Label: say.T("call.version"), Kind: menu.Plain, Value: p.Version},
+		{Label: say.T("call.video"), Kind: menu.Plain, Value: capable},
 		{
 			Label: say.T("call.seen"),
-			Kind:  model.Plain,
+			Kind:  menu.Plain,
 			Value: time.Since(p.Seen).Round(time.Second).String(),
 		},
 	}

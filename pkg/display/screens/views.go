@@ -8,7 +8,7 @@ import (
 	face "github.com/ygelfand/libcountertop/pkg/display/clockface"
 	"github.com/ygelfand/libcountertop/pkg/display/clockview"
 	"github.com/ygelfand/libcountertop/pkg/display/idleview"
-	"github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
@@ -183,7 +183,7 @@ func (a *App) livePreview(w *gogui.Window, watch func(ui.Rect) bool) gogui.View 
 	return a.preview.View(w, say.T("camera.starting"), watch)
 }
 
-func (a *App) tileView(w *gogui.Window, id, page string, c model.Cell, tap func(int)) gogui.View {
+func (a *App) tileView(w *gogui.Window, id, page string, c menu.Cell, tap func(int)) gogui.View {
 	t := gogui.CurrentTheme().Cfg
 	tw := int(t.SizeTextMedium * 8)
 	th := int(float32(tw) * 0.72)

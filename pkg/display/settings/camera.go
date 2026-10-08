@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	widget "github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/say"
@@ -107,10 +107,10 @@ func (p *CameraPages[K]) makePage() *shell.Page {
 	return p.options.Wrap(&shell.Page{
 		Title:   say.T("settings.camera"),
 		Preview: p.options.Preview,
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			sh := p.options.Read()
 
-			var rows []widget.Row
+			var rows []menu.Row
 			var taps []func(int)
 
 			for _, g := range p.Shown() {
@@ -121,17 +121,17 @@ func (p *CameraPages[K]) makePage() *shell.Page {
 					taps = append(taps, tap)
 					continue
 				}
-				rows = append(rows, widget.Row{
+				rows = append(rows, menu.Row{
 					Label: p.options.Table().Title(g),
-					Kind:  widget.Chevron,
+					Kind:  menu.Chevron,
 					Value: p.options.Table().Sums(g, &sh),
 				})
 				taps = append(taps, p.open(func() *shell.Page { return p.Section(g) }))
 			}
 			rows = append(
 				rows,
-				widget.Row{Label: say.T("camera.stream"), Hint: say.T("features.rtsp.hint"),
-					Kind: widget.Toggle, On: p.options.Stream()},
+				menu.Row{Label: say.T("camera.stream"), Hint: say.T("features.rtsp.hint"),
+					Kind: menu.Toggle, On: p.options.Stream()},
 			)
 			taps = append(taps, func(int) { p.options.SetStream(!p.options.Stream()) })
 			p.mu.Lock()
@@ -141,7 +141,7 @@ func (p *CameraPages[K]) makePage() *shell.Page {
 			if armed {
 				label = say.T("camera.reset.confirm")
 			}
-			rows = append(rows, widget.Row{Label: label})
+			rows = append(rows, menu.Row{Label: label})
 			taps = append(taps, p.reset)
 
 			return rows, taps
@@ -157,10 +157,10 @@ func (p *CameraPages[K]) watch(page *shell.Page) *shell.Page {
 func (p *CameraPages[K]) makeSection(g setting.Group) *shell.Page {
 	return p.watch(&shell.Page{
 		Title: p.options.Table().Title(g),
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			sh := p.options.Read()
 
-			var rows []widget.Row
+			var rows []menu.Row
 			var taps []func(int)
 
 			for _, s := range p.options.Table().In(g) {
@@ -173,20 +173,20 @@ func (p *CameraPages[K]) makeSection(g setting.Group) *shell.Page {
 	})
 }
 
-func (p *CameraPages[K]) Row(s setting.Setting[K], sh *K) (widget.Row, func(int)) {
-	row := widget.Row{Label: s.Title()}
+func (p *CameraPages[K]) Row(s setting.Setting[K], sh *K) (menu.Row, func(int)) {
+	row := menu.Row{Label: s.Title()}
 	idle := s.Dim(sh)
 
 	switch s.Kind {
 	case setting.Toggle:
-		row.Kind = widget.Toggle
+		row.Kind = menu.Toggle
 		row.On = s.On(sh)
 		return row, Dimmed(&row, idle, func(int) {
 			p.save(s.Name, setting.OnOff(!row.On))
 		})
 
 	case setting.Number:
-		row.Kind = widget.Slider
+		row.Kind = menu.Slider
 		row.Level = s.Percent(s.Level(sh))
 		row.Snap = func(level int) int { return s.Percent(s.Raw(level)) }
 
@@ -201,17 +201,17 @@ func (p *CameraPages[K]) Row(s setting.Setting[K], sh *K) (widget.Row, func(int)
 		})
 
 	case setting.Choice:
-		row.Kind = widget.Chevron
+		row.Kind = menu.Chevron
 		row.Value = s.Shows(sh)
 		return row, Dimmed(&row, idle, p.open(func() *shell.Page { return p.Choice(s) }))
 	}
 
-	row.Kind = widget.Plain
+	row.Kind = menu.Plain
 	row.Value = s.Read(sh)
 	return row, nil
 }
 
-func Dimmed(row *widget.Row, idle bool, act func(int)) func(int) {
+func Dimmed(row *menu.Row, idle bool, act func(int)) func(int) {
 	if !idle {
 		return act
 	}
@@ -222,7 +222,7 @@ func Dimmed(row *widget.Row, idle bool, act func(int)) func(int) {
 func (p *CameraPages[K]) makeChoice(s setting.Setting[K]) *shell.Page {
 	return p.watch(&shell.Page{
 		Title: s.Title(),
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			cfg := p.options.Read()
 			knob := s
 			if current, ok := p.options.Table().Find(knob.Name); ok {
@@ -230,13 +230,13 @@ func (p *CameraPages[K]) makeChoice(s setting.Setting[K]) *shell.Page {
 			}
 			at := knob.Read(&cfg)
 
-			rows := make([]widget.Row, 0, len(knob.Options))
+			rows := make([]menu.Row, 0, len(knob.Options))
 			taps := make([]func(int), 0, len(knob.Options))
 
 			for _, o := range knob.Options {
-				rows = append(rows, widget.Row{
+				rows = append(rows, menu.Row{
 					Label:  knob.Label(o),
-					Kind:   widget.Plain,
+					Kind:   menu.Plain,
 					Chosen: o.Value == at,
 				})
 				taps = append(taps, func(int) {

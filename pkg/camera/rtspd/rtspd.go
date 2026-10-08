@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/ygelfand/libcountertop/pkg/camera/helper"
+	"github.com/ygelfand/libcountertop/pkg/camera/camerafeed"
 	"github.com/ygelfand/libcountertop/pkg/camera/onvif"
 	"github.com/ygelfand/libcountertop/pkg/camera/session"
 	"github.com/ygelfand/libcountertop/pkg/media/rtsp"
@@ -22,8 +22,8 @@ func StreamName(i int) string {
 }
 
 type Source interface {
-	Join(at int) (*session.Session, <-chan helper.Frame, error)
-	Leave(s *session.Session, frames <-chan helper.Frame)
+	Join(at int) (*session.Session, <-chan camerafeed.Frame, error)
+	Leave(s *session.Session, frames <-chan camerafeed.Frame)
 	Sizes() []session.Size
 }
 

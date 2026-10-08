@@ -170,10 +170,18 @@ func (t *Table[T]) Find(name string) (Setting[T], bool) {
 	return Setting[T]{}, false
 }
 
-func (t *Table[T]) Row(name string) Setting[T] {
+func (t *Table[T]) Row(name string) (Setting[T], error) {
 	s, ok := t.Find(name)
 	if !ok {
-		panic(t.Domain + ": no setting called " + name)
+		return Setting[T]{}, fmt.Errorf("%s: no setting called %q", t.Domain, name)
+	}
+	return s, nil
+}
+
+func (t *Table[T]) MustRow(name string) Setting[T] {
+	s, err := t.Row(name)
+	if err != nil {
+		panic(err)
 	}
 	return s
 }

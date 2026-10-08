@@ -1,7 +1,5 @@
 package preferences
 
-import "sync"
-
 type YouTube struct {
 	Device, Music, Video string
 	Skip                 []string
@@ -14,31 +12,28 @@ type Settings struct {
 	Prime   Prime
 }
 type Provider struct {
-	Read            func() Settings
-	SaveScreens     func(device, music, video string) error
-	RequestIDPrefix string
+	Read   func() Settings
+	Save   func(device, music, video string) error
+	Prefix string
 }
 
-var mu sync.RWMutex
-var current Provider
-
-func Configure(provider Provider) { mu.Lock(); current = provider; mu.Unlock() }
-func snapshot() Provider          { mu.RLock(); defer mu.RUnlock(); return current }
-func Get() Settings {
-	if read := snapshot().Read; read != nil {
-		return read()
+func (p Provider) Settings() Settings {
+	if p.Read != nil {
+		return p.Read()
 	}
 	return Settings{YouTube: YouTube{LiveDelay: 10, Skip: []string{"sponsor"}}}
 }
-func SaveScreens(device, music, video string) error {
-	if save := snapshot().SaveScreens; save != nil {
-		return save(device, music, video)
+
+func (p Provider) SaveScreens(device, music, video string) error {
+	if p.Save != nil {
+		return p.Save(device, music, video)
 	}
 	return nil
 }
-func RequestIDPrefix() string {
-	if prefix := snapshot().RequestIDPrefix; prefix != "" {
-		return prefix
+
+func (p Provider) RequestIDPrefix() string {
+	if p.Prefix != "" {
+		return p.Prefix
 	}
 	return "countertop"
 }

@@ -210,7 +210,7 @@ func (s *Service) Report(level float64, muted bool) {
 	s.Announce(out)
 }
 
-func (s *Service) Publish(control Playing, p *Published) {
+func (s *Service) Publish(control Controls, p *Published) {
 	s.mu.Lock()
 	out := s.Receiver.Publish(control, p)
 	s.mu.Unlock()

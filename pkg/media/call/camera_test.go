@@ -7,20 +7,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ygelfand/libcountertop/pkg/camera/helper"
+	"github.com/ygelfand/libcountertop/pkg/camera/camerafeed"
 	camerasession "github.com/ygelfand/libcountertop/pkg/camera/session"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 type cameraTransport struct {
-	frames chan helper.Frame
+	frames chan camerafeed.Frame
 	done   chan struct{}
 	once   sync.Once
 	ready  sync.Once
 	opened chan struct{}
 }
 
-func (s *cameraTransport) Next(time.Duration) (helper.Frame, error) {
+func (s *cameraTransport) Next(time.Duration) (camerafeed.Frame, error) {
 	if s.opened != nil {
 		s.ready.Do(func() { close(s.opened) })
 	}
@@ -28,7 +28,7 @@ func (s *cameraTransport) Next(time.Duration) (helper.Frame, error) {
 	case f := <-s.frames:
 		return f, nil
 	case <-s.done:
-		return helper.Frame{}, net.ErrClosed
+		return camerafeed.Frame{}, net.ErrClosed
 	}
 }
 func (*cameraTransport) AskStill() error        { return nil }
@@ -41,18 +41,18 @@ func (s *cameraTransport) Close() error {
 
 func TestRTCCameraWithoutResizeSubscriberSendsConfiguredKeyframes(t *testing.T) {
 	transport := &cameraTransport{
-		frames: make(chan helper.Frame, 2),
+		frames: make(chan camerafeed.Frame, 2),
 		done:   make(chan struct{}),
 		opened: make(chan struct{}),
 	}
 	hub := camerasession.New(camerasession.Options{
 		Snapshot: func() camerasession.Snapshot {
 			return camerasession.Snapshot{
-				Config: helper.Config{Width: 1280, Height: 720},
+				Config: camerafeed.Config{Width: 1280, Height: 720},
 				Key:    "main",
 			}
 		},
-		Open: func(helper.Config) (camerasession.Transport, error) { return transport, nil },
+		Open: func(camerafeed.Config) (camerasession.Transport, error) { return transport, nil },
 	})
 	t.Cleanup(hub.Close)
 	source := NewCamera(hub)
@@ -63,8 +63,8 @@ func TestRTCCameraWithoutResizeSubscriberSendsConfiguredKeyframes(t *testing.T) 
 	case <-time.After(time.Second):
 		t.Fatal("camera did not join the shared session")
 	}
-	transport.frames <- helper.Frame{Config: true, Data: []byte{1, 2}}
-	transport.frames <- helper.Frame{Key: true, Data: []byte{3, 4}, PTS: 100}
+	transport.frames <- camerafeed.Frame{Config: true, Data: []byte{1, 2}}
+	transport.frames <- camerafeed.Frame{Key: true, Data: []byte{3, 4}, PTS: 100}
 	select {
 	case f, ok := <-frames:
 		if !ok || !f.Key || f.PTS != 100 || !bytes.Equal(f.Data, []byte{1, 2, 3, 4}) {
@@ -96,7 +96,7 @@ func TestCallCameraSelectsAvailableStreams(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			hub := camerasession.New(camerasession.Options{Snapshot: func() camerasession.Snapshot {
-				var cfg helper.Config
+				var cfg camerafeed.Config
 				if len(tc.sizes) > 0 {
 					cfg.Width, cfg.Height = tc.sizes[0].Width, tc.sizes[0].Height
 				}

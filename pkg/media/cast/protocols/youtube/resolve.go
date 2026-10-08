@@ -16,6 +16,7 @@ import (
 	yt "github.com/kkdai/youtube/v2"
 
 	"github.com/ygelfand/libcountertop/pkg/fetch"
+	"github.com/ygelfand/libcountertop/pkg/media/cast/preferences"
 	"github.com/ygelfand/libcountertop/pkg/media/hls"
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
 )
@@ -64,6 +65,8 @@ type Resolver struct {
 	http     *http.Client
 	Resample func(from int) func(stereo []int16) []int16
 	target   func() playback.Target
+
+	Preferences preferences.Provider
 }
 
 type Live struct {

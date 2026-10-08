@@ -11,6 +11,11 @@ import (
 
 type Moment = startup.Moment
 
+type GL interface {
+	visual.Programs
+	visual.Textures
+}
+
 type Reveal struct {
 	logo          *image.RGBA
 	bg            theme.Color
@@ -48,7 +53,7 @@ func (r *Reveal) header(w, h int) (float32, float32, float32) {
 	return float32(logo.X) + float32(logo.W)/2, float32(logo.Y) + float32(logo.H)/2, s
 }
 
-func (r *Reveal) Shade(g visual.GL, fresh bool, w, h int, m Moment) error {
+func (r *Reveal) Shade(g GL, fresh bool, w, h int, m Moment) error {
 	if fresh {
 		if err := g.Program(r.shader, visual.Light); err != nil {
 			return err

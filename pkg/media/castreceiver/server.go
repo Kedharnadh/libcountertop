@@ -17,6 +17,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/surface"
 	"github.com/ygelfand/libcountertop/pkg/fetch"
 	"github.com/ygelfand/libcountertop/pkg/media/cast"
+	"github.com/ygelfand/libcountertop/pkg/media/cast/preferences"
 	_ "github.com/ygelfand/libcountertop/pkg/media/cast/protocols/all"
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
 	mdns "github.com/ygelfand/libcountertop/pkg/network/advertise"
@@ -45,6 +46,8 @@ type Config struct {
 	Output   func(ended func()) playback.Output
 	Resample func(from int) func(stereo []int16) []int16
 	Surface  func() *surface.Client
+
+	Preferences preferences.Provider
 }
 
 type Server struct {
@@ -298,7 +301,7 @@ func (s *Server) env(name string, device cast.Device) cast.Env {
 		VolumeChanged: func(do func()) func() {
 			return v.Listen(func(int) { do() })
 		},
-		Publish: func(control cast.Playing, p *cast.Published) {
+		Publish: func(control cast.Controls, p *cast.Published) {
 			if svc := s.current(); svc != nil {
 				svc.Publish(control, p)
 			}
@@ -314,8 +317,9 @@ func (s *Server) env(name string, device cast.Device) cast.Env {
 				svc.End()
 			}
 		}),
-		Resample: s.config.Resample,
-		Surface:  s.config.Surface,
+		Resample:    s.config.Resample,
+		Surface:     s.config.Surface,
+		Preferences: s.config.Preferences,
 	}
 }
 

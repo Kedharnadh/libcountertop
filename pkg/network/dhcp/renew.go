@@ -42,6 +42,13 @@ func renewMessage(
 
 const renewWait = 10 * time.Second
 
+// RFC 2131 4.4.5: retransmit no sooner than 60 s.
+const retransmitFloor = 60 * time.Second
+
+func retransmitAfter(left time.Duration) time.Duration {
+	return min(max(left/2, retransmitFloor), left)
+}
+
 // RFC 2131 4.4.5: RENEWING unicasts to the granting server from T1; REBINDING broadcasts from T2.
 func extend(ctx context.Context, iface string, lease *Lease, hostname string) (*Lease, error) {
 	link, err := net.InterfaceByName(iface)
@@ -69,8 +76,7 @@ func extend(ctx context.Context, iface string, lease *Lease, hostname string) (*
 				return got, nil
 			}
 
-			// RFC 2131 4.4.5: retransmit at half the remaining time.
-			if err := sleep(ctx, max(time.Until(phase.until)/2, renewWait)); err != nil {
+			if err := sleep(ctx, retransmitAfter(time.Until(phase.until))); err != nil {
 				return nil, err
 			}
 		}

@@ -3,7 +3,7 @@ package settings
 import (
 	"image"
 
-	widget "github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
@@ -21,24 +21,24 @@ func VisualPicker(
 ) *shell.Page {
 	return &shell.Page{
 		Title: title,
-		Tiles: func() ([]widget.Cell, []func(int)) {
+		Tiles: func() ([]menu.Cell, []func(int)) {
 			now := ""
 			if chosen != nil {
 				now = chosen()
 			}
-			var cells []widget.Cell
+			var cells []menu.Cell
 			var acts []func(int)
 			if none != nil {
 				cells = append(
 					cells,
-					widget.Cell{Label: empty, Chosen: chosen != nil && now == "", Paint: NoneTile},
+					menu.Cell{Label: empty, Chosen: chosen != nil && now == "", Paint: NoneTile},
 				)
 				acts = append(acts, func(int) { none() })
 			}
 			for _, k := range visual.Built() {
 				cells = append(
 					cells,
-					widget.Cell{
+					menu.Cell{
 						Label:  k.Label(),
 						Chosen: chosen != nil && string(k) == now,
 						Paint:  ThumbTile(k, thumbnail),

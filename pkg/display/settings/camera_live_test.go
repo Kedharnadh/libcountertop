@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/ygelfand/libcountertop/pkg/camera/live"
-	widget "github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -55,14 +55,14 @@ func TestTheCameraPageIsTheSections(t *testing.T) {
 			len(shown),
 		)
 	}
-	if stream := rows[len(rows)-2]; stream.Kind != widget.Toggle {
+	if stream := rows[len(rows)-2]; stream.Kind != menu.Toggle {
 		t.Errorf("the row before reset is %+v, want the camera stream switch", stream)
 	}
-	if last := rows[len(rows)-1]; last.Kind == widget.Chevron || acts[len(acts)-1] == nil {
+	if last := rows[len(rows)-1]; last.Kind == menu.Chevron || acts[len(acts)-1] == nil {
 		t.Errorf("the last row is %+v, want the reset action", last)
 	}
 	for i, g := range shown {
-		if rows[i].Kind != widget.Chevron || acts[i] == nil {
+		if rows[i].Kind != menu.Chevron || acts[i] == nil {
 			t.Errorf("%s does not open", g)
 		}
 	}
@@ -84,11 +84,11 @@ func TestASectionIsTheKnobTable(t *testing.T) {
 			}
 			switch s.Kind {
 			case setting.Number:
-				if rows[i].Kind != widget.Slider || rows[i].Level < 0 || rows[i].Level > 100 {
+				if rows[i].Kind != menu.Slider || rows[i].Level < 0 || rows[i].Level > 100 {
 					t.Errorf("%s drew as %v at %d", s.Name, rows[i].Kind, rows[i].Level)
 				}
 			case setting.Choice:
-				if rows[i].Kind != widget.Chevron {
+				if rows[i].Kind != menu.Chevron {
 					t.Errorf("%s is a choice and drew as %v", s.Name, rows[i].Kind)
 				}
 			}

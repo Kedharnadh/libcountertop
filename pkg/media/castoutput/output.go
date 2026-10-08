@@ -19,9 +19,9 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	videoplayer "github.com/ygelfand/libcountertop/pkg/display/videopage"
 	"github.com/ygelfand/libcountertop/pkg/fetch"
+	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 	"github.com/ygelfand/libcountertop/pkg/media/pcm"
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
-	media "github.com/ygelfand/libcountertop/pkg/media/source"
 	video "github.com/ygelfand/libcountertop/pkg/media/videostream"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
@@ -854,9 +854,9 @@ type card struct {
 	p *playing
 }
 
-var _ media.Source = (*card)(nil)
+var _ nowplaying.Source = (*card)(nil)
 
-func (c *card) Now() media.Now {
+func (c *card) Now() nowplaying.Now {
 	s := c.p.src.Showing()
 	elapsed, paused := c.o.Position(c.p.src)
 
@@ -864,14 +864,14 @@ func (c *card) Now() media.Now {
 	art, mark := c.p.art, c.p.mark
 	c.o.mu.Unlock()
 
-	can := media.CanPause | media.CanStop
+	can := nowplaying.CanPause | nowplaying.CanStop
 	if s.HasNext {
-		can |= media.CanNext
+		can |= nowplaying.CanNext
 	}
 	if s.HasPrevious {
-		can |= media.CanPrevious
+		can |= nowplaying.CanPrevious
 	}
-	queue := make([]media.Track, 0, len(s.Upcoming))
+	queue := make([]nowplaying.Track, 0, len(s.Upcoming))
 	var wanted []string
 	c.o.mu.Lock()
 	if c.p.thumbs == nil {
@@ -885,7 +885,7 @@ func (c *card) Now() media.Now {
 		}
 		queue = append(
 			queue,
-			media.Track{
+			nowplaying.Track{
 				Title:  u.Title,
 				Artist: u.Artist,
 				Length: u.Length,
@@ -899,7 +899,7 @@ func (c *card) Now() media.Now {
 	for _, url := range wanted {
 		safe.Go("cast queue art", func() { c.o.fetchThumb(c.p, url) })
 	}
-	return media.Now{
+	return nowplaying.Now{
 		Queue:   queue,
 		Playing: !paused,
 		Paused:  paused,
@@ -938,8 +938,8 @@ func (c *card) Playing() (playing, paused bool) {
 	return !paused, paused
 }
 
-func (c *card) Kind() media.Kind { return media.FromCast }
-func (c *card) Label() string    { return c.p.src.Label() }
+func (c *card) Kind() nowplaying.Kind { return nowplaying.FromCast }
+func (c *card) Label() string         { return c.p.src.Label() }
 
 func (c *card) Play()  { c.p.src.Play() }
 func (c *card) Pause() { c.p.src.Pause() }
@@ -977,12 +977,12 @@ func (c *card) CanSeek() bool {
 
 type standby struct{ o *Output }
 
-var _ media.Source = (*standby)(nil)
+var _ nowplaying.Source = (*standby)(nil)
 
-func (b *standby) Now() media.Now {
+func (b *standby) Now() nowplaying.Now {
 	b.o.mu.Lock()
 	defer b.o.mu.Unlock()
-	return media.Now{
+	return nowplaying.Now{
 		Hold:  b.o.sess != nil,
 		Title: b.o.note,
 		Art:   b.o.sessArt.raw,
@@ -992,7 +992,7 @@ func (b *standby) Now() media.Now {
 
 func (b *standby) Playing() (playing, paused bool) { return false, false }
 
-func (b *standby) Kind() media.Kind { return media.FromCast }
+func (b *standby) Kind() nowplaying.Kind { return nowplaying.FromCast }
 
 func (b *standby) Open() bool {
 	b.o.mu.Lock()
@@ -1043,10 +1043,10 @@ type Queue interface {
 	Adjust(func([]int16))
 }
 type Media interface {
-	Began(media.Source)
-	Ended(media.Source)
-	Release(media.Source)
-	External(media.Source)
+	Began(nowplaying.Source)
+	Ended(nowplaying.Source)
+	Release(nowplaying.Source)
+	External(nowplaying.Source)
 	Changed()
 }
 type Options struct {

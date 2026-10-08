@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/ygelfand/libcountertop/pkg/display/surface"
+	"github.com/ygelfand/libcountertop/pkg/media/cast/preferences"
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
 )
 
@@ -23,7 +24,7 @@ type Env struct {
 	SetVolume     func(level int)
 	VolumeChanged func(do func()) (stop func())
 
-	Publish func(control Playing, p *Published)
+	Publish func(control Controls, p *Published)
 	Send    func(m Message)
 	Keep    func(app string) Kept
 
@@ -32,6 +33,8 @@ type Env struct {
 	Resample func(from int) func(stereo []int16) []int16
 
 	Surface func() *surface.Client
+
+	Preferences preferences.Provider
 }
 
 type Kept interface {

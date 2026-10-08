@@ -11,7 +11,7 @@ import (
 	esphome "github.com/ygelfand/go-esphome-device"
 
 	core "github.com/ygelfand/libcountertop/pkg/audio/sendspin"
-	media "github.com/ygelfand/libcountertop/pkg/media/source"
+	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
@@ -146,17 +146,17 @@ func (p *Player) Playing() (playing, paused bool) {
 	return p.state.Get() == statePlaying && !p.paused, p.paused
 }
 
-func (*Player) Kind() media.Kind { return media.FromGroup }
+func (*Player) Kind() nowplaying.Kind { return nowplaying.FromGroup }
 
 func (*Player) Label() string { return "" }
 
-func (p *Player) Now() media.Now {
+func (p *Player) Now() nowplaying.Now {
 	playing, paused := p.Playing()
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	return media.Now{
+	return nowplaying.Now{
 		Playing: playing,
 		Paused:  paused,
 		Title:   p.playing.Title,
@@ -166,7 +166,7 @@ func (p *Player) Now() media.Now {
 		ArtID:   artID(p.artwork),
 		Elapsed: p.reached(playing),
 		Length:  p.length,
-		Can:     media.CanPause | media.CanNext | media.CanPrevious,
+		Can:     nowplaying.CanPause | nowplaying.CanNext | nowplaying.CanPrevious,
 	}
 }
 
@@ -366,10 +366,10 @@ func (p *Player) stop() {
 }
 
 type Media interface {
-	Began(media.Source)
-	Ended(media.Source)
-	Release(media.Source)
-	External(media.Source)
+	Began(nowplaying.Source)
+	Ended(nowplaying.Source)
+	Release(nowplaying.Source)
+	External(nowplaying.Source)
 	Changed()
 }
 type Clock interface {

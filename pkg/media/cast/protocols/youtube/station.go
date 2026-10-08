@@ -89,6 +89,7 @@ func (s *station) quiet(d time.Duration) bool {
 func newStation(ctx context.Context, theme string, env cast.Env) *station {
 	r := NewResolver(env.HTTP, env.Video)
 	r.Resample = env.Resample
+	r.Preferences = env.Preferences
 	s := &station{theme: theme, env: env, resolve: r, ctx: ctx, loud: make(chan struct{}, 1)}
 	if env.VolumeChanged != nil {
 		go s.tellVolume()

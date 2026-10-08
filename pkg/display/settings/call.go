@@ -1,7 +1,7 @@
 package settings
 
 import (
-	widget "github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -29,14 +29,14 @@ func (p *CallPages) open(makePage func() shell.View) func(int) {
 func (p *CallPages) Calls() *shell.Page {
 	return &shell.Page{
 		Title: say.T("call.settings"),
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			c := p.options.Settings.Read()
-			rows := []widget.Row{
-				{Label: say.T("call.incoming.allow"), Kind: widget.Toggle, On: c.Incoming},
+			rows := []menu.Row{
+				{Label: say.T("call.incoming.allow"), Kind: menu.Toggle, On: c.Incoming},
 				{
 					Label: say.T("call.auto"),
 					Hint:  say.T("call.auto.hint"),
-					Kind:  widget.Toggle,
+					Kind:  menu.Toggle,
 					On:    c.AutoAnswer,
 				},
 			}
@@ -47,9 +47,9 @@ func (p *CallPages) Calls() *shell.Page {
 			if c.AutoAnswer {
 				rows = append(
 					rows,
-					widget.Row{
+					menu.Row{
 						Label: say.T("call.autovideo"),
-						Kind:  widget.Toggle,
+						Kind:  menu.Toggle,
 						On:    c.AutoVideo,
 					},
 				)
@@ -57,15 +57,15 @@ func (p *CallPages) Calls() *shell.Page {
 			}
 			rows = append(
 				rows,
-				widget.Row{Label: say.T("call.pausewake"), Kind: widget.Toggle, On: c.PauseWake},
+				menu.Row{Label: say.T("call.pausewake"), Kind: menu.Toggle, On: c.PauseWake},
 			)
 			acts = append(acts, func(int) { p.options.Controller.SetPauseWake(!c.PauseWake) })
 			rows = append(
 				rows,
-				widget.Row{
+				menu.Row{
 					Label: say.T("call.stream"),
 					Hint:  say.T("call.stream.hint"),
-					Kind:  widget.Chevron,
+					Kind:  menu.Chevron,
 					Value: c.Stream.Label(),
 				},
 			)
@@ -77,14 +77,14 @@ func (p *CallPages) Calls() *shell.Page {
 func (p *CallPages) CallStream() *shell.Page {
 	return &shell.Page{
 		Title: say.T("call.stream"),
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			now := p.options.Settings.Read().Stream
-			var rows []widget.Row
+			var rows []menu.Row
 			var acts []func(int)
 			for _, v := range config.CallStreams() {
 				rows = append(
 					rows,
-					widget.Row{Label: v.Label(), Kind: widget.Plain, Chosen: v == now},
+					menu.Row{Label: v.Label(), Kind: menu.Plain, Chosen: v == now},
 				)
 				acts = append(acts, func(int) { p.options.Controller.SetStream(v) })
 			}

@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/avrcp"
-	media "github.com/ygelfand/libcountertop/pkg/media/source"
+	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 )
 
 func TestWhatThePlayerIsShown(t *testing.T) {
@@ -26,10 +26,10 @@ func TestWhatThePlayerIsShown(t *testing.T) {
 	if got.Title != "Aja" || got.Artist != "Steely Dan" || got.Album != "Aja" {
 		t.Errorf("the card would read %q by %q on %q", got.Title, got.Artist, got.Album)
 	}
-	if !got.Can.Has(media.CanPause | media.CanNext | media.CanPrevious) {
+	if !got.Can.Has(nowplaying.CanPause | nowplaying.CanNext | nowplaying.CanPrevious) {
 		t.Errorf("the transport offered is %b, want pause, next and previous", got.Can)
 	}
-	if got.Can.Has(media.CanStop) {
+	if got.Can.Has(nowplaying.CanStop) {
 		t.Error("the card offers stop as well as pause")
 	}
 }

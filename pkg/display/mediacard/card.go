@@ -8,16 +8,16 @@ import (
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
-	media "github.com/ygelfand/libcountertop/pkg/media/source"
+	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
 
-type Source = media.Source
-type Opener = media.Opener
+type Source = nowplaying.Source
+type Opener = nowplaying.Opener
 type Player interface {
-	Now() media.Now
-	Holder() media.Source
+	Now() nowplaying.Now
+	Holder() nowplaying.Source
 	ResetSession()
 }
 type Dependencies struct {

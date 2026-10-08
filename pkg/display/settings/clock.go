@@ -5,7 +5,7 @@ import (
 
 	face "github.com/ygelfand/libcountertop/pkg/display/clockface"
 	"github.com/ygelfand/libcountertop/pkg/display/dashboard"
-	widget "github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
@@ -41,28 +41,28 @@ func (p *ClockPages) open(
 func (p *ClockPages) Page() *shell.Page {
 	return &shell.Page{
 		Title: say.T("clock.title"),
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			cfg := p.options.Preferences.ClockState()
 
-			return []widget.Row{
+			return []menu.Row{
 					{
 						Label: say.T("clock.face"),
-						Kind:  widget.Chevron,
+						Kind:  menu.Chevron,
 						Value: cfg.Clock.Face.Label(),
 					},
-					{Label: say.T("clock.position"), Kind: widget.Chevron,
+					{Label: say.T("clock.position"), Kind: menu.Chevron,
 						Value: cfg.Clock.Position.Label()},
 					{
 						Label: say.T("clock.size"),
-						Kind:  widget.Chevron,
+						Kind:  menu.Chevron,
 						Value: cfg.Clock.Size.Label(),
 					},
 					{
 						Label: say.T("clock.color"),
-						Kind:  widget.Chevron,
+						Kind:  menu.Chevron,
 						Value: cfg.Clock.Ink.Label(),
 					},
-					{Label: say.T("clock.date"), Kind: widget.Toggle, On: cfg.Clock.Date},
+					{Label: say.T("clock.date"), Kind: menu.Toggle, On: cfg.Clock.Date},
 				}, []func(int){
 					p.open(p.Faces(say.T("clock.face"),
 						func() config.Face { return p.options.Preferences.ClockState().Clock.Face },
@@ -83,14 +83,14 @@ func (p *ClockPages) Faces(
 ) *shell.Page {
 	return &shell.Page{
 		Title: title,
-		Tiles: func() ([]widget.Cell, []func(int)) {
+		Tiles: func() ([]menu.Cell, []func(int)) {
 			chosen := now()
 
-			cells := make([]widget.Cell, 0, len(config.Faces()))
+			cells := make([]menu.Cell, 0, len(config.Faces()))
 			acts := make([]func(int), 0, len(config.Faces()))
 
 			for _, f := range config.Faces() {
-				cells = append(cells, widget.Cell{
+				cells = append(cells, menu.Cell{
 					Label:  f.Label(),
 					Chosen: f == chosen,
 					Paint:  p.Preview(f),
@@ -119,14 +119,14 @@ func (p *ClockPages) Preview(f config.Face) func(ui.Surface, ui.Rect, theme.Them
 func (p *ClockPages) Positions() *shell.Page {
 	return &shell.Page{
 		Title: say.T("clock.position.title"),
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			now := p.options.Preferences.ClockState().Clock.Position
 
-			rows := make([]widget.Row, 0, len(config.Positions()))
+			rows := make([]menu.Row, 0, len(config.Positions()))
 			acts := make([]func(int), 0, len(config.Positions()))
 
 			for _, at := range config.Positions() {
-				rows = append(rows, widget.Row{
+				rows = append(rows, menu.Row{
 					Label:   at.Label(),
 					Chosen:  at == now,
 					Preview: p.placing(at),
@@ -145,14 +145,14 @@ func (p *ClockPages) usePosition(at config.Position) func(int) {
 func (p *ClockPages) Sizes() *shell.Page {
 	return &shell.Page{
 		Title: say.T("clock.size.title"),
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			now := p.options.Preferences.ClockState().Clock.Size
 
-			rows := make([]widget.Row, 0, len(config.Sizes()))
+			rows := make([]menu.Row, 0, len(config.Sizes()))
 			acts := make([]func(int), 0, len(config.Sizes()))
 
 			for _, size := range config.Sizes() {
-				rows = append(rows, widget.Row{
+				rows = append(rows, menu.Row{
 					Label:   size.Label(),
 					Chosen:  size == now,
 					Preview: p.sizing(size),
@@ -171,14 +171,14 @@ func (p *ClockPages) useSize(size config.Size) func(int) {
 func (p *ClockPages) Colors() *shell.Page {
 	return &shell.Page{
 		Title: say.T("clock.color.title"),
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			now := p.options.Preferences.ClockState().Clock.Ink
 
-			rows := make([]widget.Row, 0, len(config.Inks()))
+			rows := make([]menu.Row, 0, len(config.Inks()))
 			acts := make([]func(int), 0, len(config.Inks()))
 
 			for _, ink := range config.Inks() {
-				rows = append(rows, widget.Row{
+				rows = append(rows, menu.Row{
 					Label:   ink.Label(),
 					Chosen:  ink == now,
 					Preview: p.inking(ink),

@@ -6,7 +6,7 @@ import (
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
-	widget "github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/say"
 )
@@ -18,21 +18,21 @@ type NetworkState struct {
 }
 
 func NetworkPage(read func() NetworkState, setVerify func(bool)) *shell.Page {
-	return &shell.Page{Title: say.T("network.title"), Build: func() ([]widget.Row, []func(int)) {
+	return &shell.Page{Title: say.T("network.title"), Build: func() ([]menu.Row, []func(int)) {
 		c := read()
-		rows := []widget.Row{
-			{Label: say.T("network.ssid"), Kind: widget.Plain, Value: c.SSID},
-			{Label: say.T("network.address"), Kind: widget.Plain, Value: c.Address},
-			{Label: say.T("network.mac"), Kind: widget.Plain, Value: c.MAC},
+		rows := []menu.Row{
+			{Label: say.T("network.ssid"), Kind: menu.Plain, Value: c.SSID},
+			{Label: say.T("network.address"), Kind: menu.Plain, Value: c.Address},
+			{Label: say.T("network.mac"), Kind: menu.Plain, Value: c.MAC},
 		}
 		acts := []func(int){nil, nil, nil}
 		if !c.Renew.IsZero() {
 			rows = append(
 				rows,
-				widget.Row{Label: say.T("network.router"), Kind: widget.Plain, Value: c.Router},
-				widget.Row{
+				menu.Row{Label: say.T("network.router"), Kind: menu.Plain, Value: c.Router},
+				menu.Row{
 					Label: say.T("network.lease"),
-					Kind:  widget.Plain,
+					Kind:  menu.Plain,
 					Value: LeaseIn(c.Renew),
 				},
 			)
@@ -40,11 +40,11 @@ func NetworkPage(read func() NetworkState, setVerify func(bool)) *shell.Page {
 		}
 		rows = append(
 			rows,
-			widget.Row{
+			menu.Row{
 				Glyph: gogui.IconLock,
 				Label: say.T("system.certificates"),
 				Hint:  say.T("system.certificates.hint"),
-				Kind:  widget.Toggle,
+				Kind:  menu.Toggle,
 				On:    c.Verify,
 			},
 		)

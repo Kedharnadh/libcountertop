@@ -2,7 +2,6 @@ package youtube
 
 import (
 	"encoding/json"
-	"errors"
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/media/cast"
@@ -20,10 +19,6 @@ var castThumbs = []cast.Image{
 }
 
 type castControl struct{ s *station }
-
-func (c castControl) Load(cast.Media, time.Duration, bool) error {
-	return errors.New("youtube: load through the lounge")
-}
 
 func (c castControl) Play() error  { go c.s.play(); return nil }
 func (c castControl) Pause() error { go c.s.pause(); return nil }

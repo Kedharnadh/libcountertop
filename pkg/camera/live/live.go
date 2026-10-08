@@ -8,7 +8,7 @@ import (
 
 	esphome "github.com/ygelfand/go-esphome-device"
 
-	"github.com/ygelfand/libcountertop/pkg/camera/helper"
+	"github.com/ygelfand/libcountertop/pkg/camera/camerafeed"
 	"github.com/ygelfand/libcountertop/pkg/camera/session"
 	"github.com/ygelfand/libcountertop/pkg/hook"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
@@ -32,7 +32,7 @@ type Options struct {
 	StillOnKeyframe bool
 
 	Turn    func() int
-	Open    func(helper.Config) (session.Transport, error)
+	Open    func(camerafeed.Config) (session.Transport, error)
 	Muted   func() bool
 	Restart func() error
 
@@ -97,7 +97,7 @@ func (c *Camera) snapshot() session.Snapshot {
 	q := c.turn()
 	k := c.Saved()
 	sizes := c.sizesFor(q)
-	cfg := helper.Config{
+	cfg := camerafeed.Config{
 		Width:    sizes[0].Width,
 		Height:   sizes[0].Height,
 		FPS:      FPS,

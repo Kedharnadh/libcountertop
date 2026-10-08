@@ -161,7 +161,11 @@ func (s *Screen) save(row Setting, value string) error {
 }
 
 func (s *Screen) Set(name, value string) error {
-	if err := s.save(s.table.Row(name), value); err != nil {
+	row, err := s.table.Row(name)
+	if err != nil {
+		return err
+	}
+	if err := s.save(row, value); err != nil {
 		return err
 	}
 	s.knobs.Publish()

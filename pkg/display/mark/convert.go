@@ -259,11 +259,3 @@ func normalize(args *[6]float32, n int, op byte, side float32, offset f32.Vec2, 
 		}
 	}
 }
-
-func Must(data []byte) ui.Icon {
-	icon, err := Convert(data)
-	if err != nil {
-		panic(err)
-	}
-	return icon
-}

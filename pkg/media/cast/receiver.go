@@ -12,16 +12,25 @@ import (
 
 const DefaultMediaReceiver = "CC1AD845"
 
-type Playing interface {
-	Load(m Media, at time.Duration, play bool) error
-
+type Transport interface {
 	Play() error
 	Pause() error
 	Stop() error
+}
 
+type Seeking interface {
 	Seek(to time.Duration) error
-
 	Elapsed() time.Duration
+}
+
+type Controls interface {
+	Transport
+	Seeking
+}
+
+type Playing interface {
+	Controls
+	Load(m Media, at time.Duration, play bool) error
 }
 
 type Stepping interface {
@@ -75,7 +84,7 @@ type Receiver struct {
 }
 
 type appPlayer struct {
-	control  Playing
+	control  Controls
 	commands int
 	custom   json.RawMessage
 	told     string
@@ -91,7 +100,7 @@ type Published struct {
 	Request int
 }
 
-func (r *Receiver) Publish(control Playing, p *Published) []Message {
+func (r *Receiver) Publish(control Controls, p *Published) []Message {
 	if r.app == nil || control == nil {
 		return nil
 	}
@@ -132,7 +141,7 @@ func (r *Receiver) Publish(control Playing, p *Published) []Message {
 	return []Message{r.mediaBroadcast(r.full())}
 }
 
-func (r *Receiver) control() Playing {
+func (r *Receiver) control() Controls {
 	if r.appMedia.control != nil {
 		return r.appMedia.control
 	}

@@ -168,3 +168,15 @@ func TestARebindReplyFromAnotherServerIsHeard(t *testing.T) {
 		t.Errorf("leased %s, want %s", got.Address.IP, held)
 	}
 }
+
+func TestRetransmitWaitsHalfTheRemainderButAtLeastAMinute(t *testing.T) {
+	for _, tc := range []struct{ left, want time.Duration }{
+		{4 * time.Hour, 2 * time.Hour},
+		{90 * time.Second, 60 * time.Second},
+		{30 * time.Second, 30 * time.Second},
+	} {
+		if got := retransmitAfter(tc.left); got != tc.want {
+			t.Errorf("retransmitAfter(%v) = %v, want %v", tc.left, got, tc.want)
+		}
+	}
+}

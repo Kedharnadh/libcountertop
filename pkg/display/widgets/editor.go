@@ -3,9 +3,13 @@ package widgets
 import (
 	gui "github.com/go-gui-org/go-gui/gui"
 
-	"github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 )
+
+type FieldStyle interface {
+	Field(cfg *gui.InputCfg)
+}
 
 type Editor struct {
 	drafts  map[string]string
@@ -45,7 +49,7 @@ func (e *Editor) Clear(w *gui.Window, bottom float32) {
 	)
 }
 
-func (e *Editor) Field(kit style.Kit, cfg gui.InputCfg, save func()) gui.View {
+func (e *Editor) Field(kit FieldStyle, cfg gui.InputCfg, save func()) gui.View {
 	kit.Field(&cfg)
 	leaf, blur := cfg.ID, cfg.OnBlur
 	cfg.OnBlur = func(ev gui.EventCtx) {
@@ -68,7 +72,7 @@ func (e *Editor) Field(kit style.Kit, cfg gui.InputCfg, save func()) gui.View {
 	})
 }
 
-func (e *Editor) Row(kit style.Kit, id string, r model.Row) gui.View {
+func (e *Editor) Row(kit FieldStyle, id string, r menu.Row) gui.View {
 	fid := id + "-field"
 	text, ok := e.drafts[fid]
 	if !ok {

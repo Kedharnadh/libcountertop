@@ -8,7 +8,7 @@ import (
 	bt "github.com/ygelfand/libcountertop/pkg/bluetooth"
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/avrcp"
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/l2cap"
-	media "github.com/ygelfand/libcountertop/pkg/media/source"
+	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 )
 
 const listing = 50
@@ -137,7 +137,7 @@ func (s *Sink) browsable() bool {
 // All ones is no track selected.
 const nothing = ^uint64(0)
 
-func (s *Sink) queued(state avrcp.State) []media.Track {
+func (s *Sink) queued(state avrcp.State) []nowplaying.Track {
 	s.mu.Lock()
 	items := s.queue
 	s.mu.Unlock()
@@ -146,10 +146,10 @@ func (s *Sink) queued(state avrcp.State) []media.Track {
 	handles := s.handles
 	s.mu.Unlock()
 
-	out := make([]media.Track, 0, len(items))
+	out := make([]nowplaying.Track, 0, len(items))
 	for _, it := range after(items, state) {
 		raw, id := s.image(handles[it.UID])
-		out = append(out, media.Track{
+		out = append(out, nowplaying.Track{
 			Title:  it.Track.Title,
 			Artist: it.Track.Artist,
 			Length: it.Track.Duration,

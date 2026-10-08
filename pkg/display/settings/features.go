@@ -4,7 +4,7 @@ import (
 	"cmp"
 	"slices"
 
-	widget "github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/say"
 )
@@ -17,7 +17,7 @@ type Feature struct {
 }
 
 func FeaturesPage(read func() []Feature, push func(shell.View)) *shell.Page {
-	return &shell.Page{Title: say.T("features.title"), Build: func() ([]widget.Row, []func(int)) {
+	return &shell.Page{Title: say.T("features.title"), Build: func() ([]menu.Row, []func(int)) {
 		all := slices.Clone(read())
 		order := map[string]int{
 			"features.sendspin": 1,
@@ -29,18 +29,18 @@ func FeaturesPage(read func() []Feature, push func(shell.View)) *shell.Page {
 		slices.SortStableFunc(all, func(a, b Feature) int {
 			return cmp.Or(cmp.Compare(order[a.Key], order[b.Key]), cmp.Compare(a.Key, b.Key))
 		})
-		rows := []widget.Row{}
+		rows := []menu.Row{}
 		acts := []func(int){}
 		for _, f := range all {
-			row := widget.Row{
+			row := menu.Row{
 				Label: say.T(f.Key),
 				Hint:  say.T(f.Key + ".hint"),
-				Kind:  widget.Toggle,
+				Kind:  menu.Toggle,
 				On:    f.On,
 			}
 			act := func(int) { f.Set(!f.On) }
 			if f.Page != nil {
-				row.Kind = widget.Chevron
+				row.Kind = menu.Chevron
 				act = func(int) { push(f.Page()) }
 			}
 			rows = append(rows, row)

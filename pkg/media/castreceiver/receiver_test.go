@@ -146,7 +146,7 @@ func TestPreferencesReadTheCastSettings(t *testing.T) {
 	m.c.YouTube.LiveDelay = 17
 	p := Preferences("product", m)
 
-	if got := p.Read().YouTube.LiveDelay; got != 17 {
+	if got := p.Settings().YouTube.LiveDelay; got != 17 {
 		t.Errorf("live delay %d, want 17", got)
 	}
 	if err := p.SaveScreens("d", "m", "v"); err != nil {
@@ -155,7 +155,7 @@ func TestPreferencesReadTheCastSettings(t *testing.T) {
 	if got := m.Read().YouTube; got.Device != "d" || got.Music != "m" || got.Video != "v" {
 		t.Errorf("screens saved as %+v", got)
 	}
-	if p.RequestIDPrefix != "product" {
-		t.Error(p.RequestIDPrefix)
+	if p.RequestIDPrefix() != "product" {
+		t.Error(p.RequestIDPrefix())
 	}
 }

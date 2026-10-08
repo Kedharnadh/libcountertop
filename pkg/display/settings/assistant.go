@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/ygelfand/libcountertop/pkg/assistant/turn"
-	widget "github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/hook"
 	"github.com/ygelfand/libcountertop/pkg/inference/wake"
@@ -42,15 +42,15 @@ const (
 func (p *AssistantPages) Page() *shell.Page {
 	return &shell.Page{
 		Title: say.T("assistants.title"),
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			var (
-				rows []widget.Row
+				rows []menu.Row
 				acts []func(int)
 			)
 			for slot := range p.options.Slots {
-				rows = append(rows, widget.Row{
+				rows = append(rows, menu.Row{
 					Label: say.F("assistants.slot", map[string]any{"N": slot + 1}),
-					Kind:  widget.Chevron,
+					Kind:  menu.Chevron,
 					Value: p.Listening(slot),
 
 					Hint:   p.Hearing(slot),
@@ -84,32 +84,32 @@ func (p *AssistantPages) Hearing(slot int) string {
 func (p *AssistantPages) Slot(slot int) *shell.Page {
 	return &shell.Page{
 		Title: say.F("assistants.slot", map[string]any{"N": slot + 1}),
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			saved := p.options.Preferences.Wake.Read().Slot(slot)
 
-			return []widget.Row{
+			return []menu.Row{
 					{Label: say.T("assistants.talk"), Hint: say.T("assistants.talk.hint")},
 
 					{
 						Label: say.T("assistants.threshold"),
-						Kind:  widget.Slider,
+						Kind:  menu.Slider,
 						Level: Sensitivity(saved.Threshold),
 						Hint:  say.T("assistants.threshold.hint"),
 					},
 
 					{
 						Label: say.T("assistants.tone"),
-						Kind:  widget.Chevron,
+						Kind:  menu.Chevron,
 						Value: saved.Tone.Label(),
 					},
 					{
 						Label: say.T("assistants.reply"),
-						Kind:  widget.Chevron,
+						Kind:  menu.Chevron,
 						Value: saved.Delivery.Label(),
 					},
 					{
 						Label: say.T("look.title"),
-						Kind:  widget.Chevron,
+						Kind:  menu.Chevron,
 						Value: saved.Look.Place.Label(),
 					},
 				}, []func(int){
@@ -155,15 +155,15 @@ func (p *AssistantPages) Phrases() string {
 func (p *AssistantPages) Tone(slot int) *shell.Page {
 	return &shell.Page{
 		Title: say.T("tone.title"),
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			now := p.options.Preferences.Wake.Read().Slot(slot).Tone
 
 			var (
-				rows []widget.Row
+				rows []menu.Row
 				acts []func(int)
 			)
 			for _, c := range config.Chimes() {
-				rows = append(rows, widget.Row{Label: c.Label(), Chosen: c == now})
+				rows = append(rows, menu.Row{Label: c.Label(), Chosen: c == now})
 				acts = append(acts, p.UseTone(slot, c))
 			}
 			return rows, acts
@@ -187,15 +187,15 @@ func (p *AssistantPages) UseTone(slot int, c config.Chime) func(int) {
 func (p *AssistantPages) Delivery(slot int) *shell.Page {
 	return &shell.Page{
 		Title: say.T("reply.title"),
-		Build: func() ([]widget.Row, []func(int)) {
+		Build: func() ([]menu.Row, []func(int)) {
 			now := p.options.Preferences.Wake.Read().Slot(slot).Delivery
 
 			var (
-				rows []widget.Row
+				rows []menu.Row
 				acts []func(int)
 			)
 			for _, d := range config.Deliveries() {
-				rows = append(rows, widget.Row{
+				rows = append(rows, menu.Row{
 					Label: d.Label(), Chosen: d == now, Hint: Delivering(d),
 				})
 				acts = append(acts, p.UseDelivery(slot, d))

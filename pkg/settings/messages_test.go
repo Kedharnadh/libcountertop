@@ -22,11 +22,11 @@ func TestTablesKeepTheirCatalogAndResolveLanguageAtReadTime(t *testing.T) {
 			Missing: func(string) bool { return true },
 		},
 	)
-	if got := a.Row("enabled").Named(); got != "one:camera.setting.enabled" {
+	if got := a.MustRow("enabled").Named(); got != "one:camera.setting.enabled" {
 		t.Fatal(got)
 	}
 	language = "two:"
-	if got := a.Row("enabled").Title(); got != "two:camera.setting.enabled" {
+	if got := a.MustRow("enabled").Title(); got != "two:camera.setting.enabled" {
 		t.Fatal(got)
 	}
 	if got := b.Title("Panel"); got != "other:screen.group.panel" {

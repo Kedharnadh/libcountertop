@@ -10,17 +10,17 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/avrcp"
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/l2cap"
 	"github.com/ygelfand/libcountertop/pkg/bluetooth/sdp"
-	media "github.com/ygelfand/libcountertop/pkg/media/source"
+	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 )
 
 // The phone is the A2DP source but the AVRCP target.
 
 type source struct{ sink *Sink }
 
-func (s source) Now() media.Now {
+func (s source) Now() nowplaying.Now {
 	remote := s.sink.remote()
 	if remote == nil {
-		return media.Now{}
+		return nowplaying.Now{}
 	}
 
 	state := remote.State()
@@ -40,8 +40,8 @@ func (s *Sink) playing() bool {
 	return s.streaming
 }
 
-func nowOf(state avrcp.State, streaming bool, queue []media.Track) media.Now {
-	return media.Now{
+func nowOf(state avrcp.State, streaming bool, queue []nowplaying.Track) nowplaying.Now {
+	return nowplaying.Now{
 		Playing: streaming && state.Progress.Status != avrcp.StatusPaused,
 		Paused:  state.Progress.Status == avrcp.StatusPaused,
 
@@ -54,12 +54,12 @@ func nowOf(state avrcp.State, streaming bool, queue []media.Track) media.Now {
 
 		Queue: queue,
 
-		Can: media.CanPause | media.CanNext | media.CanPrevious,
+		Can: nowplaying.CanPause | nowplaying.CanNext | nowplaying.CanPrevious,
 	}
 }
 
-func (source) Kind() media.Kind { return media.FromBluetooth }
-func (s source) Label() string  { return s.sink.Label() }
+func (source) Kind() nowplaying.Kind { return nowplaying.FromBluetooth }
+func (s source) Label() string       { return s.sink.Label() }
 
 func (s source) Play()     { s.sink.press(avrcp.OpPlay) }
 func (s source) Pause()    { s.sink.press(avrcp.OpPause) }

@@ -5,11 +5,11 @@ import (
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
-	"github.com/ygelfand/libcountertop/pkg/display/model"
+	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 )
 
-func RowPreview(page string, r model.Row, palette theme.Theme) gogui.View {
+func RowPreview(page string, r menu.Row, palette theme.Theme) gogui.View {
 	h := int(gogui.CurrentTheme().Cfg.SizeTextMedium * 2.4)
 	w := h * 2
 	return Picture(

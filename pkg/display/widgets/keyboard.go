@@ -20,10 +20,15 @@ const (
 	KeyboardLarge    = schema.KeyboardLarge
 )
 
+type KeyboardStyle interface {
+	Key(cfg *gogui.ContainerCfg, st *gogui.TextStyle, state style.State)
+	Panel(cfg *gogui.ContainerCfg)
+}
+
 type KeyboardOptions struct {
 	Size         KeyboardSize
 	Palette      theme.Theme
-	Kit          style.Kit
+	Kit          KeyboardStyle
 	Cancel, Save string
 	Type         func(rune)
 	Press        func(gogui.KeyCode)

@@ -12,7 +12,6 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/display/surface"
 	"github.com/ygelfand/libcountertop/pkg/media/cast"
-	"github.com/ygelfand/libcountertop/pkg/media/cast/preferences"
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
 )
 
@@ -81,7 +80,7 @@ func New(env cast.Env) *Protocol {
 	p := &Protocol{
 		env:       env,
 		auth:      AuthHost,
-		persist:   func() bool { return preferences.Get().Prime.Persist },
+		persist:   func() bool { return env.Preferences.Settings().Prime.Persist },
 		locale:    "en_US",
 		envelopes: map[string]Envelope{},
 	}
@@ -368,6 +367,8 @@ func (p *Protocol) resolved(req loadRequest) (*title, error) {
 		Device:      p.saved.Device,
 		Marketplace: p.saved.Marketplace,
 		Locale:      p.locale,
+
+		RequestIDPrefix: p.env.Preferences.RequestIDPrefix(),
 	}
 	env, preloaded := p.envelopes[id]
 	p.mu.Unlock()
@@ -421,7 +422,7 @@ func (p *Protocol) resolved(req loadRequest) (*title, error) {
 		return nil, err
 	}
 	from := time.Duration(req.Current * float64(time.Second))
-	if at, ok := Bumper(parts); ok && preferences.Get().Prime.SkipIntro && from < at {
+	if at, ok := Bumper(parts); ok && p.env.Preferences.Settings().Prime.SkipIntro && from < at {
 		slog.Info("prime video skipping intro", "title", id, "to", at)
 		from = at
 	}
@@ -577,10 +578,6 @@ func (p *Protocol) playing() *title {
 }
 
 type control struct{ p *Protocol }
-
-func (c control) Load(cast.Media, time.Duration, bool) error {
-	return errors.New("prime video: load through the sender")
-}
 
 func (c control) Play() error {
 	if t := c.p.playing(); t != nil {

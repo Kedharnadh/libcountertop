@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
-	"github.com/ygelfand/libcountertop/pkg/media/source"
+	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 )
 
 type level struct{ v int }
@@ -22,24 +22,24 @@ func page(t *testing.T, c Controls) *Page {
 }
 
 type fake struct {
-	now    source.Now
+	now    nowplaying.Now
 	paused int
 }
 
-func (f *fake) Play()              { f.now.Paused = false }
-func (f *fake) Pause()             { f.now.Paused = true; f.paused++ }
-func (f *fake) Stop()              {}
-func (f *fake) Next()              {}
-func (f *fake) Previous()          {}
-func (f *fake) Now() source.Now    { return f.now }
-func (f *fake) Kind() source.Kind  { return source.FromCast }
-func (f *fake) Label() string      { return "phone" }
-func (f *fake) Seek(time.Duration) {}
-func (f *fake) CanSeek() bool      { return true }
+func (f *fake) Play()                 { f.now.Paused = false }
+func (f *fake) Pause()                { f.now.Paused = true; f.paused++ }
+func (f *fake) Stop()                 {}
+func (f *fake) Next()                 {}
+func (f *fake) Previous()             {}
+func (f *fake) Now() nowplaying.Now   { return f.now }
+func (f *fake) Kind() nowplaying.Kind { return nowplaying.FromCast }
+func (f *fake) Label() string         { return "phone" }
+func (f *fake) Seek(time.Duration)    {}
+func (f *fake) CanSeek() bool         { return true }
 
 func playing() *fake {
 	return &fake{
-		now: source.Now{
+		now: nowplaying.Now{
 			Playing: true,
 			Title:   "a video",
 			Elapsed: 95 * time.Second,
