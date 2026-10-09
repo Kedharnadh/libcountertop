@@ -45,10 +45,10 @@ func (p *BasicPages) Display() *shell.Page {
 					Value: say.T("uisize." + cfg.UISize),
 				},
 				{
-					Glyph: gogui.IconClock,
-					Label: say.T("display.clock"),
+					Glyph: gogui.IconHome,
+					Label: say.T("display.dashboard"),
 					Kind:  menu.Chevron,
-					Value: cfg.Clock.Face.Label(),
+					Value: p.dashboardMode().Label(),
 				},
 				{
 					Glyph: gogui.IconMoon,
@@ -56,22 +56,9 @@ func (p *BasicPages) Display() *shell.Page {
 					Kind:  menu.Chevron,
 					Value: cfg.Idle.After.Label(),
 				},
-				{
-					Glyph: gogui.IconPicture,
-					Label: say.T("display.poster"),
-					Kind:  menu.Chevron,
-					Value: cfg.PosterLabel,
-				},
-				{
-					Label: say.T("controls.dock"),
-					Kind:  menu.Chevron,
-					Value: cfg.Screen.Drawer.Label(),
-				},
-				{
-					Label: say.T("controls.volume"),
-					Kind:  menu.Chevron,
-					Value: cfg.Screen.Volume.Label(),
-				},
+				SegmentRow(say.T("controls.dock"), config.Edges(), cfg.Screen.Drawer),
+				SegmentRow(say.T("controls.volume"), config.Sides(), cfg.Screen.Volume),
+				SegmentRow(say.T("display.alerts"), config.AlertStyles(), cfg.Screen.Alert),
 				{
 					Glyph: gogui.IconEye,
 					Label: say.T("display.marks"),
@@ -85,23 +72,12 @@ func (p *BasicPages) Display() *shell.Page {
 				p.open(func() shell.View { return p.Theme() }),
 				p.open(func() shell.View { return p.Style() }),
 				func(level int) { p.setSize(SizeOf(level)) },
-				p.open(func() shell.View { return p.options.Clocks.Page() }),
+				p.open(func() shell.View { return p.DashboardPage() }),
 				p.open(func() shell.View { return p.options.Idle.Page() }),
-				p.open(func() shell.View { return p.Poster() }),
-				p.open(func() shell.View { return p.Dock() }),
-				p.open(func() shell.View { return p.VolumeEdge() }),
+				SegmentPick(config.Edges(), p.options.Screen.SetDrawer),
+				SegmentPick(config.Sides(), p.setVolumeEdge),
+				SegmentPick(config.AlertStyles(), p.setAlert),
 				func(int) { p.options.Privacy.SetMarks(!cfg.Screen.Marks) },
-			}
-			if p.options.PresencePage != nil {
-				rows = append(
-					rows,
-					menu.Row{
-						Glyph: gogui.IconEye,
-						Label: say.T("display.presence"),
-						Kind:  menu.Chevron,
-					},
-				)
-				acts = append(acts, p.open(p.options.PresencePage))
 			}
 			return rows, acts
 		},

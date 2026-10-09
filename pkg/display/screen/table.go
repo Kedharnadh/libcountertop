@@ -138,6 +138,11 @@ func rows(table func() *Table, uiSize func() string) []Setting {
 			},
 		},
 		setting.Pick(
+			Setting{Name: "alert", Group: Panel, Icon: "mdi:message-alert-outline"},
+			schema.AlertStyles(),
+			func(s *schema.Screen) *schema.AlertStyle { return &s.Alert },
+		),
+		setting.Pick(
 			Setting{Name: "keyboard", Group: Panel, Icon: "mdi:keyboard-outline"},
 			schema.KeyboardSizes(),
 			func(s *schema.Screen) *schema.KeyboardSize { return &s.Keyboard },

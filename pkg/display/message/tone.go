@@ -12,6 +12,7 @@ type Message struct {
 	Icon   string
 	Swatch string
 	Keys   []Key
+	Flash  bool
 	Ended  func(End)
 }
 

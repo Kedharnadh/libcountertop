@@ -411,8 +411,8 @@ func (v *classicVU) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 			return err
 		}
 	}
-	if fresh || v.w != v.st.w || v.h != v.st.h || v.label != x.Label {
-		v.label = x.Label
+	if fresh || v.w != v.st.w || v.h != v.st.h || v.label != Labeled(x.Label) {
+		v.label = Labeled(x.Label)
 		v.st.repaint(v.key(), v.prepare())
 		if err := g.Texture(0, v.st.back); err != nil {
 			return err

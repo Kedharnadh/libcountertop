@@ -54,6 +54,7 @@ type View struct {
 	lift      float32
 	rects     map[string]ui.Rect
 	origin    ui.Rect
+	sheetH    int
 	area      ui.Rect
 	camera    string
 	photos    map[string]*photo

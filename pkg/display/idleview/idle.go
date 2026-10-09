@@ -39,6 +39,7 @@ type Idle struct {
 
 	mu   sync.Mutex
 	hold *shell.Hold
+	woke time.Time
 }
 
 func NewIdle(options Options) *Idle {
@@ -102,6 +103,7 @@ func (i *Idle) Show() {
 func (i *Idle) Wake() {
 	i.mu.Lock()
 	hold := i.hold
+	i.woke = time.Now()
 	i.mu.Unlock()
 	if hold.Held() && i.options.Shell.Visible(i.options.View) {
 		hold.Release()
@@ -121,6 +123,11 @@ func due(after, since time.Duration) bool { return after > 0 && since > after }
 
 func (i *Idle) quiet() time.Duration {
 	since := time.Duration(math.MaxInt64)
+	i.mu.Lock()
+	if !i.woke.IsZero() {
+		since = time.Since(i.woke)
+	}
+	i.mu.Unlock()
 	for _, a := range i.options.Activity {
 		if d, ok := a(); ok {
 			since = min(since, d)
@@ -165,6 +172,12 @@ func (i *Idle) set(what string, change func(*schema.Idle)) {
 
 func (i *Idle) SetAfter(v schema.Delay) {
 	i.set("after", func(c *schema.Idle) { c.After = v })
+}
+
+func (i *Idle) Saver() schema.HomeMode { return i.options.Settings.Read().Saver }
+
+func (i *Idle) SetSaver(v schema.HomeMode) {
+	i.set("saver", func(c *schema.Idle) { c.Saver = v })
 }
 
 func (i *Idle) SetFace(v schema.Face) {

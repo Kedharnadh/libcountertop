@@ -21,6 +21,7 @@ import (
 
 const (
 	probeWait = 5 * time.Second
+	dropHold  = 10 * time.Second
 	syncWait  = 30 * time.Second
 )
 
@@ -49,6 +50,7 @@ type Controller struct {
 
 	mu      sync.Mutex
 	to      sender
+	dropped time.Time
 	access  Access
 	next    uint32
 	waiting map[uint32]chan reply
@@ -93,17 +95,7 @@ func (h *Controller) Name() string { return "homeassistant" }
 func (h *Controller) Handle(_ context.Context, conn *esphome.Conn, msg proto.Message) error {
 	switch m := msg.(type) {
 	case *api.SubscribeHomeassistantServicesRequest:
-		h.mu.Lock()
-		if h.closed {
-			h.mu.Unlock()
-			return nil
-		}
-		if h.to != conn {
-			h.failPending()
-		}
-		h.to = conn
-		h.mu.Unlock()
-		h.reprobe(conn)
+		h.attach(conn)
 	case *api.HomeassistantActionResponse:
 		h.mu.Lock()
 		ch := h.waiting[m.GetCallId()]
@@ -156,7 +148,11 @@ func (h *Controller) Access() Access {
 func (h *Controller) Connected() bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	return h.to != nil
+	return h.to != nil || h.holding(time.Now())
+}
+
+func (h *Controller) holding(now time.Time) bool {
+	return !h.dropped.IsZero() && now.Sub(h.dropped) < dropHold
 }
 
 func (h *Controller) Probe() {
@@ -168,6 +164,23 @@ func (h *Controller) Probe() {
 	}
 }
 
+func (h *Controller) attach(conn sender) {
+	h.mu.Lock()
+	if h.closed {
+		h.mu.Unlock()
+		return
+	}
+	if h.to != conn {
+		h.failPending()
+		if h.to != nil {
+			h.dropped = time.Now()
+		}
+	}
+	h.to = conn
+	h.mu.Unlock()
+	h.reprobe(conn)
+}
+
 func (h *Controller) reprobe(conn sender) {
 	if !h.settings.Home.Read().Enabled {
 		return
@@ -175,8 +188,12 @@ func (h *Controller) reprobe(conn sender) {
 	ready := make(chan struct{})
 	h.mu.Lock()
 	current := !h.closed && h.to == conn
+	reset := false
 	if current {
-		h.access = Unknown
+		if !h.holding(time.Now()) {
+			h.access, reset = Unknown, true
+		}
+		h.dropped = time.Time{}
 		if h.probeStop != nil {
 			h.probeStop()
 		}
@@ -197,7 +214,9 @@ func (h *Controller) reprobe(conn sender) {
 	if !current {
 		return
 	}
-	h.Changed.Emit(Unknown)
+	if reset {
+		h.Changed.Emit(Unknown)
+	}
 	close(ready)
 }
 
@@ -243,9 +262,11 @@ func (h *Controller) settle(conn sender, access Access) {
 func (h *Controller) lost(conn sender) {
 	h.mu.Lock()
 	gone := h.to == conn
+	var at time.Time
 	if gone {
 		h.to = nil
-		h.access = Unknown
+		at = time.Now()
+		h.dropped = at
 		if h.probeStop != nil {
 			h.probeStop()
 		}
@@ -253,6 +274,18 @@ func (h *Controller) lost(conn sender) {
 	}
 	h.mu.Unlock()
 	if gone {
+		time.AfterFunc(dropHold, func() { h.expire(at) })
+	}
+}
+
+func (h *Controller) expire(at time.Time) {
+	h.mu.Lock()
+	stale := h.to == nil && h.dropped.Equal(at)
+	if stale {
+		h.dropped, h.access = time.Time{}, Unknown
+	}
+	h.mu.Unlock()
+	if stale {
 		h.Changed.Emit(Unknown)
 	}
 }

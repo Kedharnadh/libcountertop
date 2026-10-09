@@ -9,7 +9,9 @@ import (
 
 func TestRandomSpotMovesEveryThirtySeconds(t *testing.T) {
 	v := &View{}
-	c := schema.Idle{Position: schema.PositionRandom, Align: schema.AlignRandom}
+	c := schema.Idle{
+		Placement: schema.Placement{Position: schema.PositionRandom, Align: schema.AlignRandom},
+	}
 	start := time.Now()
 	first := v.Spot(c, start)
 	if got := v.Spot(c, start.Add(moveEvery-time.Second)); got != first {
@@ -26,7 +28,9 @@ func TestRandomSpotMovesEveryThirtySeconds(t *testing.T) {
 
 func TestOneRandomAxisKeepsTheOther(t *testing.T) {
 	v := &View{}
-	c := schema.Idle{Position: schema.PositionTop, Align: schema.AlignRandom}
+	c := schema.Idle{
+		Placement: schema.Placement{Position: schema.PositionTop, Align: schema.AlignRandom},
+	}
 	start := time.Now()
 	for n := range 20 {
 		got := v.Spot(c, start.Add(time.Duration(n)*moveEvery))
@@ -34,7 +38,9 @@ func TestOneRandomAxisKeepsTheOther(t *testing.T) {
 			t.Fatalf("step %d: %v", n, got)
 		}
 	}
-	c = schema.Idle{Position: schema.PositionBottom, Align: schema.AlignLeft}
+	c = schema.Idle{
+		Placement: schema.Placement{Position: schema.PositionBottom, Align: schema.AlignLeft},
+	}
 	if got := v.Spot(c, start); got != (Spot{schema.PositionBottom, schema.AlignLeft}) {
 		t.Fatalf("fixed spot became %v", got)
 	}

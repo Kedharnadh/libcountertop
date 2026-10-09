@@ -205,10 +205,7 @@ func (v *neon) Shade(g GL, fresh bool, in ui.Rect, x Input) error {
 			return err
 		}
 	}
-	label := x.Label
-	if strings.TrimSpace(label) == "" {
-		label = "COUNTERTOP"
-	}
+	label := Labeled(x.Label)
 	if fresh || v.w != v.st.w || v.h != v.st.h {
 		if err := g.Texture(0, v.wall()); err != nil {
 			return err

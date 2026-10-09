@@ -24,11 +24,6 @@ type IdleState struct {
 	Visual  config.Visual
 	Weather config.Weather
 }
-type Placement interface {
-	SetPosition(config.Position)
-	SetAlign(config.Align)
-	SetSize(config.Size)
-}
 type IdleSlots interface {
 	SetKind(int, string)
 	SetSource(int, config.Source)
@@ -36,6 +31,7 @@ type IdleSlots interface {
 type IdleClock interface {
 	SetAfter(config.Delay)
 	SetFace(config.Face)
+	SetSaver(config.HomeMode)
 }
 type IdleActions interface {
 	IdleClock
@@ -58,24 +54,28 @@ type WeatherRendering interface {
 	SetAnimate(bool)
 	SetThemed(bool)
 	SetLook(config.WeatherLook)
+	Placement
 }
 type WeatherActions interface {
 	WeatherCatalog
 	WeatherEntity
 	WeatherPlaces
 	WeatherRendering
-	Placement
 }
 type MediaIdle interface{ SetIdle(config.Delay) }
 type VisualLabel interface{ SetLabel(string) }
+type HomeAccess interface{ Access() ha.Access }
 type IdleDependencies struct {
-	Preferences Preferences
-	Shell       *shell.Shell
-	Idle        IdleActions
-	Weather     WeatherActions
-	Media       MediaIdle
-	Visuals     VisualLabel
-	Thumbnail   func(visual.Kind, int, int) *image.RGBA
+	Preferences  Preferences
+	Home         HomeAccess
+	Marks        ModeMarks
+	Sensors      func() *shell.Page
+	Shell        *shell.Shell
+	Idle         IdleActions
+	Weather      WeatherActions
+	SaverWeather WeatherRendering
+	Visuals      VisualLabel
+	Thumbnail    func(visual.Kind, int, int) *image.RGBA
 }
 type IdlePages struct{ options IdleDependencies }
 
@@ -110,101 +110,105 @@ func (p *IdlePages) Page() *shell.Page {
 		Build: func() ([]menu.Row, []func(int)) {
 			c := p.options.Preferences.IdleState().Idle
 			i := p.options.Idle
-			return []menu.Row{
-					{Label: say.T("idle.after"), Kind: menu.Chevron, Value: c.After.Label()},
-					{
-						Label: say.T("idle.media"),
-						Hint:  say.T("idle.media.hint"),
-						Kind:  menu.Slider,
-						Level: MediaLevel(c.Media),
-						Snap:  MediaSnap,
-						Value: c.Media.Label(),
-					},
-					{
-						Label: say.T("idle.visual1"),
-						Kind:  menu.Chevron,
-						Value: IdleKindLabel(c.First.Kind),
-					},
-					{
-						Label: say.T("idle.source1"),
-						Kind:  menu.Chevron,
-						Value: c.First.Source.Label(),
-					},
-					{
-						Label: say.T("idle.visual2"),
-						Kind:  menu.Chevron,
-						Value: IdleKindLabel(c.Second.Kind),
-					},
-					{
-						Label: say.T("idle.source2"),
-						Kind:  menu.Chevron,
-						Value: c.Second.Source.Label(),
-					},
-					{Label: say.T("idle.face"), Kind: menu.Chevron, Value: c.Face.Label()},
-					{
-						Label: say.T("idle.vertical"),
-						Kind:  menu.Chevron,
-						Value: c.Position.Label(),
-					},
-					{Label: say.T("idle.horizontal"), Kind: menu.Chevron, Value: c.Align.Label()},
-					{Label: say.T("idle.size"), Kind: menu.Chevron, Value: c.Size.Label()},
-					{
-						Label: say.T("idle.label"),
-						Kind:  menu.Field,
-						Value: p.options.Preferences.IdleState().Visual.Label,
-						Save:  p.options.Visuals.SetLabel,
-					},
-				}, []func(int){
-					p.open(Choose(
-						say.T("idle.after.title"),
-						config.Delays(),
-						func() config.Delay { return p.options.Preferences.IdleState().Idle.After },
-						i.SetAfter,
-						nil,
-					)),
-					func(level int) { p.options.Media.SetIdle(config.MediaDelays()[MediaIndex(level)]) },
-					p.makePage(func() shell.View { return p.Visual(0) }),
-					p.makePage(func() shell.View { return p.Source(0) }),
-					p.makePage(func() shell.View { return p.Visual(1) }),
-					p.makePage(func() shell.View { return p.Source(1) }),
-					p.open(Choose(
-						say.T("idle.face"),
-						config.IdleFaces(),
-						func() config.Face { return p.options.Preferences.IdleState().Idle.Face },
-						i.SetFace,
-						p.FacePreview,
-					)),
-					p.open(Choose(
-						say.T("idle.vertical"),
-						config.IdlePositions(),
-						func() config.Position { return p.options.Preferences.IdleState().Idle.Position },
-						i.SetPosition,
-						func(position config.Position) func(ui.Surface, ui.Rect, theme.Theme) {
-							return p.Placed(func(c *config.Idle) { c.Position = position })
-						},
-					)),
-					p.open(Choose(
-						say.T("idle.horizontal"),
-						config.IdleAligns(),
-						func() config.Align { return p.options.Preferences.IdleState().Idle.Align },
-						i.SetAlign,
-						func(a config.Align) func(ui.Surface, ui.Rect, theme.Theme) {
-							return p.Placed(func(c *config.Idle) { c.Align = a })
-						},
-					)),
-					p.open(Choose(
-						say.T("idle.size"),
-						config.Sizes(),
-						func() config.Size { return p.options.Preferences.IdleState().Idle.Size },
-						i.SetSize,
-						func(s config.Size) func(ui.Surface, ui.Rect, theme.Theme) {
-							return p.Placed(func(c *config.Idle) { c.Size = s })
-						},
-					)),
+			rows, taps := []menu.Row{
+				{Label: say.T("idle.after"), Kind: menu.Chevron, Value: c.After.Label()},
+				{
+					Label: say.T("idle.visual1"),
+					Kind:  menu.Chevron,
+					Value: IdleKindLabel(c.First.Kind),
+				},
+				{
+					Label: say.T("idle.source1"),
+					Kind:  menu.Chevron,
+					Value: c.First.Source.Label(),
+				},
+				{
+					Label: say.T("idle.visual2"),
+					Kind:  menu.Chevron,
+					Value: IdleKindLabel(c.Second.Kind),
+				},
+				{
+					Label: say.T("idle.source2"),
+					Kind:  menu.Chevron,
+					Value: c.Second.Source.Label(),
+				},
+				{Label: say.T("idle.face"), Kind: menu.Chevron, Value: c.Face.Label()},
+			}, []func(int){
+				p.open(Choose(
+					say.T("idle.after.title"),
+					config.Delays(),
+					func() config.Delay { return p.options.Preferences.IdleState().Idle.After },
+					i.SetAfter,
 					nil,
-				}
+				)),
+				p.makePage(func() shell.View { return p.Visual(0) }),
+				p.makePage(func() shell.View { return p.Source(0) }),
+				p.makePage(func() shell.View { return p.Visual(1) }),
+				p.makePage(func() shell.View { return p.Source(1) }),
+				p.open(Choose(
+					say.T("idle.face"),
+					config.IdleFaces(),
+					func() config.Face { return p.options.Preferences.IdleState().Idle.Face },
+					i.SetFace,
+					p.FacePreview,
+				)),
+			}
+			placed, placing := Placing{
+				Positions: config.IdlePositions(),
+				Aligns:    config.IdleAligns(),
+				Read: func() config.Placement {
+					return p.options.Preferences.IdleState().Idle.Placement
+				},
+				Set:     i,
+				Preview: p.Placed,
+			}.Rows(p.options.Shell)
+			rows, taps = append(rows, placed...), append(taps, placing...)
+			w := p.options.Preferences.IdleState().Weather
+			rows = append(rows,
+				menu.Row{
+					Label: say.T("weather.title"),
+					Kind:  menu.Chevron,
+					Value: weatherShown(w.Idle, w.SaverLayout()),
+				},
+				menu.Row{
+					Label: say.T("idle.label"),
+					Kind:  menu.Field,
+					Value: p.options.Preferences.IdleState().Visual.Label,
+					Save:  p.options.Visuals.SetLabel,
+				},
+			)
+			taps = append(taps, p.makePage(func() shell.View { return p.SaverWeather() }), nil)
+			return p.withSaver(c, rows, taps)
 		},
 	}
+}
+
+const saverShared = 1
+
+func (p *IdlePages) withSaver(
+	c config.Idle,
+	rows []menu.Row,
+	taps []func(int),
+) ([]menu.Row, []func(int)) {
+	head, headTaps := slices.Clone(rows[:saverShared]), slices.Clone(taps[:saverShared])
+	rest, restTaps := rows[saverShared:], taps[saverShared:]
+	if p.options.Sensors != nil {
+		r, t := p.options.Sensors().Build()
+		head, headTaps = append(head, r...), append(headTaps, t...)
+	}
+	if p.options.Home != nil && p.options.Home.Access() == ha.Allowed {
+		mode := p.options.Marks.Row(say.T("idle.saver"), c.Saver)
+		if c.Tessera() {
+			mode.Hint = say.T("idle.saver.tessera")
+			for n := range rest {
+				rest[n].Dim = true
+				restTaps[n] = func(int) {}
+			}
+		}
+		head = append(head, mode)
+		headTaps = append(headTaps, p.options.Marks.Pick(p.options.Idle.SetSaver))
+	}
+	return append(head, rest...), append(headTaps, restTaps...)
 }
 
 func MediaIndex(level int) int {
@@ -259,87 +263,94 @@ func (p *IdlePages) FacePreview(f config.Face) func(ui.Surface, ui.Rect, theme.T
 	}
 }
 
-func (p *IdlePages) Placed(change func(*config.Idle)) func(ui.Surface, ui.Rect, theme.Theme) {
+func (p *IdlePages) Placed(at config.Placement) func(ui.Surface, ui.Rect, theme.Theme) {
 	return func(s ui.Surface, box ui.Rect, palette theme.Theme) {
 		cfg := p.options.Preferences.IdleState()
-		c := cfg.Idle
-		change(&c)
-		if c.Face == config.FaceNone {
+		if cfg.Idle.Face == config.FaceNone {
 			return
 		}
 		r := face.Read(time.Now(), cfg.Screen.Hours == config.TwentyFourHour)
-		within := dashboard.Place(c.Position, c.Align, c.Size, box.W, box.H)
+		within := dashboard.Place(at.Position, at.Align, at.Size, box.W, box.H)
 		within.X += box.X
 		within.Y += box.Y
-		face.Of(c.Face).Draw(s, within, r.Undated(), cfg.Clock.Ink.Over(palette))
+		face.Of(cfg.Idle.Face).Draw(s, within, r.Undated(), cfg.Clock.Ink.Over(palette))
 	}
 }
 
-func (p *IdlePages) Weather() *shell.Page {
+func weatherShown(on bool, l config.WeatherLayout) string {
+	if !on {
+		return say.T("weather.off")
+	}
+	return l.Look.Label()
+}
+
+type weatherSpot struct {
+	shown  string
+	on     func(config.Weather) bool
+	show   func(bool)
+	layout func(config.Weather) config.WeatherLayout
+	set    WeatherRendering
+}
+
+func (p *IdlePages) DashboardWeather() *shell.Page {
+	return p.weatherPage(weatherSpot{
+		shown:  say.T("weather.dashboard"),
+		on:     func(w config.Weather) bool { return w.Dashboard },
+		show:   p.options.Weather.SetDashboard,
+		layout: func(w config.Weather) config.WeatherLayout { return w.WeatherLayout },
+		set:    p.options.Weather,
+	})
+}
+
+func (p *IdlePages) SaverWeather() *shell.Page {
+	return p.weatherPage(weatherSpot{
+		shown:  say.T("weather.idle"),
+		on:     func(w config.Weather) bool { return w.Idle },
+		show:   p.options.Weather.SetIdle,
+		layout: config.Weather.SaverLayout,
+		set:    p.options.SaverWeather,
+	})
+}
+
+func (p *IdlePages) weatherPage(at weatherSpot) *shell.Page {
+	read := func() config.WeatherLayout {
+		return at.layout(p.options.Preferences.IdleState().Weather)
+	}
 	return &shell.Page{
 		Title: say.T("weather.title"),
 		Build: func() ([]menu.Row, []func(int)) {
-			c := p.options.Preferences.IdleState().Weather
-			return []menu.Row{
-					{
-						Label: say.T("weather.entity"),
-						Kind:  menu.Chevron,
-						Value: p.options.Weather.Title(c.Entity),
-					},
-					{Label: say.T("weather.dashboard"), Kind: menu.Toggle, On: c.Dashboard},
-					{Label: say.T("weather.idle"), Kind: menu.Toggle, On: c.Idle},
-					{Label: say.T("weather.look"), Kind: menu.Chevron, Value: c.Look.Label()},
-					{Label: say.T("weather.animate"), Kind: menu.Toggle, On: c.Animate},
-					{
-						Label: say.T("weather.themed"),
-						Hint:  say.T("weather.themed.hint"),
-						Kind:  menu.Toggle,
-						On:    c.Themed,
-					},
-					{
-						Label: say.T("idle.vertical"),
-						Kind:  menu.Chevron,
-						Value: c.Position.Label(),
-					},
-					{Label: say.T("idle.horizontal"), Kind: menu.Chevron, Value: c.Align.Label()},
-					{Label: say.T("weather.size"), Kind: menu.Chevron, Value: c.Size.Label()},
-				}, []func(int){
-					func(int) {
-						p.options.Weather.Fetch()
-						p.options.Shell.Push(p.WeatherEntities())
-					},
-					func(int) { p.options.Weather.SetDashboard(!c.Dashboard) },
-					func(int) { p.options.Weather.SetIdle(!c.Idle) },
-					p.makePage(func() shell.View { return p.WeatherLooks() }),
-					func(int) { p.options.Weather.SetAnimate(!c.Animate) },
-					func(int) { p.options.Weather.SetThemed(!c.Themed) },
-					p.open(Choose(
-						say.T("idle.vertical"),
-						config.Positions(),
-						func() config.Position { return p.options.Preferences.IdleState().Weather.Position },
-						p.options.Weather.SetPosition,
-						nil,
-					)),
-					p.open(Choose(
-						say.T("idle.horizontal"),
-						config.Aligns(),
-						func() config.Align { return p.options.Preferences.IdleState().Weather.Align },
-						p.options.Weather.SetAlign,
-						nil,
-					)),
-					p.open(Choose(
-						say.T("weather.size"),
-						config.Sizes(),
-						func() config.Size { return p.options.Preferences.IdleState().Weather.Size },
-						p.options.Weather.SetSize,
-						nil,
-					)),
-				}
+			w := p.options.Preferences.IdleState().Weather
+			on, l := at.on(w), at.layout(w)
+			rows := []menu.Row{
+				{Label: at.shown, Kind: menu.Toggle, On: on},
+				{Label: say.T("weather.look"), Kind: menu.Chevron, Value: l.Look.Label()},
+				{Label: say.T("weather.animate"), Kind: menu.Toggle, On: l.Animate},
+				{
+					Label: say.T("weather.themed"),
+					Hint:  say.T("weather.themed.hint"),
+					Kind:  menu.Toggle,
+					On:    l.Themed,
+				},
+			}
+			taps := []func(int){
+				func(int) { at.show(!on) },
+				p.makePage(func() shell.View { return p.WeatherLooks(read, at.set) }),
+				func(int) { at.set.SetAnimate(!l.Animate) },
+				func(int) { at.set.SetThemed(!l.Themed) },
+			}
+			placed, placing := Placing{
+				Positions: config.Positions(),
+				Aligns:    config.Aligns(),
+				Read:      func() config.Placement { return read().Placement },
+				Set:       at.set,
+			}.Rows(p.options.Shell)
+			return append(rows, placed...), append(taps, placing...)
 		},
 	}
 }
 
 func (p *IdlePages) WeatherEntities() *shell.Page {
+	p.options.Weather.Fetch()
 	return &shell.Page{
 		Title: say.T("weather.entity"),
 		Build: func() ([]menu.Row, []func(int)) {
@@ -371,16 +382,25 @@ func (p *IdlePages) WeatherEntities() *shell.Page {
 	}
 }
 
-func (p *IdlePages) WeatherLooks() *shell.Page {
+func (p *IdlePages) WeatherLooks(
+	read func() config.WeatherLayout,
+	set WeatherRendering,
+) *shell.Page {
 	return &shell.Page{
 		Title: say.T("weather.look"),
 		Tiles: func() ([]menu.Cell, []func(int)) {
-			now := p.options.Preferences.IdleState().Weather.Look
+			now := read()
 			var cells []menu.Cell
 			var taps []func(int)
-			for _, l := range config.WeatherLooks() {
-				cells = append(cells, menu.Cell{Label: l.Label(), Chosen: l == now, Weather: l})
-				taps = append(taps, func(int) { p.options.Weather.SetLook(l) })
+			for _, look := range config.WeatherLooks() {
+				sample := now
+				sample.Look = look
+				cells = append(cells, menu.Cell{
+					Label:   look.Label(),
+					Chosen:  look == now.Look,
+					Weather: sample,
+				})
+				taps = append(taps, func(int) { set.SetLook(look) })
 			}
 			return cells, taps
 		},

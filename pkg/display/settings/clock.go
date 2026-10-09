@@ -18,9 +18,8 @@ type ClockState struct {
 	Clock  config.Clock
 }
 type ClockController interface {
+	Placement
 	SetFace(config.Face)
-	SetPosition(config.Position)
-	SetSize(config.Size)
 	SetInk(config.Ink)
 	SetDate(bool)
 }
@@ -44,34 +43,40 @@ func (p *ClockPages) Page() *shell.Page {
 		Build: func() ([]menu.Row, []func(int)) {
 			cfg := p.options.Preferences.ClockState()
 
-			return []menu.Row{
-					{
-						Label: say.T("clock.face"),
-						Kind:  menu.Chevron,
-						Value: cfg.Clock.Face.Label(),
-					},
-					{Label: say.T("clock.position"), Kind: menu.Chevron,
-						Value: cfg.Clock.Position.Label()},
-					{
-						Label: say.T("clock.size"),
-						Kind:  menu.Chevron,
-						Value: cfg.Clock.Size.Label(),
-					},
-					{
-						Label: say.T("clock.color"),
-						Kind:  menu.Chevron,
-						Value: cfg.Clock.Ink.Label(),
-					},
-					{Label: say.T("clock.date"), Kind: menu.Toggle, On: cfg.Clock.Date},
-				}, []func(int){
-					p.open(p.Faces(say.T("clock.face"),
-						func() config.Face { return p.options.Preferences.ClockState().Clock.Face },
-						p.options.Controller.SetFace)),
-					p.open(p.Positions()),
-					p.open(p.Sizes()),
-					p.open(p.Colors()),
-					func(int) { p.options.Controller.SetDate(!cfg.Clock.Date) },
-				}
+			rows := []menu.Row{
+				{
+					Label: say.T("clock.face"),
+					Kind:  menu.Chevron,
+					Value: cfg.Clock.Face.Label(),
+				},
+			}
+			taps := []func(int){
+				p.open(p.Faces(say.T("clock.face"),
+					func() config.Face { return p.options.Preferences.ClockState().Clock.Face },
+					p.options.Controller.SetFace)),
+			}
+			placed, placing := Placing{
+				Positions: config.Positions(),
+				Aligns:    config.Aligns(),
+				Read: func() config.Placement {
+					return p.options.Preferences.ClockState().Clock.Placement
+				},
+				Set:     p.options.Controller,
+				Preview: p.placed,
+			}.Rows(p.options.Shell)
+			rows = append(append(rows, placed...),
+				menu.Row{
+					Label: say.T("clock.color"),
+					Kind:  menu.Chevron,
+					Value: cfg.Clock.Ink.Label(),
+				},
+				menu.Row{Label: say.T("clock.date"), Kind: menu.Toggle, On: cfg.Clock.Date},
+			)
+			taps = append(append(taps, placing...),
+				p.open(p.Colors()),
+				func(int) { p.options.Controller.SetDate(!cfg.Clock.Date) },
+			)
+			return rows, taps
 		},
 	}
 }
@@ -116,58 +121,6 @@ func (p *ClockPages) Preview(f config.Face) func(ui.Surface, ui.Rect, theme.Them
 	}
 }
 
-func (p *ClockPages) Positions() *shell.Page {
-	return &shell.Page{
-		Title: say.T("clock.position.title"),
-		Build: func() ([]menu.Row, []func(int)) {
-			now := p.options.Preferences.ClockState().Clock.Position
-
-			rows := make([]menu.Row, 0, len(config.Positions()))
-			acts := make([]func(int), 0, len(config.Positions()))
-
-			for _, at := range config.Positions() {
-				rows = append(rows, menu.Row{
-					Label:   at.Label(),
-					Chosen:  at == now,
-					Preview: p.placing(at),
-				})
-				acts = append(acts, p.usePosition(at))
-			}
-			return rows, acts
-		},
-	}
-}
-
-func (p *ClockPages) usePosition(at config.Position) func(int) {
-	return func(int) { p.options.Controller.SetPosition(at) }
-}
-
-func (p *ClockPages) Sizes() *shell.Page {
-	return &shell.Page{
-		Title: say.T("clock.size.title"),
-		Build: func() ([]menu.Row, []func(int)) {
-			now := p.options.Preferences.ClockState().Clock.Size
-
-			rows := make([]menu.Row, 0, len(config.Sizes()))
-			acts := make([]func(int), 0, len(config.Sizes()))
-
-			for _, size := range config.Sizes() {
-				rows = append(rows, menu.Row{
-					Label:   size.Label(),
-					Chosen:  size == now,
-					Preview: p.sizing(size),
-				})
-				acts = append(acts, p.useSize(size))
-			}
-			return rows, acts
-		},
-	}
-}
-
-func (p *ClockPages) useSize(size config.Size) func(int) {
-	return func(int) { p.options.Controller.SetSize(size) }
-}
-
 func (p *ClockPages) Colors() *shell.Page {
 	return &shell.Page{
 		Title: say.T("clock.color.title"),
@@ -194,33 +147,17 @@ func (p *ClockPages) useInk(ink config.Ink) func(int) {
 	return func(int) { p.options.Controller.SetInk(ink) }
 }
 
-func (p *ClockPages) placing(at config.Position) func(ui.Surface, ui.Rect, theme.Theme) {
+func (p *ClockPages) placed(at config.Placement) func(ui.Surface, ui.Rect, theme.Theme) {
 	return func(s ui.Surface, box ui.Rect, palette theme.Theme) {
-		p.laid(s, box, palette, at, p.options.Preferences.ClockState().Clock.Size)
+		cfg := p.options.Preferences.ClockState()
+		reading := face.Read(time.Now(), cfg.Screen.Hours == config.TwentyFourHour)
+
+		within := dashboard.Place(at.Position, at.Align, at.Size, box.W, box.H)
+		within.X += box.X
+		within.Y += box.Y
+
+		face.Of(cfg.Clock.Face).Draw(s, within, reading.Undated(), cfg.Clock.Ink.Over(palette))
 	}
-}
-
-func (p *ClockPages) sizing(size config.Size) func(ui.Surface, ui.Rect, theme.Theme) {
-	return func(s ui.Surface, box ui.Rect, palette theme.Theme) {
-		p.laid(s, box, palette, p.options.Preferences.ClockState().Clock.Position, size)
-	}
-}
-
-func (p *ClockPages) laid(
-	s ui.Surface,
-	box ui.Rect,
-	palette theme.Theme,
-	at config.Position,
-	size config.Size,
-) {
-	cfg := p.options.Preferences.ClockState()
-	reading := face.Read(time.Now(), cfg.Screen.Hours == config.TwentyFourHour)
-
-	within := dashboard.Box(at, size, box.W, box.H)
-	within.X += box.X
-	within.Y += box.Y
-
-	face.Of(cfg.Clock.Face).Draw(s, within, reading.Undated(), cfg.Clock.Ink.Over(palette))
 }
 
 func (p *ClockPages) inking(ink config.Ink) func(ui.Surface, ui.Rect, theme.Theme) {

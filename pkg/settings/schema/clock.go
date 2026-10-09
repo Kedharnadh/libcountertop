@@ -12,10 +12,15 @@ type Clock struct {
 
 	Date bool `json:"date"`
 
-	Position Position `json:"position"`
-	Size     Size     `json:"size"`
+	Placement
 
 	Ink Ink `json:"ink"`
+}
+
+type Placement struct {
+	Position Position `json:"position"`
+	Align    Align    `json:"align"`
+	Size     Size     `json:"size"`
 }
 
 type Delay string
@@ -169,11 +174,10 @@ const DefaultDate = true
 
 func DefaultClock() Clock {
 	return Clock{
-		Face:     DefaultFace,
-		Date:     DefaultDate,
-		Position: DefaultPosition,
-		Size:     DefaultSize,
-		Ink:      DefaultInk,
+		Face:      DefaultFace,
+		Date:      DefaultDate,
+		Placement: Placement{Position: DefaultPosition, Align: AlignCenter, Size: DefaultSize},
+		Ink:       DefaultInk,
 	}
 }
 

@@ -19,6 +19,8 @@ type Screen struct {
 
 	Volume Edge `json:"volume"`
 
+	Alert AlertStyle `json:"alert"`
+
 	Marks bool `json:"marks"`
 
 	Language string `json:"language"`
@@ -43,6 +45,7 @@ func DefaultScreen() Screen {
 		Keyboard:  KeyboardCompact,
 		Drawer:    DefaultEdge,
 		Volume:    DefaultEdge,
+		Alert:     DefaultAlertStyle,
 		Marks:     DefaultMarks,
 	}
 }

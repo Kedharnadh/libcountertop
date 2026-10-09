@@ -1,6 +1,7 @@
 package widgets
 
 import (
+	"image"
 	"slices"
 	"sync"
 	"testing"
@@ -80,11 +81,24 @@ func TestKeyedMessageIgnoresStrayTaps(t *testing.T) {
 	defer m.Close()
 	show, _ := Alerter(m)
 	show(tessera.Alert{Buttons: []tessera.AlertButton{{Text: "OK"}}})
-	m.Dismiss(3)
+	m.Dismiss(3, image.Point{})
 	if m.Took(3) {
 		t.Fatal("a tap meant for a button was swallowed")
 	}
 	if _, up := m.Current(); !up {
 		t.Fatal("a stray tap closed an alert that waits for its button")
+	}
+}
+
+func TestAlerterPassesFlashThrough(t *testing.T) {
+	m := message.New()
+	defer m.Close()
+	show, _ := Alerter(m)
+	for _, flash := range []bool{true, false} {
+		show(tessera.Alert{Flash: flash, Buttons: []tessera.AlertButton{{Text: "OK"}}})
+		got, up := m.Current()
+		if !up || got.Flash != flash {
+			t.Fatalf("flash %v arrived as %v", flash, got.Flash)
+		}
 	}
 }

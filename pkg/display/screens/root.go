@@ -129,7 +129,7 @@ func (a *App) nativeDash(w *gogui.Window, vw, vh, top, margin int, pal theme.The
 	if !cfg.Clock.Date {
 		r = r.Undated()
 	}
-	box := dashboard.Box(cfg.Clock.Position, cfg.Clock.Size, vw, vh)
+	box := dashboard.Place(cfg.Clock.Position, cfg.Clock.Align, cfg.Clock.Size, vw, vh)
 	if top > box.Y {
 		shift := top - box.Y
 		box.Y += shift
@@ -165,7 +165,7 @@ func (a *App) nativeDash(w *gogui.Window, vw, vh, top, margin int, pal theme.The
 		layers = append(layers, widgets.Placed(box, build(w, box, r, ink)))
 	}
 	if cfg.Weather.Dashboard {
-		if v := a.weatherLayer(w, vw, vh, float32(top), pal); v != nil {
+		if v := a.weatherLayer(w, cfg.Weather.WeatherLayout, vw, vh, float32(top), pal); v != nil {
 			layers = append(layers, v)
 		}
 	}

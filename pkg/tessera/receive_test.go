@@ -227,3 +227,22 @@ func TestASaverWordIsNotATileKey(t *testing.T) {
 		t.Errorf("saver answered %v", got)
 	}
 }
+
+func TestAClockSaverWithATemperatureIsTaken(t *testing.T) {
+	c := &sender{t: t, s: screen()}
+	c.session = c.send(map[string]any{"op": "hello", "request": "34f13e8fb3066a17"})["session"].(string)
+	for _, m := range []map[string]any{
+		{"op": "begin", "tiles": 0, "pages": 1, "home": 0, "title": "", "keepalive": 60},
+		{"op": "page", "p": 0, "id": "00000000000000b1", "title": "", "home_control": false, "excluded": false, "items": []any{}},
+		{"op": "commit"},
+	} {
+		c.send(m)
+	}
+	if got := c.send(map[string]any{"op": "saver", "k": "clock", "w": "51°"})["status"]; got != "Synced" {
+		t.Errorf("clock saver answered %v", got)
+	}
+	l, _ := c.s.Layout()
+	if s, ok := l.Shown(); !ok || s.Kind != SaverClock || s.Temperature != "51°" {
+		t.Errorf("saver shown %+v %v", s, ok)
+	}
+}

@@ -53,42 +53,6 @@ func PosterSays(p config.Poster) string {
 	}
 	return p.Every.Label()
 }
-func (p *BasicPages) Dock() *shell.Page {
-	return &shell.Page{
-		Title: say.T("dock.title"),
-		Build: func() ([]menu.Row, []func(int)) {
-			now := p.state().Screen.Drawer
-
-			var (
-				rows []menu.Row
-				acts []func(int)
-			)
-			for _, e := range config.Edges() {
-				rows = append(rows, menu.Row{Label: e.Label(), Chosen: e == now})
-				acts = append(acts, func(int) { p.options.Screen.SetDrawer(e) })
-			}
-			return rows, acts
-		},
-	}
-}
-func (p *BasicPages) VolumeEdge() *shell.Page {
-	return &shell.Page{
-		Title: say.T("volume.location.title"),
-		Build: func() ([]menu.Row, []func(int)) {
-			now := p.state().Screen.Volume
-
-			var (
-				rows []menu.Row
-				acts []func(int)
-			)
-			for _, e := range config.Sides() {
-				rows = append(rows, menu.Row{Label: e.Label(), Chosen: e == now})
-				acts = append(acts, func(int) { p.setVolumeEdge(e) })
-			}
-			return rows, acts
-		},
-	}
-}
 func (p *BasicPages) System() *shell.Page {
 	return &shell.Page{Title: say.T("system.title"), Build: func() ([]menu.Row, []func(int)) {
 		c := p.state()

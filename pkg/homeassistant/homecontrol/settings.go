@@ -18,13 +18,12 @@ const Group setting.Group = "Home"
 const (
 	enabled        = "enabled"
 	combine        = "combine"
-	mode           = "mode"
+	dashboardMode  = "dashboard"
 	tesseraColumns = "tessera.columns"
 	tesseraRows    = "tessera.rows"
 	tesseraReturn  = "tessera.home_after_idle"
 	tesseraWide    = "tessera.landscape"
 	tesseraTall    = "tessera.portrait"
-	tesseraSaver   = "tessera.screensaver"
 )
 
 func (e *Engine) Controls() *setting.Controls[config.Home] { return e.knobs }
@@ -49,7 +48,7 @@ func (e *Engine) table() *setting.Table[config.Home] {
 			func(h *config.Home) *bool { return &h.Combine },
 		),
 		setting.Pick(
-			Setting{Name: mode, Group: Group, Icon: "mdi:view-dashboard-variant"},
+			Setting{Name: dashboardMode, Group: Group, Icon: "mdi:view-dashboard-variant"},
 			config.HomeModes(),
 			func(h *config.Home) *config.HomeMode { return &h.Mode },
 		),
@@ -72,10 +71,6 @@ func (e *Engine) table() *setting.Table[config.Home] {
 		setting.Flag(
 			Setting{Name: tesseraTall, Group: Group, Icon: "mdi:phone-rotate-portrait"},
 			func(h *config.Home) *bool { return &h.Tall },
-		),
-		setting.Flag(
-			Setting{Name: tesseraSaver, Group: Group, Icon: "mdi:monitor-shimmer"},
-			func(h *config.Home) *bool { return &h.Saver },
 		),
 	}
 	for _, s := range e.selections {
@@ -143,7 +138,7 @@ func (e *Engine) store(s Setting, v string) error {
 		e.cache.clear()
 	}
 	switch s.Name {
-	case enabled, mode, tesseraWide, tesseraTall:
+	case enabled, dashboardMode, tesseraWide, tesseraTall:
 		e.Speaking.Emit(e.Speaks())
 	case tesseraColumns, tesseraRows:
 		e.Regrid.Emit(e.Grid())

@@ -5,6 +5,7 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 type FrameOptions struct {
@@ -27,6 +28,27 @@ func Placed(at ui.Rect, v gogui.View) gogui.View {
 		Padding:      gogui.NoPadding,
 		Content:      []gogui.View{v},
 	})
+}
+
+func HAligned(a schema.Align) gogui.HorizontalAlign {
+	switch a {
+	case schema.AlignLeft:
+		return gogui.HAlignLeft
+	case schema.AlignRight:
+		return gogui.HAlignRight
+	}
+	return gogui.HAlignCenter
+}
+
+func Aligned(p schema.Placement, cfg gogui.ContainerCfg) gogui.ContainerCfg {
+	cfg.HAlign, cfg.VAlign = HAligned(p.Align), gogui.VAlignMiddle
+	switch p.Position {
+	case schema.PositionTop:
+		cfg.VAlign = gogui.VAlignTop
+	case schema.PositionBottom:
+		cfg.VAlign = gogui.VAlignBottom
+	}
+	return cfg
 }
 
 func Floating(z int, v gogui.View) gogui.View {

@@ -17,7 +17,6 @@ type Home struct {
 	Return  bool                `json:"tessera_return"`
 	Wide    bool                `json:"tessera_landscape"`
 	Tall    bool                `json:"tessera_portrait"`
-	Saver   bool                `json:"tessera_screensaver"`
 }
 
 const (
@@ -35,9 +34,9 @@ const (
 func (m HomeMode) Label() string {
 	switch m {
 	case HomeNative:
-		return say.T("home.mode.native")
+		return say.T("mode.native")
 	case HomeTessera:
-		return say.T("home.mode.tessera")
+		return say.T("mode.tessera")
 	}
 	return string(m)
 }

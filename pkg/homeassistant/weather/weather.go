@@ -214,3 +214,35 @@ func (w *Weather) SetPosition(v schema.Position) { w.save("position", w.set().Po
 func (w *Weather) SetAlign(v schema.Align) { w.save("align", w.set().Align(v)) }
 
 func (w *Weather) SetSize(v schema.Size) { w.save("size", w.set().Size(v)) }
+
+type Saver struct{ w *Weather }
+
+func (w *Weather) Saver() Saver { return Saver{w: w} }
+
+func (s Saver) change(what string, change func(*schema.WeatherLayout)) {
+	s.w.save("saver."+what, s.w.set().Saver(change))
+}
+
+func (s Saver) SetLook(v schema.WeatherLook) {
+	s.change("look", func(l *schema.WeatherLayout) { l.Look = v })
+}
+
+func (s Saver) SetAnimate(on bool) {
+	s.change("animate", func(l *schema.WeatherLayout) { l.Animate = on })
+}
+
+func (s Saver) SetThemed(on bool) {
+	s.change("themed", func(l *schema.WeatherLayout) { l.Themed = on })
+}
+
+func (s Saver) SetPosition(v schema.Position) {
+	s.change("position", func(l *schema.WeatherLayout) { l.Position = v })
+}
+
+func (s Saver) SetAlign(v schema.Align) {
+	s.change("align", func(l *schema.WeatherLayout) { l.Align = v })
+}
+
+func (s Saver) SetSize(v schema.Size) {
+	s.change("size", func(l *schema.WeatherLayout) { l.Size = v })
+}

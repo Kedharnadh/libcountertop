@@ -14,10 +14,9 @@ var MaxFPSSteps = []int{10, 15, 20, 30, 45, 60}
 
 const (
 	DefaultVisual = "orb"
-	DefaultLabel  = ""
 	DefaultMaxFPS = 60
 )
 
 func DefaultVisualSettings() Visual {
-	return Visual{Kind: DefaultVisual, Label: DefaultLabel, MaxFPS: DefaultMaxFPS}
+	return Visual{Kind: DefaultVisual, MaxFPS: DefaultMaxFPS}
 }

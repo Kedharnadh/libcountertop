@@ -23,6 +23,8 @@ const (
 
 func NewTable() *Table {
 	rows := []Setting{
+		setting.Pick(Setting{Name: "saver", Group: Group, Icon: "mdi:monitor-shimmer"},
+			schema.HomeModes(), func(c *schema.Idle) *schema.HomeMode { return &c.Saver }),
 		setting.Pick(Setting{Name: "after", Group: Group, Icon: "mdi:timer-outline"},
 			schema.Delays(), func(c *schema.Idle) *schema.Delay { return &c.After }),
 		setting.Pick(Setting{Name: "media", Group: Group, Icon: "mdi:timer-pause-outline"},

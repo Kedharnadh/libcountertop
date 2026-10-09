@@ -115,6 +115,10 @@ func (w ClockWriter) Position(v Position) error {
 	return w.s.Update(func(c *Clock) { c.Position = v })
 }
 
+func (w ClockWriter) Align(v Align) error {
+	return w.s.Update(func(c *Clock) { c.Align = v })
+}
+
 func (w ClockWriter) Size(v Size) error {
 	return w.s.Update(func(c *Clock) { c.Size = v })
 }
@@ -339,6 +343,10 @@ func (w ScreenWriter) Volume(v Edge) error {
 	return w.s.Update(func(c *Screen) { c.Volume = v })
 }
 
+func (w ScreenWriter) Alert(v AlertStyle) error {
+	return w.s.Update(func(c *Screen) { c.Alert = v })
+}
+
 func (w ScreenWriter) Language(v string) error {
 	return w.s.Update(func(c *Screen) { c.Language = v })
 }
@@ -531,4 +539,8 @@ func (w WeatherWriter) Align(v Align) error {
 
 func (w WeatherWriter) Size(v Size) error {
 	return w.s.Update(func(c *Weather) { c.Size = v })
+}
+
+func (w WeatherWriter) Saver(change func(*WeatherLayout)) error {
+	return w.s.Update(func(c *Weather) { change(c.SeedSaver()) })
 }

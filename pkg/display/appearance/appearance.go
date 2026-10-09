@@ -148,6 +148,11 @@ func Look(name, palette, size string) gogui.Theme {
 	cfg.TextStyleDef.Color = color(p.Text)
 	cfg.TextStyleDef.Family = st.Family
 	cfg.ScrollMultiplier = 1
+	ink, surface := color(p.Text), color(p.Surface)
+	cfg.ColorHover = ink.WithOpacity(0.06).Over(surface)
+	cfg.ColorActive = ink.WithOpacity(0.12).Over(surface)
+	cfg.ColorSeparator = ink.WithOpacity(0.1).Over(surface)
+	cfg.ColorBorder = ink.WithOpacity(0.16).Over(surface)
 	cfg.FocusRing = nil
 	cfg.ColorFocus = cfg.ColorInterior
 	cfg.ColorBorderFocus = cfg.ColorBorder

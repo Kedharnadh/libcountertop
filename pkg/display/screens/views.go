@@ -198,7 +198,7 @@ func (a *App) tileView(w *gogui.Window, id, page string, c menu.Cell, tap func(i
 	content := []gogui.View{}
 	build, native := clockview.Of(c.Face)
 	switch {
-	case c.Weather != "":
+	case c.Weather.Look != "":
 		content = append(content, a.weatherSample(w, c.Weather, float32(tw), float32(th)))
 	case c.Style != "":
 		content = append(content, widgets.StyleSample(c.Style, float32(tw), float32(th)))

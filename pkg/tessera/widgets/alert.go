@@ -18,6 +18,7 @@ func Alerter(m *message.Messages) (show func(tessera.Alert), clear func()) {
 			Icon:   a.Icon,
 			Swatch: a.Color,
 			Keys:   keys,
+			Flash:  a.Flash,
 			Ended: func(e message.End) {
 				if a.Ended != nil {
 					a.Ended(alertAction(e, len(keys)))

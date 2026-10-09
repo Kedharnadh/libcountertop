@@ -3,15 +3,16 @@ package schema
 import "github.com/ygelfand/libcountertop/pkg/say"
 
 type Idle struct {
-	After    Delay      `json:"after"`
-	Media    Delay      `json:"media"`
-	Face     Face       `json:"face"`
-	Position Position   `json:"position"`
-	Align    Align      `json:"align"`
-	Size     Size       `json:"size"`
-	First    IdleVisual `json:"first"`
-	Second   IdleVisual `json:"second"`
+	After Delay `json:"after"`
+	Media Delay `json:"media"`
+	Face  Face  `json:"face"`
+	Placement
+	First  IdleVisual `json:"first"`
+	Second IdleVisual `json:"second"`
+	Saver  HomeMode   `json:"saver"`
 }
+
+func (c Idle) Tessera() bool { return c.Saver == HomeTessera }
 
 type IdleVisual struct {
 	Kind   string `json:"kind"`
@@ -75,13 +76,12 @@ func Sources() []Source { return []Source{SourceBoth, SourceMic, SourceSpeaker} 
 
 func DefaultIdle() Idle {
 	return Idle{
-		After:    DefaultDelay,
-		Media:    Delay5m,
-		Face:     DefaultFace,
-		Position: PositionRandom,
-		Align:    AlignRandom,
-		Size:     DefaultSize,
-		First:    IdleVisual{Source: SourceBoth},
-		Second:   IdleVisual{Source: SourceBoth},
+		After:     DefaultDelay,
+		Media:     Delay5m,
+		Face:      DefaultFace,
+		Placement: Placement{Position: PositionRandom, Align: AlignRandom, Size: DefaultSize},
+		First:     IdleVisual{Source: SourceBoth},
+		Second:    IdleVisual{Source: SourceBoth},
+		Saver:     HomeNative,
 	}
 }

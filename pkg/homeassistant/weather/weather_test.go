@@ -53,3 +53,31 @@ func TestAnUnknownChoiceFromHomeAssistantChangesNothing(t *testing.T) {
 		t.Errorf("settings became %+v", saved.v)
 	}
 }
+
+func TestTheScreenSaverShowsTheDashboardUntilItIsChanged(t *testing.T) {
+	saved := &section{v: schema.DefaultWeather()}
+	w := New(Options{Settings: saved, Redraw: func() {}})
+	w.knobs.Publish()
+
+	if got, want := w.sel("saver.look").Get(), saved.v.Look.Label(); got != want {
+		t.Errorf(
+			"Home Assistant shows the screen saver look %q, want the dashboard's %q",
+			got,
+			want,
+		)
+	}
+	if saved.v.Saver != (schema.WeatherLayout{}) {
+		t.Fatalf("reading seeded the screen saver: %+v", saved.v.Saver)
+	}
+
+	w.sel("saver.size").OnCommand(schema.SizeLarge.Label())
+
+	want := schema.DefaultWeather().WeatherLayout
+	want.Size = schema.SizeLarge
+	if saved.v.Saver != want {
+		t.Errorf("screen saver saved as %+v, want %+v", saved.v.Saver, want)
+	}
+	if saved.v.WeatherLayout != schema.DefaultWeather().WeatherLayout {
+		t.Errorf("dashboard became %+v", saved.v.WeatherLayout)
+	}
+}

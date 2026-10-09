@@ -50,6 +50,7 @@ func TestEntitiesKeepTheirIdentity(t *testing.T) {
 		"clock_format",
 		"clock_face",
 		"clock_position",
+		"clock_align",
 		"clock_size",
 		"clock_color",
 		"clock_date",

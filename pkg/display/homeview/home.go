@@ -3,8 +3,6 @@ package homeview
 import (
 	"errors"
 	"fmt"
-	"image"
-	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -12,6 +10,7 @@ import (
 	gogui "github.com/go-gui-org/go-gui/gui"
 
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
+	"github.com/ygelfand/libcountertop/pkg/display/settings"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
@@ -36,6 +35,7 @@ func (view *Renderer) Body(w *gogui.Window) gogui.View {
 	switch {
 	case !on:
 		return Column([]gogui.View{master})
+	case ha.Access() == homeassistant.Allowed:
 	case !ha.Connected():
 		return Column(
 			[]gogui.View{
@@ -65,34 +65,22 @@ func (view *Renderer) Body(w *gogui.Window) gogui.View {
 	}
 
 	engine := view.options.Engine
-	modes := schema.HomeModes()
-	speaks := slices.Index(modes, engine.Speaks())
-	labels := make([]string, len(modes))
-	for i, m := range modes {
-		labels[i] = m.Label()
+	marks := view.options.Marks
+	views := []gogui.View{master}
+	if saver := view.options.Saver; saver != nil {
+		views = append(views, view.options.UI.Row("saver", "home",
+			marks.Row(say.T("home.saver"), saver.Saver()), marks.Pick(saver.SetSaver), false))
 	}
-	views := []gogui.View{
-		master,
-		view.options.UI.Row(
-			"mode",
-			"home",
-			menu.Row{
-				Label:   say.T("home.mode"),
-				Kind:    menu.Segments,
-				Options: labels,
-				Marks:   view.marks(modes),
-				Level:   speaks,
-			},
-			func(i int) { engine.SetMode(modes[i]) },
-			false,
-		),
+	views = append(views,
+		view.options.UI.Row("mode", "home",
+			marks.Row(say.T("home.dashboard"), engine.Speaks()), marks.Pick(engine.SetMode), false),
 		view.options.UI.Row("native", "home",
 			menu.Row{Label: schema.HomeNative.Label(), Kind: menu.Chevron, Dim: !engine.Native()},
 			func(int) { view.options.Shell.Push(view.NativePage()) }, false),
 		view.options.UI.Row("tessera", "home",
 			menu.Row{Label: schema.HomeTessera.Label(), Kind: menu.Chevron, Dim: !engine.Tessera()},
 			func(int) { view.options.Shell.Push(view.TesseraPage()) }, false),
-	}
+	)
 	return Column(views)
 }
 
@@ -395,16 +383,21 @@ type Client interface {
 	Probe()
 }
 type Dependencies struct {
-	Engine      *homecontrol.Engine
-	Client      Client
-	Name        func() string
-	Weather     storage.Section[schema.Weather]
-	WeatherPage func() shell.View
-	Shell       *shell.Shell
-	Logo        string
-	TesseraMark string
-	NativeMark  func() image.Image
-	UI          *widgets.UI
+	Engine          *homecontrol.Engine
+	Client          Client
+	Name            func() string
+	Weather         storage.Section[schema.Weather]
+	WeatherEntities func() shell.View
+	Shell           *shell.Shell
+	Logo            string
+	Marks           settings.ModeMarks
+	Saver           SaverMode
+	UI              *widgets.UI
+}
+
+type SaverMode interface {
+	Saver() schema.HomeMode
+	SetSaver(schema.HomeMode)
 }
 
 type Listener interface {
@@ -504,7 +497,7 @@ func (view *Renderer) NativePage() *shell.Page {
 				menu.Row{Label: say.T("home.refresh")},
 			)
 			taps = append(taps,
-				func(int) { view.options.Shell.Push(view.options.WeatherPage()) },
+				func(int) { view.options.Shell.Push(view.options.WeatherEntities()) },
 				func(int) { engine.Refresh() },
 			)
 			return rows, taps
@@ -519,12 +512,10 @@ func (view *Renderer) TesseraPage() *shell.Page {
 			engine := view.options.Engine
 			g := view.grid.shown(engine.Grid())
 			back := engine.ReturnHome()
-			saver := engine.TesseraSaver()
 			rows := []menu.Row{
 				gridRow(say.T("home.tessera.columns"), g.Columns),
 				gridRow(say.T("home.tessera.rows"), g.Rows),
 				{Label: say.T("home.tessera.return"), Kind: menu.Toggle, On: back},
-				{Label: say.T("home.tessera.screensaver"), Kind: menu.Toggle, On: saver},
 			}
 			taps := []func(int){
 				func(level int) {
@@ -538,7 +529,6 @@ func (view *Renderer) TesseraPage() *shell.Page {
 					view.grid.move(schema.TesseraGrid{Columns: c, Rows: r}, engine.SetGrid)
 				},
 				func(int) { engine.SetReturnHome(!back) },
-				func(int) { engine.SetTesseraSaver(!saver) },
 			}
 			if t := view.tessera; t != nil && t.Turns() {
 				wide, tall := engine.Landscape(), engine.Portrait()
@@ -577,18 +567,3 @@ func gridOf(level int) int {
 }
 
 func gridLevel(n int) int { return (n - 1) * 100 / (schema.TesseraMost - 1) }
-
-func (view *Renderer) marks(modes []schema.HomeMode) []menu.Mark {
-	out := make([]menu.Mark, len(modes))
-	for i, m := range modes {
-		switch m {
-		case schema.HomeTessera:
-			out[i].SVG = view.options.TesseraMark
-		case schema.HomeNative:
-			if view.options.NativeMark != nil {
-				out[i].Image = view.options.NativeMark()
-			}
-		}
-	}
-	return out
-}

@@ -258,3 +258,24 @@ func TestRestorePutsEveryEntityBack(t *testing.T) {
 		}
 	}
 }
+
+func TestAWakeKeepsTheIdleScreenDownForTheWait(t *testing.T) {
+	r := newRig(t)
+	for _, d := range schema.Delays() {
+		if d.After() > 0 {
+			r.SetAfter(d)
+			break
+		}
+	}
+	r.still = r.store.Get().After.After() + time.Second
+	r.step()
+	if !r.shell.Visible(r.View()) {
+		t.Fatal("did not come up after the wait")
+	}
+
+	r.Wake()
+	r.step()
+	if r.shell.Visible(r.View()) {
+		t.Fatal("came straight back up after a wake with no other activity")
+	}
+}

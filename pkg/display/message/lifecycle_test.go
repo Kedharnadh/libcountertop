@@ -1,6 +1,7 @@
 package message
 
 import (
+	"image"
 	"testing"
 	"time"
 )
@@ -15,7 +16,7 @@ func TestReplacementIsNotHiddenByOldExpiry(t *testing.T) {
 	if current, up := m.Current(); !up || current.Body != "second" {
 		t.Fatal("old message timer hid the replacement")
 	}
-	m.Dismiss(7)
+	m.Dismiss(7, image.Point{})
 	if !m.Took(7) {
 		t.Fatal("dismissed touch was not consumed")
 	}

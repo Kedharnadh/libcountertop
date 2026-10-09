@@ -172,6 +172,13 @@ func gateFor(replying bool) gate {
 	return micGate
 }
 
+func Labeled(label string) string {
+	if strings.TrimSpace(label) == "" {
+		return "Empty Value"
+	}
+	return label
+}
+
 func (x Input) Voice() analysis.Analysis {
 	if x.Mic == x.Speaker {
 		return single(x.Mic, gateFor(x.Replying))

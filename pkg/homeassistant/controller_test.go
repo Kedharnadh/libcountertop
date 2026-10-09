@@ -103,14 +103,42 @@ func TestSendFailureDisconnects(t *testing.T) {
 	if err := h.Call(context.Background(), "light.turn_on", nil); err == nil {
 		t.Fatal("a failed send reported success")
 	}
-	if h.Connected() {
-		t.Error("still connected after the send failed")
-	}
-	if heard != Unknown {
-		t.Errorf("heard %s, want unknown", heard)
-	}
 	if err := h.Call(context.Background(), "light.turn_on", nil); !errors.Is(err, ErrNotConnected) {
 		t.Errorf("the next call said %v, want ErrNotConnected", err)
+	}
+	if !h.Connected() || heard != Allowed {
+		t.Errorf("a fresh drop showed connected=%v heard=%s, want it held", h.Connected(), heard)
+	}
+	h.mu.Lock()
+	at := h.dropped
+	h.mu.Unlock()
+	h.expire(at)
+	if h.Connected() {
+		t.Error("still connected after the hold ran out")
+	}
+	if heard != Unknown {
+		t.Errorf("heard %s after the hold, want unknown", heard)
+	}
+}
+
+func TestAReconnectWithinTheHoldKeepsAccess(t *testing.T) {
+	h, f := connected(answering(`{"response":"ok"}`))
+	h.access = Allowed
+	var heard []Access
+	var mu sync.Mutex
+	h.Changed.Listen(func(a Access) { mu.Lock(); heard = append(heard, a); mu.Unlock() })
+
+	h.lost(f)
+	if !h.Connected() || h.Access() != Allowed {
+		t.Fatalf("a dropped connection showed connected=%v access=%s", h.Connected(), h.Access())
+	}
+	h.attach(f)
+	waitFor(t, h, Allowed)
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(heard) != 0 {
+		t.Errorf("a quick reconnect announced %v, want nothing", heard)
 	}
 }
 
@@ -200,3 +228,21 @@ type testAPISettings struct{}
 
 func (testAPISettings) Read() schema.API               { return schema.API{} }
 func (testAPISettings) Update(func(*schema.API)) error { return nil }
+
+func TestAReplacedConnectionKeepsAccess(t *testing.T) {
+	h, f := connected(answering(`{"response":"ok"}`))
+	h.access = Allowed
+	var heard []Access
+	var mu sync.Mutex
+	h.Changed.Listen(func(a Access) { mu.Lock(); heard = append(heard, a); mu.Unlock() })
+
+	h.attach(&fake{h: h, answer: answering(`{"response":"ok"}`)})
+	waitFor(t, h, Allowed)
+	_ = f
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(heard) != 0 {
+		t.Errorf("a replaced connection announced %v, want nothing", heard)
+	}
+}

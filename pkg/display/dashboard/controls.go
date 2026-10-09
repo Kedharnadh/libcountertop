@@ -32,6 +32,8 @@ func NewTable() *Table {
 			schema.Faces(), func(s *Setup) *schema.Face { return &s.Clock.Face }),
 		setting.Pick(Setting{Name: "position", Group: Group, Icon: "mdi:align-vertical-center"},
 			schema.Positions(), func(s *Setup) *schema.Position { return &s.Clock.Position }),
+		setting.Pick(Setting{Name: "align", Group: Group, Icon: "mdi:align-horizontal-center"},
+			schema.Aligns(), func(s *Setup) *schema.Align { return &s.Clock.Align }),
 		setting.Pick(Setting{Name: "size", Group: Group, Icon: "mdi:format-size"},
 			schema.Sizes(), func(s *Setup) *schema.Size { return &s.Clock.Size }),
 		setting.Pick(Setting{Name: "color", Group: Group, Icon: "mdi:palette-outline"},
@@ -128,6 +130,10 @@ func (c *Controls) SetFace(v schema.Face) {
 
 func (c *Controls) SetPosition(v schema.Position) {
 	c.commit("position", func(s *Setup) { s.Clock.Position = v })
+}
+
+func (c *Controls) SetAlign(v schema.Align) {
+	c.commit("align", func(s *Setup) { s.Clock.Align = v })
 }
 
 func (c *Controls) SetSize(v schema.Size) {

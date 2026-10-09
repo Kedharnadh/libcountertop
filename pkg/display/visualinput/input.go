@@ -146,7 +146,7 @@ func New(options Options) *Visuals {
 		ring:    analysis.NewRing(options.SpeakerRate * options.SpeakerChannels / 5),
 		listen:  options.Listen, muted: options.Muted, tap: options.Tap,
 	}
-	v.chosen, v.named = visual.Kind(config.DefaultVisual), config.DefaultLabel
+	v.chosen = visual.Kind(config.DefaultVisual)
 	v.knobs = &setting.Controls[Setup]{
 		Table:  NewTable(),
 		Device: options.DeviceID,

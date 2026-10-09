@@ -8,6 +8,10 @@ about.title: About
 about.version: Version
 access.group.access: Access
 access.setting.adb: ADB over network
+alertstyle.banner: Banner
+alertstyle.card: Card
+alertstyle.full: Full screen
+alertstyle.toast: Toast
 align.center: Center
 align.left: Left
 align.random: Random
@@ -191,16 +195,13 @@ clock.color.title: Clock color
 clock.date: Show date
 clock.face: Clock face
 clock.hours: Use 24-hour format
-clock.position: Position
-clock.position.title: Clock position
+clock.setting.align: Clock horizontal position
 clock.setting.color: Clock color
 clock.setting.date: Clock date
 clock.setting.face: Clock face
 clock.setting.hours: Clock format
-clock.setting.position: Clock position
+clock.setting.position: Clock vertical position
 clock.setting.size: Clock size
-clock.size: Size
-clock.size.title: Clock size
 clock.title: Clock
 clock.zone: Time zone
 controls.dock: Dock position
@@ -223,9 +224,11 @@ delay.5m: 5 minutes
 delay.never: Never
 delivery.stream: Stream
 delivery.whole: Download first
+display.alerts: Alert style
 display.auto: Adaptive brightness
 display.brightness: Brightness
 display.clock: Clock
+display.dashboard: Dashboard
 display.idle: Screen saver
 display.marks: Privacy indicators
 display.poster: Wallpaper
@@ -234,7 +237,6 @@ display.size: Size
 display.style: Style
 display.theme: Theme
 display.title: Display
-dock.title: Dock position
 edge.bottom: Bottom
 edge.left: Left
 edge.right: Right
@@ -277,9 +279,10 @@ home.group.home: Home control
 home.group.none: Every device on its own card
 home.label.count: "{{.N}} device{{if ne .N 1}}s{{end}}"
 home.loading: Loading…
-home.mode: Mode
-home.mode.native: Native
-home.mode.tessera: Tessera
+home.dashboard: Dashboard
+home.saver: Screen saver
+mode.native: Native
+mode.tessera: Tessera
 home.noarea: No area
 home.none: None
 home.picked.areas: "{{.N}} area{{if ne .N 1}}s{{end}}"
@@ -298,12 +301,11 @@ home.setting.control.switches: Control switches
 home.setting.enabled: Enable home control
 home.setting.group.lights: Group lights from
 home.setting.group.switches: Group switches from
-home.setting.mode: Home control mode
+home.setting.dashboard: Dashboard
 home.setting.tessera.columns: Tessera tiles along the long side
 home.setting.tessera.home_after_idle: "Tessera: back to the home page after the screensaver"
 home.setting.tessera.landscape: "Tessera: landscape screen"
 home.setting.tessera.portrait: "Tessera: portrait screen"
-home.setting.tessera.screensaver: "Tessera: use its screensaver"
 home.setting.tessera.rows: Tessera tiles along the short side
 home.tab.labels: Labels
 home.tab.manual: Manual
@@ -311,7 +313,6 @@ home.tessera.columns: Long side
 home.tessera.landscape: Enable landscape
 home.tessera.portrait: Enable portrait
 home.tessera.return: Go back to the home page after the screensaver
-home.tessera.screensaver: Use Tessera's screensaver
 home.tessera.rows: Short side
 home.tile.all.off: All off
 home.tile.all.on: All on
@@ -328,26 +329,26 @@ hours.24: 24 hour
 idle.after: Start after
 idle.after.title: Start after
 idle.face: Clock face
-idle.horizontal: Clock horizontal position
 idle.label: Visual label
 idle.media: Close paused player after
 idle.media.hint: Audio and video players
 idle.none: None
+idle.saver: Mode
+idle.saver.tessera: Set it up in Tessera's screen settings
 idle.setting.after: Idle screen after
 idle.setting.align: Idle clock horizontal position
 idle.setting.face: Idle clock face
 idle.setting.media: Close paused player after
 idle.setting.position: Idle clock vertical position
+idle.setting.saver: Screen saver mode
 idle.setting.size: Idle clock size
 idle.setting.visual1: Idle visual 1
 idle.setting.visual1.source: Idle visual 1 listens to
 idle.setting.visual2: Idle visual 2
 idle.setting.visual2.source: Idle visual 2 listens to
-idle.size: Clock size
 idle.source1: Visual 1 audio
 idle.source2: Visual 2 audio
 idle.title: Screen saver
-idle.vertical: Clock vertical position
 idle.visual1: Visual 1
 idle.visual2: Visual 2
 ink.amber: Amber
@@ -400,6 +401,9 @@ onboard.add: Scan the code, then add
 onboard.hint: Scan the code, then enter this address.
 onboard.or: or enter this address
 onboard.title: Add me to Home Assistant
+place.horizontal: Horizontal position
+place.size: Size
+place.vertical: Vertical position
 player.live: LIVE
 player.next: Up next
 player.now: Now playing
@@ -445,6 +449,7 @@ reply.stream: Starts sooner, can gap
 reply.title: Response playback
 rtsp.group.rtsp: RTSP
 rtsp.setting.enabled: RTSP server
+screen.setting.alert: Alert style
 screen.setting.auto: Auto brightness
 screen.setting.backlight: Brightness
 screen.setting.drawer: Dock location
@@ -581,7 +586,7 @@ tessera.last.yesterday: "Yesterday {{.T}}"
 tessera.light.brightness: Brightness
 tessera.light.effect: Effect
 tessera.light.effects: Effects
-tessera.light.hue: Hue
+tessera.light.hue: Color
 tessera.light.lamps: Lamps
 tessera.light.waiting: Waiting
 tessera.light.warmth: Color temperature
@@ -702,7 +707,6 @@ visual.synthwave: Synthwave
 visual.tesla: Tesla
 visual.thunderstorm: Thunderstorm
 volume.chime: Notification sound
-volume.location.title: Volume panel position
 weather.animate: Animate
 weather.cond.clear-night: Clear
 weather.cond.cloudy: Cloudy
@@ -733,18 +737,23 @@ weather.look.stack: Stack
 weather.look.words: Words
 weather.none: No weather entities in Home Assistant
 weather.off: "Off"
-weather.setting.align: Weather horizontal position
-weather.setting.animate: Animate weather
+weather.setting.align: Dashboard weather horizontal position
+weather.setting.animate: Animate dashboard weather
 weather.setting.dashboard: Weather on dashboard
 weather.setting.entity: Weather entity
 weather.setting.idle: Weather on screen saver
-weather.setting.look: Weather look
-weather.setting.position: Weather vertical position
-weather.setting.size: Weather size
-weather.setting.themed: Themed weather colors
-weather.size: Size
+weather.setting.look: Dashboard weather look
+weather.setting.position: Dashboard weather vertical position
+weather.setting.saver.align: Screen saver weather horizontal position
+weather.setting.saver.animate: Animate screen saver weather
+weather.setting.saver.look: Screen saver weather look
+weather.setting.saver.position: Screen saver weather vertical position
+weather.setting.saver.size: Screen saver weather size
+weather.setting.saver.themed: Themed screen saver weather colors
+weather.setting.size: Dashboard weather size
+weather.setting.themed: Themed dashboard weather colors
 weather.themed: Themed colors
-weather.themed.hint: "Off uses natural colors: a yellow sun, grey clouds, blue rain"
+weather.themed.hint: "Off uses natural colors: a yellow sun, gray clouds, blue rain"
 weather.title: Weather
 weather.uv: "UV {{.N}}"
 weather.wind: "Wind {{.N}} {{.Unit}}"

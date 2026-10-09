@@ -52,19 +52,28 @@ type ZoneControl interface {
 }
 type HoursControl interface{ SetHours(config.HourFormat) }
 type BasicDependencies struct {
-	Preferences                         Preferences
-	Shell                               *shell.Shell
-	Screen                              ScreenControl
-	Poster                              PosterControl
-	Visuals                             VisualControl
-	Privacy                             PrivacyControl
-	Access                              ADBControl
-	Zone                                ZoneControl
-	Dashboard                           HoursControl
-	Clocks                              *ClockPages
-	Idle                                *IdlePages
-	UISize                              func() string
-	PowerPage, VisualPage, PresencePage func() shell.View
+	Preferences           Preferences
+	Shell                 *shell.Shell
+	Screen                ScreenControl
+	Poster                PosterControl
+	Visuals               VisualControl
+	Privacy               PrivacyControl
+	Access                ADBControl
+	Zone                  ZoneControl
+	Dashboard             HoursControl
+	Clocks                *ClockPages
+	Idle                  *IdlePages
+	UISize                func() string
+	PowerPage, VisualPage func() shell.View
+	Media                 MediaIdle
+	Home                  DashboardMode
+	HA                    HomeAccess
+	Marks                 ModeMarks
+}
+type DashboardMode interface {
+	Enabled() bool
+	Speaks() config.HomeMode
+	SetMode(config.HomeMode)
 }
 type BasicPages struct{ options BasicDependencies }
 
@@ -347,6 +356,11 @@ func (p *BasicPages) setVolumeEdge(v config.Edge) {
 		"screen.volume",
 		func(c *config.Screen) { c.Volume = v },
 	)
+}
+func (p *BasicPages) setAlert(v config.AlertStyle) {
+	if err := p.options.Screen.Set("alert", string(v)); err != nil {
+		slog.Error("saving the alert style failed", "err", err)
+	}
 }
 func (p *BasicPages) setStyle(v string) error { return p.options.Screen.Set("style", v) }
 func (p *BasicPages) setSize(v string) {

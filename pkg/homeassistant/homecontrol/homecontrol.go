@@ -76,7 +76,7 @@ func (e *Engine) Native() bool { return e.Speaks() == config.HomeNative }
 
 func (e *Engine) Tessera() bool { return e.Speaks() == config.HomeTessera }
 
-func (e *Engine) SetMode(m config.HomeMode) { e.set(mode, string(m)) }
+func (e *Engine) SetMode(m config.HomeMode) { e.set(dashboardMode, string(m)) }
 
 func (e *Engine) Grid() config.TesseraGrid {
 	return e.options.Settings.Read().Tessera.Or(e.options.Grid)
@@ -174,7 +174,3 @@ func (e *Engine) Portrait() bool { return e.Tessera() && e.options.Settings.Read
 func (e *Engine) SetLandscape(on bool) { e.set(tesseraWide, setting.OnOff(on)) }
 
 func (e *Engine) SetPortrait(on bool) { e.set(tesseraTall, setting.OnOff(on)) }
-
-func (e *Engine) TesseraSaver() bool { return e.Tessera() && e.options.Settings.Read().Saver }
-
-func (e *Engine) SetTesseraSaver(on bool) { e.set(tesseraSaver, setting.OnOff(on)) }

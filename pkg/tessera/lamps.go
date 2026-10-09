@@ -9,7 +9,7 @@ const (
 	lampsMost     = 24
 	kelvinLeast   = 2000
 	kelvinMost    = 6500
-	lampColour    = 1
+	lampColor     = 1
 	lampWarmth    = 2
 	kelvinFloor   = 1000
 	kelvinCeiling = 15000
@@ -54,7 +54,7 @@ func lampTile(entity string, l map[string]any) Tile {
 	}
 	caps := whole("c")
 	var modes []string
-	if caps&lampColour != 0 {
+	if caps&lampColor != 0 {
 		modes = append(modes, "hs")
 	}
 	if caps&lampWarmth != 0 {

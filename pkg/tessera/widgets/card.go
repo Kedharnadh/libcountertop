@@ -189,24 +189,36 @@ func (v *View) cardView(
 	}
 	content = append(content, body...)
 	sheet := sheetRect(at)
-	top := gogui.PadAll(0)
-	top.Top = float32(sheet.Y - at.Y)
 	return kit.Placed(at, gogui.Column(gogui.ContainerCfg{
 		Width:   float32(at.W),
 		Height:  float32(at.H),
 		Sizing:  gogui.FixedFixed,
 		Color:   gogui.RGB(pal.Background.R, pal.Background.G, pal.Background.B),
-		Padding: top,
+		Padding: gogui.NoPadding,
 		HAlign:  gogui.HAlignCenter,
+		VAlign:  gogui.VAlignMiddle,
+		OnClick: func(e gogui.EventCtx) {
+			e.Consume()
+			v.lower(e.Window)
+		},
 		Content: []gogui.View{gogui.Column(gogui.ContainerCfg{
-			Width:   float32(sheet.W),
-			Height:  float32(sheet.H),
-			Sizing:  gogui.FixedFixed,
-			Padding: gogui.PadAll(reach * 0.5),
-			Spacing: gogui.SpacingPx(reach * 0.35),
-			Radius:  gogui.RadiusLarge,
-			Color:   surface(pal),
-			HAlign:  gogui.HAlignCenter,
+			Width:     float32(sheet.W),
+			MaxHeight: float32(sheet.H),
+			Sizing:    gogui.FixedFit,
+			Padding:   gogui.PadAll(reach * 0.5),
+			Spacing:   gogui.SpacingPx(reach * 0.35),
+			Radius:    gogui.RadiusLarge,
+			Color:     surface(pal),
+			HAlign:    gogui.HAlignCenter,
+			OnClick:   func(e gogui.EventCtx) { e.Consume() },
+			AmendLayout: func(e gogui.EventCtx) {
+				if e.Layout == nil || e.Layout.Shape == nil {
+					return
+				}
+				v.mu.Lock()
+				v.sheetH = int(e.Layout.Shape.Height)
+				v.mu.Unlock()
+			},
 			Content: content,
 		})},
 	}))
@@ -221,9 +233,13 @@ func sheetRect(at ui.Rect) ui.Rect {
 
 func (v *View) morph(at ui.Rect, f frame) []gogui.View {
 	v.mu.Lock()
-	p, from := v.lift, v.origin
+	p, from, h := v.lift, v.origin, v.sheetH
 	v.mu.Unlock()
 	to := sheetRect(at)
+	if h > 0 && h < to.H {
+		to.Y += (to.H - h) / 2
+		to.H = h
+	}
 	if from.W == 0 {
 		from = ui.Rect{X: to.X + to.W/2, Y: to.Y + to.H/2}
 	}

@@ -48,7 +48,7 @@ type message struct {
 	Base      string          `json:"base"`
 	Targets   []int           `json:"targets"`
 	Item      json.RawMessage `json:"item"`
-	W         *int            `json:"w"`
+	W         json.RawMessage `json:"w"`
 
 	raw json.RawMessage
 }
@@ -280,8 +280,8 @@ func (s *Screen) barValue(m message) (string, bool) {
 		return "", false
 	}
 	stride := wireItems
-	if m.W != nil {
-		stride = *m.W
+	if len(m.W) > 0 && json.Unmarshal(m.W, &stride) != nil {
+		return "", false
 	}
 	if stride < 1 {
 		return "", false

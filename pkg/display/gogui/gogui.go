@@ -91,6 +91,9 @@ type Renderer struct {
 	nextImage uint32
 	norm      []gui.GradientStop
 	sampled   []gui.GradientStop
+
+	down  [2]float32
+	still bool
 }
 
 type picture struct {
@@ -169,6 +172,21 @@ var phases = [...]gui.EventType{
 func (r *Renderer) Touch(p Phase, id uint64, x, y float32) {
 	if p < Began || p > Cancelled {
 		return
+	}
+	switch p {
+	case Began:
+		r.down, r.still = [2]float32{x, y}, true
+	case Moved:
+		if r.still {
+			dx, dy := x-r.down[0], y-r.down[1]
+			slop := gui.CurrentTheme().Cfg.TextStyleDef.Size
+			if dx*dx+dy*dy <= slop*slop {
+				return
+			}
+			r.still = false
+		}
+	default:
+		r.still = false
 	}
 	e := gui.Event{Type: phases[p], NumTouches: 1}
 	e.Touches[0] = gui.TouchPoint{

@@ -3,6 +3,7 @@ package message
 import (
 	"context"
 	"fmt"
+	"image"
 	"log/slog"
 	"sync"
 	"time"
@@ -26,6 +27,7 @@ type Messages struct {
 	current    Message
 	generation uint64
 	took       *int
+	catch      image.Rectangle
 }
 
 func (m *Messages) Took(id int) bool {
@@ -44,9 +46,15 @@ func New() *Messages                              { return &Messages{} }
 func (m *Messages) Run(ctx context.Context) error { <-ctx.Done(); m.Close(); return nil }
 func (m *Messages) Close()                        { m.Hide() }
 
-func (m *Messages) Dismiss(id int) {
+func (m *Messages) Catch(area image.Rectangle) {
 	m.mu.Lock()
-	showing := m.up && len(m.current.Keys) == 0
+	defer m.mu.Unlock()
+	m.catch = area
+}
+
+func (m *Messages) Dismiss(id int, at image.Point) {
+	m.mu.Lock()
+	showing := m.up && len(m.current.Keys) == 0 && (m.catch.Empty() || at.In(m.catch))
 	m.took = nil
 	if showing {
 		m.took = &id
@@ -106,6 +114,7 @@ func (m *Messages) Show(msg Message, hold time.Duration) {
 	m.mu.Lock()
 	old, was := m.current, m.up
 	m.current, m.up = msg, true
+	m.catch = image.Rectangle{}
 	m.generation++
 	generation := m.generation
 	if m.timer != nil {

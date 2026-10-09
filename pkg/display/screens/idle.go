@@ -33,7 +33,7 @@ func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
 		e.Consume()
 		e.Window.InvalidateLayout()
 	}
-	if a.o.Tessera != nil && a.o.Home != nil && a.o.Home.TesseraSaver() {
+	if a.o.Tessera != nil && a.o.Settings().Idle.Tessera() {
 		if layers := a.o.Tessera.Saver(w, ui.Rect{W: vw, H: vh}); layers != nil {
 			v.Close()
 			return gogui.Column(gogui.ContainerCfg{
@@ -108,7 +108,7 @@ func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
 		}
 	}
 	if wc := cfg.Weather; wc.Idle {
-		if v := a.weatherLayer(w, vw, vh, 0, pal); v != nil {
+		if v := a.weatherLayer(w, wc.SaverLayout(), vw, vh, 0, pal); v != nil {
 			layers = append(layers, v)
 		}
 	}

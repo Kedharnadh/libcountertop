@@ -40,7 +40,36 @@ func NewTable() *Table {
 			schema.Aligns(), func(c *schema.Weather) *schema.Align { return &c.Align }),
 		setting.Pick(Setting{Name: "size", Group: Group, Icon: "mdi:resize"},
 			schema.Sizes(), func(c *schema.Weather) *schema.Size { return &c.Size }),
+		seeded(setting.Pick(Setting{Name: "saver.look", Group: Group, Icon: "mdi:palette-outline"},
+			schema.WeatherLooks(),
+			func(c *schema.Weather) *schema.WeatherLook { return &c.SeedSaver().Look })),
+		seeded(flag("saver.animate", "", "mdi:animation-play-outline",
+			func(c *schema.Weather) *bool { return &c.SeedSaver().Animate })),
+		seeded(flag("saver.themed", "", "mdi:palette",
+			func(c *schema.Weather) *bool { return &c.SeedSaver().Themed })),
+		seeded(
+			setting.Pick(Setting{Name: "saver.position", Group: Group, Icon: "mdi:arrow-up-down"},
+				schema.Positions(),
+				func(c *schema.Weather) *schema.Position { return &c.SeedSaver().Position }),
+		),
+		seeded(
+			setting.Pick(Setting{Name: "saver.align", Group: Group, Icon: "mdi:arrow-left-right"},
+				schema.Aligns(),
+				func(c *schema.Weather) *schema.Align { return &c.SeedSaver().Align }),
+		),
+		seeded(setting.Pick(Setting{Name: "saver.size", Group: Group, Icon: "mdi:resize"},
+			schema.Sizes(),
+			func(c *schema.Weather) *schema.Size { return &c.SeedSaver().Size })),
 	}, setting.Messages{Text: say.T, Missing: say.Missing})
+}
+
+func seeded(s Setting) Setting {
+	read := s.Read
+	s.Read = func(c *schema.Weather) string {
+		probe := *c
+		return read(&probe)
+	}
+	return s
 }
 
 func (w *Weather) Name() string { return "weather" }

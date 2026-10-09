@@ -27,6 +27,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/playerview"
 	"github.com/ygelfand/libcountertop/pkg/display/poster"
 	"github.com/ygelfand/libcountertop/pkg/display/screen"
+	"github.com/ygelfand/libcountertop/pkg/display/settings"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/surface"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
@@ -141,15 +142,16 @@ type Options struct {
 	Tabs      *dashboard.Tabs
 	Home      *homecontrol.Engine
 	HomeHA    homeview.Client
+	Saver     homeview.SaverMode
 	Tessera   *tesseraview.View
 	Forecast  Weather
 
-	WeatherPage func() shell.View
-	Player      playerview.Player
-	PlayerPage  func() shell.View
-	MediaVolume volume.Channel
-	Volume      Volume
-	Streams     []schema.Stream
+	WeatherEntities func() shell.View
+	Player          playerview.Player
+	PlayerPage      func() shell.View
+	MediaVolume     volume.Channel
+	Volume          Volume
+	Streams         []schema.Stream
 
 	Upgrade   func() widgets.Upgrade
 	Upgrading Watch
@@ -196,16 +198,16 @@ func New(o Options) *App {
 		UI:     o.UI,
 	})
 	a.home = homeview.New(homeview.Dependencies{
-		Engine:      o.Home,
-		Client:      o.HomeHA,
-		Name:        o.DeviceName,
-		Weather:     o.Weather,
-		WeatherPage: o.WeatherPage,
-		Shell:       o.Shell,
-		Logo:        esphomeLogo,
-		TesseraMark: tesseraview.Mark,
-		NativeMark:  a.logo,
-		UI:          o.UI,
+		Engine:          o.Home,
+		Client:          o.HomeHA,
+		Name:            o.DeviceName,
+		Weather:         o.Weather,
+		WeatherEntities: o.WeatherEntities,
+		Shell:           o.Shell,
+		Logo:            esphomeLogo,
+		Marks:           settings.ModeMarks{Tessera: tesseraview.Mark, Native: a.logo},
+		Saver:           o.Saver,
+		UI:              o.UI,
 	})
 	if o.Tessera != nil {
 		a.home.Listen(o.Tessera)
@@ -392,7 +394,7 @@ func (a *App) Run(ctx context.Context) error {
 	})
 	defer stopMoved()
 	for _, o := range []*navigation.Overlay{
-		{Priority: priorityAlert, Build: a.messageCard},
+		{Priority: priorityAlert, Build: a.alert},
 		{Priority: priorityNotice, Build: a.timerCard},
 		{Priority: priorityNotice + 1, Build: a.assistantPanel},
 		{Priority: playerview.PriorityMini, Build: a.player.Mini},

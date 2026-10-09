@@ -60,5 +60,5 @@ type Cell struct {
 
 	Style string
 
-	Weather schema.WeatherLook
+	Weather schema.WeatherLayout
 }

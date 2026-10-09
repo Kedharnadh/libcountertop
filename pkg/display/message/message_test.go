@@ -1,6 +1,7 @@
 package message
 
 import (
+	"image"
 	"testing"
 	"time"
 
@@ -108,19 +109,52 @@ func TestDismissWithNothingShowing(t *testing.T) {
 	m.timer = nil
 	m.mu.Unlock()
 
-	m.Dismiss(0)
+	m.Dismiss(0, image.Point{})
 }
 
 func TestNegativeContactsAreTakenOnlyWhenDismissing(t *testing.T) {
 	m := New()
 	defer m.Close()
-	m.Dismiss(-1)
+	m.Dismiss(-1, image.Point{})
 	if m.Took(-1) {
 		t.Fatal("a touch with nothing showing was consumed")
 	}
 	m.Show(Message{Body: "up"}, time.Hour)
-	m.Dismiss(-2)
+	m.Dismiss(-2, image.Point{})
 	if !m.Took(-2) || m.Took(-1) {
 		t.Fatal("the dismissing touch was not the one consumed")
+	}
+}
+
+func TestATapOutsideTheCaughtAreaPassesThrough(t *testing.T) {
+	m := New()
+	defer m.Close()
+	m.Show(Message{Body: "up"}, time.Hour)
+	m.Catch(image.Rect(0, 0, 100, 40))
+	m.Dismiss(1, image.Pt(50, 200))
+	if m.Took(1) {
+		t.Fatal("a tap below the banner was consumed")
+	}
+	if _, up := m.Current(); !up {
+		t.Fatal("a tap below the banner closed it")
+	}
+	m.Dismiss(2, image.Pt(50, 20))
+	if !m.Took(2) {
+		t.Fatal("a tap on the banner was not consumed")
+	}
+	if _, up := m.Current(); up {
+		t.Fatal("a tap on the banner left it up")
+	}
+}
+
+func TestANewMessageCatchesEverywhereUntilPlaced(t *testing.T) {
+	m := New()
+	defer m.Close()
+	m.Show(Message{Body: "first"}, time.Hour)
+	m.Catch(image.Rect(0, 0, 100, 40))
+	m.Show(Message{Body: "second"}, time.Hour)
+	m.Dismiss(3, image.Pt(50, 200))
+	if !m.Took(3) {
+		t.Fatal("the next message kept the last one's area")
 	}
 }

@@ -39,7 +39,7 @@ func (v *View) follow(s *tessera.Screen, l tessera.Layout) {
 	if a.Index < 0 || a.Index >= len(l.Pages) {
 		return
 	}
-	v.revision = l.Revision
+	v.revision, v.rested = l.Revision, false
 	v.page, v.route, v.card, v.camera, v.sub = a.Index, nil, "", "", sub{}
 	v.lift, v.code = 0, code{}
 	v.shown = l.Pages[a.Index].ID
