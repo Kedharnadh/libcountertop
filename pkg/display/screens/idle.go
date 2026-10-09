@@ -28,6 +28,23 @@ func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
 		a.o.Tessera.Rested()
 	}
 	vw, vh := w.WindowSize()
+	wake := func(e gogui.EventCtx) {
+		a.o.Shell.Remove(v)
+		e.Consume()
+		e.Window.InvalidateLayout()
+	}
+	if a.o.Tessera != nil && a.o.Home != nil && a.o.Home.TesseraSaver() {
+		if layers := a.o.Tessera.Saver(w, ui.Rect{W: vw, H: vh}); layers != nil {
+			v.Close()
+			return gogui.Column(gogui.ContainerCfg{
+				ID:      "idle",
+				Sizing:  gogui.FillFill,
+				Padding: gogui.NoPadding,
+				Content: layers,
+				OnClick: wake,
+			})
+		}
+	}
 	cfg := a.o.Settings()
 	pal := a.ui.Palette()
 	slots := v.Keep(vw, vh)
@@ -100,11 +117,7 @@ func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
 		Sizing:  gogui.FillFill,
 		Padding: gogui.NoPadding,
 		Content: layers,
-		OnClick: func(e gogui.EventCtx) {
-			a.o.Shell.Remove(v)
-			e.Consume()
-			e.Window.InvalidateLayout()
-		},
+		OnClick: wake,
 	})
 }
 

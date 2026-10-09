@@ -28,6 +28,23 @@ func (v *View) showing(l tessera.Layout) int {
 	return v.page
 }
 
+func (v *View) follow(s *tessera.Screen, l tessera.Layout) {
+	a := s.Asked()
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if a.Ask == v.asked {
+		return
+	}
+	v.asked = a.Ask
+	if a.Index < 0 || a.Index >= len(l.Pages) {
+		return
+	}
+	v.revision = l.Revision
+	v.page, v.route, v.card, v.camera, v.sub = a.Index, nil, "", "", sub{}
+	v.lift, v.code = 0, code{}
+	v.shown = l.Pages[a.Index].ID
+}
+
 func (v *View) home(l tessera.Layout) {
 	v.mu.Lock()
 	defer v.mu.Unlock()

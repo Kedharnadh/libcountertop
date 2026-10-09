@@ -6,6 +6,8 @@ import (
 	"image"
 	"slices"
 	"strconv"
+	"sync"
+	"time"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
@@ -413,6 +415,51 @@ type Listener interface {
 type Renderer struct {
 	options Dependencies
 	tessera Listener
+	grid    gridDraft
+}
+
+const gridSettle = 400 * time.Millisecond
+
+type gridDraft struct {
+	mu    sync.Mutex
+	held  *schema.TesseraGrid
+	timer *time.Timer
+}
+
+func (d *gridDraft) move(g schema.TesseraGrid, commit func(schema.TesseraGrid)) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.held = &g
+	if d.timer != nil {
+		d.timer.Stop()
+	}
+	d.timer = time.AfterFunc(gridSettle, d.land(commit))
+}
+
+func (d *gridDraft) land(commit func(schema.TesseraGrid)) func() {
+	return func() {
+		d.mu.Lock()
+		g := d.held
+		d.mu.Unlock()
+		if g == nil {
+			return
+		}
+		commit(*g)
+		d.mu.Lock()
+		if d.held == g {
+			d.held = nil
+		}
+		d.mu.Unlock()
+	}
+}
+
+func (d *gridDraft) shown(saved schema.TesseraGrid) schema.TesseraGrid {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.held == nil {
+		return saved
+	}
+	return d.held.Or(saved)
 }
 
 func (view *Renderer) Listen(l Listener) { view.tessera = l }
@@ -470,17 +517,28 @@ func (view *Renderer) TesseraPage() *shell.Page {
 		Title: schema.HomeTessera.Label(),
 		Build: func() ([]menu.Row, []func(int)) {
 			engine := view.options.Engine
-			g := engine.Grid()
+			g := view.grid.shown(engine.Grid())
 			back := engine.ReturnHome()
+			saver := engine.TesseraSaver()
 			rows := []menu.Row{
 				gridRow(say.T("home.tessera.columns"), g.Columns),
 				gridRow(say.T("home.tessera.rows"), g.Rows),
 				{Label: say.T("home.tessera.return"), Kind: menu.Toggle, On: back},
+				{Label: say.T("home.tessera.screensaver"), Kind: menu.Toggle, On: saver},
 			}
 			taps := []func(int){
-				func(level int) { engine.SetGrid(schema.TesseraGrid{Columns: gridOf(level), Rows: g.Rows}) },
-				func(level int) { engine.SetGrid(schema.TesseraGrid{Columns: g.Columns, Rows: gridOf(level)}) },
+				func(level int) {
+					c := gridOf(level)
+					r := min(g.Rows, schema.TesseraCells/c)
+					view.grid.move(schema.TesseraGrid{Columns: c, Rows: r}, engine.SetGrid)
+				},
+				func(level int) {
+					r := gridOf(level)
+					c := min(g.Columns, schema.TesseraCells/r)
+					view.grid.move(schema.TesseraGrid{Columns: c, Rows: r}, engine.SetGrid)
+				},
 				func(int) { engine.SetReturnHome(!back) },
+				func(int) { engine.SetTesseraSaver(!saver) },
 			}
 			if t := view.tessera; t != nil && t.Turns() {
 				wide, tall := engine.Landscape(), engine.Portrait()

@@ -21,7 +21,7 @@ const (
 
 func (v *View) openCard(w *gogui.Window, t tessera.Tile) {
 	v.mu.Lock()
-	v.card, v.hours, v.lift = t.Entity, 24, 0
+	v.card, v.hours, v.lift, v.sub = t.Entity, 24, 0, sub{}
 	r := v.rects[t.Entity]
 	v.origin = ui.Rect{X: v.area.X + r.X, Y: v.area.Y + r.Y, W: r.W, H: r.H}
 	screen := v.screen
@@ -34,7 +34,7 @@ func (v *View) openCard(w *gogui.Window, t tessera.Tile) {
 
 func (v *View) closeCard() {
 	v.mu.Lock()
-	v.card, v.code, v.lift = "", code{}, 0
+	v.card, v.code, v.lift, v.sub = "", code{}, 0, sub{}
 	v.mu.Unlock()
 }
 
@@ -119,6 +119,7 @@ func (v *View) cardView(
 	var tail gogui.View
 	body := []gogui.View{}
 	status := v.line(shown, l, v.seen(t, f.now), f.now, false)
+	title, back := t.Name, v.lower
 	switch d := t.Domain(); {
 	case historyCard(t):
 		if d == "switch" || d == "input_boolean" {
@@ -126,7 +127,22 @@ func (v *View) cardView(
 		}
 		body = v.historyBody(w, t, l, e, width, float32(at.H), hours)
 		status = ""
-	case d == "light" || d == "fan":
+	case d == "light" && v.aside().kind == subLamps:
+		back = v.backAside
+		status = ""
+		if l, ok := lampOf(t, v.aside().lamp); ok {
+			title = l.Name
+		}
+		body = v.lampsBody(w, t, f.fresh, width, float32(sheetRect(at).H))
+	case d == "light" && v.aside().kind == subEffects:
+		back = v.backAside
+		status = ""
+		body = v.effectsBody(w, t, e, width, float32(sheetRect(at).H))
+	case d == "light":
+		tail = v.toggle(w, "tessera-card", t, e)
+		body = append(body, v.lightBody(w, t, e, width)...)
+		body = append(body, v.asideKeys(t, width)...)
+	case d == "fan":
 		tail = v.toggle(w, "tessera-card", t, e)
 		body = append(body, v.slider(w, "tessera-card", t, e, width))
 	case d == "cover":
@@ -166,7 +182,7 @@ func (v *View) cardView(
 		body = sunBody(t)
 	}
 	content := []gogui.View{
-		v.cardHeader(w, t.Name, width, tail, v.lower),
+		v.cardHeader(w, title, width, tail, back),
 	}
 	if status != "" {
 		content = append(content, gogui.Label(status, secondary()))

@@ -46,6 +46,9 @@ type View struct {
 	grips     map[string]*grip
 	edits     map[string]*edit
 	card      string
+	radio     radio
+	asked     uint64
+	sub       sub
 	hours     int
 	code      code
 	lift      float32
@@ -83,6 +86,7 @@ func (v *View) Draw(w *gogui.Window, at ui.Rect) []gogui.View {
 	g := screen.Grid()
 	now := time.Now()
 	f := frame{now: now, pal: v.o.UI.Palette(), fresh: screen.Fresh(now)}
+	v.follow(screen, layout)
 	page := v.showing(layout)
 	if entity := v.showingCamera(); entity != "" {
 		if t, ok := cardTile(layout, entity); ok {
@@ -245,6 +249,9 @@ func (v *View) pick(at ui.Rect) *tessera.Screen {
 	v.last = at
 	if screen != v.screen {
 		v.screen, v.revision, v.shown, v.route, v.card = screen, "", "", nil, ""
+		if screen != nil {
+			v.asked = screen.Asked().Ask
+		}
 	}
 	return screen
 }

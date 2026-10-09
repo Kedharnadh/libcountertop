@@ -75,7 +75,13 @@ func (v *View) topBar(
 	var items []gogui.View
 	for _, it := range p.Bar {
 		var parts []gogui.View
-		if r := icons.Codepoint(it.Icon); r != 0 {
+		r, words := icons.Codepoint(it.Icon), barText(it, l.Clock24, now)
+		if mark, said, ok := v.deviceItem(it, f.fresh, now); ok {
+			r, words = mark, said
+		} else if device(it.Kind) {
+			continue
+		}
+		if r != 0 {
 			st := symbol
 			if c, ok := hexColor(it.Color); ok {
 				st.Color = c
@@ -83,7 +89,7 @@ func (v *View) topBar(
 			parts = append(parts, gogui.Label(icons.Glyph(r), st))
 			width -= w.TextWidth(icons.Glyph(r), st)
 		}
-		if s := barText(it, l.Clock24, now); s != "" {
+		if s := words; s != "" {
 			if len(parts) > 0 {
 				parts = append(parts, gap(iconGap))
 				width -= iconGap

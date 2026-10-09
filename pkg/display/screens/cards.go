@@ -1,12 +1,17 @@
 package screens
 
 import (
+	"strconv"
+
 	gogui "github.com/go-gui-org/go-gui/gui"
 	"golang.org/x/exp/shiny/materialdesign/icons"
 
 	"github.com/ygelfand/libcountertop/pkg/assistant/timer"
 	"github.com/ygelfand/libcountertop/pkg/assistant/turn"
 	"github.com/ygelfand/libcountertop/pkg/display/assistant"
+	mdi "github.com/ygelfand/libcountertop/pkg/display/icons"
+	"github.com/ygelfand/libcountertop/pkg/display/message"
+	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
@@ -21,7 +26,8 @@ func (a *App) messageCard(w *gogui.Window) gogui.View {
 	}
 	t := gogui.CurrentTheme()
 	vw, vh := w.WindowSize()
-	tint := color(m.Tone.Color(a.ui.Palette()))
+	pal := a.ui.Palette()
+	tint := color(m.Tint(pal))
 
 	words := []gogui.View{}
 	if m.Title != "" {
@@ -58,12 +64,13 @@ func (a *App) messageCard(w *gogui.Window) gogui.View {
 					Padding: gogui.NoPadding,
 				},
 			),
+			a.messageIcon(m, tint),
 			gogui.Column(
 				gogui.ContainerCfg{
 					Sizing:  gogui.FillFit,
 					Padding: gogui.NoPadding,
 					Spacing: gogui.SpacingMedium,
-					Content: words,
+					Content: append(words, a.messageKeys(m, pal)...),
 				},
 			),
 		},
@@ -78,6 +85,51 @@ func (a *App) messageCard(w *gogui.Window) gogui.View {
 		VAlign:  gogui.VAlignMiddle,
 		Content: []gogui.View{card},
 	})
+}
+
+func (a *App) messageIcon(m message.Message, tint gogui.Color) gogui.View {
+	if m.Icon == "" {
+		return gogui.Row(gogui.ContainerCfg{Padding: gogui.NoPadding})
+	}
+	glyph := mdi.Named(m.Icon)
+	if glyph == 0 {
+		glyph = mdi.Named("alert-outline")
+	}
+	st := gogui.CurrentTheme().TextStyleDisplay
+	st.Family, st.Color = mdi.Family, tint
+	st.Size *= 1.6
+	return gogui.Label(mdi.Glyph(glyph), st)
+}
+
+func (a *App) messageKeys(m message.Message, pal theme.Theme) []gogui.View {
+	if len(m.Keys) == 0 {
+		return nil
+	}
+	t := gogui.CurrentTheme()
+	keys := make([]gogui.View, 0, len(m.Keys))
+	for i, k := range m.Keys {
+		fill := widgets.KeyFill(pal)
+		st := t.Cfg.TextStyleDef
+		if c, ok := message.Swatch(k.Swatch, pal); ok {
+			fill, st.Color = color(c), color(pal.Background)
+		}
+		keys = append(keys, a.ui.Toolkit.Keyed(gogui.ContainerCfg{
+			ID:      "message-key-" + strconv.Itoa(i),
+			Height:  style.Reach(),
+			Sizing:  gogui.FillFixed,
+			Radius:  gogui.RadiusLarge,
+			Color:   fill,
+			HAlign:  gogui.HAlignCenter,
+			VAlign:  gogui.VAlignMiddle,
+			Padding: gogui.NoPadding,
+		}, k.Text, st, style.Rest, func(gogui.EventCtx) { a.o.Messages.Press(i) }))
+	}
+	return []gogui.View{gogui.Row(gogui.ContainerCfg{
+		Sizing:  gogui.FillFit,
+		Padding: gogui.NoPadding,
+		Spacing: gogui.SpacingMedium,
+		Content: keys,
+	})}
 }
 
 const priorityNotice = 20

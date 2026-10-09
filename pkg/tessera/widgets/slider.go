@@ -75,19 +75,35 @@ func bounds(t tessera.Tile) (lo, hi float64) {
 	return lo, hi
 }
 
-func (v *View) shownLevel(t tessera.Tile, now time.Time) float64 {
+type dial struct {
+	key    string
+	real   float64
+	live   bool
+	commit func(*gogui.Window, float64)
+}
+
+func (v *View) levelDial(t tessera.Tile) dial {
 	real, _ := level(t)
+	return dial{
+		key:    t.Entity,
+		real:   real,
+		live:   available(t),
+		commit: func(w *gogui.Window, x float64) { v.commitLevel(w, t, x) },
+	}
+}
+
+func (v *View) held(d dial, now time.Time) float64 {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	g, ok := v.grips[t.Entity]
+	g, ok := v.grips[d.key]
 	switch {
 	case !ok:
-		return real
+		return d.real
 	case g.sent.IsZero():
 		return g.value
-	case now.Sub(g.sent) > holdMost || math.Abs(real-g.value) <= holdNear || !available(t):
-		delete(v.grips, t.Entity)
-		return real
+	case now.Sub(g.sent) > holdMost || math.Abs(d.real-g.value) <= holdNear || !d.live:
+		delete(v.grips, d.key)
+		return d.real
 	}
 	return g.value
 }
@@ -99,27 +115,43 @@ func (v *View) slider(
 	f kit.EntityTile,
 	width float32,
 ) gogui.View {
-	height := style.Reach()
-	value := v.shownLevel(t, time.Now())
+	d := v.levelDial(t)
+	value := v.held(d, time.Now())
 	if t.Domain() == "light" && t.State != "on" {
 		value = 0
 	}
+	var fill *gogui.Color
+	if f.On {
+		fill = f.Accent
+	}
+	return v.dialSlider(w, id, d, value, width, fill, !f.Available)
+}
+
+func (v *View) dialSlider(
+	w *gogui.Window,
+	id string,
+	d dial,
+	value float64,
+	width float32,
+	fill *gogui.Color,
+	disabled bool,
+) gogui.View {
 	thumb := gogui.CurrentTheme().Cfg.SizeSliderThumb
 	cfg := gogui.SliderCfg{
 		ID:     id + "-slider",
 		Width:  max(1, width-thumb),
-		Height: height,
+		Height: style.Reach(),
 		Sizing: gogui.FixedFit,
 		Value:  float32(value * 1000),
 		Max:    1000,
 		OnChange: func(x float32, e gogui.EventCtx) {
-			v.nudge(e.Window, t, float64(x)/1000)
+			v.nudge(e.Window, d, float64(x)/1000)
 			e.Window.InvalidateLayout()
 		},
-		Disabled: !f.Available,
+		Disabled: disabled,
 	}
-	if f.On && f.Accent != nil {
-		cfg.ColorLeft = *f.Accent
+	if fill != nil {
+		cfg.ColorLeft = *fill
 	}
 	return gogui.Row(gogui.ContainerCfg{
 		Sizing:  gogui.FitFit,
@@ -133,32 +165,32 @@ func (v *View) slider(
 			e.Consume()
 			switch e.Event.GesturePhase {
 			case gogui.GesturePhaseEnded, gogui.GesturePhaseCancelled:
-				v.letGo(w, t)
+				v.letGo(w, d)
 			}
 		},
 	})
 }
 
-func (v *View) nudge(w *gogui.Window, t tessera.Tile, value float64) {
+func (v *View) nudge(w *gogui.Window, d dial, value float64) {
 	v.mu.Lock()
-	g, ok := v.grips[t.Entity]
+	g, ok := v.grips[d.key]
 	if !ok || !g.sent.IsZero() {
 		g = &grip{}
-		v.grips[t.Entity] = g
+		v.grips[d.key] = g
 	}
 	g.value, g.moved = min(max(value, 0), 1), time.Now()
 	if g.commit != nil {
 		g.commit.Stop()
 	}
 	g.commit = time.AfterFunc(tapRelease, func() {
-		w.QueueCommand(func(w *gogui.Window) { v.letGo(w, t) })
+		w.QueueCommand(func(w *gogui.Window) { v.letGo(w, d) })
 	})
 	v.mu.Unlock()
 }
 
-func (v *View) letGo(w *gogui.Window, t tessera.Tile) {
+func (v *View) letGo(w *gogui.Window, d dial) {
 	v.mu.Lock()
-	g, ok := v.grips[t.Entity]
+	g, ok := v.grips[d.key]
 	if !ok || !g.sent.IsZero() {
 		v.mu.Unlock()
 		return
@@ -169,7 +201,7 @@ func (v *View) letGo(w *gogui.Window, t tessera.Tile) {
 	g.sent = time.Now()
 	value := g.value
 	v.mu.Unlock()
-	v.commitLevel(w, t, value)
+	d.commit(w, value)
 	w.InvalidateLayout()
 }
 

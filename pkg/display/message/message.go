@@ -21,6 +21,7 @@ type Messages struct {
 	Changed hook.Hook[bool]
 
 	mu         sync.Mutex
+	up         bool
 	timer      *time.Timer
 	current    Message
 	generation uint64
@@ -36,7 +37,7 @@ func (m *Messages) Took(id int) bool {
 func (m *Messages) Current() (Message, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.current, m.timer != nil
+	return m.current, m.up
 }
 
 func New() *Messages                              { return &Messages{} }
@@ -45,7 +46,7 @@ func (m *Messages) Close()                        { m.Hide() }
 
 func (m *Messages) Dismiss(id int) {
 	m.mu.Lock()
-	showing := m.timer != nil
+	showing := m.up && len(m.current.Keys) == 0
 	m.took = nil
 	if showing {
 		m.took = &id
@@ -56,7 +57,16 @@ func (m *Messages) Dismiss(id int) {
 		return
 	}
 	slog.Info("message dismissed")
-	m.Hide()
+	m.end(End{Why: EndTapped})
+}
+
+func (m *Messages) Press(key int) {
+	m.mu.Lock()
+	ok := m.up && key >= 0 && key < len(m.current.Keys)
+	m.mu.Unlock()
+	if ok {
+		m.end(End{Key: key, Why: EndKey})
+	}
 }
 
 func (m *Messages) Name() string { return "messages" }
@@ -94,14 +104,21 @@ func (m *Messages) Actions() []*esphome.Action {
 
 func (m *Messages) Show(msg Message, hold time.Duration) {
 	m.mu.Lock()
-	m.current = msg
+	old, was := m.current, m.up
+	m.current, m.up = msg, true
 	m.generation++
 	generation := m.generation
 	if m.timer != nil {
 		m.timer.Stop()
+		m.timer = nil
 	}
-	m.timer = time.AfterFunc(hold, func() { m.expire(generation) })
+	if hold > 0 {
+		m.timer = time.AfterFunc(hold, func() { m.expire(generation) })
+	}
 	m.mu.Unlock()
+	if was && old.Ended != nil {
+		old.Ended(End{Why: EndReplaced})
+	}
 	slog.Info("message", "title", msg.Title, "tone", msg.Tone, "for", hold)
 	m.Changed.Emit(true)
 }
@@ -110,16 +127,29 @@ func (m *Messages) Info(title, body string, hold time.Duration) {
 	m.Show(Message{Title: title, Body: body, Tone: ToneInfo}, hold)
 }
 
-func (m *Messages) Hide() {
+func (m *Messages) Hide() { m.end(End{Why: EndCleared}) }
+
+func (m *Messages) end(why End) {
 	m.mu.Lock()
-	if m.timer == nil {
+	if !m.up {
 		m.mu.Unlock()
 		return
 	}
+	m.endLocked(why)
+}
+
+func (m *Messages) endLocked(why End) {
+	ended := m.current.Ended
+	m.up = false
 	m.generation++
-	m.timer.Stop()
-	m.timer = nil
+	if m.timer != nil {
+		m.timer.Stop()
+		m.timer = nil
+	}
 	m.mu.Unlock()
+	if ended != nil {
+		ended(why)
+	}
 	m.Changed.Emit(false)
 }
 
@@ -144,11 +174,10 @@ func Hold(v int) time.Duration {
 
 func (m *Messages) expire(generation uint64) {
 	m.mu.Lock()
-	if m.timer == nil || m.generation != generation {
+	if !m.up || m.generation != generation {
 		m.mu.Unlock()
 		return
 	}
 	m.timer = nil
-	m.mu.Unlock()
-	m.Changed.Emit(false)
+	m.endLocked(End{Why: EndTimeout})
 }

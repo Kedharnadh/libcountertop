@@ -174,3 +174,7 @@ func (e *Engine) Portrait() bool { return e.Tessera() && e.options.Settings.Read
 func (e *Engine) SetLandscape(on bool) { e.set(tesseraWide, setting.OnOff(on)) }
 
 func (e *Engine) SetPortrait(on bool) { e.set(tesseraTall, setting.OnOff(on)) }
+
+func (e *Engine) TesseraSaver() bool { return e.Tessera() && e.options.Settings.Read().Saver }
+
+func (e *Engine) SetTesseraSaver(on bool) { e.set(tesseraSaver, setting.OnOff(on)) }

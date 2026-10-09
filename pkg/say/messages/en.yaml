@@ -303,6 +303,7 @@ home.setting.tessera.columns: Tessera tiles along the long side
 home.setting.tessera.home_after_idle: "Tessera: back to the home page after the screensaver"
 home.setting.tessera.landscape: "Tessera: landscape screen"
 home.setting.tessera.portrait: "Tessera: portrait screen"
+home.setting.tessera.screensaver: "Tessera: use its screensaver"
 home.setting.tessera.rows: Tessera tiles along the short side
 home.tab.labels: Labels
 home.tab.manual: Manual
@@ -310,6 +311,7 @@ home.tessera.columns: Long side
 home.tessera.landscape: Enable landscape
 home.tessera.portrait: Enable portrait
 home.tessera.return: Go back to the home page after the screensaver
+home.tessera.screensaver: Use Tessera's screensaver
 home.tessera.rows: Short side
 home.tile.all.off: All off
 home.tile.all.on: All on
@@ -508,6 +510,7 @@ tessera.alarm.clear: Clear
 tessera.alarm.disarm: Disarm
 tessera.alarm.ok: OK
 tessera.alarm.text: Enter this panel's code in Home Assistant.
+tessera.alert.notification: Notification
 tessera.again: Tap again to unlock
 tessera.binary.battery.off: Normal
 tessera.binary.battery.on: Low
@@ -575,6 +578,13 @@ tessera.last.date: "Last {{.D}}"
 tessera.last.time: "Last {{.T}}"
 tessera.last.yest: "Yest. {{.T}}"
 tessera.last.yesterday: "Yesterday {{.T}}"
+tessera.light.brightness: Brightness
+tessera.light.effect: Effect
+tessera.light.effects: Effects
+tessera.light.hue: Hue
+tessera.light.lamps: Lamps
+tessera.light.waiting: Waiting
+tessera.light.warmth: Color temperature
 tessera.lock.jammed: Jammed
 tessera.lock.lock: Lock
 tessera.lock.locked: Locked

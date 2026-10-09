@@ -6,9 +6,62 @@ import (
 )
 
 type Message struct {
-	Title string
-	Body  string
-	Tone  Tone
+	Title  string
+	Body   string
+	Tone   Tone
+	Icon   string
+	Swatch string
+	Keys   []Key
+	Ended  func(End)
+}
+
+type Key struct {
+	Text   string
+	Swatch string
+}
+
+type End struct {
+	Key int
+	Why string
+}
+
+const (
+	EndKey      = "key"
+	EndTimeout  = "timeout"
+	EndReplaced = "replaced"
+	EndCleared  = "cleared"
+	EndTapped   = "tapped"
+)
+
+func Swatch(name string, palette theme.Theme) (theme.Color, bool) {
+	switch name {
+	case "red":
+		return palette.Danger, true
+	case "orange":
+		return palette.Warning, true
+	case "yellow":
+		return palette.Roles.Warm, true
+	case "green":
+		return palette.Success, true
+	case "mint":
+		return palette.Roles.Air, true
+	case "blue":
+		return palette.Roles.Cool, true
+	case "purple":
+		return palette.Roles.Choice, true
+	case "pink":
+		return palette.Roles.Heat, true
+	case "gray", "grey":
+		return palette.Muted, true
+	}
+	return theme.Color{}, false
+}
+
+func (m Message) Tint(palette theme.Theme) theme.Color {
+	if c, ok := Swatch(m.Swatch, palette); ok {
+		return c
+	}
+	return m.Tone.Color(palette)
 }
 
 type Tone string

@@ -17,6 +17,7 @@ type Home struct {
 	Return  bool                `json:"tessera_return"`
 	Wide    bool                `json:"tessera_landscape"`
 	Tall    bool                `json:"tessera_portrait"`
+	Saver   bool                `json:"tessera_screensaver"`
 }
 
 const (

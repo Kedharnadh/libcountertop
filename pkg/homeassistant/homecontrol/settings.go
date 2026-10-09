@@ -24,6 +24,7 @@ const (
 	tesseraReturn  = "tessera.home_after_idle"
 	tesseraWide    = "tessera.landscape"
 	tesseraTall    = "tessera.portrait"
+	tesseraSaver   = "tessera.screensaver"
 )
 
 func (e *Engine) Controls() *setting.Controls[config.Home] { return e.knobs }
@@ -71,6 +72,10 @@ func (e *Engine) table() *setting.Table[config.Home] {
 		setting.Flag(
 			Setting{Name: tesseraTall, Group: Group, Icon: "mdi:phone-rotate-portrait"},
 			func(h *config.Home) *bool { return &h.Tall },
+		),
+		setting.Flag(
+			Setting{Name: tesseraSaver, Group: Group, Icon: "mdi:monitor-shimmer"},
+			func(h *config.Home) *bool { return &h.Saver },
 		),
 	}
 	for _, s := range e.selections {

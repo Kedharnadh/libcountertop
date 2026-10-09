@@ -54,6 +54,9 @@ type Options struct {
 	Name     func() string
 	Speaking func() bool
 	Keep     string
+	Alert    func(Alert)
+	Unalert  func()
+	Front    func()
 }
 
 type Screen struct {
@@ -75,6 +78,8 @@ type Screen struct {
 	fed      time.Time
 	asked    question
 	history  *History
+	names    *Names
+	wanted   PageAsk
 	pictures map[string]*picture
 }
 
@@ -177,7 +182,7 @@ func (s *Screen) Actions() []*esphome.Action {
 	if !s.options.Speaking() {
 		return nil
 	}
-	return []*esphome.Action{{
+	return append([]*esphome.Action{{
 		Name:    s.options.Facing.word() + "_screen_message",
 		Args:    []esphome.Arg{{Name: "message", Type: esphome.ArgString}},
 		Answers: true,
@@ -186,7 +191,7 @@ func (s *Screen) Actions() []*esphome.Action {
 			s.inbox.Set(answer["status"].(string))
 			return answer, nil
 		},
-	}}
+	}}, s.screenActions()...)
 }
 
 func (s *Screen) Layout() (Layout, bool) {

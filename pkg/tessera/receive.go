@@ -192,7 +192,9 @@ func (s *Screen) apply(m message, revision uint64) (string, bool) {
 		return s.answerHistory(m.raw)
 	case "camera":
 		return s.answerPicture(m.raw)
-	case "options", "browse":
+	case "options":
+		return s.answerNames(m.raw)
+	case "browse":
 		return "Synced", true
 	}
 	return "", false
