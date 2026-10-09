@@ -186,16 +186,16 @@ func (p *BasicPages) Theme() *shell.Page {
 
 		Tiles: func() ([]menu.Cell, []func(int)) {
 			now := p.state().Screen.Theme
-			follow, _ := theme.ByName(style.Theme(p.state().Screen.Style, style.ThemeDefault))
+			follow, _ := theme.ByName(style.Theme(p.state().Screen.Style, theme.Follow))
 
 			cells := []menu.Cell{
 				{
 					Label:   say.T("theme.default"),
-					Chosen:  now == style.ThemeDefault,
+					Chosen:  now == theme.Follow,
 					Palette: &follow,
 				},
 			}
-			acts := []func(int){p.useTheme(style.ThemeDefault)}
+			acts := []func(int){p.useTheme(theme.Follow)}
 
 			for _, t := range theme.All {
 				cells = append(cells, menu.Cell{
@@ -235,7 +235,7 @@ func Swatch(t theme.Theme) func(ui.Surface, ui.Rect, theme.Theme) {
 }
 
 func ThemeSays(name string) string {
-	if name == style.ThemeDefault {
+	if name == theme.Follow {
 		return say.T("theme.default")
 	}
 	return name

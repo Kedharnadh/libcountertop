@@ -24,27 +24,37 @@ type Dependencies struct {
 	Perform func(ctx context.Context, action string, data, templates map[string]string) error
 
 	HomeAfterIdle func() bool
-	Mark          *ui.Logo
+	Logo          *ui.Logo
 }
 
 type View struct {
 	o Dependencies
 
-	mu       sync.Mutex
-	page     int
-	route    []string
-	revision string
-	shown    string
-	rested   bool
-	due      time.Time
-	slide    slide
-	width    float32
-	screen   *tessera.Screen
-	last     ui.Rect
-	watches  map[string]*watch
-	armed    map[string]time.Time
-	grips    map[string]*grip
-	edits    map[string]*edit
+	mu        sync.Mutex
+	page      int
+	route     []string
+	revision  string
+	shown     string
+	rested    bool
+	due       time.Time
+	slide     slide
+	width     float32
+	screen    *tessera.Screen
+	last      ui.Rect
+	watches   map[string]*watch
+	armed     map[string]time.Time
+	grips     map[string]*grip
+	edits     map[string]*edit
+	card      string
+	hours     int
+	code      code
+	lift      float32
+	rects     map[string]ui.Rect
+	origin    ui.Rect
+	area      ui.Rect
+	camera    string
+	photos    map[string]*photo
+	liveAsked []liveSlot
 }
 
 func New(o Dependencies) *View {
@@ -55,6 +65,8 @@ func New(o Dependencies) *View {
 		armed:   map[string]time.Time{},
 		grips:   map[string]*grip{},
 		edits:   map[string]*edit{},
+		rects:   map[string]ui.Rect{},
+		photos:  map[string]*photo{},
 	}
 }
 
@@ -72,6 +84,23 @@ func (v *View) Draw(w *gogui.Window, at ui.Rect) []gogui.View {
 	now := time.Now()
 	f := frame{now: now, pal: v.o.UI.Palette(), fresh: screen.Fresh(now)}
 	page := v.showing(layout)
+	if entity := v.showingCamera(); entity != "" {
+		if t, ok := cardTile(layout, entity); ok {
+			return []gogui.View{v.cameraView(w, at, screen, t, now)}
+		}
+		v.closeCamera(w)
+	}
+	var over []gogui.View
+	if entity, _ := v.showingCard(); entity != "" {
+		if t, ok := cardTile(layout, entity); ok {
+			if v.lifted() >= 1 {
+				return []gogui.View{v.cardView(w, at, layout, t, f)}
+			}
+			over = v.morph(at, f)
+		} else {
+			v.closeCard()
+		}
+	}
 	reach := float64(style.Reach())
 	margin := int(math.Round(reach * 0.5))
 	gap := int(math.Round(reach * 0.25))
@@ -96,7 +125,7 @@ func (v *View) Draw(w *gogui.Window, at ui.Rect) []gogui.View {
 	if strip {
 		views = append(views, v.bottomStrip(bottom, layout, page))
 	}
-	return views
+	return append(views, over...)
 }
 
 func (v *View) Hint() (title, body string) {
@@ -128,6 +157,7 @@ func (v *View) pageArea(
 ) gogui.View {
 	v.mu.Lock()
 	v.width = float32(area.W)
+	v.area = area
 	v.mu.Unlock()
 	s := v.sliding()
 	inner := ui.Rect{W: area.W, H: area.H}
@@ -160,6 +190,7 @@ func (v *View) tiles(
 	f frame,
 ) []gogui.View {
 	var out []gogui.View
+	var slots []liveSlot
 	for i, t := range l.Tiles {
 		if !t.Received || t.Parent >= 0 {
 			continue
@@ -169,11 +200,32 @@ func (v *View) tiles(
 			continue
 		}
 		r := c.rect(in, g, gap)
+		var pic func(float32, float32) gogui.View
+		if shift == 0 {
+			v.mu.Lock()
+			v.rects[t.Entity] = r
+			area := v.area
+			v.mu.Unlock()
+			if pictured(t) {
+				slots = append(slots, liveSlot{
+					entity: t.Entity,
+					index:  i,
+					at:     ui.Rect{X: area.X + r.X, Y: area.Y + r.Y, W: r.W, H: r.H},
+					every:  pace(t),
+					ground: groundHex(t, f.pal),
+					mark:   pictureMark(t),
+				})
+				pic = v.livePicture(i)
+			}
+		}
 		r.X += shift
 		out = append(
 			out,
-			kit.Placed(r, v.tile(w, fmt.Sprintf("tessera-%d-%d", page, i), t, l, r, c, f)),
+			kit.Placed(r, v.tile(w, fmt.Sprintf("tessera-%d-%d", page, i), t, l, r, c, f, pic)),
 		)
+	}
+	if shift == 0 {
+		v.wantLive(w, slots, f)
 	}
 	return out
 }
@@ -192,7 +244,7 @@ func (v *View) pick(at ui.Rect) *tessera.Screen {
 	defer v.mu.Unlock()
 	v.last = at
 	if screen != v.screen {
-		v.screen, v.revision, v.shown, v.route = screen, "", "", nil
+		v.screen, v.revision, v.shown, v.route, v.card = screen, "", "", nil, ""
 	}
 	return screen
 }

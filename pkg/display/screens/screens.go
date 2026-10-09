@@ -124,7 +124,6 @@ type Options struct {
 
 	Brand    func() theme.Theme
 	Logo     func() image.Image
-	Mark     func() image.Image
 	Night    func() image.Image
 	Offering func() string
 
@@ -205,7 +204,7 @@ func New(o Options) *App {
 		Shell:       o.Shell,
 		Logo:        esphomeLogo,
 		TesseraMark: tesseraview.Mark,
-		NativeMark:  o.Mark,
+		NativeMark:  a.logo,
 		UI:          o.UI,
 	})
 	if o.Tessera != nil {

@@ -328,27 +328,38 @@ func unitSuffix(unit string) string {
 
 func (v *View) editing(t tessera.Tile) (float64, bool) {
 	real, _ := strconv.ParseFloat(t.State, 64)
+	return v.editingAt(t.Entity, real)
+}
+
+func (v *View) editingAt(key string, real float64) (float64, bool) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	e, ok := v.edits[t.Entity]
+	e, ok := v.edits[key]
 	switch {
 	case !ok:
 		return real, false
 	case e.sent.IsZero():
 		return e.value, true
 	case real == e.value || time.Since(e.sent) > editMost:
-		delete(v.edits, t.Entity)
+		delete(v.edits, key)
 		return real, false
 	}
 	return e.value, true
 }
 
 func (v *View) stepTo(w *gogui.Window, t tessera.Tile, value float64) {
+	v.stepAt(t.Entity, value, func(sent float64) {
+		data := map[string]string{"value": strconv.FormatFloat(sent, 'f', -1, 64)}
+		v.send(w, t, t.Domain()+".set_value", data, nil, "")
+	})
+}
+
+func (v *View) stepAt(key string, value float64, commit func(float64)) {
 	v.mu.Lock()
-	e, ok := v.edits[t.Entity]
+	e, ok := v.edits[key]
 	if !ok || !e.sent.IsZero() {
 		e = &edit{}
-		v.edits[t.Entity] = e
+		v.edits[key] = e
 	}
 	e.value = value
 	if e.timer != nil {
@@ -359,8 +370,7 @@ func (v *View) stepTo(w *gogui.Window, t tessera.Tile, value float64) {
 		e.sent = time.Now()
 		sent := e.value
 		v.mu.Unlock()
-		data := map[string]string{"value": strconv.FormatFloat(sent, 'f', -1, 64)}
-		v.send(w, t, t.Domain()+".set_value", data, nil, "")
+		commit(sent)
 	})
 	v.mu.Unlock()
 }

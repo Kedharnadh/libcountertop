@@ -10,6 +10,8 @@ import (
 	"golang.org/x/image/font/gofont/gomono"
 	"golang.org/x/image/font/gofont/gomonobold"
 	"golang.org/x/image/font/gofont/goregular"
+
+	"github.com/ygelfand/libcountertop/pkg/display/theme"
 )
 
 const (
@@ -25,13 +27,11 @@ type Style struct {
 	Kit     Kit
 }
 
-const ThemeDefault = "Default"
-
-func Theme(style, theme string) string {
-	if theme == ThemeDefault {
+func Theme(style, name string) string {
+	if name == theme.Follow {
 		return ByName(style).Palette
 	}
-	return theme
+	return name
 }
 
 var All = []Style{

@@ -2,9 +2,12 @@ package tessera
 
 import (
 	"encoding/json"
+	"math"
 	"strconv"
 	"strings"
 )
+
+const samplesMost = 24
 
 type Layout struct {
 	Revision  string
@@ -65,6 +68,7 @@ type Tile struct {
 	Controls   string
 	Inline     string
 	Guard      string
+	Refresh    int
 	Slot       int
 	Parent     int
 	Key        int
@@ -114,6 +118,11 @@ func (t Tile) Number(key string) (float64, bool) {
 	return v, ok
 }
 
+func (t Tile) Bool(key string) (bool, bool) {
+	v, ok := t.attributes()[key].(bool)
+	return v, ok
+}
+
 func (t Tile) Numbers(key string) []float64 {
 	list, _ := t.attributes()[key].([]any)
 	out := make([]float64, 0, len(list))
@@ -152,6 +161,54 @@ func (t Tile) ExtraText(key string) string {
 func (t Tile) ExtraNumber(key string) (float64, bool) {
 	v, ok := t.extra()[key].(float64)
 	return v, ok
+}
+
+func (t Tile) ExtraList(key string) []map[string]any {
+	list, _ := t.extra()[key].([]any)
+	out := make([]map[string]any, 0, len(list))
+	for _, v := range list {
+		if m, ok := v.(map[string]any); ok {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func (t Tile) ExtraNumbers(key string) []float64 {
+	list, _ := t.extra()[key].([]any)
+	out := make([]float64, len(list))
+	for i, v := range list {
+		out[i], _ = v.(float64)
+	}
+	return out
+}
+
+func (t Tile) ExtraTexts(key string) []string {
+	list, _ := t.extra()[key].([]any)
+	out := make([]string, 0, len(list))
+	for _, v := range list {
+		s, _ := v.(string)
+		out = append(out, s)
+	}
+	return out
+}
+
+func (t Tile) Samples() []float64 {
+	var h struct {
+		Values []*float64 `json:"values"`
+	}
+	if json.Unmarshal(t.History, &h) != nil {
+		return nil
+	}
+	out := make([]float64, 0, min(len(h.Values), samplesMost))
+	for _, v := range h.Values[:min(len(h.Values), samplesMost)] {
+		if v == nil {
+			out = append(out, math.NaN())
+			continue
+		}
+		out = append(out, *v)
+	}
+	return out
 }
 
 func (t Tile) ExtraBool(key string) bool {

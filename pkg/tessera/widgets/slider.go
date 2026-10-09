@@ -50,6 +50,9 @@ func level(t tessera.Tile) (float64, bool) {
 			return 1, false
 		}
 		return (100 - p) / 100, true
+	case "media_player":
+		v, ok := t.Number("volume_level")
+		return v, ok
 	case "number", "input_number":
 		lo, hi := bounds(t)
 		v, err := strconv.ParseFloat(t.State, 64)
@@ -180,7 +183,7 @@ func levelAction(
 	t tessera.Tile,
 	value float64,
 ) (action string, data map[string]string, wish string) {
-	if t.State == "off" {
+	if t.State == "off" && t.Domain() != "media_player" {
 		wish = "on"
 	}
 	switch t.Domain() {
@@ -193,6 +196,10 @@ func levelAction(
 	case "cover":
 		p := 100 - int(math.Round(value*100))
 		return "cover.set_cover_position", map[string]string{"position": strconv.Itoa(p)}, ""
+	case "media_player":
+		return "media_player.volume_set", map[string]string{
+			"volume_level": strconv.FormatFloat(math.Round(value*100)/100, 'f', -1, 64),
+		}, ""
 	case "number", "input_number":
 		lo, hi := bounds(t)
 		step := 1.0

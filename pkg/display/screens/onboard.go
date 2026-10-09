@@ -33,6 +33,10 @@ func (a *App) onboard(w *gogui.Window, addr string) gogui.View {
 	band := short * onboardBand
 	inner := [2]float32{cw - 2*pad - band, ch - 2*pad}
 
+	head := a.onboardHead(w, inner[0], short, brand)
+	gapY := short * onboardMark * 0.5
+	room := inner[1] - short*onboardMark - gapY
+
 	var body gogui.View
 	if vw >= vh {
 		half := inner[0] * 0.42
@@ -43,12 +47,12 @@ func (a *App) onboard(w *gogui.Window, addr string) gogui.View {
 			Spacing: gogui.SpacingPx(gap),
 			VAlign:  gogui.VAlignMiddle,
 			Content: []gogui.View{
-				qrCode(web.AdoptURL, half, inner[1], brand),
+				qrCode(web.AdoptURL, half, room, brand),
 				a.onboardWords(w, addr, inner[0]-half-gap, short, brand),
 			},
 		})
 	} else {
-		part := inner[1] * 0.48
+		part := room * 0.5
 		body = gogui.Column(gogui.ContainerCfg{
 			Sizing:  gogui.FillFill,
 			Padding: gogui.NoPadding,
@@ -58,6 +62,12 @@ func (a *App) onboard(w *gogui.Window, addr string) gogui.View {
 			},
 		})
 	}
+	body = gogui.Column(gogui.ContainerCfg{
+		Sizing:  gogui.FillFill,
+		Padding: gogui.NoPadding,
+		Spacing: gogui.SpacingPx(gapY),
+		Content: []gogui.View{head, body},
+	})
 
 	card := gogui.Row(gogui.ContainerCfg{
 		Width:   cw,
@@ -135,54 +145,70 @@ func qrCode(url string, w, h float32, brand theme.Theme) gogui.View {
 	})
 }
 
+func (a *App) onboardHead(w *gogui.Window, wide, short float32, brand theme.Theme) gogui.View {
+	markH := short * onboardMark
+	mark := a.o.Logo()
+	mw, mh := mark.Bounds().Dx(), mark.Bounds().Dy()
+	markW := markH * float32(mw) / float32(max(mh, 1))
+	gap := markH * 0.4
+	title := say.T("onboard.title")
+	head := clockview.Lettering(glyph.TypefaceBold, 0, brand.Text)
+	head.Size = clockview.Fitted(w, title, head, wide-markW-gap, min(short*onboardTitle, markH))
+	return gogui.Row(gogui.ContainerCfg{
+		Width:   wide,
+		Sizing:  gogui.FixedFit,
+		Padding: gogui.NoPadding,
+		Spacing: gogui.SpacingPx(gap),
+		VAlign:  gogui.VAlignMiddle,
+		Content: []gogui.View{
+			gogui.Image(gogui.ImageCfg{
+				Src:    widgets.ImageSource("logo/light", mark),
+				Width:  markW,
+				Height: markH,
+			}),
+			gogui.Label(title, head),
+		},
+	})
+}
+
 func (a *App) onboardWords(
 	w *gogui.Window,
 	addr string,
 	wide, short float32,
 	brand theme.Theme,
 ) gogui.View {
-	title := say.T("onboard.title")
-	head := clockview.Lettering(glyph.TypefaceBold, 0, brand.Text)
-	head.Size = clockview.Fitted(w, title, head, wide, short*onboardTitle)
-
 	plate := brand.Accent.Blend(brand.Surface, 0.88)
 	at := clockview.Lettering(glyph.TypefaceBold, 0, brand.Accent)
 	at.Size = clockview.Fitted(w, addr, at, wide*0.9, short*onboardAddr)
+	chip := func(text string) gogui.View {
+		return gogui.Row(gogui.ContainerCfg{
+			Color:   color(plate),
+			Radius:  gogui.RadiusPx(at.Size),
+			Padding: gogui.NewPadding(at.Size*0.3, at.Size/2, at.Size*0.3, at.Size/2),
+			Content: []gogui.View{gogui.Label(text, at)},
+		})
+	}
+	small := clockview.Lettering(glyph.TypefaceRegular, short*onboardHint, brand.Muted)
+	line := func(text string) gogui.View {
+		return gogui.Text(gogui.TextCfg{Text: text, TextStyle: small, Mode: gogui.TextModeWrap})
+	}
 
-	markH := short * onboardMark
-	mark := a.o.Logo()
-	mw, mh := mark.Bounds().Dx(), mark.Bounds().Dy()
+	steps := []gogui.View{line(say.T("onboard.hint")), chip(addr)}
+	if a.o.DeviceName != nil {
+		if name := a.o.DeviceName(); name != "" {
+			steps = []gogui.View{
+				line(say.T("onboard.add")),
+				chip(name),
+				line(say.T("onboard.or")),
+				chip(addr),
+			}
+		}
+	}
 	return gogui.Column(gogui.ContainerCfg{
 		Width:   wide,
 		Sizing:  gogui.FixedFit,
 		Padding: gogui.NoPadding,
-		Spacing: gogui.SpacingPx(head.Size / 3),
-		Content: []gogui.View{
-			gogui.Image(
-				gogui.ImageCfg{
-					Src:    widgets.ImageSource("logo/light", mark),
-					Width:  markH * float32(mw) / float32(max(mh, 1)),
-					Height: markH,
-				},
-			),
-			gogui.Text(gogui.TextCfg{Text: title, TextStyle: head, Mode: gogui.TextModeWrap}),
-			gogui.Row(gogui.ContainerCfg{
-				Color:   color(plate),
-				Radius:  gogui.RadiusPx(at.Size),
-				Padding: gogui.NewPadding(at.Size*0.3, at.Size/2, at.Size*0.3, at.Size/2),
-				Content: []gogui.View{gogui.Label(addr, at)},
-			}),
-			gogui.Text(
-				gogui.TextCfg{
-					Text: say.T("onboard.hint"),
-					TextStyle: clockview.Lettering(
-						glyph.TypefaceRegular,
-						short*onboardHint,
-						brand.Muted,
-					),
-					Mode: gogui.TextModeWrap,
-				},
-			),
-		},
+		Spacing: gogui.SpacingPx(small.Size * 0.5),
+		Content: steps,
 	})
 }

@@ -73,6 +73,9 @@ type Screen struct {
 	heard    bool
 	dirty    bool
 	fed      time.Time
+	asked    question
+	history  *History
+	pictures map[string]*picture
 }
 
 func New(o Options) *Screen {

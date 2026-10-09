@@ -38,7 +38,7 @@ func DefaultScreen() Screen {
 	return Screen{
 		Backlight: DefaultBacklight,
 		Mode:      DefaultScreenMode,
-		Theme:     theme.DefaultName,
+		Theme:     theme.Follow,
 		Hours:     DefaultHourFormat,
 		Keyboard:  KeyboardCompact,
 		Drawer:    DefaultEdge,
@@ -122,4 +122,4 @@ func KeyboardSizes() []KeyboardSize {
 	return []KeyboardSize{KeyboardCompact, KeyboardStandard, KeyboardLarge}
 }
 
-const DefaultTheme = theme.DefaultName
+const DefaultTheme = theme.Follow

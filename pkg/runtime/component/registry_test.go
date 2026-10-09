@@ -193,7 +193,10 @@ func TestOneShotKeepsItsRestartPolicy(t *testing.T) {
 	select {
 	case <-radio.up:
 	case <-time.After(5 * time.Second):
-		t.Fatalf("a one-shot that asked for restarts was started %d times, never again", radio.tries)
+		t.Fatalf(
+			"a one-shot that asked for restarts was started %d times, never again",
+			radio.tries,
+		)
 	}
 	stop()
 	if err := <-done; err != nil {

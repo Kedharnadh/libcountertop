@@ -394,7 +394,9 @@ network.router: Router
 network.setting.verify: Verify certificates
 network.ssid: Wi-Fi network
 network.title: Network & internet
-onboard.hint: Scan the code, then choose this address.
+onboard.add: Scan the code, then add
+onboard.hint: Scan the code, then enter this address.
+onboard.or: or enter this address
 onboard.title: Add me to Home Assistant
 player.live: LIVE
 player.next: Up next
@@ -496,6 +498,16 @@ system.adb.hint: Unauthenticated root shell on 5555
 system.certificates: Verify certificates
 system.certificates.hint: TLS certificate validation
 system.title: System
+tessera.alarm.armed_away: Away
+tessera.alarm.armed_custom_bypass: Custom bypass
+tessera.alarm.armed_home: Home
+tessera.alarm.armed_night: Night
+tessera.alarm.armed_vacation: Vacation
+tessera.alarm.cancel: Cancel
+tessera.alarm.clear: Clear
+tessera.alarm.disarm: Disarm
+tessera.alarm.ok: OK
+tessera.alarm.text: Enter this panel's code in Home Assistant.
 tessera.again: Tap again to unlock
 tessera.binary.battery.off: Normal
 tessera.binary.battery.on: Low
@@ -553,19 +565,31 @@ tessera.binary.vibration.off: Clear
 tessera.binary.vibration.on: Detected
 tessera.binary.window.off: Closed
 tessera.binary.window.on: Open
+tessera.card.empty: No history for this range
+tessera.card.high: "High {{.V}} at {{.T}}"
+tessera.card.loading: Loading history…
+tessera.card.low: "Low {{.V}} at {{.T}}"
+tessera.card.now: "Now {{.T}}"
+tessera.card.since: "Since {{.T}}"
 tessera.last.date: "Last {{.D}}"
 tessera.last.time: "Last {{.T}}"
 tessera.last.yest: "Yest. {{.T}}"
 tessera.last.yesterday: "Yesterday {{.T}}"
 tessera.lock.jammed: Jammed
+tessera.lock.lock: Lock
 tessera.lock.locked: Locked
 tessera.lock.locking: Locking
 tessera.lock.open: Open
+tessera.lock.open.key: Open
 tessera.lock.opening: Opening
+tessera.lock.unlock: Unlock
 tessera.lock.unlocked: Unlocked
 tessera.lock.unlocking: Unlocking
 tessera.never: Never run
 tessera.paused: "Paused {{.T}}"
+tessera.range.day: 24 h
+tessera.range.hour: 1 h
+tessera.range.week: 7 d
 tessera.ago: "{{.T}} ago"
 tessera.connected: Set up this screen in Tessera
 tessera.empty: "Configure and add tiles to this screen ({{.Name}}) in Tessera."
@@ -581,8 +605,39 @@ tessera.key.activate: Activate
 tessera.key.press: Press
 tessera.key.run: Run
 tessera.silent: No answer
+tessera.sun.name: "Sun"
+tessera.energy.solar: Solar
+tessera.energy.grid: Grid
+tessera.energy.battery: Battery
+tessera.energy.home: Home
+tessera.energy.other: Other
+tessera.sun.rise: "Sunrise {{.T}}"
+tessera.sun.set: "Sunset {{.T}}"
 tessera.updating: Updating…
+tessera.vacuum.battery: "Battery {{.N}}%"
+tessera.vacuum.dock: Dock
+tessera.vacuum.locate: Locate
+tessera.vacuum.pause: Pause
+tessera.vacuum.start: Start
 tessera.waiting: Install Tessera
+tessera.weather.clear-night: Clear night
+tessera.weather.cloudy: Cloudy
+tessera.weather.exceptional: Exceptional
+tessera.weather.fog: Fog
+tessera.weather.hail: Hail
+tessera.weather.lightning: Lightning
+tessera.weather.lightning-rainy: Lightning, rainy
+tessera.weather.partlycloudy: Partly cloudy
+tessera.weather.pouring: Pouring
+tessera.weather.rainy: Rainy
+tessera.weather.snowy: Snowy
+tessera.weather.snowy-rainy: Snowy, rainy
+tessera.weather.sunny: Sunny
+tessera.weather.windy: Windy
+tessera.weather.windy-variant: Windy, cloudy
+tessera.weather.feels: "Feels like {{.T}}"
+tessera.weather.none: No forecast
+tessera.weather.wind: "Wind {{.W}}"
 theme.default: Default
 theme.title: Theme
 tone.alert: Alert

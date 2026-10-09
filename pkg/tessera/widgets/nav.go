@@ -18,7 +18,7 @@ func (v *View) showing(l tessera.Layout) int {
 	if v.rested {
 		v.rested = false
 		if v.o.HomeAfterIdle != nil && v.o.HomeAfterIdle() {
-			v.page, v.route = l.Home, nil
+			v.page, v.route, v.card = l.Home, nil, ""
 		}
 	}
 	if v.page < 0 || v.page >= len(l.Pages) {
@@ -31,7 +31,7 @@ func (v *View) showing(l tessera.Layout) int {
 func (v *View) home(l tessera.Layout) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	v.page, v.route = l.Home, nil
+	v.page, v.route, v.card, v.camera = l.Home, nil, "", ""
 	v.shown = l.Pages[v.page].ID
 }
 

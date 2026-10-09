@@ -59,7 +59,7 @@ func TestDefaultTakesEachStylesPalette(t *testing.T) {
 		}
 		if got := Look(
 			st.Name,
-			style.ThemeDefault,
+			theme.Follow,
 			SizeLarge,
 		).Cfg.Name; !strings.Contains(
 			got,

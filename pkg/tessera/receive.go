@@ -188,7 +188,11 @@ func (s *Screen) apply(m message, revision uint64) (string, bool) {
 	case "saver":
 		s.layout.Saver = m.raw
 		return "Synced", true
-	case "camera", "history", "options", "browse":
+	case "history":
+		return s.answerHistory(m.raw)
+	case "camera":
+		return s.answerPicture(m.raw)
+	case "options", "browse":
 		return "Synced", true
 	}
 	return "", false
@@ -364,8 +368,13 @@ func (s *Screen) tile(m message, initial bool) (string, bool) {
 			Controls   string `json:"controls"`
 			Inline     string `json:"inline"`
 			Guard      string `json:"guard"`
+			Refresh    int    `json:"refresh"`
 		}
 		_ = json.Unmarshal(m.O, &o)
+		refresh := refreshDefault
+		if o.Refresh >= refreshLeast && o.Refresh <= refreshMost {
+			refresh = o.Refresh
+		}
 		*t = Tile{
 			Entity:     m.Entity,
 			Size:       o.Size,
@@ -377,6 +386,7 @@ func (s *Screen) tile(m message, initial bool) (string, bool) {
 			Controls:   o.Controls,
 			Inline:     o.Inline,
 			Guard:      o.Guard,
+			Refresh:    refresh,
 			Options:    m.O,
 			Parent:     -1,
 			Key:        -1,

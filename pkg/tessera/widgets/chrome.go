@@ -11,7 +11,6 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/display/icons"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
-	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/say"
@@ -139,19 +138,14 @@ func glyphView(r rune, size float32) gogui.View {
 }
 
 func (v *View) mark(f frame) (image.Image, string) {
-	if v.o.Mark == nil {
+	if v.o.Logo == nil {
 		return nil, ""
 	}
-	img, key := v.o.Mark.Light(), "tessera-mark-light"
-	if theme.Dark(f.pal.Background) {
-		if dark := v.o.Mark.Dark(); dark != nil {
-			img, key = dark, "tessera-mark-dark"
-		}
-	}
+	img := v.o.Logo.On(f.pal.Background)
 	if img == nil || img.Bounds().Dy() == 0 {
 		return nil, ""
 	}
-	return img, widgets.ImageSource(key, img)
+	return img, widgets.ImageSource(fmt.Sprintf("tessera-logo/%p", img), img)
 }
 
 func (v *View) barKey(

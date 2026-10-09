@@ -20,6 +20,7 @@ func (v *View) tile(
 	at ui.Rect,
 	c cell,
 	f frame,
+	pic func(float32, float32) gogui.View,
 ) gogui.View {
 	now := f.now
 	wt := v.seen(t, now)
@@ -33,6 +34,7 @@ func (v *View) tile(
 		}
 	}
 	e := kit.EntityTile{
+		Picture:   pic,
 		ID:        id,
 		Width:     float32(at.W),
 		Height:    float32(at.H),
@@ -52,11 +54,30 @@ func (v *View) tile(
 		c := gogui.RGB(a.R, a.G, a.B)
 		e.Accent = &c
 	}
+	if samples := t.Samples(); e.Picture == nil && t.Domain() == "sensor" && t.Display == "graph" &&
+		len(samples) > 0 {
+		a := v.o.UI.Palette().Accent
+		ink := gogui.RGB(a.R, a.G, a.B)
+		if e.Accent != nil {
+			ink = *e.Accent
+		}
+		e.Picture = sparkline(id, samples, ink)
+	}
+	if body := v.bodyFor(w, id, t, l, c, f); body != nil {
+		e.Body, e.Available, e.On, e.Accent = body, true, false, nil
+		return v.o.UI.Entity(e)
+	}
 	if pageNumber(t.Entity) > 0 {
 		v.link(&e, t, l)
 		return v.o.UI.Entity(e)
 	}
 	e.Status = v.line(shown, l, wt, now, at.W < at.H*3/2)
+	if favorite(t) && wt == nil {
+		e.Status = favoriteLine(shown)
+		if r := icons.Codepoint(t.ExtraText("fi")); r != 0 {
+			e.Glyph = icons.Glyph(r)
+		}
+	}
 	if t.Display == "watch" {
 		e.Value, e.Status = e.Status, ""
 		unit := shown.Text("unit_of_measurement")
@@ -120,6 +141,12 @@ func (v *View) press(w *gogui.Window, id string, t tessera.Tile, hold bool) func
 			v.act(w, t, a.Service, a.Data, a.Templates)
 		case guarded:
 			v.guard(w, t)
+		case card:
+			v.openCard(e.Window, t)
+		case picture:
+			v.openCamera(t)
+		case play:
+			v.playFavorite(e.Window, t)
 		}
 		e.Window.InvalidateLayout()
 	}

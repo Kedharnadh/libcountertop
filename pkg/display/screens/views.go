@@ -1,6 +1,8 @@
 package screens
 
 import (
+	"fmt"
+	"image"
 	"time"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
@@ -154,12 +156,20 @@ func (a *App) upgradeCard(w *gogui.Window) gogui.View {
 	if !up.Active {
 		return nil
 	}
-	pal := a.ui.Palette()
-	img, key := a.o.Logo(), "logo/light"
-	if theme.Dark(pal.Background) {
-		img, key = a.o.Night(), "logo/night"
+	img := a.logo()
+	return widgets.UpgradeCard(
+		w,
+		up,
+		a.ui.Palette(),
+		widgets.ImageSource(fmt.Sprintf("logo/%p", img), img),
+	)
+}
+
+func (a *App) logo() image.Image {
+	if theme.Dark(a.ui.Palette().Background) {
+		return a.o.Night()
 	}
-	return widgets.UpgradeCard(w, up, pal, widgets.ImageSource(key, img))
+	return a.o.Logo()
 }
 
 func iconStyle(c gogui.Color) gogui.TextStyle {

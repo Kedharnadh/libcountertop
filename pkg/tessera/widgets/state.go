@@ -3,9 +3,9 @@ package widgets
 import (
 	"math"
 	"strconv"
-	"strings"
 
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
+	"github.com/ygelfand/libcountertop/pkg/say"
 	"github.com/ygelfand/libcountertop/pkg/tessera"
 )
 
@@ -240,5 +240,8 @@ func word(t tessera.Tile, n tessera.Numbers) string {
 	if w := t.ExtraText("w"); w != "" {
 		return w
 	}
-	return strings.ReplaceAll(t.State, "_", " ")
+	if _, ok := weatherIcons[t.State]; ok && t.Domain() == "weather" {
+		return say.T("tessera.weather." + t.State)
+	}
+	return pretty(t.State)
 }

@@ -114,7 +114,7 @@ func rows(table func() *Table, uiSize func() string) []Setting {
 			Kind: setting.Choice, Options: themes(),
 			Read: func(s *schema.Screen) string { return s.Theme },
 			Write: func(s *schema.Screen, v string) error {
-				if _, ok := theme.ByName(v); !ok && v != style.ThemeDefault {
+				if _, ok := theme.ByName(v); !ok && v != theme.Follow {
 					return table().MustRow("theme").Bad(v, "")
 				}
 				s.Theme = v
@@ -158,7 +158,7 @@ func plain(values []string) []setting.Option {
 }
 
 func themes() []setting.Option {
-	out := []setting.Option{{Value: style.ThemeDefault, Label: style.ThemeDefault}}
+	out := []setting.Option{{Value: theme.Follow, Label: theme.Follow}}
 	for _, name := range theme.Names() {
 		out = append(out, setting.Option{Value: name, Label: name})
 	}

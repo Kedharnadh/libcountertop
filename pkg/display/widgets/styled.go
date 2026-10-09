@@ -207,7 +207,12 @@ func StyleSample(name string, w, h float32) gogui.View {
 		},
 	}
 	st.Kit.Panel(&card)
-	return gogui.Column(card)
+	return gogui.Column(gogui.ContainerCfg{
+		Sizing:   gogui.FitFit,
+		Padding:  gogui.NoPadding,
+		Disabled: true,
+		Content:  []gogui.View{gogui.Column(card)},
+	})
 }
 
 func Outline(cfg *gogui.ContainerCfg) {

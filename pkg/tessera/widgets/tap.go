@@ -14,6 +14,8 @@ const (
 	custom
 	card
 	guarded
+	picture
+	play
 )
 
 type tap struct {
@@ -38,6 +40,12 @@ func routeOf(t tessera.Tile, hold bool) tap {
 	}
 	if !hold && t.Tap == "toggle" {
 		return tap{route: service, service: d + ".toggle"}
+	}
+	if d == "camera" || d == "image" {
+		return tap{route: picture}
+	}
+	if !hold && favorite(t) && (t.Tap == "" || t.Tap == "auto") {
+		return tap{route: play}
 	}
 	if d == "automation" && t.Tap != "detail" {
 		if hold != runs(t) {

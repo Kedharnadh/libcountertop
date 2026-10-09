@@ -311,6 +311,8 @@ var All = []Theme{
 
 const DefaultName = "Paper"
 
+const Follow = "Default"
+
 func Default() Theme {
 	t, _ := ByName(DefaultName)
 	return t

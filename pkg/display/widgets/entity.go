@@ -20,6 +20,8 @@ type EntityTile struct {
 	More          []gogui.View
 	Control       func(width float32) gogui.View
 	ControlWidth  float32
+	Picture       func(width, height float32) gogui.View
+	Body          func(width, height float32) gogui.View
 	Tap, Hold     func(gogui.EventCtx)
 	Window        *gogui.Window
 }
@@ -69,6 +71,10 @@ func (u *UI) Entity(t EntityTile) gogui.View {
 	}
 	var content []gogui.View
 	switch {
+	case t.Body != nil && t.Height > 0:
+		content = []gogui.View{t.Body(inner, t.Height-2*pad)}
+	case t.Picture != nil && t.Height > 0:
+		content = t.picture(inner, t.Height-2*pad, gap)
 	case t.Value != "":
 		content = t.watch(side*0.6, inner, gap, badgeFill, badgeInk)
 	case t.Height > 0 && t.Width >= 1.8*t.Height:
@@ -169,6 +175,20 @@ func (t EntityTile) stack(side, inner float32, fill, ink gogui.Color) []gogui.Vi
 		content = append(content, t.Control(inner))
 	}
 	return content
+}
+
+func (t EntityTile) picture(width, height, gap float32) []gogui.View {
+	lines := t.lines(width)
+	line := gogui.CurrentTheme().Cfg.TextStyleDef.Size * 1.3 * float32(len(lines))
+	return append([]gogui.View{gogui.Row(gogui.ContainerCfg{
+		Width:   width,
+		Height:  max(1, height-line-gap),
+		Sizing:  gogui.FixedFixed,
+		Padding: gogui.NoPadding,
+		HAlign:  gogui.HAlignCenter,
+		VAlign:  gogui.VAlignMiddle,
+		Content: []gogui.View{t.Picture(width, max(1, height-line-gap))},
+	})}, lines...)
 }
 
 func (t EntityTile) roomy(side, gap float32) bool {
