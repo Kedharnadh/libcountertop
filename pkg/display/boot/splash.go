@@ -33,7 +33,6 @@ type Splash struct {
 	Version  string
 	Progress func() []startup.Progress
 	Ready    func() bool
-	Raster   func(p *panel.Panel, progress []startup.Progress) error
 	Blank    func(p *panel.Panel) error
 }
 
@@ -114,16 +113,14 @@ func (s Splash) Play(ctx context.Context, w, h int) bool {
 		Progress: s.Progress,
 		Ready:    s.Ready, Skipped: skipped.Load, OfferSkip: offering.Store,
 		Draw: func(progress []startup.Progress) {
-			if scene != nil {
-				err := scene.Draw(progress, true)
-				if err == nil {
-					return
-				}
+			if scene == nil {
+				return
+			}
+			if err := scene.Draw(progress, true); err != nil {
 				slog.Error("drawing boot progress", "err", err)
 				scene.Close()
 				scene = nil
 			}
-			s.Claim.Show(func(p *panel.Panel) error { return s.Raster(p, progress) })
 		},
 		Changed: func(text string) { slog.Info("coming up", "waiting", text) },
 		Animate: func(m startup.Moment) bool {

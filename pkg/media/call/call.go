@@ -17,6 +17,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/media/rtc"
 	discovery "github.com/ygelfand/libcountertop/pkg/network/peer"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 const (
@@ -103,6 +104,8 @@ type View struct{}
 func (*View) Covers() bool { return true }
 
 func (*View) Wakes() bool { return true }
+
+func (*View) Shows(s schema.Stream) bool { return s == schema.StreamVoice }
 
 type Profile struct{ ID string }
 

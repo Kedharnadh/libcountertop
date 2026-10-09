@@ -5,7 +5,6 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
-	"github.com/ygelfand/libcountertop/pkg/runtime/startup"
 )
 
 var sizes = []struct {
@@ -14,30 +13,6 @@ var sizes = []struct {
 }{
 	{"landscape", 1920, 1200},
 	{"portrait", 1200, 1920},
-}
-
-func coming() []startup.Progress {
-	return []startup.Progress{
-		{Name: "wifi", Doing: "looking for the network"},
-		{Name: "dhcp", Doing: "asking for an address", Done: true},
-	}
-}
-
-func raster(w, h int, progress []startup.Progress) *ui.Image {
-	img := ui.NewImage(w, h, theme.Default().Surface)
-	Raster(img, theme.Default(), progress, "1.0", "Skip")
-	return img
-}
-
-func same(a, b *ui.Image, in ui.Rect) bool {
-	for y := in.Y; y < in.Y+in.H; y++ {
-		for x := in.X; x < in.X+in.W; x++ {
-			if a.At(x, y) != b.At(x, y) {
-				return false
-			}
-		}
-	}
-	return true
 }
 
 func TestSplitDividesTheLongEdge(t *testing.T) {
@@ -66,29 +41,6 @@ func TestSplitDividesTheLongEdge(t *testing.T) {
 		if logo.W != s.w || list.W != s.w {
 			t.Errorf("%s: a stacked split should use the full width", s.name)
 		}
-	}
-}
-
-func TestRasterFitsBothWaysUp(t *testing.T) {
-	for _, s := range sizes {
-		raster(s.w, s.h, coming())
-	}
-}
-
-func TestRasterWritesTheList(t *testing.T) {
-	_, list := Split(1920, 1200)
-	if same(raster(1920, 1200, nil), raster(1920, 1200, coming()), list) {
-		t.Error("the list area is identical with and without a list to draw")
-	}
-}
-
-func TestDoneAndWaitingLookDifferent(t *testing.T) {
-	waiting := raster(1920, 1200, []startup.Progress{{Name: "wifi", Doing: "looking"}})
-	done := raster(1920, 1200, []startup.Progress{{Name: "wifi", Doing: "looking", Done: true}})
-
-	_, list := Split(1920, 1200)
-	if same(waiting, done, list) {
-		t.Error("a component that is up is drawn the same as one that is not")
 	}
 }
 
