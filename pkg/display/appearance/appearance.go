@@ -5,6 +5,7 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
+	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 )
 
 type Size struct {
@@ -123,8 +124,6 @@ func sizeNamed(name string) Size {
 	return sizes[0]
 }
 
-func color(c theme.Color) gogui.Color { return gogui.RGB(c.R, c.G, c.B) }
-
 func Look(name, palette, size string) gogui.Theme {
 	st := style.ByName(name)
 	p, ok := theme.ByName(style.Theme(name, palette))
@@ -137,18 +136,18 @@ func Look(name, palette, size string) gogui.Theme {
 		cfg = gogui.ThemeLight.Cfg
 	}
 	cfg.Name = st.Name + "/" + p.Name + "/" + size
-	cfg.ColorBackground = color(p.Background)
-	cfg.ColorPanel = color(p.Surface)
-	cfg.ColorInterior = color(p.Surface)
-	cfg.ColorAccent = color(p.Accent)
-	cfg.ColorSuccess = color(p.Success)
-	cfg.ColorWarning = color(p.Warning)
-	cfg.ColorError = color(p.Danger)
-	cfg.ColorTextSecondary = color(p.Muted)
-	cfg.TextStyleDef.Color = color(p.Text)
+	cfg.ColorBackground = widgets.Color(p.Background)
+	cfg.ColorPanel = widgets.Color(p.Surface)
+	cfg.ColorInterior = widgets.Color(p.Surface)
+	cfg.ColorAccent = widgets.Color(p.Accent)
+	cfg.ColorSuccess = widgets.Color(p.Success)
+	cfg.ColorWarning = widgets.Color(p.Warning)
+	cfg.ColorError = widgets.Color(p.Danger)
+	cfg.ColorTextSecondary = widgets.Color(p.Muted)
+	cfg.TextStyleDef.Color = widgets.Color(p.Text)
 	cfg.TextStyleDef.Family = st.Family
 	cfg.ScrollMultiplier = 1
-	ink, surface := color(p.Text), color(p.Surface)
+	ink, surface := widgets.Color(p.Text), widgets.Color(p.Surface)
 	cfg.ColorHover = ink.WithOpacity(0.06).Over(surface)
 	cfg.ColorActive = ink.WithOpacity(0.12).Over(surface)
 	cfg.ColorSeparator = ink.WithOpacity(0.1).Over(surface)

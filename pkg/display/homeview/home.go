@@ -99,7 +99,9 @@ func (view *Renderer) blocked(w *gogui.Window, title, hint string, retry func(in
 	if hint != "" {
 		views = append(
 			views,
-			gogui.Text(gogui.TextCfg{Text: hint, TextStyle: secondary(), Mode: gogui.TextModeWrap}),
+			gogui.Text(
+				gogui.TextCfg{Text: hint, TextStyle: widgets.Secondary(), Mode: gogui.TextModeWrap},
+			),
 		)
 	}
 	if retry != nil {
@@ -340,7 +342,7 @@ func (view *Renderer) areaHeader(
 								"home.area.count",
 								map[string]any{"N": a.Included, "Of": len(a.Entities)},
 							),
-							secondary(),
+							widgets.Secondary(),
 						),
 					},
 				},
@@ -459,12 +461,6 @@ func (view *Renderer) Listen(l Listener) { view.tessera = l }
 
 func New(o Dependencies) *Renderer { return &Renderer{options: o} }
 func reach() float32               { return style.Reach() }
-func secondary() gogui.TextStyle {
-	t := gogui.CurrentTheme().Cfg
-	st := t.TextStyleDef
-	st.Color = t.ColorTextSecondary
-	return st
-}
 func icon(glyph string, c gogui.Color) gogui.View {
 	st := gogui.CurrentTheme().TextStyleIconMedium
 	st.Color = c

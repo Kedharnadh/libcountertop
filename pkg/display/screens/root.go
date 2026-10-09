@@ -138,7 +138,7 @@ func (a *App) dashboard(w *gogui.Window) gogui.View {
 		gogui.ContainerCfg{
 			Sizing:  gogui.FillFill,
 			Padding: gogui.NoPadding,
-			Color:   color(pal.Background),
+			Color:   widgets.Color(pal.Background),
 			Content: []gogui.View{dash},
 		},
 	)
@@ -197,10 +197,11 @@ func (a *App) nativeDash(w *gogui.Window, vw, vh, top, margin int, pal theme.The
 	if build, ok := clockview.Of(cfg.Clock.Face); ok {
 		layers = append(layers, widgets.Placed(box, build(w, box, r, ink)))
 	}
-	if cfg.Weather.Dashboard {
-		if v := a.weatherLayer(w, cfg.Weather.WeatherLayout, vw, vh, float32(top), pal); v != nil {
-			layers = append(layers, v)
-		}
+	if r, ok := a.o.Forecast.Now(); ok && cfg.Weather.Dashboard {
+		layers = append(
+			layers,
+			a.weather.Layer(w, r, cfg.Weather.WeatherLayout, vw, vh, float32(top), pal),
+		)
 	}
 	return layers
 }
@@ -218,5 +219,3 @@ func (a *App) page(w *gogui.Window, p *Screen) gogui.View {
 		},
 	)
 }
-
-func color(c theme.Color) gogui.Color { return gogui.RGB(c.R, c.G, c.B) }

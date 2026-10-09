@@ -16,12 +16,6 @@ type RowRenderer struct {
 	Grip    func(gogui.View) gogui.View
 }
 
-func secondary() gogui.TextStyle {
-	st := gogui.CurrentTheme().Cfg.TextStyleDef
-	st.Color = gogui.CurrentTheme().Cfg.ColorTextSecondary
-	return st
-}
-
 func icon(glyph string, c gogui.Color) gogui.View {
 	st := gogui.CurrentTheme().TextStyleIconMedium
 	st.Color = c
@@ -37,7 +31,7 @@ func (kit *Toolkit) Row(
 ) gogui.View {
 	label := []gogui.View{gogui.Label(r.Label, gogui.TextStyle{})}
 	if r.Hint != "" {
-		label = append(label, gogui.Label(r.Hint, secondary()))
+		label = append(label, gogui.Label(r.Hint, Secondary()))
 	}
 	head := gogui.Column(
 		gogui.ContainerCfg{Sizing: gogui.FillFit, Padding: gogui.NoPadding, Content: label},
@@ -70,7 +64,7 @@ func (kit *Toolkit) Row(
 		}
 		content = append(content, gogui.Row(gogui.ContainerCfg{
 			Padding: gogui.NewPadding(0, style.Reach()*0.4, 0, 0),
-			Content: []gogui.View{gogui.Label(says, secondary())},
+			Content: []gogui.View{gogui.Label(says, Secondary())},
 		}))
 		level := gogui.SliderCfg{
 			ID:     id + "-slider",
@@ -97,7 +91,7 @@ func (kit *Toolkit) Row(
 		content = append(content, kit.segments(id, r, tap))
 	case menu.Chevron:
 		if r.Value != "" {
-			content = append(content, gogui.Label(r.Value, secondary()))
+			content = append(content, gogui.Label(r.Value, Secondary()))
 		}
 		content = append(
 			content,
@@ -106,7 +100,7 @@ func (kit *Toolkit) Row(
 		onClick = interaction.Tapped(tap, 0)
 	default:
 		if r.Value != "" {
-			content = append(content, gogui.Label(r.Value, secondary()))
+			content = append(content, gogui.Label(r.Value, Secondary()))
 		}
 		if r.Preview != nil {
 			content = append(content, render.Preview(page, r))

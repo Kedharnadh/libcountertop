@@ -36,7 +36,7 @@ func (cv *View) callsBoard(at ui.Rect, pal theme.Theme) gogui.View {
 
 	var views []gogui.View
 	if len(peers) == 0 {
-		views = append(views, gogui.Label(say.T("call.empty"), secondary()))
+		views = append(views, gogui.Label(say.T("call.empty"), widgets.Secondary()))
 	}
 	stacks := make([][]gogui.View, cols)
 	for i, p := range peers {
@@ -119,7 +119,7 @@ func (cv *View) peerTile(id string, side float32, p peer.Peer, pal theme.Theme) 
 		Padding: gogui.PaddingMedium,
 		Spacing: gogui.SpacingSmall,
 		Radius:  gogui.RadiusLarge,
-		Color:   color(pal.Surface),
+		Color:   widgets.Color(pal.Surface),
 		Content: []gogui.View{
 			gogui.Label(p.Name, t.TextStyleDef),
 			gogui.Row(

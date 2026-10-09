@@ -9,6 +9,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/surface"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
+	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/runtime/startup"
 )
 
@@ -76,7 +77,6 @@ func (s *Scene) Draw(p []startup.Progress, listed bool) error {
 	_, err := s.r.Render(s.w)
 	return err
 }
-func color(c theme.Color) gui.Color { return gui.RGB(c.R, c.G, c.B) }
 func box(at ui.Rect, bg theme.Color, content ...gui.View) gui.View {
 	return gui.Column(
 		gui.ContainerCfg{
@@ -89,7 +89,7 @@ func box(at ui.Rect, bg theme.Color, content ...gui.View) gui.View {
 			Padding:      gui.NoPadding,
 			Spacing:      gui.NoSpacing,
 			ClipContents: true,
-			Color:        color(bg),
+			Color:        widgets.Color(bg),
 			Content:      content,
 		},
 	)
@@ -101,7 +101,7 @@ func text(value string, size float32, c theme.Color) gui.View {
 			Family:   style.ByName("standard").Family,
 			Typeface: glyph.TypefaceRegular,
 			Size:     max(size, 1),
-			Color:    color(c),
+			Color:    widgets.Color(c),
 		},
 	)
 }
@@ -197,7 +197,7 @@ func centeredBox(at ui.Rect, bg theme.Color, content ...gui.View) gui.View {
 			Padding:      gui.NoPadding,
 			Spacing:      gui.NoSpacing,
 			ClipContents: true,
-			Color:        color(bg),
+			Color:        widgets.Color(bg),
 			HAlign:       gui.HAlignCenter,
 			VAlign:       gui.VAlignMiddle,
 			Content:      content,
@@ -212,10 +212,10 @@ func bootTheme(p theme.Theme) gui.Theme {
 	}
 	cfg.Name = "boot/" + p.Name
 	cfg.TextStyleDef.Family = style.ByName("standard").Family
-	cfg.TextStyleDef.Color = color(p.Text)
-	cfg.ColorBackground = color(p.Background)
-	cfg.ColorPanel = color(p.Surface)
-	cfg.ColorTextSecondary = color(p.Muted)
+	cfg.TextStyleDef.Color = widgets.Color(p.Text)
+	cfg.ColorBackground = widgets.Color(p.Background)
+	cfg.ColorPanel = widgets.Color(p.Surface)
+	cfg.ColorTextSecondary = widgets.Color(p.Muted)
 	return gui.ThemeMaker(cfg)
 }
 
@@ -231,7 +231,7 @@ func line(
 		Family:   style.ByName("standard").Family,
 		Typeface: glyph.TypefaceRegular,
 		Size:     max(size, 1),
-		Color:    color(ink),
+		Color:    widgets.Color(ink),
 	}
 	if m := w.TextMeasurer(); m != nil {
 		for range 4 {

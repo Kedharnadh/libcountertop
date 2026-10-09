@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
+
 	esphome "github.com/ygelfand/go-esphome-device"
 
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
@@ -14,14 +16,14 @@ func TestToneFallsBackToInfo(t *testing.T) {
 	tests := []struct {
 		name string
 		in   string
-		want Tone
+		want schema.Tone
 	}{
-		{"named", "warning", ToneWarning},
-		{"alert", "alert", ToneAlert},
-		{"success", "success", ToneSuccess},
-		{"info", "info", ToneInfo},
-		{"nothing given", "", ToneInfo},
-		{"something else entirely", "urgent!!", ToneInfo},
+		{"named", "warning", schema.ToneWarning},
+		{"alert", "alert", schema.ToneAlert},
+		{"success", "success", schema.ToneSuccess},
+		{"info", "info", schema.ToneInfo},
+		{"nothing given", "", schema.ToneInfo},
+		{"something else entirely", "urgent!!", schema.ToneInfo},
 	}
 
 	for _, tt := range tests {
@@ -58,7 +60,7 @@ func TestSeconds(t *testing.T) {
 func TestEveryToneHasAColor(t *testing.T) {
 	palette := theme.Default()
 
-	for _, tone := range Tones() {
+	for _, tone := range schema.Tones() {
 		c := tone.Color(palette)
 		if c == palette.Surface {
 			t.Errorf("%s is the same color as the card it sits on", tone)
@@ -68,7 +70,7 @@ func TestEveryToneHasAColor(t *testing.T) {
 
 func TestTonesAreLabelledDistinctly(t *testing.T) {
 	seen := map[string]bool{}
-	for _, tone := range Tones() {
+	for _, tone := range schema.Tones() {
 		label := tone.Label()
 		if label == "" {
 			t.Errorf("%s has no label", tone)

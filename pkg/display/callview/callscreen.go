@@ -32,7 +32,7 @@ func (cv *View) callBody(w *gogui.Window) gogui.View {
 
 	name := t.TextStyleDef
 	name.Size *= 2
-	status := secondary()
+	status := widgets.Secondary()
 	status.Size *= 1.3
 
 	controls := []gogui.View{cv.callButtons(vw, c)}
@@ -360,7 +360,7 @@ func (cv *View) profileScreen(p *call.Profile) *navigation.Screen {
 func (cv *View) profileBody(w *gogui.Window, prof *call.Profile) gogui.View {
 	p, ok := cv.o.Peers.Find(prof.ID)
 	if !ok {
-		return homeview.Column([]gogui.View{gogui.Label(say.T("call.gone"), secondary())})
+		return homeview.Column([]gogui.View{gogui.Label(say.T("call.gone"), widgets.Secondary())})
 	}
 	t := gogui.CurrentTheme().Cfg
 	vw, vh := w.WindowSize()

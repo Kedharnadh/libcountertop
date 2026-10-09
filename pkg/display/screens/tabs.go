@@ -38,7 +38,7 @@ func (a *App) tabStrip(at ui.Rect, tabs []dashboard.Tab, open string) gogui.View
 		a.ui.Toolkit.Tab(&cfg, &st, widgets.Chosen(t.Key == open))
 		content := []gogui.View{gogui.Label(t.Name, st)}
 		if kind, ok := a.boards[t.Kind]; ok && kind.Glyph != nil {
-			mark := iconStyle(st.Color)
+			mark := widgets.IconStyle(st.Color)
 			mark.Size = st.Size
 			content = append([]gogui.View{gogui.Label(kind.Glyph(t), mark)}, content...)
 		}

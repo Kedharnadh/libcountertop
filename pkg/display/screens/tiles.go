@@ -24,9 +24,9 @@ func (app *App) tileBoard(at ui.Rect, s homecontrol.Selection, pal theme.Theme) 
 	var views []gogui.View
 	switch {
 	case loading:
-		views = append(views, gogui.Label(say.T("home.loading"), secondary()))
+		views = append(views, gogui.Label(say.T("home.loading"), widgets.Secondary()))
 	case len(areas) == 0:
-		views = append(views, gogui.Label(say.T("home.empty"), secondary()))
+		views = append(views, gogui.Label(say.T("home.empty"), widgets.Secondary()))
 	}
 	stacks := make([][]gogui.View, cols)
 	for i, a := range areas {
@@ -170,13 +170,13 @@ func (app *App) chip(
 	t := gogui.CurrentTheme().Cfg
 	badgeFill, badgeInk, fill := widgets.Tint(on, pal)
 	if !on {
-		fill = color(pal.Background).WithOpacity(0.35)
+		fill = widgets.Color(pal.Background).WithOpacity(0.35)
 	}
-	mark := iconStyle(badgeInk)
+	mark := widgets.IconStyle(badgeInk)
 	mark.Size *= 0.7
 	small := t.TextStyleDef
 	small.Size *= 0.8
-	note := secondary()
+	note := widgets.Secondary()
 	note.Size *= 0.75
 	badge := gogui.Row(gogui.ContainerCfg{
 		Width:   reach() * 0.7,
@@ -240,9 +240,9 @@ func (app *App) chevron(
 		Height:  reach(),
 		Sizing:  gogui.FixedFixed,
 		Radius:  gogui.RadiusLarge,
-		Color:   color(pal.Background).WithOpacity(0.35),
+		Color:   widgets.Color(pal.Background).WithOpacity(0.35),
 		HAlign:  gogui.HAlignCenter,
 		VAlign:  gogui.VAlignMiddle,
 		Padding: gogui.NoPadding,
-	}, glyph, iconStyle(color(pal.Text)), style.Partial, func(gogui.EventCtx) { app.o.Home.Dash().Expand(s, a.ID) })
+	}, glyph, widgets.IconStyle(widgets.Color(pal.Text)), style.Partial, func(gogui.EventCtx) { app.o.Home.Dash().Expand(s, a.ID) })
 }

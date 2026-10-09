@@ -81,25 +81,65 @@ func Chosen() string {
 }
 
 func add(tag, name string, raw []byte) error {
-	if _, err := bundle.ParseMessageFileBytes(raw, name); err != nil {
-		return err
-	}
-
-	var flat map[string]any
-	if err := yaml.Unmarshal(raw, &flat); err != nil {
+	flat, err := read(raw)
+	if err != nil {
 		return fmt.Errorf("say: reading %s: %w", name, err)
 	}
+	lang, err := language.Parse(tag)
+	if err != nil {
+		return fmt.Errorf("say: %s is not a language: %w", name, err)
+	}
 
+	messages := make([]*i18n.Message, 0, len(flat))
 	has := map[string]bool{}
-	for id := range flat {
+	for id, text := range flat {
+		messages = append(messages, &i18n.Message{ID: id, Other: text})
 		has[id] = true
+	}
+	if err := bundle.AddMessages(lang, messages...); err != nil {
+		return err
 	}
 	carries[tag] = has
 
-	if own, ok := flat["language.name"].(string); ok && own != "" {
+	if own := flat["language.name"]; own != "" {
 		names[tag] = own
 	}
 
+	return nil
+}
+
+func read(raw []byte) (map[string]string, error) {
+	var tree map[string]any
+	if err := yaml.Unmarshal(raw, &tree); err != nil {
+		return nil, err
+	}
+	flat := map[string]string{}
+	return flat, flatten("", tree, flat)
+}
+
+func flatten(prefix string, tree map[string]any, flat map[string]string) error {
+	for key, value := range tree {
+		id := key
+		switch {
+		case key == "_":
+			id = prefix
+		case prefix != "":
+			id = prefix + "." + key
+		}
+		switch v := value.(type) {
+		case string:
+			if _, dup := flat[id]; dup {
+				return fmt.Errorf("%s is defined twice", id)
+			}
+			flat[id] = v
+		case map[string]any:
+			if err := flatten(id, v, flat); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("%s is %T, not text", id, value)
+		}
+	}
 	return nil
 }
 
@@ -181,8 +221,8 @@ func Ids() ([]string, error) {
 		return nil, err
 	}
 
-	var flat map[string]any
-	if err := yaml.Unmarshal(raw, &flat); err != nil {
+	flat, err := read(raw)
+	if err != nil {
 		return nil, fmt.Errorf("say: reading en.yaml: %w", err)
 	}
 

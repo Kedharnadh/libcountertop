@@ -23,6 +23,8 @@ type Placement struct {
 	Size     Size     `json:"size"`
 }
 
+func (p Placement) TopRight() bool { return p.Position == PositionTop && p.Align == AlignRight }
+
 type Delay string
 
 const (
@@ -34,6 +36,7 @@ const (
 	Delay5m    Delay = "5m"
 	Delay10m   Delay = "10m"
 	Delay15m   Delay = "15m"
+	Delay30m   Delay = "30m"
 )
 
 const DefaultDelay = Delay1m
@@ -56,6 +59,8 @@ func (d Delay) Label() string {
 		return say.T("delay.10m")
 	case Delay15m:
 		return say.T("delay.15m")
+	case Delay30m:
+		return say.T("delay.30m")
 	}
 	return string(d)
 }
@@ -76,6 +81,8 @@ func (d Delay) After() time.Duration {
 		return 10 * time.Minute
 	case Delay15m:
 		return 15 * time.Minute
+	case Delay30m:
+		return 30 * time.Minute
 	}
 	return 0
 }

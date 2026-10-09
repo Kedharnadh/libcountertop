@@ -3,12 +3,9 @@ package screens
 import (
 	"fmt"
 	"image"
-	"time"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
-	face "github.com/ygelfand/libcountertop/pkg/display/clockface"
-	"github.com/ygelfand/libcountertop/pkg/display/clockview"
 	"github.com/ygelfand/libcountertop/pkg/display/idleview"
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
@@ -174,19 +171,6 @@ func (a *App) logo() image.Image {
 	return a.o.Logo()
 }
 
-func iconStyle(c gogui.Color) gogui.TextStyle {
-	st := gogui.CurrentTheme().TextStyleIconMedium
-	st.Color = c
-	return st
-}
-
-func secondary() gogui.TextStyle {
-	t := gogui.CurrentTheme().Cfg
-	st := t.TextStyleDef
-	st.Color = t.ColorTextSecondary
-	return st
-}
-
 func reach() float32 { return style.Reach() }
 
 func (a *App) livePreview(w *gogui.Window, watch func(ui.Rect) bool) gogui.View {
@@ -197,52 +181,13 @@ func (a *App) tileView(w *gogui.Window, id, page string, c menu.Cell, tap func(i
 	t := gogui.CurrentTheme().Cfg
 	tw := int(t.SizeTextMedium * 8)
 	th := int(float32(tw) * 0.72)
-	content := []gogui.View{}
-	build, native := clockview.Of(c.Face)
-	switch {
-	case c.Weather.Look != "":
-		content = append(content, a.weatherSample(w, c.Weather, float32(tw), float32(th)))
-	case c.Style != "":
-		content = append(content, widgets.StyleSample(c.Style, float32(tw), float32(th)))
-	case c.Palette != nil:
-		content = append(content, widgets.Swatch(*c.Palette, float32(tw), float32(th)))
-	case native:
-		content = append(content, a.faceTile(w, build, tw, th))
-	case c.Paint != nil:
-		content = append(
-			content,
-			widgets.Picture(
-				a.painted(
-					"tile/"+page+"/"+c.Label+"/"+time.Now().Format("15:04"),
-					tw,
-					th,
-					a.ui.Palette().Surface,
-					c.Paint,
-				),
-				tw,
-				th,
-			),
-		)
+	var content []gogui.View
+	if c.Preview != nil {
+		content = append(content, c.Preview.View(w, float32(tw), float32(th)))
 	}
 	return a.ui.Toolkit.Tile(id, c.Label, c.Chosen, content, tap)
 }
 
 func (a *App) painted(key string, w, h int, fill theme.Color, draw widgets.Paint) string {
 	return widgets.Painted(key, w, h, fill, a.ui.Palette(), draw)
-}
-
-func (a *App) faceTile(w *gogui.Window, build clockview.View, tw, th int) gogui.View {
-	cfg := a.o.Settings()
-	pal := a.ui.Palette()
-	r := face.Read(time.Now(), cfg.Screen.Hours == schema.TwentyFourHour).Undated()
-	return gogui.Column(gogui.ContainerCfg{
-		Width:   float32(tw),
-		Height:  float32(th),
-		Sizing:  gogui.FixedFixed,
-		Color:   color(pal.Surface),
-		Radius:  gogui.RadiusMedium,
-		Padding: gogui.NoPadding,
-		Clip:    true,
-		Content: []gogui.View{build(w, ui.Rect{W: tw, H: th}, r, cfg.Clock.Ink.Over(pal))},
-	})
 }

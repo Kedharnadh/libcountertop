@@ -14,6 +14,8 @@ const (
 	ChimeDing Chime = "ding"
 
 	ChimeRise       Chime = "rise"
+	ChimeTimer      Chime = "timer"
+	ChimeTrouble    Chime = "trouble"
 	ChimeMuteSwitch Chime = "mute"
 )
 
@@ -27,11 +29,17 @@ func (c Chime) Label() string {
 		return say.T("chime.ding")
 	case ChimeRise:
 		return say.T("chime.rise")
+	case ChimeTimer:
+		return say.T("chime.timer")
+	case ChimeTrouble:
+		return say.T("chime.trouble")
 	}
 	return say.T("chime.chirp")
 }
 
 func Chimes() []Chime { return []Chime{ChimeNone, ChimeChirp, ChimeDing, ChimeRise} }
+
+func AlertChimes() []Chime { return append(Chimes(), ChimeTimer, ChimeTrouble) }
 
 func (c Chime) Silent() bool { return c == ChimeNone }
 

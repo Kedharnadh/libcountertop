@@ -28,7 +28,7 @@ type EntityTile struct {
 
 func Tint(on bool, pal theme.Theme) (badgeFill, badgeInk, fill gogui.Color) {
 	if on {
-		return lit(guiColor(pal.Roles.Warm))
+		return lit(Color(pal.Roles.Warm))
 	}
 	return gogui.RGB(pal.Background.R, pal.Background.G, pal.Background.B).WithOpacity(0.4),
 		gogui.RGB(pal.Text.R, pal.Text.G, pal.Text.B),
@@ -144,7 +144,7 @@ func (t EntityTile) text(s string, st gogui.TextStyle, width float32) gogui.View
 func (t EntityTile) lines(width float32) []gogui.View {
 	out := []gogui.View{t.text(t.Name, gogui.CurrentTheme().Cfg.TextStyleDef, width)}
 	if t.Status != "" {
-		out = append(out, t.text(t.Status, secondary(), width))
+		out = append(out, t.text(t.Status, Secondary(), width))
 	}
 	return out
 }
@@ -262,7 +262,7 @@ func (t EntityTile) row(side, inner, gap float32, fill, ink gogui.Color) []gogui
 func (t EntityTile) watch(side, inner, gap float32, fill, ink gogui.Color) []gogui.View {
 	big := gogui.CurrentTheme().Cfg.TextStyleDef
 	big.Size *= 2.6
-	unit := secondary()
+	unit := Secondary()
 	words := max(1, inner-side-gap)
 	number := []gogui.View{gogui.Label(t.Value, big)}
 	if t.Unit != "" {

@@ -62,7 +62,7 @@ func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
 					gogui.ContainerCfg{
 						Sizing:  gogui.FillFill,
 						Padding: gogui.NoPadding,
-						Color:   color(pal.Background),
+						Color:   widgets.Color(pal.Background),
 					},
 				),
 			),
@@ -107,10 +107,8 @@ func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
 			})))
 		}
 	}
-	if wc := cfg.Weather; wc.Idle {
-		if v := a.weatherLayer(w, wc.SaverLayout(), vw, vh, 0, pal); v != nil {
-			layers = append(layers, v)
-		}
+	if r, ok := a.o.Forecast.Now(); ok && cfg.Weather.Idle {
+		layers = append(layers, a.weather.Layer(w, r, cfg.Weather.SaverLayout(), vw, vh, 0, pal))
 	}
 	return gogui.Column(gogui.ContainerCfg{
 		ID:      "idle",

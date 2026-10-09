@@ -8,7 +8,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/audio/volume"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
-	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	videoplayer "github.com/ygelfand/libcountertop/pkg/display/videopage"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
@@ -41,14 +40,7 @@ func (p *Renderer) Close() {
 	p.seeking.sk = nil
 	p.seeking.mu.Unlock()
 }
-func Color(c theme.Color) gogui.Color { return gogui.Color{R: c.R, G: c.G, B: c.B, A: 0xff} }
-func reach() float32                  { return style.Reach() }
-func secondary() gogui.TextStyle {
-	t := gogui.CurrentTheme().Cfg
-	st := t.TextStyleDef
-	st.Color = t.ColorTextSecondary
-	return st
-}
+func reach() float32 { return style.Reach() }
 func iconStyle(c gogui.Color) gogui.TextStyle {
 	st := gogui.CurrentTheme().TextStyleIconMedium
 	st.Color = c
@@ -65,7 +57,7 @@ func spans(marks []videoplayer.Mark, length time.Duration) []style.Span {
 			style.Span{
 				From:  float32(m.From) / float32(length),
 				To:    float32(m.To) / float32(length),
-				Color: Color(m.Color),
+				Color: widgets.Color(m.Color),
 			},
 		)
 	}

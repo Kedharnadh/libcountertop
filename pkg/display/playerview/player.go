@@ -137,15 +137,15 @@ func (p *Renderer) Body(w *gogui.Window) gogui.View {
 		words = append(words, gogui.Label(now.Artist, gogui.TextStyle{}))
 	}
 	if now.Album != "" {
-		words = append(words, gogui.Label(now.Album, secondary()))
+		words = append(words, gogui.Label(now.Album, widgets.Secondary()))
 	}
 	if from := p.options.Player.Named(); from != "" {
-		words = append(words, gogui.Label(from, secondary()))
+		words = append(words, gogui.Label(from, widgets.Secondary()))
 	}
 	var controls []gogui.View
 	if now.Length > 0 {
 		sk, _ := p.options.Player.Transport().(nowplaying.Seeker)
-		controls = append(controls, p.progress(w, now, sk, secondary(), nil))
+		controls = append(controls, p.progress(w, now, sk, widgets.Secondary(), nil))
 	}
 	controls = append(controls, p.transport(now), p.loudness())
 
@@ -381,12 +381,12 @@ func (p *Renderer) loudness() gogui.View {
 }
 
 func (p *Renderer) queue(now nowplaying.Now) gogui.View {
-	rows := []gogui.View{gogui.Label(say.T("player.next"), secondary())}
+	rows := []gogui.View{gogui.Label(say.T("player.next"), widgets.Secondary())}
 	for i, tr := range now.Queue {
 		play := tr.Play
 		line := []gogui.View{gogui.Text(gogui.TextCfg{Text: tr.Title, Mode: gogui.TextModeWrap})}
 		if tr.Artist != "" {
-			line = append(line, gogui.Label(tr.Artist, secondary()))
+			line = append(line, gogui.Label(tr.Artist, widgets.Secondary()))
 		}
 		var onClick func(gogui.EventCtx)
 		if play != nil {
@@ -418,7 +418,7 @@ func (p *Renderer) queue(now nowplaying.Now) gogui.View {
 			),
 		)
 		if tr.Length > 0 {
-			content = append(content, gogui.Label(ClockText(tr.Length), secondary()))
+			content = append(content, gogui.Label(ClockText(tr.Length), widgets.Secondary()))
 		}
 		row := gogui.ContainerCfg{
 			ID:      fmt.Sprintf("queue-%d", i),
@@ -478,7 +478,7 @@ func (p *Renderer) Mini(w *gogui.Window) gogui.View {
 
 	words := []gogui.View{gogui.Label(nowplaying.Heading(now), gogui.TextStyle{})}
 	if now.Artist != "" {
-		words = append(words, gogui.Label(now.Artist, secondary()))
+		words = append(words, gogui.Label(now.Artist, widgets.Secondary()))
 	}
 
 	mark := t.TextStyleIconLarge

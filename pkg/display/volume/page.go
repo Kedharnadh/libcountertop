@@ -43,7 +43,7 @@ func NewPage(o PageOptions) *shell.Page {
 				Level: o.Levels.Level(s),
 			}
 			if s == schema.StreamMain && o.MainSteps > 0 {
-				row.Snap = stepped(o.MainSteps)
+				row.Snap = menu.Steps(o.MainSteps + 1).Snap
 			}
 			rows = append(rows, row)
 			actions = append(actions, func(level int) {
@@ -70,13 +70,6 @@ func NewPage(o PageOptions) *shell.Page {
 		}
 		return rows, actions
 	}}
-}
-
-func stepped(steps int) func(int) int {
-	return func(level int) int {
-		step := (min(max(level, 0), 100)*steps + 50) / 100
-		return step * 100 / steps
-	}
 }
 
 type preview struct {

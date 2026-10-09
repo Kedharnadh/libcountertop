@@ -29,3 +29,25 @@ func Choose[T interface {
 		return rows, actions
 	}}
 }
+
+func Tiles[T labeled](
+	title string,
+	values []T,
+	read func() T,
+	save func(T),
+	preview func(T) menu.Preview,
+) *shell.Page {
+	return &shell.Page{Title: title, Tiles: func() ([]menu.Cell, []func(int)) {
+		now := read()
+		cells := make([]menu.Cell, 0, len(values))
+		taps := make([]func(int), 0, len(values))
+		for _, v := range values {
+			cells = append(
+				cells,
+				menu.Cell{Label: v.Label(), Chosen: v == now, Preview: preview(v)},
+			)
+			taps = append(taps, func(int) { save(v) })
+		}
+		return cells, taps
+	}}
+}

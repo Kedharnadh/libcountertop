@@ -4,6 +4,7 @@ import (
 	"image"
 
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
+	"github.com/ygelfand/libcountertop/pkg/display/previews"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
@@ -18,6 +19,7 @@ func VisualPicker(
 	chosen func() string,
 	pick func(visual.Kind),
 	thumbnail func(visual.Kind, int, int) *image.RGBA,
+	kit previews.Kit,
 ) *shell.Page {
 	return &shell.Page{
 		Title: title,
@@ -29,21 +31,19 @@ func VisualPicker(
 			var cells []menu.Cell
 			var acts []func(int)
 			if none != nil {
-				cells = append(
-					cells,
-					menu.Cell{Label: empty, Chosen: chosen != nil && now == "", Paint: NoneTile},
-				)
+				cells = append(cells, menu.Cell{
+					Label:   empty,
+					Chosen:  chosen != nil && now == "",
+					Preview: kit.Painted("none", NoneTile),
+				})
 				acts = append(acts, func(int) { none() })
 			}
 			for _, k := range visual.Built() {
-				cells = append(
-					cells,
-					menu.Cell{
-						Label:  k.Label(),
-						Chosen: chosen != nil && string(k) == now,
-						Paint:  ThumbTile(k, thumbnail),
-					},
-				)
+				cells = append(cells, menu.Cell{
+					Label:   k.Label(),
+					Chosen:  chosen != nil && string(k) == now,
+					Preview: kit.Painted("visual/"+string(k), ThumbTile(k, thumbnail)),
+				})
 				acts = append(acts, func(int) { pick(k) })
 			}
 			return cells, acts

@@ -3,6 +3,7 @@ package schema
 import "github.com/ygelfand/libcountertop/pkg/settings/storage"
 
 type Shared struct {
+	Alerts    Alerts    `json:"alerts"`
 	API       API       `json:"api"`
 	Bluetooth Bluetooth `json:"bluetooth"`
 	Call      Call      `json:"call"`
@@ -27,6 +28,7 @@ type Shared struct {
 
 func DefaultShared() Shared {
 	return Shared{
+		Alerts:    DefaultAlerts(),
 		API:       DefaultAPI(),
 		Bluetooth: DefaultBluetooth(),
 		Call:      DefaultCall(),
@@ -58,6 +60,7 @@ func (s Shared) Clone() Shared {
 }
 
 type Sections[C any] struct {
+	Alerts    storage.Binding[C, Alerts]
 	API       storage.Binding[C, API]
 	Bluetooth storage.Binding[C, Bluetooth]
 	Call      storage.Binding[C, Call]
@@ -82,6 +85,7 @@ type Sections[C any] struct {
 
 func NewSections[C any](store func() *storage.Store[C], shared func(*C) *Shared) Sections[C] {
 	return Sections[C]{
+		Alerts:    bind(store, shared, func(s *Shared) *Alerts { return &s.Alerts }),
 		API:       bind(store, shared, func(s *Shared) *API { return &s.API }),
 		Bluetooth: bind(store, shared, func(s *Shared) *Bluetooth { return &s.Bluetooth }),
 		Call:      bind(store, shared, func(s *Shared) *Call { return &s.Call }),

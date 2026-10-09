@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
+	"github.com/ygelfand/libcountertop/pkg/display/previews"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/visual"
 	"github.com/ygelfand/libcountertop/pkg/say"
@@ -99,13 +100,14 @@ func (p *LookPages) Stage(slot int, st config.Stage) *shell.Page {
 	return VisualPicker(st.Label(), say.T("look.default"),
 		func() { use("") },
 		func() string { return p.options.Preferences.Wake.Read().Slot(slot).Look.Kind(st) },
-		func(k visual.Kind) { use(string(k)) }, p.options.Thumbnail)
+		func(k visual.Kind) { use(string(k)) }, p.options.Thumbnail, p.options.Previews)
 }
 
 type LookDependencies struct {
 	Preferences Preferences
 	Shell       *shell.Shell
 	Thumbnail   func(visual.Kind, int, int) *image.RGBA
+	Previews    previews.Kit
 }
 type LookPages struct{ options LookDependencies }
 

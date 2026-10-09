@@ -17,6 +17,7 @@ func (p *BasicPages) Display() *shell.Page {
 		Title: say.T("display.title"),
 		Build: func() ([]menu.Row, []func(int)) {
 			cfg := p.state()
+			sizes := menu.Steps(len(config.ScreenSizes()))
 			auto := cfg.Screen.Mode == config.ModeAuto
 
 			rows := []menu.Row{
@@ -40,8 +41,8 @@ func (p *BasicPages) Display() *shell.Page {
 				{
 					Label: say.T("display.size"),
 					Kind:  menu.Slider,
-					Level: SizeLevel(cfg.UISize),
-					Snap:  SizeSnap,
+					Level: sizes.Level(slices.Index(config.ScreenSizes(), cfg.UISize)),
+					Snap:  sizes.Snap,
 					Value: say.T("uisize." + cfg.UISize),
 				},
 				{
@@ -58,12 +59,6 @@ func (p *BasicPages) Display() *shell.Page {
 				},
 				SegmentRow(say.T("controls.dock"), config.Edges(), cfg.Screen.Drawer),
 				SegmentRow(say.T("controls.volume"), config.Sides(), cfg.Screen.Volume),
-				SegmentRow(say.T("display.alerts"), config.AlertStyles(), cfg.Screen.Alert),
-				{
-					Label: say.T("display.timer"),
-					Kind:  menu.Chevron,
-					Value: cfg.Screen.Timer.Label(),
-				},
 				{
 					Glyph: gogui.IconEye,
 					Label: say.T("display.marks"),
@@ -76,34 +71,14 @@ func (p *BasicPages) Display() *shell.Page {
 				func(int) { p.toggleAuto(auto) },
 				p.open(func() shell.View { return p.Theme() }),
 				p.open(func() shell.View { return p.Style() }),
-				func(level int) { p.setSize(SizeOf(level)) },
+				func(level int) { p.setSize(config.ScreenSizes()[sizes.Index(level)]) },
 				p.open(func() shell.View { return p.DashboardPage() }),
 				p.open(func() shell.View { return p.options.Idle.Page() }),
 				SegmentPick(config.Edges(), p.options.Screen.SetDrawer),
 				SegmentPick(config.Sides(), p.setVolumeEdge),
-				SegmentPick(config.AlertStyles(), p.setAlert),
-				p.open(func() shell.View {
-					return Choose(
-						say.T("display.timer"),
-						config.TimerStyles(),
-						func() config.TimerStyle { return p.state().Screen.Timer },
-						p.setTimer,
-						nil,
-					)
-				}),
 				func(int) { p.options.Privacy.SetMarks(!cfg.Screen.Marks) },
 			}
 			return rows, acts
 		},
 	}
 }
-func SizeOf(level int) string {
-	all := config.ScreenSizes()
-	last := len(all) - 1
-	return all[min(max((level*last+50)/100, 0), last)]
-}
-func SizeLevel(name string) int {
-	all := config.ScreenSizes()
-	return max(slices.Index(all, name), 0) * 100 / (len(all) - 1)
-}
-func SizeSnap(level int) int { return SizeLevel(SizeOf(level)) }

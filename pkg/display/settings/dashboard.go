@@ -1,6 +1,8 @@
 package settings
 
 import (
+	"slices"
+
 	gogui "github.com/go-gui-org/go-gui/gui"
 
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
@@ -27,6 +29,7 @@ func (p *BasicPages) DashboardPage() *shell.Page {
 		Title: say.T("display.dashboard"),
 		Build: func() ([]menu.Row, []func(int)) {
 			cfg := p.state()
+			media := menu.Steps(len(config.MediaDelays()))
 			weather := p.options.Preferences.IdleState().Weather
 			mode := p.dashboardMode()
 			rows := []menu.Row{
@@ -64,12 +67,12 @@ func (p *BasicPages) DashboardPage() *shell.Page {
 				Label: say.T("idle.media"),
 				Hint:  say.T("idle.media.hint"),
 				Kind:  menu.Slider,
-				Level: MediaLevel(cfg.Idle.Media),
-				Snap:  MediaSnap,
+				Level: media.Level(slices.Index(config.MediaDelays(), cfg.Idle.Media)),
+				Snap:  media.Snap,
 				Value: cfg.Idle.Media.Label(),
 			})
 			acts = append(acts, func(level int) {
-				p.options.Media.SetIdle(config.MediaDelays()[MediaIndex(level)])
+				p.options.Media.SetIdle(config.MediaDelays()[media.Index(level)])
 			})
 			if !p.dashboardOffered() {
 				return rows, acts

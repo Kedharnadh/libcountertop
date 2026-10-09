@@ -6,6 +6,7 @@ import (
 	face "github.com/ygelfand/libcountertop/pkg/display/clockface"
 	"github.com/ygelfand/libcountertop/pkg/display/dashboard"
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
+	"github.com/ygelfand/libcountertop/pkg/display/previews"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
@@ -27,6 +28,7 @@ type ClockDependencies struct {
 	Preferences Preferences
 	Shell       *shell.Shell
 	Controller  ClockController
+	Previews    previews.Kit
 }
 type ClockPages struct{ options ClockDependencies }
 
@@ -96,10 +98,9 @@ func (p *ClockPages) Faces(
 
 			for _, f := range config.Faces() {
 				cells = append(cells, menu.Cell{
-					Label:  f.Label(),
-					Chosen: f == chosen,
-					Paint:  p.Preview(f),
-					Face:   f,
+					Label:   f.Label(),
+					Chosen:  f == chosen,
+					Preview: p.options.Previews.ClockFace(f),
 				})
 				acts = append(acts, picks(use, f))
 			}
@@ -110,15 +111,6 @@ func (p *ClockPages) Faces(
 
 func picks(use func(config.Face), f config.Face) func(int) {
 	return func(int) { use(f) }
-}
-
-func (p *ClockPages) Preview(f config.Face) func(ui.Surface, ui.Rect, theme.Theme) {
-	return func(s ui.Surface, at ui.Rect, palette theme.Theme) {
-		cfg := p.options.Preferences.ClockState()
-		reading := face.Read(time.Now(), cfg.Screen.Hours == config.TwentyFourHour)
-
-		face.Of(f).Draw(s, at, reading.Undated(), cfg.Clock.Ink.Over(palette))
-	}
 }
 
 func (p *ClockPages) Colors() *shell.Page {

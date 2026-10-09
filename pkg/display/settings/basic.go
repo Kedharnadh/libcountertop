@@ -7,10 +7,10 @@ import (
 	gogui "github.com/go-gui-org/go-gui/gui"
 
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
+	"github.com/ygelfand/libcountertop/pkg/display/previews"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/visual"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -69,6 +69,13 @@ type BasicDependencies struct {
 	Home                  DashboardMode
 	HA                    HomeAccess
 	Marks                 ModeMarks
+	Alerts                AlertSettings
+	Previews              previews.Kit
+}
+type AlertSettings interface {
+	Current() config.Alerts
+	Change(name, value string) error
+	Preview(config.Chime)
 }
 type DashboardMode interface {
 	Enabled() bool
@@ -85,11 +92,6 @@ func (p *BasicPages) useTheme(name string) func(int) { return func(int) { p.setT
 func (p *BasicPages) useZone(name string) func(int) {
 	return func(int) { p.options.Zone.SetZone(name) }
 }
-
-const (
-	swatchPad = 0.12
-	swatchGap = 0.07
-)
 
 func (p *BasicPages) Debug() *shell.Page {
 	return &shell.Page{
@@ -176,7 +178,11 @@ func (p *BasicPages) Style() *shell.Page {
 			for _, name := range style.Names() {
 				cells = append(
 					cells,
-					menu.Cell{Label: say.T("style." + name), Chosen: name == now, Style: name},
+					menu.Cell{
+						Label:   say.T("style." + name),
+						Chosen:  name == now,
+						Preview: p.options.Previews.Style(name),
+					},
 				)
 				taps = append(taps, func(int) {
 					if err := p.setStyle(name); err != nil {
@@ -201,7 +207,7 @@ func (p *BasicPages) Theme() *shell.Page {
 				{
 					Label:   say.T("theme.default"),
 					Chosen:  now == theme.Follow,
-					Palette: &follow,
+					Preview: p.options.Previews.Theme(follow),
 				},
 			}
 			acts := []func(int){p.useTheme(theme.Follow)}
@@ -210,36 +216,12 @@ func (p *BasicPages) Theme() *shell.Page {
 				cells = append(cells, menu.Cell{
 					Label:   t.Name,
 					Chosen:  t.Name == now,
-					Paint:   Swatch(t),
-					Palette: &t,
+					Preview: p.options.Previews.Theme(t),
 				})
 				acts = append(acts, p.useTheme(t.Name))
 			}
 			return cells, acts
 		},
-	}
-}
-
-func Swatch(t theme.Theme) func(ui.Surface, ui.Rect, theme.Theme) {
-	return func(s ui.Surface, at ui.Rect, _ theme.Theme) {
-		ui.FillRect(s, at, t.Background)
-
-		ui.Border(s, at, max(at.H/40, 1), t.Text.Blend(t.Background, 0.7))
-
-		on := []theme.Color{t.Surface, t.Text, t.Accent, t.Accent2}
-
-		pad := int(float64(at.H) * swatchPad)
-		gap := int(float64(at.H) * swatchGap)
-
-		wide := (at.W - pad*2 - gap*(len(on)-1)) / len(on)
-		side := min(at.H-pad*2, wide)
-
-		x := at.X + (at.W-side*len(on)-gap*(len(on)-1))/2
-		y := at.Y + (at.H-side)/2
-
-		for i, c := range on {
-			ui.FillRect(s, ui.Rect{X: x + i*(side+gap), Y: y, W: side, H: side}, c)
-		}
 	}
 }
 

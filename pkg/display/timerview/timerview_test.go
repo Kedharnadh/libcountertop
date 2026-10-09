@@ -1,4 +1,4 @@
-package screens
+package timerview
 
 import (
 	"math"
@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/display/clockkind"
-	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 func TestTheRingEmptiesClockwiseFromTwelve(t *testing.T) {
@@ -64,23 +63,6 @@ func TestTheCornerStaysInsideARoundScreen(t *testing.T) {
 	x, y = cornerSpot(1280, 800, wide, margin, margin)
 	if x != 1280-margin-wide || y != margin {
 		t.Errorf("on a wide screen the chip sits at %v,%v, want the corner", x, y)
-	}
-}
-
-func TestTheCornerMovesAwayFromTheWeatherOnlyWhenItSitsThere(t *testing.T) {
-	for _, tc := range []struct {
-		at    schema.Placement
-		shown bool
-		want  bool
-	}{
-		{schema.Placement{Position: schema.PositionTop, Align: schema.AlignRight}, true, true},
-		{schema.Placement{Position: schema.PositionTop, Align: schema.AlignRight}, false, false},
-		{schema.Placement{Position: schema.PositionTop, Align: schema.AlignLeft}, true, false},
-		{schema.Placement{Position: schema.PositionBottom, Align: schema.AlignRight}, true, false},
-	} {
-		if got := crowds(tc.at, tc.shown); got != tc.want {
-			t.Errorf("weather at %+v shown=%v crowds the corner: %v", tc.at, tc.shown, got)
-		}
 	}
 }
 

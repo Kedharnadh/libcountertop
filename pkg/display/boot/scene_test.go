@@ -9,6 +9,7 @@ import (
 
 	backend "github.com/ygelfand/libcountertop/pkg/display/gogui"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
+	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/runtime/startup"
 )
 
@@ -123,8 +124,13 @@ func TestBootTextUsesBundledFontAndPaletteBeforeMainGUI(t *testing.T) {
 			}
 			if cmd.Text == "Wi-Fi" {
 				found = true
-				if cmd.Color != color(p.Text) {
-					t.Errorf("dark=%t label color=%v, want %v", dark, cmd.Color, color(p.Text))
+				if cmd.Color != widgets.Color(p.Text) {
+					t.Errorf(
+						"dark=%t label color=%v, want %v",
+						dark,
+						cmd.Color,
+						widgets.Color(p.Text),
+					)
 				}
 			}
 		}

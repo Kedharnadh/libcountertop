@@ -1,4 +1,4 @@
-package screens
+package weatherview
 
 import (
 	"fmt"
@@ -9,6 +9,7 @@ import (
 	gogui "github.com/go-gui-org/go-gui/gui"
 
 	"github.com/ygelfand/libcountertop/pkg/display/clockview"
+	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
@@ -17,7 +18,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
-type weatherView func(
+type lookView func(
 	w *gogui.Window,
 	size float32,
 	r weather.Reading,
@@ -25,55 +26,48 @@ type weatherView func(
 	l schema.WeatherLayout,
 ) gogui.View
 
-func (a *App) weatherLook(look schema.WeatherLook) weatherView {
-	switch look {
-	case schema.WeatherStack:
-		return a.stackWeather
-	case schema.WeatherIcon:
-		return a.iconWeather
-	case schema.WeatherWords:
-		return a.wordsWeather
-	case schema.WeatherCard:
-		return a.cardWeather
-	case schema.WeatherDetail:
-		return a.detailWeather
-	}
-	return a.compactWeather
+type View struct {
+	UI    *widgets.UI
+	Again func(w *gogui.Window, after time.Duration)
+	Start time.Time
 }
 
-func (a *App) phase(w *gogui.Window, l schema.WeatherLayout) float64 {
+func (v *View) look(look schema.WeatherLook) lookView {
+	switch look {
+	case schema.WeatherStack:
+		return v.stack
+	case schema.WeatherIcon:
+		return v.iconLook
+	case schema.WeatherWords:
+		return v.words
+	case schema.WeatherCard:
+		return v.card
+	case schema.WeatherDetail:
+		return v.detail
+	}
+	return v.compact
+}
+
+func (v *View) phase(w *gogui.Window, l schema.WeatherLayout) float64 {
 	if !l.Animate {
 		return 0
 	}
-	a.again(w, weatherFrame)
-	return time.Since(a.weatherStart).Seconds()
+	v.Again(w, weatherFrame)
+	return time.Since(v.Start).Seconds()
 }
 
-func (a *App) again(w *gogui.Window, after time.Duration) {
-	if a.ticking.Swap(true) {
-		return
-	}
-	time.AfterFunc(after, func() {
-		a.ticking.Store(false)
-		w.QueueCommand(func(w *gogui.Window) { w.InvalidateLayout() })
-	})
-}
-
-func (a *App) weatherLayer(
+func (v *View) Layer(
 	w *gogui.Window,
+	r weather.Reading,
 	l schema.WeatherLayout,
 	vw, vh int,
 	top float32,
 	ink theme.Theme,
 ) gogui.View {
-	r, ok := a.o.Forecast.Now()
-	if !ok {
-		return nil
-	}
-	r.Phase = a.phase(w, l)
-	build := a.weatherLook(l.Look)
-	size := reach() * float32(0.5+l.Size.Share()*1.4)
-	margin := reach() * 0.5
+	r.Phase = v.phase(w, l)
+	build := v.look(l.Look)
+	size := style.Reach() * float32(0.5+l.Size.Share()*1.4)
+	margin := style.Reach() * 0.5
 	return widgets.Placed(ui.Rect{W: vw, H: vh}, gogui.Column(widgets.Aligned(l.Placement,
 		gogui.ContainerCfg{
 			Sizing:  gogui.FillFill,
@@ -82,14 +76,14 @@ func (a *App) weatherLayer(
 		})))
 }
 
-func (a *App) weatherSample(w *gogui.Window, l schema.WeatherLayout, tw, th float32) gogui.View {
-	r, ok := a.o.Forecast.Now()
-	if !ok {
-		t := 72.0
-		r = weather.Reading{Condition: "sunny", Temperature: &t}
-	}
-	r.Phase = a.phase(w, l)
-	build := a.weatherLook(l.Look)
+func (v *View) Sample(
+	w *gogui.Window,
+	r weather.Reading,
+	l schema.WeatherLayout,
+	tw, th float32,
+) gogui.View {
+	r.Phase = v.phase(w, l)
+	build := v.look(l.Look)
 	return gogui.Column(gogui.ContainerCfg{
 		Width:   tw,
 		Height:  th,
@@ -98,7 +92,7 @@ func (a *App) weatherSample(w *gogui.Window, l schema.WeatherLayout, tw, th floa
 		HAlign:  gogui.HAlignCenter,
 		VAlign:  gogui.VAlignMiddle,
 		Clip:    true,
-		Content: []gogui.View{build(w, th*0.28, r, a.ui.Palette(), l)},
+		Content: []gogui.View{build(w, th*0.28, r, v.UI.Palette(), l)},
 	})
 }
 
@@ -137,7 +131,7 @@ func line(gap float32, content ...gogui.View) gogui.View {
 	)
 }
 
-func (a *App) compactWeather(
+func (v *View) compact(
 	_ *gogui.Window,
 	size float32,
 	r weather.Reading,
@@ -147,12 +141,12 @@ func (a *App) compactWeather(
 	big := clockview.Lettering(glyph.TypefaceBold, size, ink.Text)
 	return line(
 		size*0.2,
-		a.weatherIcon(r.Condition, r.Phase, size*1.1, ink, l),
+		v.icon(r.Condition, r.Phase, size*1.1, ink, l),
 		gogui.Label(degrees(r), big),
 	)
 }
 
-func (a *App) stackWeather(
+func (v *View) stack(
 	_ *gogui.Window,
 	size float32,
 	r weather.Reading,
@@ -165,13 +159,13 @@ func (a *App) stackWeather(
 		gogui.Label(degrees(r), big),
 		line(
 			small.Size*0.4,
-			a.weatherIcon(r.Condition, r.Phase, small.Size*1.4, ink, l),
+			v.icon(r.Condition, r.Phase, small.Size*1.4, ink, l),
 			gogui.Label(condition(r), small),
 		),
 	})
 }
 
-func (a *App) iconWeather(
+func (v *View) iconLook(
 	_ *gogui.Window,
 	size float32,
 	r weather.Reading,
@@ -181,13 +175,13 @@ func (a *App) iconWeather(
 	st := clockview.Lettering(glyph.TypefaceBold, size*0.7, ink.Text)
 	return stacked(l,
 		[]gogui.View{
-			a.weatherIcon(r.Condition, r.Phase, size*1.8, ink, l),
+			v.icon(r.Condition, r.Phase, size*1.8, ink, l),
 			gogui.Label(degrees(r), st),
 		},
 	)
 }
 
-func (a *App) wordsWeather(
+func (v *View) words(
 	_ *gogui.Window,
 	size float32,
 	r weather.Reading,
@@ -200,7 +194,7 @@ func (a *App) wordsWeather(
 	)
 }
 
-func (a *App) cardWeather(
+func (v *View) card(
 	_ *gogui.Window,
 	size float32,
 	r weather.Reading,
@@ -219,18 +213,18 @@ func (a *App) cardWeather(
 			),
 		)
 	}
-	return gogui.Row(a.ui.Toolkit.Panel(gogui.ContainerCfg{
+	return gogui.Row(v.UI.Toolkit.Panel(gogui.ContainerCfg{
 		Padding: gogui.PaddingLarge,
 		Spacing: gogui.SpacingPx(size * 0.3),
 		VAlign:  gogui.VAlignMiddle,
 		Content: []gogui.View{
-			a.weatherIcon(r.Condition, r.Phase, size*1.5, ink, l),
+			v.icon(r.Condition, r.Phase, size*1.5, ink, l),
 			gogui.Column(gogui.ContainerCfg{Padding: gogui.NoPadding, Content: words}),
 		},
 	}))
 }
 
-func (a *App) detailWeather(
+func (v *View) detail(
 	_ *gogui.Window,
 	size float32,
 	r weather.Reading,
@@ -242,7 +236,7 @@ func (a *App) detailWeather(
 	lines := []gogui.View{
 		line(
 			size*0.2,
-			a.weatherIcon(r.Condition, r.Phase, size, ink, l),
+			v.icon(r.Condition, r.Phase, size, ink, l),
 			gogui.Label(degrees(r), big),
 		),
 		gogui.Label(condition(r), small),
@@ -311,7 +305,13 @@ func iconColors(ink theme.Theme, l schema.WeatherLayout) tints {
 	if !l.Themed {
 		return natural
 	}
-	accent, text, second := color(ink.Accent), color(ink.Text), color(ink.Accent2)
+	accent, text, second := widgets.Color(
+		ink.Accent,
+	), widgets.Color(
+		ink.Text,
+	), widgets.Color(
+		ink.Accent2,
+	)
 	return tints{
 		sun:   accent,
 		moon:  accent,
@@ -325,7 +325,7 @@ func iconColors(ink theme.Theme, l schema.WeatherLayout) tints {
 	}
 }
 
-func (a *App) weatherIcon(
+func (v *View) icon(
 	cond string,
 	p float64,
 	side float32,

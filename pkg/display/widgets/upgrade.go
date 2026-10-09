@@ -24,7 +24,7 @@ func UpgradeCard(w *gogui.Window, up Upgrade, pal theme.Theme, logo string) gogu
 		return nil
 	}
 	accent := gogui.CurrentTheme().Cfg.ColorAccent
-	track := guiColor(pal.Text).WithOpacity(0.12)
+	track := Color(pal.Text).WithOpacity(0.12)
 	vw, vh := w.WindowSize()
 	side := float32(min(vw, vh)) * 0.42
 	installing := up.At >= 1
@@ -79,11 +79,11 @@ func UpgradeCard(w *gogui.Window, up Upgrade, pal theme.Theme, logo string) gogu
 		Width:   float32(vw),
 		Height:  float32(vh),
 		Sizing:  gogui.FixedFixed,
-		Color:   guiColor(pal.Background),
+		Color:   Color(pal.Background),
 		HAlign:  gogui.HAlignCenter,
 		VAlign:  gogui.VAlignMiddle,
 		Spacing: gogui.SpacingLarge,
-		Content: []gogui.View{dial, gogui.Label(line, secondary())},
+		Content: []gogui.View{dial, gogui.Label(line, Secondary())},
 		OnClick: func(e gogui.EventCtx) { e.Consume() },
 	})
 }

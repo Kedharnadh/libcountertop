@@ -12,13 +12,14 @@ import (
 	face "github.com/ygelfand/libcountertop/pkg/display/clockface"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
+	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 )
 
 type View func(w *gogui.Window, box ui.Rect, r face.Reading, ink theme.Theme) gogui.View
 
 func Lettering(weight glyph.Typeface, size float32, c theme.Color) gogui.TextStyle {
 	st := gogui.CurrentTheme().Cfg.TextStyleDef
-	st.Typeface, st.Size, st.Color = weight, max(size, 1), color(c)
+	st.Typeface, st.Size, st.Color = weight, max(size, 1), widgets.Color(c)
 	return st
 }
 
@@ -164,9 +165,9 @@ func Cards(w *gogui.Window, box ui.Rect, r face.Reading, ink theme.Theme) gogui.
 			Sizing: gogui.FixedFixed,
 			HAlign: gogui.HAlignCenter,
 			VAlign: gogui.VAlignMiddle,
-			Color: color(
-				ink.Surface,
-			),
+			Color: widgets.Color(
+				ink.Surface),
+
 			Radius:  gogui.RadiusPx(side * 0.11),
 			Padding: gogui.NoPadding,
 			Content: content,
@@ -231,19 +232,19 @@ func Analog(seconds bool) View {
 				width := dial * 0.058
 				dc.FilledPolygon(
 					hand(cx, cy, dial*0.28, width, float64(hour%12)*30+float64(minute)*0.5),
-					color(ink.Text),
+					widgets.Color(ink.Text),
 				)
 				dc.FilledPolygon(
 					hand(cx, cy, dial*0.44, width*0.70, float64(minute)*6),
-					color(ink.Text),
+					widgets.Color(ink.Text),
 				)
 				if seconds {
 					dc.FilledPolygon(
 						hand(cx, cy, dial*0.47, width*0.28, float64(r.Second)*6),
-						color(ink.Accent),
+						widgets.Color(ink.Accent),
 					)
 				}
-				dc.FilledCircle(cx, cy, dial*0.0375, color(ink.Text))
+				dc.FilledCircle(cx, cy, dial*0.0375, widgets.Color(ink.Text))
 
 				if r.Dated() {
 					dc.Text(cx-dc.TextWidth(r.Date, date)/2, cy+dial/2+under, r.Date, date)
@@ -322,7 +323,7 @@ func Overlap(w *gogui.Window, box ui.Rect, r face.Reading, ink theme.Theme) gogu
 	size := Fitted(w, hour, big, float32(box.W)*0.78/1.18, float32(box.H)*0.46)
 	big.Size = size
 	faint := big
-	faint.Color = color(ink.Muted)
+	faint.Color = widgets.Color(ink.Muted)
 
 	top := []gogui.View{gogui.Label(hour, faint)}
 	if r.Suffix != "" {
@@ -380,8 +381,8 @@ func Segments(w *gogui.Window, box ui.Rect, r face.Reading, ink theme.Theme) gog
 	gap := height * 0.22
 	tall := height*float32(len(rows)) + gap*float32(len(rows)-1)
 
-	on := color(ink.Text)
-	off := color(ink.Text.Blend(ink.Background, 0.91))
+	on := widgets.Color(ink.Text)
+	off := widgets.Color(ink.Text.Blend(ink.Background, 0.91))
 	digits := gogui.DrawCanvas(gogui.DrawCanvasCfg{
 		ID: "segments", Width: bw, Height: tall,
 		Version: canvasVersion(box, r, ink, false),
@@ -428,8 +429,6 @@ func Segments(w *gogui.Window, box ui.Rect, r face.Reading, ink theme.Theme) gog
 	cfg.Spacing = gogui.SpacingPx(height * 0.34)
 	return gogui.Column(cfg)
 }
-
-func color(c theme.Color) gogui.Color { return gogui.RGB(c.R, c.G, c.B) }
 
 func canvasVersion(box ui.Rect, r face.Reading, ink theme.Theme, seconds bool) uint64 {
 	second := 0

@@ -2,6 +2,7 @@ package widgets
 
 import (
 	"github.com/ygelfand/libcountertop/pkg/display/message"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/tessera"
 )
 
@@ -14,7 +15,7 @@ func Alerter(m *message.Messages) (show func(tessera.Alert), clear func()) {
 		m.Show(message.Message{
 			Title:  a.Title,
 			Body:   a.Subtitle,
-			Tone:   message.ToneInfo,
+			Tone:   schema.ToneInfo,
 			Icon:   a.Icon,
 			Swatch: a.Color,
 			Keys:   keys,

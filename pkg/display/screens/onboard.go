@@ -73,7 +73,7 @@ func (a *App) onboard(w *gogui.Window, addr string) gogui.View {
 		Width:   cw,
 		Height:  ch,
 		Sizing:  gogui.FixedFixed,
-		Color:   color(brand.Surface),
+		Color:   widgets.Color(brand.Surface),
 		Radius:  gogui.RadiusPx(short * onboardRadius),
 		Padding: gogui.NoPadding,
 		Clip:    true,
@@ -83,7 +83,7 @@ func (a *App) onboard(w *gogui.Window, addr string) gogui.View {
 					Width:   band,
 					Sizing:  gogui.FixedFill,
 					Padding: gogui.NoPadding,
-					Color:   color(brand.Accent),
+					Color:   widgets.Color(brand.Accent),
 				},
 			),
 			gogui.Column(
@@ -98,7 +98,7 @@ func (a *App) onboard(w *gogui.Window, addr string) gogui.View {
 	return gogui.Column(gogui.ContainerCfg{
 		Sizing:  gogui.FillFill,
 		Padding: gogui.NoPadding,
-		Color:   color(brand.Background),
+		Color:   widgets.Color(brand.Background),
 		HAlign:  gogui.HAlignCenter,
 		VAlign:  gogui.VAlignMiddle,
 		Content: []gogui.View{card},
@@ -114,7 +114,7 @@ func qrCode(url string, w, h float32, brand theme.Theme) gogui.View {
 	scale := max(float32(int(side*0.88/float32(code.Size))), 1)
 	quiet := scale * 3
 	drawn := float32(code.Size)*scale + 2*quiet
-	ink := color(brand.Text)
+	ink := widgets.Color(brand.Text)
 	return gogui.Column(gogui.ContainerCfg{
 		Width:   w,
 		Height:  h,
@@ -182,7 +182,7 @@ func (a *App) onboardWords(
 	at.Size = clockview.Fitted(w, addr, at, wide*0.9, short*onboardAddr)
 	chip := func(text string) gogui.View {
 		return gogui.Row(gogui.ContainerCfg{
-			Color:   color(plate),
+			Color:   widgets.Color(plate),
 			Radius:  gogui.RadiusPx(at.Size),
 			Padding: gogui.NewPadding(at.Size*0.3, at.Size/2, at.Size*0.3, at.Size/2),
 			Content: []gogui.View{gogui.Label(text, at)},

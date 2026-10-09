@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
+
 	esphome "github.com/ygelfand/go-esphome-device"
 
 	"github.com/ygelfand/libcountertop/pkg/hook"
@@ -132,8 +134,23 @@ func (m *Messages) Show(msg Message, hold time.Duration) {
 	m.Changed.Emit(true)
 }
 
+type Sounder interface {
+	Start(schema.Tone)
+	Stop()
+}
+
+func (m *Messages) SoundWith(s Sounder) {
+	m.Changed.Listen(func(up bool) {
+		if current, ok := m.Current(); up && ok {
+			s.Start(current.Tone)
+			return
+		}
+		s.Stop()
+	})
+}
+
 func (m *Messages) Info(title, body string, hold time.Duration) {
-	m.Show(Message{Title: title, Body: body, Tone: ToneInfo}, hold)
+	m.Show(Message{Title: title, Body: body, Tone: schema.ToneInfo}, hold)
 }
 
 func (m *Messages) Hide() { m.end(End{Why: EndCleared}) }
@@ -162,13 +179,13 @@ func (m *Messages) endLocked(why End) {
 	m.Changed.Emit(false)
 }
 
-func tone(name string) Tone {
-	for _, t := range Tones() {
+func tone(name string) schema.Tone {
+	for _, t := range schema.Tones() {
 		if string(t) == name {
 			return t
 		}
 	}
-	return ToneInfo
+	return schema.ToneInfo
 }
 
 func Hold(v int) time.Duration {

@@ -8,6 +8,7 @@ import (
 	face "github.com/ygelfand/libcountertop/pkg/display/clockface"
 	"github.com/ygelfand/libcountertop/pkg/display/dashboard"
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
+	"github.com/ygelfand/libcountertop/pkg/display/previews"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
@@ -76,6 +77,7 @@ type IdleDependencies struct {
 	SaverWeather WeatherRendering
 	Visuals      VisualLabel
 	Thumbnail    func(visual.Kind, int, int) *image.RGBA
+	Previews     previews.Kit
 }
 type IdlePages struct{ options IdleDependencies }
 
@@ -96,7 +98,7 @@ func (p *IdlePages) visualPicker(
 	chosen func() string,
 	pick func(visual.Kind),
 ) *shell.Page {
-	return VisualPicker(title, empty, none, chosen, pick, p.options.Thumbnail)
+	return VisualPicker(title, empty, none, chosen, pick, p.options.Thumbnail, p.options.Previews)
 }
 func IdleKindLabel(kind string) string {
 	if kind == "" {
@@ -145,12 +147,12 @@ func (p *IdlePages) Page() *shell.Page {
 				p.makePage(func() shell.View { return p.Source(0) }),
 				p.makePage(func() shell.View { return p.Visual(1) }),
 				p.makePage(func() shell.View { return p.Source(1) }),
-				p.open(Choose(
+				p.open(Tiles(
 					say.T("idle.face"),
 					config.IdleFaces(),
 					func() config.Face { return p.options.Preferences.IdleState().Idle.Face },
 					i.SetFace,
-					p.FacePreview,
+					p.options.Previews.ClockFace,
 				)),
 			}
 			placed, placing := Placing{
@@ -211,18 +213,6 @@ func (p *IdlePages) withSaver(
 	return append(head, rest...), append(headTaps, restTaps...)
 }
 
-func MediaIndex(level int) int {
-	n := len(config.MediaDelays()) - 1
-	return min(max((level*n+50)/100, 0), n)
-}
-
-func MediaLevel(d config.Delay) int {
-	i := max(slices.Index(config.MediaDelays(), d), 0)
-	return i * 100 / (len(config.MediaDelays()) - 1)
-}
-
-func MediaSnap(level int) int { return MediaLevel(config.MediaDelays()[MediaIndex(level)]) }
-
 func (p *IdlePages) SlotVisual(slot int) config.IdleVisual {
 	c := p.options.Preferences.IdleState().Idle
 	if slot == 0 {
@@ -250,17 +240,6 @@ func (p *IdlePages) Source(slot int) *shell.Page {
 	return Choose(title, config.Sources(),
 		func() config.Source { return p.SlotVisual(slot).Source },
 		func(s config.Source) { p.options.Idle.SetSource(slot, s) }, nil)
-}
-
-func (p *IdlePages) FacePreview(f config.Face) func(ui.Surface, ui.Rect, theme.Theme) {
-	return func(s ui.Surface, at ui.Rect, palette theme.Theme) {
-		if f == config.FaceNone {
-			return
-		}
-		cfg := p.options.Preferences.IdleState()
-		r := face.Read(time.Now(), cfg.Screen.Hours == config.TwentyFourHour)
-		face.Of(f).Draw(s, at, r.Undated(), cfg.Clock.Ink.Over(palette))
-	}
 }
 
 func (p *IdlePages) Placed(at config.Placement) func(ui.Surface, ui.Rect, theme.Theme) {
@@ -398,7 +377,7 @@ func (p *IdlePages) WeatherLooks(
 				cells = append(cells, menu.Cell{
 					Label:   look.Label(),
 					Chosen:  look == now.Look,
-					Weather: sample,
+					Preview: p.options.Previews.Weather(sample),
 				})
 				taps = append(taps, func(int) { set.SetLook(look) })
 			}

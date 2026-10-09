@@ -10,7 +10,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/navigation"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
-	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/media/call"
@@ -74,17 +73,8 @@ func iconStyle(c gogui.Color) gogui.TextStyle {
 	return st
 }
 
-func secondary() gogui.TextStyle {
-	t := gogui.CurrentTheme().Cfg
-	st := t.TextStyleDef
-	st.Color = t.ColorTextSecondary
-	return st
-}
-
 func reach() float32 { return style.Reach() }
 
 func cell(width, gap float32, n int) float32 {
 	return float32(math.Floor(float64((width - gap*float32(n-1)) / float32(n))))
 }
-
-func color(c theme.Color) gogui.Color { return gogui.RGB(c.R, c.G, c.B) }

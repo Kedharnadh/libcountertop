@@ -11,6 +11,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/interaction"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	videoplayer "github.com/ygelfand/libcountertop/pkg/display/videopage"
+	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 	"github.com/ygelfand/libcountertop/pkg/say"
 )
@@ -280,7 +281,7 @@ func (pv *Renderer) live(
 	c videoplayer.Controls,
 	st gogui.TextStyle,
 ) gogui.View {
-	fill := Color(pv.options.UI.Palette().Danger)
+	fill := widgets.Color(pv.options.UI.Palette().Danger)
 	var content []gogui.View
 	if behind := now.Length - now.Elapsed; behind > now.LiveWithin {
 		fill = gogui.Color{R: 0x60, G: 0x60, B: 0x60, A: 0xff}

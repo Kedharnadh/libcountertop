@@ -10,6 +10,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ygelfand/libcountertop/pkg/display/weatherview"
+
+	"github.com/ygelfand/libcountertop/pkg/display/timerview"
+
+	"github.com/ygelfand/libcountertop/pkg/display/alertview"
+
 	gogui "github.com/go-gui-org/go-gui/gui"
 
 	"github.com/ygelfand/libcountertop/pkg/assistant/timer"
@@ -170,9 +176,11 @@ type App struct {
 	preview *widgets.LivePreview
 	player  *playerview.Renderer
 	home    *homeview.Renderer
+	alerts  alertview.View
+	timers  timerview.View
+	weather weatherview.View
 
-	weatherStart time.Time
-	ticking      atomic.Bool
+	ticking atomic.Bool
 
 	mu sync.Mutex
 	w  *gogui.Window
@@ -181,11 +189,13 @@ type App struct {
 
 func New(o Options) *App {
 	a := &App{
-		o:            o,
-		ui:           o.UI,
-		preview:      &widgets.LivePreview{},
-		weatherStart: time.Now(),
+		o:       o,
+		ui:      o.UI,
+		preview: &widgets.LivePreview{},
 	}
+	a.alerts = alertview.View{UI: o.UI, Messages: o.Messages, Again: a.again}
+	a.timers = timerview.View{UI: o.UI, Timers: o.Timers, Again: a.again}
+	a.weather = weatherview.View{UI: o.UI, Again: a.again, Start: time.Now()}
 	a.boards = map[string]Board{homecontrol.TabKind: {Glyph: homeGlyph, Draw: a.homeBoard}}
 	for k, b := range o.Boards {
 		a.boards[k] = b

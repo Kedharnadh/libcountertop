@@ -34,8 +34,6 @@ type KeyboardOptions struct {
 	Press        func(gogui.KeyCode)
 }
 
-func guiColor(c theme.Color) gogui.Color { return gogui.Color{R: c.R, G: c.G, B: c.B, A: 255} }
-
 var (
 	letterRows = []string{"qwertyuiop", "asdfghjkl", "zxcvbnm"}
 	symbolRows = []string{"1234567890", "-/:;()&@\"", ".,?!'#"}
@@ -63,14 +61,14 @@ func (editor *Editor) Keyboard(w *gogui.Window, opts KeyboardOptions) (ui.Rect, 
 			st = gogui.CurrentTheme().TextStyleIconMedium
 		}
 		st.Size *= textScale
-		st.Color = guiColor(pal.Text)
+		st.Color = Color(pal.Text)
 		cfg := gogui.ContainerCfg{
 			ID:      "key-" + id,
 			Width:   width,
 			Height:  high,
 			Sizing:  gogui.FixedFixed,
 			Radius:  gogui.RadiusMedium,
-			Color:   guiColor(fill),
+			Color:   Color(fill),
 			HAlign:  gogui.HAlignCenter,
 			VAlign:  gogui.VAlignMiddle,
 			Padding: gogui.NoPadding,
@@ -170,7 +168,7 @@ func (editor *Editor) Keyboard(w *gogui.Window, opts KeyboardOptions) (ui.Rect, 
 		Sizing:  gogui.FillFill,
 		Padding: gogui.NewPadding(pad, pad, pad*1.5, pad),
 		Spacing: gogui.SpacingPx(gap),
-		Color:   guiColor(pal.Background.Blend(pal.Text, 0.04)),
+		Color:   Color(pal.Background.Blend(pal.Text, 0.04)),
 		Radius:  corners,
 		HAlign:  gogui.HAlignCenter,
 		Content: lines,

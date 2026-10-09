@@ -3,9 +3,10 @@ package menu
 import (
 	"image"
 
+	gogui "github.com/go-gui-org/go-gui/gui"
+
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
-	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 type Mark struct {
@@ -48,17 +49,12 @@ type Row struct {
 	Save func(string)
 }
 
+type Preview interface {
+	View(w *gogui.Window, width, height float32) gogui.View
+}
+
 type Cell struct {
-	Label  string
-	Chosen bool
-
-	Paint func(s ui.Surface, at ui.Rect, palette theme.Theme)
-
-	Palette *theme.Theme
-
-	Face schema.Face
-
-	Style string
-
-	Weather schema.WeatherLayout
+	Label   string
+	Chosen  bool
+	Preview Preview
 }

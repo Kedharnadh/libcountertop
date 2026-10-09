@@ -18,7 +18,7 @@ func (p *LivePreview) View(w *gogui.Window, starting string, watch func(ui.Rect)
 	var content []gogui.View
 	fill := gogui.Color{}
 	if !p.ready {
-		content = append(content, gogui.Label(starting, secondary()))
+		content = append(content, gogui.Label(starting, Secondary()))
 		fill = t.Cfg.ColorPanel
 	}
 	return gogui.Column(gogui.ContainerCfg{

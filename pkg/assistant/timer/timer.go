@@ -29,8 +29,9 @@ type Countdown interface {
 }
 
 type Options struct {
-	Alarm func() (release func())
-	Chime func()
+	Alarm   func() (release func())
+	Chime   func()
+	RingFor func() time.Duration
 
 	Countdown Countdown
 }
@@ -252,7 +253,11 @@ func (t *Timers) ring(ctx context.Context, sound Options) {
 		defer sound.Alarm()()
 	}
 
-	over := time.After(ringFor)
+	length := ringFor
+	if t.opts.RingFor != nil && t.opts.RingFor() > 0 {
+		length = t.opts.RingFor()
+	}
+	over := time.After(length)
 	for {
 		if sound.Chime != nil {
 			sound.Chime()
@@ -262,7 +267,7 @@ func (t *Timers) ring(ctx context.Context, sound Options) {
 		case <-ctx.Done():
 			return
 		case <-over:
-			slog.Info("timer rang out", "for", ringFor)
+			slog.Info("timer rang out", "for", length)
 			return
 		case <-time.After(ringEvery):
 		}

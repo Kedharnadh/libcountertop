@@ -65,8 +65,8 @@ func (kit *Toolkit) VolumeCard(w *gogui.Window, options VolumeOptions) gogui.Vie
 			}
 		}
 		icon := t.TextStyleIconMedium
-		icon.Color = secondary().Color
-		label := []gogui.View{gogui.Label(choice.Label, secondary())}
+		icon.Color = Secondary().Color
+		label := []gogui.View{gogui.Label(choice.Label, Secondary())}
 		if current {
 			label = append([]gogui.View{gogui.Label(arrow, icon)}, label...)
 		}

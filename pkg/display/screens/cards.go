@@ -36,7 +36,7 @@ func (a *App) assistantPanel(w *gogui.Window) gogui.View {
 	pad := t.Cfg.PaddingLarge.Left
 	bandW, bandH := float32(vw)-2*pad, deep*0.34
 
-	ink := color(a.ui.Palette().Text)
+	ink := widgets.Color(a.ui.Palette().Text)
 	switch show.Phase {
 	case turn.Listening:
 		ink = t.Cfg.ColorAccent
@@ -112,7 +112,7 @@ func (a *App) assistantPanel(w *gogui.Window) gogui.View {
 	}
 	content := []gogui.View{band}
 	if show.Said != "" {
-		content = append(content, gogui.Label(show.Said, secondary()))
+		content = append(content, gogui.Label(show.Said, widgets.Secondary()))
 	}
 	if show.Reply != "" {
 		content = append(
@@ -147,7 +147,11 @@ func (a *App) captions(w *gogui.Window, show assistant.Showing) gogui.View {
 		lines = append(
 			lines,
 			gogui.Text(
-				gogui.TextCfg{Text: show.Said, TextStyle: secondary(), Mode: gogui.TextModeWrap},
+				gogui.TextCfg{
+					Text:      show.Said,
+					TextStyle: widgets.Secondary(),
+					Mode:      gogui.TextModeWrap,
+				},
 			),
 		)
 	}
@@ -168,7 +172,7 @@ func (a *App) captions(w *gogui.Window, show assistant.Showing) gogui.View {
 		content = append(content, gogui.Column(gogui.ContainerCfg{
 			ID:      "assistant-captions",
 			Sizing:  gogui.FillFit,
-			Color:   color(a.ui.Palette().Background).WithOpacity(0.6),
+			Color:   widgets.Color(a.ui.Palette().Background).WithOpacity(0.6),
 			Radius:  gogui.RadiusLarge,
 			Padding: gogui.PaddingLarge,
 			Spacing: gogui.SpacingSmall,
@@ -208,7 +212,7 @@ func (a *App) privacyMarks(w *gogui.Window) gogui.View {
 	size := markSize(vw, vh)
 	glyph := int(size * 0.30)
 	at := int(size/3) - glyph/2
-	red := color(markRed)
+	red := widgets.Color(markRed)
 
 	corner := func(right bool, icon ui.Icon, key string) []gogui.View {
 		x := float32(0)
