@@ -33,6 +33,8 @@ type silent struct{}
 
 func (silent) Level() int                     { return 0 }
 func (silent) SetLevel(int)                   {}
+func (silent) Mute(bool)                      {}
+func (silent) Muted() bool                    { return false }
 func (silent) Listen(func(int)) (stop func()) { return func() {} }
 
 func fresh(t *testing.T) (*Receiver, *memory) {

@@ -20,6 +20,7 @@ const (
 	priorityAlert = 30
 	flashFrame    = time.Second / 30
 	flashPeriod   = 1400 * time.Millisecond
+	flashDepth    = 0.35
 	bannerLines   = 3
 )
 
@@ -44,6 +45,11 @@ func (a *App) alert(w *gogui.Window) gogui.View {
 	return a.alertBanner(w, m)
 }
 
+func (a *App) alertCovers() bool {
+	_, ok := a.o.Messages.Current()
+	return ok && a.o.Settings().Screen.Alert == schema.AlertFull
+}
+
 func (a *App) alertBanner(w *gogui.Window, m message.Message) gogui.View {
 	t := gogui.CurrentTheme()
 	vw, vh := w.WindowSize()
@@ -60,7 +66,7 @@ func (a *App) alertBanner(w *gogui.Window, m message.Message) gogui.View {
 	if !beside {
 		words = append(words, a.alertKeys(w, m, pal, keySt, reach(), true)...)
 	}
-	content := []gogui.View{edge(a.pulse(w, m, tint, pal.Background, 0.7), t.Cfg.RadiusMedium)}
+	content := []gogui.View{edge(a.pulse(w, m, tint, pal.Background), t.Cfg.RadiusMedium)}
 	content = append(content, messageIcon(m, color(tint), t.TextStyleTitle.Size*1.6)...)
 	content = append(content, gogui.Column(gogui.ContainerCfg{
 		Sizing:  gogui.FillFit,
@@ -111,7 +117,7 @@ func (a *App) alertCard(w *gogui.Window, m message.Message) gogui.View {
 	words = append(words, alertWords(w, m, head, t.TextStyleTitle, 0)...)
 	words = append(words, a.alertKeys(w, m, pal, t.Cfg.TextStyleDef, style.Reach(), true)...)
 
-	content := []gogui.View{edge(a.pulse(w, m, tint, pal.Background, 0.7), t.Cfg.RadiusMedium)}
+	content := []gogui.View{edge(a.pulse(w, m, tint, pal.Background), t.Cfg.RadiusMedium)}
 	content = append(content, icon...)
 	content = append(content, gogui.Column(gogui.ContainerCfg{
 		Sizing:  gogui.FillFit,
@@ -177,7 +183,7 @@ func (a *App) alertFull(w *gogui.Window, m message.Message) gogui.View {
 		Width:       float32(vw),
 		Height:      float32(vh),
 		Sizing:      gogui.FixedFixed,
-		Color:       a.pulse(w, m, tint, deeper, 0.35),
+		Color:       a.pulse(w, m, tint, deeper),
 		Padding:     gogui.PaddingLarge,
 		Spacing:     gogui.SpacingLarge,
 		AmendLayout: a.caught,
@@ -219,7 +225,7 @@ func (a *App) alertToast(w *gogui.Window, m message.Message) gogui.View {
 		words = append(words, gogui.Label(rest, secondary()))
 	}
 
-	top := []gogui.View{edge(a.pulse(w, m, tint, pal.Background, 0.7), bar)}
+	top := []gogui.View{edge(a.pulse(w, m, tint, pal.Background), bar)}
 	top = append(top, icon...)
 	top = append(top, gogui.Column(gogui.ContainerCfg{
 		MaxWidth: max(textRoom, 0),
@@ -261,18 +267,17 @@ func (a *App) alertToast(w *gogui.Window, m message.Message) gogui.View {
 	})
 }
 
-func (a *App) pulse(
-	w *gogui.Window,
-	m message.Message,
-	c, toward theme.Color,
-	depth float64,
-) gogui.Color {
+func (a *App) pulse(w *gogui.Window, m message.Message, c, toward theme.Color) gogui.Color {
 	if !m.Flash {
 		return color(c)
 	}
+	return color(a.flash(w, c, toward))
+}
+
+func (a *App) flash(w *gogui.Window, c, toward theme.Color) theme.Color {
 	a.again(w, flashFrame)
 	at := float64(time.Now().UnixNano()%int64(flashPeriod)) / float64(flashPeriod)
-	return color(c.Blend(toward, depth*(1-math.Cos(2*math.Pi*at))/2))
+	return c.Blend(toward, flashDepth*(1-math.Cos(2*math.Pi*at))/2)
 }
 
 func (a *App) caught(e gogui.EventCtx) {

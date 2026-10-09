@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ygelfand/libcountertop/pkg/audio/tone"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 type callSound struct {
@@ -20,9 +21,8 @@ func (*callSound) Frames() (<-chan []int16, func())          { return nil, func(
 func (s *callSound) Play(pcm []int16)                        { s.played = slices.Clone(pcm) }
 func (s *callSound) Queued() int                             { return s.queued }
 func (*callSound) Claim(string, func(context.Context) error) {}
-func (*callSound) Sounding()                                 {}
 func (s *callSound) Duck(on bool)                            { s.ducked = append(s.ducked, on) }
-func (s *callSound) Chime(float64, ...tone.Note) {
+func (s *callSound) Chime(schema.Stream, float64, ...tone.Note) {
 	s.chimes++
 	s.stop()
 }

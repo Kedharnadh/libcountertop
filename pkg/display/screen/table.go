@@ -143,6 +143,11 @@ func rows(table func() *Table, uiSize func() string) []Setting {
 			func(s *schema.Screen) *schema.AlertStyle { return &s.Alert },
 		),
 		setting.Pick(
+			Setting{Name: "timer", Group: Panel, Icon: "mdi:timer-outline"},
+			schema.TimerStyles(),
+			func(s *schema.Screen) *schema.TimerStyle { return &s.Timer },
+		),
+		setting.Pick(
 			Setting{Name: "keyboard", Group: Panel, Icon: "mdi:keyboard-outline"},
 			schema.KeyboardSizes(),
 			func(s *schema.Screen) *schema.KeyboardSize { return &s.Keyboard },

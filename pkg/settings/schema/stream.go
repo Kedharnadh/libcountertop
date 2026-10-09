@@ -17,7 +17,7 @@ const (
 func (s Stream) Label() string {
 	switch s {
 	case StreamMain:
-		return "Main"
+		return say.T("stream.main")
 	case StreamMedia:
 		return say.T("stream.media")
 	case StreamAlerts:

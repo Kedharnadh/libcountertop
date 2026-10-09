@@ -4,7 +4,6 @@ import (
 	gogui "github.com/go-gui-org/go-gui/gui"
 	"golang.org/x/exp/shiny/materialdesign/icons"
 
-	"github.com/ygelfand/libcountertop/pkg/assistant/timer"
 	"github.com/ygelfand/libcountertop/pkg/assistant/turn"
 	"github.com/ygelfand/libcountertop/pkg/display/assistant"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
@@ -13,78 +12,6 @@ import (
 )
 
 const priorityNotice = 20
-
-func (a *App) timerCard(w *gogui.Window) gogui.View {
-	c := a.o.Timers.Now()
-	if !c.Showing {
-		return nil
-	}
-	t := gogui.CurrentTheme()
-	vw, vh := w.WindowSize()
-	ink := t.Cfg.TextStyleDef.Color
-	glyph := gogui.IconClock
-	if c.Ringing {
-		ink, glyph = t.Cfg.ColorError, gogui.IconBell
-	}
-	big := t.TextStyleTitle
-	big.Color = ink
-
-	line := []gogui.View{
-		gogui.Label(glyph, iconStyle(ink)),
-		gogui.Label(timer.Remaining(c.Left), big),
-	}
-	if c.Name != "" {
-		line = append(line, gogui.Label(c.Name, secondary()))
-	}
-	content := []gogui.View{
-		gogui.Row(
-			gogui.ContainerCfg{
-				Sizing:  gogui.FillFit,
-				VAlign:  gogui.VAlignMiddle,
-				Padding: gogui.NoPadding,
-				Spacing: gogui.SpacingMedium,
-				Content: line,
-			},
-		),
-	}
-	if !c.Ringing && c.Of > 0 {
-		content = append(
-			content,
-			a.ui.Toolkit.ProgressBar(
-				gogui.ProgressBarCfg{
-					Percent: float32(min(max(c.Left.Seconds()/c.Of.Seconds(), 0), 1)),
-					Sizing:  gogui.FillFit,
-				},
-			),
-		)
-	}
-
-	var stop func(gogui.EventCtx)
-	if c.Ringing {
-		stop = func(gogui.EventCtx) { a.o.Timers.Stop() }
-	}
-	card := a.ui.Presses.Pressable(
-		gogui.Column,
-		a.ui.Toolkit.Panel(gogui.ContainerCfg{
-			ID:      "timer",
-			Width:   float32(vw) * 0.84,
-			Sizing:  gogui.FixedFit,
-			Padding: gogui.PaddingMedium,
-			Spacing: gogui.SpacingSmall,
-			Content: content,
-		}),
-		stop,
-	)
-	return gogui.Column(gogui.ContainerCfg{
-		Width:   float32(vw),
-		Height:  float32(vh),
-		Sizing:  gogui.FixedFixed,
-		Padding: gogui.PaddingMedium,
-		HAlign:  gogui.HAlignCenter,
-		VAlign:  gogui.VAlignBottom,
-		Content: []gogui.View{card},
-	})
-}
 
 func (a *App) assistantPanel(w *gogui.Window) gogui.View {
 	show, ok := a.o.Assistant.Now()
@@ -98,7 +25,11 @@ func (a *App) assistantPanel(w *gogui.Window) gogui.View {
 		a.o.Stage.Unstage()
 	}
 	if custom && full {
-		a.o.Stage.Below(ui.Rect{W: vw, H: vh}, show)
+		if a.covered() {
+			a.o.Stage.Unstage()
+		} else {
+			a.o.Stage.Below(ui.Rect{W: vw, H: vh}, show)
+		}
 		return a.captions(w, show)
 	}
 	deep := float32(vh) * 0.26
@@ -264,6 +195,8 @@ func (a *App) fullLook() bool {
 
 const priorityMarks = 100
 
+func markSize(vw, vh int) float32 { return float32(min(vw, vh)) / 11 }
+
 var markRed = theme.Color{R: 0xe0, G: 0x3b, B: 0x2f}
 
 func (a *App) privacyMarks(w *gogui.Window) gogui.View {
@@ -272,7 +205,7 @@ func (a *App) privacyMarks(w *gogui.Window) gogui.View {
 		return nil
 	}
 	vw, vh := w.WindowSize()
-	size := float32(min(vw, vh)) / 11
+	size := markSize(vw, vh)
 	glyph := int(size * 0.30)
 	at := int(size/3) - glyph/2
 	red := color(markRed)

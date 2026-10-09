@@ -394,12 +394,12 @@ func (a *App) Run(ctx context.Context) error {
 	})
 	defer stopMoved()
 	for _, o := range []*navigation.Overlay{
-		{Priority: priorityAlert, Build: a.alert},
-		{Priority: priorityNotice, Build: a.timerCard},
-		{Priority: priorityNotice + 1, Build: a.assistantPanel},
+		{Priority: priorityAlert, Build: a.alert, Covers: a.alertCovers},
+		{Priority: priorityNotice, Build: a.timer, Covers: a.timerCovers},
+		{Priority: priorityNotice + 1, Build: a.assistantPanel, Covered: a.o.Stage.Unstage},
 		{Priority: playerview.PriorityMini, Build: a.player.Mini},
 		{Priority: priorityMarks, Build: a.privacyMarks},
-		{Priority: widgets.UpgradePriority, Build: a.upgradeCard},
+		{Priority: widgets.UpgradePriority, Build: a.upgradeCard, Covers: a.upgradeCovers},
 	} {
 		a.nav.Show(o)
 		defer a.nav.Hide(o)

@@ -6,6 +6,7 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/audio/tone"
 	"github.com/ygelfand/libcountertop/pkg/media/rtc"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 const (
@@ -42,7 +43,7 @@ func ring(ctx context.Context, sound Sound) bool {
 	repeat := time.NewTicker(ringEvery)
 	defer repeat.Stop()
 	for ctx.Err() == nil {
-		sound.Chime(ringLevel, ringTone...)
+		sound.Chime(schema.StreamAlerts, ringLevel, ringTone...)
 		select {
 		case <-ctx.Done():
 			return false
@@ -58,7 +59,7 @@ func ringback(ctx context.Context, sound Sound) {
 	repeat := time.NewTicker(ringbackEvery)
 	defer repeat.Stop()
 	for ctx.Err() == nil {
-		sound.Chime(ringbackLevel, ringbackTone...)
+		sound.Chime(schema.StreamVoice, ringbackLevel, ringbackTone...)
 		select {
 		case <-ctx.Done():
 			return

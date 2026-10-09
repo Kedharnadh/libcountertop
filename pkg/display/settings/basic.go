@@ -362,6 +362,11 @@ func (p *BasicPages) setAlert(v config.AlertStyle) {
 		slog.Error("saving the alert style failed", "err", err)
 	}
 }
+func (p *BasicPages) setTimer(v config.TimerStyle) {
+	if err := p.options.Screen.Set("timer", string(v)); err != nil {
+		slog.Error("saving the timer style failed", "err", err)
+	}
+}
 func (p *BasicPages) setStyle(v string) error { return p.options.Screen.Set("style", v) }
 func (p *BasicPages) setSize(v string) {
 	if err := p.options.Screen.Set("size", v); err != nil {

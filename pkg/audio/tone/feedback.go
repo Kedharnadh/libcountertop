@@ -9,7 +9,10 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
 
-type Player interface{ Chime([]Note) }
+type Player interface {
+	Chime(schema.Stream, []Note)
+}
+
 type Feedback struct {
 	settings storage.Section[schema.Feedback]
 	player   Player
@@ -56,9 +59,15 @@ func (f *Feedback) SetChime(c schema.Chime) {
 	f.Restore()
 }
 func (f *Feedback) Restore() { f.choice.Set(f.Chime().Label()) }
-func (f *Feedback) Preview() { f.Sound(Wake(f.Chime())) }
-func (f *Feedback) Sound(notes []Note) {
+func (f *Feedback) Preview(s schema.Stream) {
+	if s == schema.StreamMain {
+		s = schema.StreamFeedback
+	}
+	f.Play(s, Wake(f.Chime()))
+}
+func (f *Feedback) Sound(notes []Note) { f.Play(schema.StreamFeedback, notes) }
+func (f *Feedback) Play(s schema.Stream, notes []Note) {
 	if !f.Chime().Silent() {
-		f.player.Chime(notes)
+		f.player.Chime(s, notes)
 	}
 }

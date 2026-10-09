@@ -220,16 +220,27 @@ func (t *Timers) finished(e esphome.TimerEvent) {
 	defer t.mu.Unlock()
 
 	delete(t.held, e.TimerID)
+	t.start(t.opts)
+}
+
+func (t *Timers) RingSilently() {
+	t.mu.Lock()
+	t.start(Options{})
+	t.mu.Unlock()
+	t.show()
+}
+
+func (t *Timers) start(sound Options) {
 	if t.stop != nil {
 		return
 	}
 
 	var ctx context.Context
 	ctx, t.stop = context.WithCancel(context.Background())
-	safe.Go("timer alarm", func() { t.ring(ctx) })
+	safe.Go("timer alarm", func() { t.ring(ctx, sound) })
 }
 
-func (t *Timers) ring(ctx context.Context) {
+func (t *Timers) ring(ctx context.Context, sound Options) {
 	defer func() {
 		t.mu.Lock()
 		t.stop = nil
@@ -237,14 +248,14 @@ func (t *Timers) ring(ctx context.Context) {
 		t.show()
 	}()
 
-	if t.opts.Alarm != nil {
-		defer t.opts.Alarm()()
+	if sound.Alarm != nil {
+		defer sound.Alarm()()
 	}
 
 	over := time.After(ringFor)
 	for {
-		if t.opts.Chime != nil {
-			t.opts.Chime()
+		if sound.Chime != nil {
+			sound.Chime()
 		}
 
 		select {

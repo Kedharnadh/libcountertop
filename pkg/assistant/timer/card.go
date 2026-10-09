@@ -22,6 +22,13 @@ func (c Card) key() string {
 	return fmt.Sprintf("%v|%s|%s", c.Ringing, c.Name, Remaining(c.Left))
 }
 
+func (c Card) Share() float64 {
+	if c.Of <= 0 {
+		return 1
+	}
+	return min(max(c.Left.Seconds()/c.Of.Seconds(), 0), 1)
+}
+
 func Remaining(d time.Duration) string {
 	if d < 0 {
 		d = 0

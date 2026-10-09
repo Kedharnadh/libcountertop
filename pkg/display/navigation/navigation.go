@@ -19,6 +19,8 @@ type Screen struct {
 type Overlay struct {
 	Priority int
 	Build    func(*gui.Window) gui.View
+	Covers   func() bool
+	Covered  func()
 }
 type screenEntry struct {
 	once   sync.Once
@@ -73,6 +75,15 @@ func (n *Nav) Showing(stack []shell.View) (covering *Screen, above []*Screen) {
 	}
 	return nil, shown
 }
+func Covering(overlays []*Overlay) int {
+	for i := len(overlays) - 1; i >= 0; i-- {
+		if o := overlays[i]; o.Covers != nil && o.Covers() {
+			return i
+		}
+	}
+	return -1
+}
+
 func (n *Nav) Show(overlay *Overlay) {
 	n.mu.Lock()
 	defer n.mu.Unlock()

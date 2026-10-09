@@ -126,7 +126,7 @@ func (c *Card) selects(stream config.Stream) func() {
 func (c *Card) Shows(s config.Stream) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.held.Held() && c.stream == s
+	return c.held.Held() && (c.open || c.stream == s)
 }
 
 func NewCard(stack *shell.Shell) *Card { return &Card{shell: stack} }

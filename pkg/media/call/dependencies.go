@@ -49,9 +49,8 @@ type Sound interface {
 	rtc.Audio
 	Queued() int
 	Claim(string, func(context.Context) error)
-	Sounding()
 	Duck(bool)
-	Chime(float64, ...tone.Note)
+	Chime(schema.Stream, float64, ...tone.Note)
 }
 
 type Dependencies struct {

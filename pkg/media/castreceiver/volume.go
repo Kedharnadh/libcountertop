@@ -11,6 +11,8 @@ import (
 type Volume interface {
 	Level() int
 	SetLevel(level int)
+	Mute(on bool)
+	Muted() bool
 	Listen(changed func(level int)) (stop func())
 }
 
@@ -20,21 +22,23 @@ type loudness struct {
 	mu  sync.Mutex
 	svc *cast.Service
 
-	wants chan int
+	wants chan wanted
+}
+
+type wanted struct {
+	level int
+	muted bool
 }
 
 func newLoudness(v Volume) *loudness {
-	l := &loudness{volume: v, wants: make(chan int, 1)}
+	l := &loudness{volume: v, wants: make(chan wanted, 1)}
 	safe.Go("cast volume", l.run)
 	v.Listen(l.changed)
 	return l
 }
 
 func (l *loudness) asked(level float64, muted bool) {
-	want := int(math.Round(level * 100))
-	if muted {
-		want = 0
-	}
+	want := wanted{level: int(math.Round(level * 100)), muted: muted}
 
 	select {
 	case <-l.wants:
@@ -45,7 +49,8 @@ func (l *loudness) asked(level float64, muted bool) {
 
 func (l *loudness) run() {
 	for want := range l.wants {
-		l.volume.SetLevel(want)
+		l.volume.SetLevel(want.level)
+		l.volume.Mute(want.muted)
 	}
 }
 
@@ -55,7 +60,7 @@ func (l *loudness) changed(level int) {
 	l.mu.Unlock()
 
 	if svc != nil {
-		svc.Report(float64(level)/100, false)
+		svc.Report(float64(level)/100, l.volume.Muted())
 	}
 }
 
@@ -65,6 +70,6 @@ func (l *loudness) serve(svc *cast.Service) {
 	l.mu.Unlock()
 
 	if svc != nil {
-		svc.Report(float64(l.volume.Level())/100, false)
+		svc.Report(float64(l.volume.Level())/100, l.volume.Muted())
 	}
 }

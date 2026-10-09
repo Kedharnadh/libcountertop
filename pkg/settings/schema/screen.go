@@ -21,6 +21,8 @@ type Screen struct {
 
 	Alert AlertStyle `json:"alert"`
 
+	Timer TimerStyle `json:"timer"`
+
 	Marks bool `json:"marks"`
 
 	Language string `json:"language"`
@@ -46,6 +48,7 @@ func DefaultScreen() Screen {
 		Drawer:    DefaultEdge,
 		Volume:    DefaultEdge,
 		Alert:     DefaultAlertStyle,
+		Timer:     DefaultTimerStyle,
 		Marks:     DefaultMarks,
 	}
 }

@@ -8,13 +8,14 @@ import (
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/audio/tone"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 type fake struct{}
 
-func (*fake) Drain()                      {}
-func (*fake) Queued() int                 { return 0 }
-func (*fake) Chime(float64, ...tone.Note) {}
+func (*fake) Drain()                                     {}
+func (*fake) Queued() int                                { return 0 }
+func (*fake) Chime(schema.Stream, float64, ...tone.Note) {}
 
 func driver() *Driver[*fake] { return NewDriver(&fake{}) }
 

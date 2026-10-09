@@ -7,6 +7,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/audio/sound"
 	"github.com/ygelfand/libcountertop/pkg/audio/tone"
 	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 type (
@@ -24,13 +25,13 @@ const (
 
 type speaker struct{}
 
-func (*speaker) Play([]int16)                {}
-func (*speaker) Take() []int16               { return nil }
-func (*speaker) Adjust(func([]int16))        {}
-func (*speaker) Drain()                      {}
-func (*speaker) Queued() int                 { return 0 }
-func (*speaker) Chime(float64, ...tone.Note) {}
-func (*speaker) PlayVoice([]int16)           {}
+func (*speaker) Play([]int16)                               {}
+func (*speaker) Take() []int16                              { return nil }
+func (*speaker) Adjust(func([]int16))                       {}
+func (*speaker) Drain()                                     {}
+func (*speaker) Queued() int                                { return 0 }
+func (*speaker) Chime(schema.Stream, float64, ...tone.Note) {}
+func (*speaker) PlayVoice([]int16)                          {}
 
 type volume struct{}
 

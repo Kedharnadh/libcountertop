@@ -1,0 +1,129 @@
+package mix
+
+import (
+	"slices"
+	"testing"
+
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
+)
+
+func TestBusScalesEachStreamByItsOwnGain(t *testing.T) {
+	var b Bus
+	b.SetGain(schema.StreamMedia, 0.5)
+	b.SetGain(schema.StreamVoice, 0.25)
+	b.Push(schema.StreamMedia, []int16{1000, 1000})
+	b.Push(schema.StreamVoice, []int16{400, 400})
+
+	out := make([]int32, 2)
+	queued, rendered := b.Next(0, out)
+
+	if want := []int32{600, 600}; !slices.Equal(out, want) {
+		t.Errorf("mixed %v, want %v", out, want)
+	}
+	if queued != 2 || rendered {
+		t.Errorf("queued %d rendered %t, want 2 and false", queued, rendered)
+	}
+}
+
+func TestBusAppliesAGainChangeToWhatIsAlreadyQueued(t *testing.T) {
+	var b Bus
+	b.Push(schema.StreamMedia, []int16{1000, 1000, 1000, 1000})
+
+	out := make([]int32, 2)
+	b.Next(0, out)
+	b.SetGain(schema.StreamMedia, 0.5)
+	b.Next(0, out)
+
+	if want := []int32{500, 500}; !slices.Equal(out, want) {
+		t.Errorf("after the change %v, want %v", out, want)
+	}
+}
+
+func TestBusMuteSilencesOneStreamAndKeepsItsGain(t *testing.T) {
+	var b Bus
+	b.SetGain(schema.StreamMedia, 0.5)
+	b.Mute(schema.StreamMedia, true)
+	b.Push(schema.StreamMedia, []int16{1000, 1000})
+	b.Push(schema.StreamFeedback, []int16{100, 100})
+
+	out := make([]int32, 2)
+	b.Next(0, out)
+	if want := []int32{100, 100}; !slices.Equal(out, want) {
+		t.Errorf("muted mix %v, want %v", out, want)
+	}
+	if !b.Muted(schema.StreamMedia) || b.Muted(schema.StreamFeedback) {
+		t.Error("mute reached the wrong stream")
+	}
+
+	b.Mute(schema.StreamMedia, false)
+	if got := b.Gain(schema.StreamMedia); got != 0.5 {
+		t.Errorf("unmuted gain %v, want 0.5", got)
+	}
+}
+
+func TestBusTakeReturnsSamplesUnscaled(t *testing.T) {
+	var b Bus
+	b.SetGain(schema.StreamMedia, 0.5)
+	b.Push(schema.StreamMedia, []int16{1000, 1000})
+
+	kept := b.Take(schema.StreamMedia)
+	b.Push(schema.StreamMedia, kept)
+
+	out := make([]int32, 2)
+	b.Next(0, out)
+	if want := []int32{500, 500}; !slices.Equal(out, want) {
+		t.Errorf("replayed %v, want %v once scaled", out, want)
+	}
+}
+
+func TestBusTakeLeavesOtherStreams(t *testing.T) {
+	var b Bus
+	b.Push(schema.StreamMedia, []int16{1, 2})
+	b.Push(schema.StreamAlerts, []int16{3, 4, 5})
+
+	if got := b.Take(schema.StreamMedia); !slices.Equal(got, []int16{1, 2}) {
+		t.Errorf("took %v", got)
+	}
+	if got := b.Len(); got != 3 {
+		t.Errorf("len %d, want the alerts still queued", got)
+	}
+	b.Clear()
+	if got := b.Len(); got != 0 {
+		t.Errorf("len %d after clear", got)
+	}
+}
+
+type steady int16
+
+func (s steady) Render(_ uint64, out []int16) {
+	for i := range out {
+		out[i] = int16(s)
+	}
+}
+
+func TestBusScalesTheAttachedSourceAsMedia(t *testing.T) {
+	var b Bus
+	b.SetGain(schema.StreamMedia, 0.5)
+	b.Attach(steady(800))
+
+	out := make([]int32, 2)
+	queued, rendered := b.Next(0, out)
+	if want := []int32{400, 400}; !slices.Equal(out, want) {
+		t.Errorf("rendered %v, want %v", out, want)
+	}
+	if queued != 0 || !rendered {
+		t.Errorf("queued %d rendered %t, want 0 and true", queued, rendered)
+	}
+}
+
+func TestBusOverlayMixesWithinOneStream(t *testing.T) {
+	var b Bus
+	b.Push(schema.StreamFeedback, []int16{10, 10})
+	b.Overlay(schema.StreamFeedback, []int16{5, 5, 5})
+
+	out := make([]int32, 3)
+	b.Next(0, out)
+	if want := []int32{15, 15, 5}; !slices.Equal(out, want) {
+		t.Errorf("overlaid %v, want %v", out, want)
+	}
+}

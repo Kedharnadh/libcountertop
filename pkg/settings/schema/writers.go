@@ -347,6 +347,10 @@ func (w ScreenWriter) Alert(v AlertStyle) error {
 	return w.s.Update(func(c *Screen) { c.Alert = v })
 }
 
+func (w ScreenWriter) Timer(v TimerStyle) error {
+	return w.s.Update(func(c *Screen) { c.Timer = v })
+}
+
 func (w ScreenWriter) Language(v string) error {
 	return w.s.Update(func(c *Screen) { c.Language = v })
 }

@@ -418,7 +418,6 @@ func (c *Calls) talking(s *session) {
 	c.mu.Unlock()
 	slog.Info("call connected", "peer", s.Peer.Name, "video", s.Video)
 	c.options.Media.Pause()
-	c.options.Sound.Sounding()
 	c.options.Sound.Claim("call", func(ctx context.Context) error {
 		select {
 		case <-ctx.Done():

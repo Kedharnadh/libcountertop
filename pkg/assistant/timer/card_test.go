@@ -57,3 +57,21 @@ func TestRingingIsNotTheSameFrameAsCountingDown(t *testing.T) {
 		t.Error("a ringing timer draws the same as one still counting")
 	}
 }
+
+func TestTheShareLeftRunsFromFullToEmpty(t *testing.T) {
+	for _, tc := range []struct {
+		left, of time.Duration
+		want     float64
+	}{
+		{time.Minute, time.Minute, 1},
+		{30 * time.Second, time.Minute, 0.5},
+		{0, time.Minute, 0},
+		{-time.Second, time.Minute, 0},
+		{2 * time.Minute, time.Minute, 1},
+		{time.Minute, 0, 1},
+	} {
+		if got := (Card{Left: tc.left, Of: tc.of}).Share(); got != tc.want {
+			t.Errorf("%v of %v leaves %v, want %v", tc.left, tc.of, got, tc.want)
+		}
+	}
+}

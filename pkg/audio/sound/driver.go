@@ -7,12 +7,13 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/audio/background"
 	"github.com/ygelfand/libcountertop/pkg/audio/tone"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 type Player interface {
 	Drain()
 	Queued() int
-	Chime(level float64, notes ...tone.Note)
+	Chime(s schema.Stream, level float64, notes ...tone.Note)
 }
 
 type Background interface {
@@ -80,11 +81,11 @@ func (d *Driver[P]) Claim(name string, play func(ctx context.Context, p P) error
 
 func (d *Driver[P]) Interject(play func(p P)) { play(d.p) }
 
-func (d *Driver[P]) Chime(notes []tone.Note) {
+func (d *Driver[P]) Chime(s schema.Stream, notes []tone.Note) {
 	if d == nil || len(notes) == 0 {
 		return
 	}
-	d.Interject(func(p P) { p.Chime(tone.Level, notes...) })
+	d.Interject(func(p P) { p.Chime(s, tone.Level, notes...) })
 }
 
 func (d *Driver[P]) Silence() {

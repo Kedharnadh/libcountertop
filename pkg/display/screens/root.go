@@ -9,6 +9,7 @@ import (
 	face "github.com/ygelfand/libcountertop/pkg/display/clockface"
 	"github.com/ygelfand/libcountertop/pkg/display/clockview"
 	"github.com/ygelfand/libcountertop/pkg/display/dashboard"
+	"github.com/ygelfand/libcountertop/pkg/display/navigation"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
@@ -17,41 +18,27 @@ import (
 
 func (a *App) root(w *gogui.Window) gogui.View {
 	covering, above := a.nav.Showing(a.o.Shell.Views())
-	if a.fullLook() || a.o.Stage.StagedFull() {
-		a.seeThrough(true)
-		layers := []gogui.View{
-			gogui.Column(gogui.ContainerCfg{Sizing: gogui.FillFill, Padding: gogui.NoPadding}),
-		}
-		for _, o := range a.nav.Overlays() {
-			if v := o.Build(w); v != nil {
-				layers = append(layers, widgets.Floating(o.Priority+1, v))
+	overlays := a.nav.Overlays()
+	if top := navigation.Covering(overlays); top >= 0 {
+		for _, o := range overlays[:top] {
+			if o.Covered != nil {
+				o.Covered()
 			}
 		}
-		return gogui.Column(
-			gogui.ContainerCfg{Sizing: gogui.FillFill, Padding: gogui.NoPadding, Content: layers},
-		)
+		a.seeThrough(false)
+		pause(covering)
+		return stack(overlaid(w, []gogui.View{blank()}, overlays[top:]))
+	}
+	if a.fullLook() || a.o.Stage.StagedFull() {
+		a.seeThrough(true)
+		return stack(overlaid(w, []gogui.View{blank()}, overlays))
 	}
 	a.seeThrough(covering != nil && covering.Clear)
-	base := a.dashboard(w)
-	if addr := a.o.Offering(); addr != "" {
-		base = a.onboard(w, addr)
-	}
-	switch {
-	case covering == nil:
-	case covering.Title == "":
-		base = covering.Build(w)
-	default:
-		base = a.page(w, covering)
-	}
-	layers := []gogui.View{base}
+	layers := []gogui.View{a.base(w, covering)}
 	for _, s := range above {
 		layers = append(layers, widgets.Floating(0, s.Build(w)))
 	}
-	for _, o := range a.nav.Overlays() {
-		if v := o.Build(w); v != nil {
-			layers = append(layers, widgets.Floating(o.Priority+1, v))
-		}
-	}
+	layers = overlaid(w, layers, overlays)
 	if a.ui.Editor.Typing(w) {
 		if v := a.keyboard(w); v != nil {
 			layers = append(
@@ -68,6 +55,52 @@ func (a *App) root(w *gogui.Window) gogui.View {
 			)
 		}
 	}
+	return stack(layers)
+}
+
+func (a *App) base(w *gogui.Window, covering *Screen) gogui.View {
+	switch {
+	case covering == nil:
+	case covering.Title == "":
+		return covering.Build(w)
+	default:
+		return a.page(w, covering)
+	}
+	if addr := a.o.Offering(); addr != "" {
+		return a.onboard(w, addr)
+	}
+	return a.dashboard(w)
+}
+
+func overlaid(
+	w *gogui.Window,
+	layers []gogui.View,
+	overlays []*navigation.Overlay,
+) []gogui.View {
+	for _, o := range overlays {
+		if v := o.Build(w); v != nil {
+			layers = append(layers, widgets.Floating(o.Priority+1, v))
+		}
+	}
+	return layers
+}
+
+func (a *App) covered() bool { return navigation.Covering(a.nav.Overlays()) >= 0 }
+
+func pause(s *Screen) {
+	if s == nil || !s.Clear {
+		return
+	}
+	if c, ok := s.View.(interface{ Close() }); ok {
+		c.Close()
+	}
+}
+
+func blank() gogui.View {
+	return gogui.Column(gogui.ContainerCfg{Sizing: gogui.FillFill, Padding: gogui.NoPadding})
+}
+
+func stack(layers []gogui.View) gogui.View {
 	return gogui.Column(
 		gogui.ContainerCfg{Sizing: gogui.FillFill, Padding: gogui.NoPadding, Content: layers},
 	)

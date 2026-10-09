@@ -60,6 +60,83 @@ const glyphFS = `
     }
 `
 
+const gradientFS = `
+    #version 330
+    uniform mat4 tm2;
+    in vec2 uv;
+    in vec4 color;
+    in float params;
+    in vec4 stop12;
+    in vec4 stop34;
+    in vec4 axis;
+    in vec4 meta;
+    out vec4 frag_color;
+
+    vec4 stop(float packed, float rest, out float at) {
+        at = floor(rest / 256.0) / 10000.0;
+        return vec4(
+            mod(packed, 256.0),
+            mod(floor(packed / 256.0), 256.0),
+            floor(packed / 65536.0),
+            mod(rest, 256.0)) / 255.0;
+    }
+
+    void blend(inout vec4 pre, float t, float from, float at, vec4 c, bool live) {
+        float f = clamp((t - from) / max(at - from, 0.0001), 0.0, 1.0);
+        vec4 next = vec4(c.rgb * c.a, c.a);
+        pre = live ? mix(pre, next, f) : pre;
+    }
+
+    void main() {
+        float radius = floor(params / 4096.0) / 4.0;
+        vec2 half_size = meta.xy;
+        int n = int(meta.w);
+        vec2 pos = uv * half_size;
+
+        float t = meta.z > 0.5 ? length(pos) / axis.w : dot(uv, axis.zw) * 0.5 + 0.5;
+        t = clamp(t, 0.0, 1.0);
+
+        float p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11;
+        vec4 c0 = stop(stop12.x, stop12.y, p0);
+        vec4 c1 = stop(stop12.z, stop12.w, p1);
+        vec4 c2 = stop(stop34.x, stop34.y, p2);
+        vec4 c3 = stop(stop34.z, stop34.w, p3);
+        vec4 c4 = stop(tm2[0].x, tm2[0].y, p4);
+        vec4 c5 = stop(tm2[0].z, tm2[0].w, p5);
+        vec4 c6 = stop(tm2[1].x, tm2[1].y, p6);
+        vec4 c7 = stop(tm2[1].z, tm2[1].w, p7);
+        vec4 c8 = stop(tm2[2].x, tm2[2].y, p8);
+        vec4 c9 = stop(tm2[2].z, tm2[2].w, p9);
+        vec4 c10 = stop(tm2[3].x, tm2[3].y, p10);
+        vec4 c11 = stop(tm2[3].z, tm2[3].w, p11);
+
+        vec4 pre = vec4(c0.rgb * c0.a, c0.a);
+        blend(pre, t, p0, p1, c1, n > 1);
+        blend(pre, t, p1, p2, c2, n > 2);
+        blend(pre, t, p2, p3, c3, n > 3);
+        blend(pre, t, p3, p4, c4, n > 4);
+        blend(pre, t, p4, p5, c5, n > 5);
+        blend(pre, t, p5, p6, c6, n > 6);
+        blend(pre, t, p6, p7, c7, n > 7);
+        blend(pre, t, p7, p8, c8, n > 8);
+        blend(pre, t, p8, p9, c9, n > 9);
+        blend(pre, t, p9, p10, c10, n > 10);
+        blend(pre, t, p10, p11, c11, n > 11);
+
+        vec3 rgb = pre.rgb / max(pre.a, 0.0001);
+        rgb += (fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5) / 255.0;
+
+        float alpha = color.a * pre.a;
+        if (radius > 0.0) {
+            vec2 q = abs(pos) - half_size + vec2(radius);
+            float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
+            d = d / max(length(vec2(dFdx(d), dFdy(d))), 0.001);
+            alpha *= 1.0 - smoothstep(-0.59, 0.59, d);
+        }
+        frag_color = vec4(rgb, alpha);
+    }
+`
+
 type Stats struct {
 	Quads, Runs, Bytes int
 	Layout, Encode     time.Duration
@@ -116,7 +193,7 @@ func New(sink Sink, w *gui.Window) (*Renderer, error) {
 	if err := sink.Program(slotShadow, shader.VsShadowGLSL, shader.FsShadowGLSL); err != nil {
 		return nil, err
 	}
-	if err := sink.Program(slotGradient, shader.VsGradientGLSL, shader.FsGradientGLSL); err != nil {
+	if err := sink.Program(slotGradient, shader.VsGradientGLSL, gradientFS); err != nil {
 		return nil, err
 	}
 	if err := sink.Program(slotImage, shader.VsGLSL, shader.FsImageClipGLSL); err != nil {
@@ -310,10 +387,58 @@ func (r *Renderer) gradient(c *gui.RenderCmd) {
 	if len(stops) == 0 {
 		return
 	}
+	if r.banded(c, stops) {
+		return
+	}
 	tm, tm2 := packGradientUniforms(c.Gradient, stops, c.W, c.H)
 	r.runWith(slotGradient, 0, &tm, &tm2)
 	v := buildQuad(c.X, c.Y, c.W, c.H, gui.White, c.Radius, 0)
 	r.push(&v)
+}
+
+func (r *Renderer) banded(c *gui.RenderCmd, stops []gui.GradientStop) bool {
+	dx, dy := gui.GradientDir(c.Gradient, c.W, c.H)
+	if c.Radius > 0 || c.Gradient.Type != gui.GradientLinear {
+		return false
+	}
+	vertical := abs32(dx) < 1e-3 && abs32(abs32(dy)-1) < 1e-3
+	horizontal := abs32(dy) < 1e-3 && abs32(abs32(dx)-1) < 1e-3
+	if !vertical && !horizontal {
+		return false
+	}
+	for i := 1; i < len(stops); i++ {
+		if stops[i].Pos > stops[i-1].Pos && stops[i].Color != stops[i-1].Color {
+			return false
+		}
+	}
+	band := func(from, to float32, col gui.Color) {
+		if to <= from {
+			return
+		}
+		reversed := (vertical && dy < 0) || (horizontal && dx < 0)
+		if reversed {
+			from, to = 1-to, 1-from
+		}
+		if vertical {
+			r.quad(c.X, c.Y+from*c.H, c.W, (to-from)*c.H, col, 0, 0)
+			return
+		}
+		r.quad(c.X+from*c.W, c.Y, (to-from)*c.W, c.H, col, 0, 0)
+	}
+	band(0, stops[0].Pos, stops[0].Color)
+	for i := 1; i < len(stops); i++ {
+		band(stops[i-1].Pos, stops[i].Pos, stops[i-1].Color)
+	}
+	last := stops[len(stops)-1]
+	band(last.Pos, 1, last.Color)
+	return true
+}
+
+func abs32(v float32) float32 {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
 
 func (r *Renderer) imageID() uint32 {

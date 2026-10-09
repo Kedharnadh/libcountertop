@@ -236,6 +236,7 @@ display.presence: Sensors
 display.size: Size
 display.style: Style
 display.theme: Theme
+display.timer: Timer style
 display.title: Display
 edge.bottom: Bottom
 edge.left: Left
@@ -459,6 +460,7 @@ screen.setting.marks: Privacy marks
 screen.setting.size: Size
 screen.setting.style: Style
 screen.setting.theme: Theme
+screen.setting.timer: Timer style
 sendspin.group.sendspin: Sendspin
 sendspin.setting.on: Sendspin
 settings.about: About
@@ -481,6 +483,7 @@ size.nano: Nano
 size.small: Small
 sound.alerts: Alarm volume
 sound.feedback: System sounds
+sound.main: Main volume
 sound.media: Media volume
 sound.voice: Assistant volume
 source.both: Microphone and speaker
@@ -488,6 +491,7 @@ source.mic: Microphone
 source.speaker: Speaker
 stream.alerts: Alerts
 stream.feedback: Feedback
+stream.main: Main
 stream.media: Media
 stream.voice: Voice
 style.eink: E-ink
@@ -655,6 +659,13 @@ tessera.weather.none: No forecast
 tessera.weather.wind: "Wind {{.W}}"
 theme.default: Default
 theme.title: Theme
+timer.stop: Stop
+timerstyle.banner: Banner
+timerstyle.bar: Bar
+timerstyle.corner: Corner
+timerstyle.dial: Dial
+timerstyle.face: Clock face
+timerstyle.full: Full screen
 tone.alert: Alert
 tone.info: Info
 tone.success: Success

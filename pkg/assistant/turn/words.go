@@ -8,7 +8,10 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
 
-type Chimes interface{ Chime([]tone.Note) }
+type Chimes interface {
+	Chime(schema.Stream, []tone.Note)
+}
+
 type Words struct {
 	Settings storage.Section[schema.Wake]
 	Speaker  Chimes
@@ -35,5 +38,5 @@ func (w Words) Tones(slot int) bool      { return !w.Settings.Read().Slot(slot).
 func (w Words) Chime(
 	slot int,
 ) {
-	w.Speaker.Chime(tone.Wake(w.Settings.Read().Slot(slot).Tone))
+	w.Speaker.Chime(schema.StreamFeedback, tone.Wake(w.Settings.Read().Slot(slot).Tone))
 }

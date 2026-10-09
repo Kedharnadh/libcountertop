@@ -60,6 +60,11 @@ func (p *BasicPages) Display() *shell.Page {
 				SegmentRow(say.T("controls.volume"), config.Sides(), cfg.Screen.Volume),
 				SegmentRow(say.T("display.alerts"), config.AlertStyles(), cfg.Screen.Alert),
 				{
+					Label: say.T("display.timer"),
+					Kind:  menu.Chevron,
+					Value: cfg.Screen.Timer.Label(),
+				},
+				{
 					Glyph: gogui.IconEye,
 					Label: say.T("display.marks"),
 					Kind:  menu.Toggle,
@@ -77,6 +82,15 @@ func (p *BasicPages) Display() *shell.Page {
 				SegmentPick(config.Edges(), p.options.Screen.SetDrawer),
 				SegmentPick(config.Sides(), p.setVolumeEdge),
 				SegmentPick(config.AlertStyles(), p.setAlert),
+				p.open(func() shell.View {
+					return Choose(
+						say.T("display.timer"),
+						config.TimerStyles(),
+						func() config.TimerStyle { return p.state().Screen.Timer },
+						p.setTimer,
+						nil,
+					)
+				}),
 				func(int) { p.options.Privacy.SetMarks(!cfg.Screen.Marks) },
 			}
 			return rows, acts

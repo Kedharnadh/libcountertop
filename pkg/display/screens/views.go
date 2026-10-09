@@ -165,6 +165,8 @@ func (a *App) upgradeCard(w *gogui.Window) gogui.View {
 	)
 }
 
+func (a *App) upgradeCovers() bool { return a.o.Upgrade().Active }
+
 func (a *App) logo() image.Image {
 	if theme.Dark(a.ui.Palette().Background) {
 		return a.o.Night()

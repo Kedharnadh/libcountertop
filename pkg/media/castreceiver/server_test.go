@@ -11,6 +11,7 @@ import (
 type fakeVolume struct {
 	mu     sync.Mutex
 	level  int
+	muted  bool
 	listen []func(int)
 	set    chan int
 }
@@ -23,9 +24,22 @@ func (v *fakeVolume) Level() int {
 
 func (v *fakeVolume) SetLevel(level int) {
 	v.mu.Lock()
+	defer v.mu.Unlock()
 	v.level = level
+}
+
+func (v *fakeVolume) Mute(on bool) {
+	v.mu.Lock()
+	v.muted = on
+	level := v.level
 	v.mu.Unlock()
 	v.set <- level
+}
+
+func (v *fakeVolume) Muted() bool {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.muted
 }
 
 func (v *fakeVolume) Listen(f func(int)) func() {
@@ -89,8 +103,13 @@ func TestASenderVolumeReachesTheDevice(t *testing.T) {
 		t.Errorf("the level is %d, want 42", got)
 	}
 	l.asked(0.42, true)
-	if got := <-v.set; got != 0 {
-		t.Errorf("a muted level is %d, want 0", got)
+	if got := <-v.set; got != 42 || !v.Muted() {
+		t.Errorf("muted at %d, want 42 kept and muted", got)
+	}
+	l.asked(0.42, false)
+	<-v.set
+	if v.Muted() {
+		t.Error("unmuting left the device muted")
 	}
 }
 

@@ -235,3 +235,23 @@ func TestTheAlarmIsReleasedWhenTheRingingStops(t *testing.T) {
 	}
 	t.Error("the alarm was never released")
 }
+
+func TestASilentRingShowsWithoutTheAlarm(t *testing.T) {
+	var sounded atomic.Bool
+	ts := New(Options{
+		Alarm: func() func() { sounded.Store(true); return func() {} },
+		Chime: func() { sounded.Store(true) },
+	})
+
+	ts.RingSilently()
+	if !ts.Now().Ringing {
+		t.Fatal("not ringing")
+	}
+	time.Sleep(20 * time.Millisecond)
+	if !ts.Stop() {
+		t.Error("Stop reported nothing to stop")
+	}
+	if sounded.Load() {
+		t.Error("a silent ring sounded the alarm")
+	}
+}
