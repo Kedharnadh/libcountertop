@@ -40,6 +40,9 @@ typedef struct {
 typedef struct {
 	ANativeWindow *win;
 	int w, h;
+	int ww, wh;
+	int turned;
+	float turn[6];
 	pthread_t th;
 	int started;
 	pthread_mutex_t mu;
@@ -62,7 +65,7 @@ typedef struct {
 	int read_want, read_done, read_ok;
 } glview;
 
-int gl_open(glview *g, ANativeWindow *win, int w, int h);
+int gl_open(glview *g, ANativeWindow *win, int w, int h, int ww, int wh, const float *turn);
 void gl_texture(glview *g, int unit, int w, int h, const uint8_t *pix);
 int gl_program(glview *g, const char *src, int len, int flags);
 void gl_values(glview *g, const float *u, int n, gl_glow glow);

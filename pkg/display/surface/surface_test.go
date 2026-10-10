@@ -245,11 +245,18 @@ func TestGLOpsCarryTheirPayloads(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer c.Close()
-	if err := c.GLOpen(4, 300, 200, -3); err != nil {
+	if err := c.GLOpen(4, 300, 200, -3, Turn{}); err != nil {
 		t.Fatal(err)
 	}
 	if w := <-f.gl; len(w) != 4 || w[0] != 4 || w[1] != 300 || int32(w[3]) != -3 {
 		t.Errorf("open %v", w)
+	}
+	if err := c.GLOpen(5, 300, 200, -3, Turn{W: 200, H: 300, B: -1, C: 300, D: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if w := <-f.gl; len(w) != 12 || w[4] != 200 || w[5] != 300 ||
+		math.Float32frombits(w[8]) != 300 {
+		t.Errorf("turned open %v", w)
 	}
 	if err := c.GLTexture(4, 1, 2, 1, []byte{1, 2, 3, 4, 5, 6, 7, 8}); err != nil {
 		t.Fatal(err)

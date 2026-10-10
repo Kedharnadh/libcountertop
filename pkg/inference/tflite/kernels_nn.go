@@ -36,11 +36,48 @@ func conv2D(o *OpDesc, in, out []*Tensor) error {
 	}
 
 	xd, wd, yd := x.F32, w.F32, y.F32
+	fs := kh * kw * ic
 	yi := 0
 	for b := 0; b < batch; b++ {
 		for oy := 0; oy < oh; oy++ {
 			for ox := 0; ox < ow; ox++ {
-				for f := 0; f < oc; f++ {
+				f := 0
+				for ; ic > 1 && f+4 <= oc; f += 4 {
+					var acc [4]float32
+					if bias != nil {
+						copy(acc[:], bias[f:f+4])
+					}
+					for ky := 0; ky < kh; ky++ {
+						iy := oy*p.strideH - padH + ky*p.dilationH
+						if iy < 0 || iy >= ih {
+							continue
+						}
+						for kx := 0; kx < kw; kx++ {
+							ix := ox*p.strideW - padW + kx*p.dilationW
+							if ix < 0 || ix >= iw {
+								continue
+							}
+							xo := ((b*ih+iy)*iw + ix) * ic
+							wo := ((f*kh+ky)*kw + kx) * ic
+							s := vec.Dot4(
+								xd[xo:xo+ic],
+								wd[wo:wo+ic],
+								wd[wo+fs:wo+fs+ic],
+								wd[wo+2*fs:wo+2*fs+ic],
+								wd[wo+3*fs:wo+3*fs+ic],
+							)
+							acc[0] += s[0]
+							acc[1] += s[1]
+							acc[2] += s[2]
+							acc[3] += s[3]
+						}
+					}
+					for _, a := range acc {
+						yd[yi] = activate(a, p.act)
+						yi++
+					}
+				}
+				for ; f < oc; f++ {
 					var acc float32
 					if bias != nil {
 						acc = bias[f]

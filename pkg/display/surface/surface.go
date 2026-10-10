@@ -125,6 +125,12 @@ type Played struct {
 
 type Matrix struct{ DsDx, DtDx, DtDy, DsDy float32 }
 
+// Turn draws a GL layer into a W×H window: a window pixel (x, y) shows the layer at (A·x+B·y+C, D·x+E·y+F).
+type Turn struct {
+	W, H             int
+	A, B, C, D, E, F float32
+}
+
 const (
 	Opaque = 1 << iota
 	Secure
@@ -733,10 +739,17 @@ func (c *Client) pairStatus(op uint32) error {
 	return nil
 }
 
-func (c *Client) GLOpen(id uint32, w, h, z int) error {
+func (c *Client) GLOpen(id uint32, w, h, z int, t Turn) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if err := c.send(opGLOpen, id, uint32(w), uint32(h), uint32(z)); err != nil {
+	words := []uint32{id, uint32(w), uint32(h), uint32(z)}
+	if t.W > 0 && t.H > 0 {
+		words = append(words, uint32(t.W), uint32(t.H))
+		for _, v := range []float32{t.A, t.B, t.C, t.D, t.E, t.F} {
+			words = append(words, math.Float32bits(v))
+		}
+	}
+	if err := c.send(opGLOpen, words...); err != nil {
 		return err
 	}
 	ans, _, err := c.recv(opGLOpen)

@@ -40,6 +40,32 @@ type Layer struct {
 	id     uint32
 	z      int
 	W, H   int
+	turn   surface.Turn
+}
+
+func turnFor(o geometry.Orientation, w, h int) surface.Turn {
+	if o == geometry.Rotate0 {
+		return surface.Turn{}
+	}
+	ww, wh := o.Size(w, h)
+	x0, y0, m, _ := o.Place(ww, wh, geometry.Rect{W: w, H: h}, w, h)
+	t := surface.Turn{W: ww, H: wh, A: m.DsDx, B: m.DtDx, D: m.DtDy, E: m.DsDy}
+	t.C = -(t.A*x0 + t.B*y0)
+	t.F = -(t.D*x0 + t.E*y0)
+	return t
+}
+
+func (l *Layer) placed(x, y float32, m surface.Matrix) (float32, float32, surface.Matrix) {
+	t := l.turn
+	if t.W == 0 {
+		return x, y, m
+	}
+	return x + m.DsDx*t.C + m.DtDy*t.F, y + m.DtDx*t.C + m.DsDy*t.F, surface.Matrix{
+		DsDx: m.DsDx*t.A + m.DtDy*t.D,
+		DtDy: m.DsDx*t.B + m.DtDy*t.E,
+		DtDx: m.DtDx*t.A + m.DsDy*t.D,
+		DsDy: m.DtDx*t.B + m.DsDy*t.E,
+	}
 }
 
 func (r *Renderer) Open(w, h int) (*Layer, error) { return r.OpenAt(w, h, z) }
@@ -50,13 +76,14 @@ func (r *Renderer) OpenAt(w, h, depth int) (*Layer, error) {
 		return nil, ErrNoHelper
 	}
 	id := 2000 + r.ids.Add(1)
-	if err := c.GLOpen(id, w, h, depth); err != nil {
+	t := turnFor(r.display.Orientation(), w, h)
+	if err := c.GLOpen(id, w, h, depth, t); err != nil {
 		if c.Err() != nil {
 			return nil, ErrNoHelper
 		}
 		return nil, err
 	}
-	return &Layer{owner: r, c: c, id: id, z: depth, W: w, H: h}, nil
+	return &Layer{owner: r, c: c, id: id, z: depth, W: w, H: h, turn: t}, nil
 }
 
 func (r *Renderer) OpenOffscreen(w, h int) (*Layer, error) {
@@ -170,7 +197,7 @@ func (l *Layer) Quads(q []visual.Quad) error {
 }
 
 func (l *Layer) Place(at ui.Rect) error {
-	x, y, m := l.owner.place(at, l.W, l.H)
+	x, y, m := l.placed(l.owner.place(at, l.W, l.H))
 	return l.c.VideoPlace(l.id, x, y, m, l.z, true)
 }
 

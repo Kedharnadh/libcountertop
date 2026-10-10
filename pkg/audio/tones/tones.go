@@ -125,12 +125,10 @@ func (s *Store) Actions() []*esphome.Action {
 						c.Int("page"),
 					)
 				}
-				return nil, s.Write(
-					c.String("key"),
-					c.String("name"),
-					c.Int("page"),
-					c.Int("pages"),
-					data,
+				key := c.String("key")
+				return done(
+					key,
+					s.Write(key, c.String("name"), c.Int("page"), c.Int("pages"), data),
 				)
 			},
 		},
@@ -142,7 +140,8 @@ func (s *Store) Actions() []*esphome.Action {
 			},
 			Answers: true,
 			Run: func(c esphome.Call) (any, error) {
-				return nil, s.Rename(c.String("key"), c.String("name"))
+				key := c.String("key")
+				return done(key, s.Rename(key, c.String("name")))
 			},
 		},
 		{
@@ -150,10 +149,19 @@ func (s *Store) Actions() []*esphome.Action {
 			Args:    []esphome.Arg{{Name: "key", Type: esphome.ArgString}},
 			Answers: true,
 			Run: func(c esphome.Call) (any, error) {
-				return nil, s.Remove(c.String("key"))
+				key := c.String("key")
+				return done(key, s.Remove(key))
 			},
 		},
 	}
+}
+
+// Home Assistant fails a return_response call whose answer is not a JSON object.
+func done(key string, err error) (any, error) {
+	if err != nil {
+		return nil, err
+	}
+	return map[string]string{"key": key}, nil
 }
 
 func (s *Store) Write(key, name string, page, pages int, data []byte) error {

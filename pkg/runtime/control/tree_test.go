@@ -129,7 +129,7 @@ func TestGroupHelpListsItsCommands(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if device.Short != "device: state, version, wait" {
+	if device.Short != "device: profile, state, version, wait" {
 		t.Errorf("device group summary = %q", device.Short)
 	}
 	if _, _, err := root.Find([]string{"input"}); err == nil {

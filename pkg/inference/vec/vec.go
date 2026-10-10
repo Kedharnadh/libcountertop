@@ -17,6 +17,17 @@ func dotGo(a, b []float32) float32 {
 	return s
 }
 
+func dot4Go(out *[4]float32, x, w0, w1, w2, w3 []float32) {
+	n := len(x)
+	w0, w1, w2, w3 = w0[:n], w1[:n], w2[:n], w3[:n]
+	for i, v := range x {
+		out[0] += v * w0[i]
+		out[1] += v * w1[i]
+		out[2] += v * w2[i]
+		out[3] += v * w3[i]
+	}
+}
+
 func axpyGo(dst []float32, gain float32, x []float32) {
 	dst = dst[:len(x)]
 	for i, v := range x {

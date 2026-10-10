@@ -558,15 +558,25 @@ static int video_place(int conn, const uint32_t *a) {
 	return reply(conn, OP_VIDEO_PLACE, (uint32_t[]){OK}, 1, -1);
 }
 
-static int gl_new(int conn, const uint32_t *a) {
+static int gl_new(int conn, const uint32_t *a, uint32_t len) {
 	uint32_t id = a[0], w = a[1], h = a[2];
 	int32_t z = (int32_t)a[3];
-	if (find(id) || w == 0 || h == 0 || w > 4096 || h > 4096) return reply(conn, OP_GL_OPEN, (uint32_t[]){id, ERR_ARGS}, 2, -1);
+	uint32_t ww = w, wh = h;
+	float turn[6];
+	const float *turned = NULL;
+	if (len == 48) {
+		ww = a[4];
+		wh = a[5];
+		for (int i = 0; i < 6; i++) turn[i] = as_float(a[6 + i]);
+		turned = turn;
+	}
+	if (find(id) || w == 0 || h == 0 || w > 4096 || h > 4096 || ww == 0 || wh == 0 || ww > 4096 || wh > 4096)
+		return reply(conn, OP_GL_OPEN, (uint32_t[]){id, ERR_ARGS}, 2, -1);
 	layer *l = free_slot();
 	if (!l) return reply(conn, OP_GL_OPEN, (uint32_t[]){id, ERR_FULL}, 2, -1);
-	int st = surface_for(l, id, w, h, 0, 0, z, 0);
+	int st = surface_for(l, id, ww, wh, 0, 0, z, 0);
 	if (st == OK) {
-		st = gl_open(&l->gl, l->win, w, h);
+		st = gl_open(&l->gl, l->win, w, h, ww, wh, turned);
 		if (st == OK) l->is_gl = 1;
 		else drop(l);
 	}
@@ -657,7 +667,7 @@ static int gl_offscreen(int conn, const uint32_t *a) {
 	l->id = id;
 	l->w = (int)w;
 	l->h = (int)h;
-	int st = gl_open(&l->gl, NULL, (int)w, (int)h);
+	int st = gl_open(&l->gl, NULL, (int)w, (int)h, (int)w, (int)h, NULL);
 	if (st == OK) l->is_gl = 1;
 	else memset(l, 0, sizeof *l);
 	return reply(conn, OP_GL_OFFSCREEN, (uint32_t[]){id, (uint32_t)st}, 2, -1);
@@ -839,7 +849,7 @@ static void serve(int conn) {
 			break;
 		}
 		case OP_GL_OPEN:
-			err = hdr[1] == 16 ? gl_new(conn, buf) : -1;
+			err = hdr[1] == 16 || hdr[1] == 48 ? gl_new(conn, buf, hdr[1]) : -1;
 			break;
 		case OP_GL_TEXTURE:
 			err = hdr[1] >= 16 ? gl_upload(conn, buf, hdr[1]) : -1;

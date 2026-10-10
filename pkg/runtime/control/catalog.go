@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
+	"github.com/ygelfand/libcountertop/pkg/runtime/profiler"
 )
 
 type DeviceInfo struct {
@@ -45,7 +47,36 @@ func DeviceCommands(read func() DeviceInfo) []*cobra.Command {
 				return nil
 			},
 		},
+		Says(&cobra.Command{
+			Use:       "profile [on|off]",
+			Short:     "Open or close the CPU and memory profiler on " + profiler.Addr,
+			Args:      cobra.MaximumNArgs(1),
+			ValidArgs: []string{"on", "off"},
+		}, profile),
 	}
+}
+
+var profiling profiler.Server
+
+func profile(args []string) (string, error) {
+	if len(args) == 1 {
+		switch args[0] {
+		case "on":
+			if _, err := profiling.Open(); err != nil {
+				return "", err
+			}
+		case "off":
+			if err := profiling.Close(); err != nil {
+				return "", err
+			}
+		default:
+			return "", fmt.Errorf("want on or off, not %q", args[0])
+		}
+	}
+	if at := profiling.Listening(); at != "" {
+		return "on " + at, nil
+	}
+	return "off", nil
 }
 
 type CallActions struct {

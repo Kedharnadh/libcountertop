@@ -209,6 +209,18 @@ static const char *add_src =
 	"uniform float second;\n"
 	"void main() { highp vec2 uv = gl_FragCoord.xy * texel; gl_FragColor = texture2D(src, uv) + second * texture2D(more, uv); }\n";
 
+static const char *turn_src =
+	"precision highp float;\n"
+	"uniform sampler2D src;\n"
+	"uniform vec2 win;\n"
+	"uniform vec2 size;\n"
+	"uniform mat2 lin;\n"
+	"uniform vec2 off;\n"
+	"void main() {\n"
+	"	vec2 b = lin * vec2(gl_FragCoord.x, win.y - gl_FragCoord.y) + off;\n"
+	"	gl_FragColor = texture2D(src, vec2(b.x / size.x, 1.0 - b.y / size.y));\n"
+	"}\n";
+
 static const char *blur_src =
 	"precision mediump float;\n"
 	"uniform sampler2D src;\n"
@@ -598,6 +610,8 @@ static void *render(void *arg) {
 	GLuint down2 = link(down2_src, NULL, NULL);
 	GLuint blurp = link(blur_src, NULL, NULL);
 	GLuint addp = link(add_src, NULL, NULL);
+	GLuint turnp = g->turned ? link(turn_src, NULL, NULL) : 0;
+	target scene = {0};
 	GLuint pointp = link_with(point_vertex_src, point_src, NULL, NULL);
 	target feeds[2] = {{0}, {0}};
 	target splats[2] = {{0}, {0}};
@@ -817,7 +831,8 @@ static void *render(void *arg) {
 			mark(&tm, ST_BLUR);
 		}
 
-		into(NULL, W, H);
+		int turning = turnp && target_make(&scene, W, H, GL_NEAREST);
+		into(turning ? &scene : NULL, W, H);
 		mark(&tm, ST_WAIT);
 		user(prog, W, H, u, nu, glowing ? glow.amount : 0, 0);
 		if (pointp) dots(pointp, pts, npts, INTO_FINAL, W, H, 1);
@@ -832,9 +847,21 @@ static void *render(void *arg) {
 			pthread_cond_broadcast(&g->cv);
 		}
 		pthread_mutex_unlock(&g->mu);
+		if (turning) {
+			into(NULL, g->ww, g->wh);
+			sampled(turnp, scene.tex, W, H);
+			glUniform2f(glGetUniformLocation(turnp, "win"), (float)g->ww, (float)g->wh);
+			glUniform2f(glGetUniformLocation(turnp, "size"), (float)W, (float)H);
+			const float *t = g->turn;
+			glUniformMatrix2fv(glGetUniformLocation(turnp, "lin"), 1, GL_FALSE, (GLfloat[]){t[0], t[3], t[1], t[4]});
+			glUniform2f(glGetUniformLocation(turnp, "off"), t[2], t[5]);
+			draw();
+		}
 		eglSwapBuffers(dpy, surf);
 	}
 
+	target_free(&scene);
+	if (turnp) glDeleteProgram(turnp);
 	target_free(&o0);
 	target_free(&t0);
 	target_free(&o1);
@@ -867,11 +894,17 @@ static void *render(void *arg) {
 	return NULL;
 }
 
-int gl_open(glview *g, ANativeWindow *win, int w, int h) {
+int gl_open(glview *g, ANativeWindow *win, int w, int h, int ww, int wh, const float *turn) {
 	memset(g, 0, sizeof *g);
 	g->win = win;
 	g->w = w;
 	g->h = h;
+	g->ww = ww;
+	g->wh = wh;
+	if (turn) {
+		memcpy(g->turn, turn, sizeof g->turn);
+		g->turned = 1;
+	}
 	pthread_mutex_init(&g->mu, NULL);
 	pthread_cond_init(&g->cv, NULL);
 	if (pthread_create(&g->th, NULL, render, g) != 0) return ERR_SURFACE;

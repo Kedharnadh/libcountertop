@@ -55,6 +55,59 @@ func TestDotExactly(t *testing.T) {
 	}
 }
 
+func TestDot4AgreesWithFourDots(t *testing.T) {
+	for _, n := range lengths {
+		x := random(n, uint64(n)+6000)
+		var w [4][]float32
+		for k := range w {
+			w[k] = random(n+3, uint64(n*10+k))
+		}
+
+		got := Dot4(x, w[0], w[1], w[2], w[3])
+		for k := range w {
+			var scale float64
+			for i := range x {
+				scale += math.Abs(float64(x[i]) * float64(w[k][i]))
+			}
+			want := dotGo(x, w[k][:n])
+			if d := math.Abs(float64(got[k]-want)) / math.Max(1, scale); d > 1e-6 {
+				t.Errorf("n=%d filter %d: %v against %v, off by %.3g", n, k, got[k], want, d)
+			}
+		}
+	}
+}
+
+func TestDot4PanicsOnAShortFilter(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Error("no panic")
+		}
+	}()
+	x := make([]float32, 8)
+	Dot4(x, x, x, make([]float32, 4), x)
+}
+
+func BenchmarkDot4(b *testing.B) {
+	for _, n := range []int{32, 64} {
+		x := random(n, 1)
+		var w [4][]float32
+		for k := range w {
+			w[k] = random(n, uint64(k+2))
+		}
+		b.Run("dot4/"+strconv.Itoa(n), func(b *testing.B) {
+			for range b.N {
+				s := Dot4(x, w[0], w[1], w[2], w[3])
+				sink = s[0]
+			}
+		})
+		b.Run("4xdot/"+strconv.Itoa(n), func(b *testing.B) {
+			for range b.N {
+				sink = Dot(x, w[0]) + Dot(x, w[1]) + Dot(x, w[2]) + Dot(x, w[3])
+			}
+		})
+	}
+}
+
 func TestDotOfEmptySlices(t *testing.T) {
 	if got := Dot(nil, nil); got != 0 {
 		t.Errorf("dot of nothing is %v", got)
