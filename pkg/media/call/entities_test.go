@@ -6,7 +6,6 @@ import (
 
 	esphome "github.com/ygelfand/go-esphome-device"
 
-	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
@@ -26,7 +25,7 @@ func (s *callSettings) Update(change func(*schema.Call)) error {
 
 func TestFailedCallSettingPublishesSavedValue(t *testing.T) {
 	settings := &callSettings{value: schema.DefaultCall(), err: errors.New("write failed")}
-	c := New(Dependencies{Settings: settings, Shell: shell.New()})
+	c := New(Dependencies{Settings: settings})
 	t.Cleanup(c.Close)
 	c.Restore(settings.Read())
 	c.SetIncoming(false)

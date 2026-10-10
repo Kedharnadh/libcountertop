@@ -1,4 +1,4 @@
-package call
+package callvideo
 
 import (
 	"testing"
@@ -58,7 +58,7 @@ func TestArrange(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			full := display.Rect{W: c.vw, H: c.vh}
-			l := arrange(c.vw, c.vh, c.remote, c.own)
+			l := Arrange(c.vw, c.vh, c.remote, c.own)
 			if l.Side != c.side {
 				t.Fatalf("side %v, want %v (%+v)", l.Side, c.side, l)
 			}

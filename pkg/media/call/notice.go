@@ -22,5 +22,8 @@ func (c *Calls) notice(peer string, reason Reason) {
 	default:
 		return
 	}
+	if c.options.Messages == nil {
+		return
+	}
 	c.options.Messages.Info(peer, body, noticeFor)
 }

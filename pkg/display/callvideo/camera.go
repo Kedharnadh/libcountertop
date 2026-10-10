@@ -1,4 +1,4 @@
-package call
+package callvideo
 
 import (
 	"context"
@@ -18,9 +18,9 @@ func (c *Camera) Select(stream config.CallStream) (int, Size, bool) {
 		return 0, Size{}, false
 	}
 	if stream == config.CallSub && len(sizes) > 1 {
-		return 1, sizes[1], true
+		return 1, Size(sizes[1]), true
 	}
-	return 0, sizes[0], true
+	return 0, Size(sizes[0]), true
 }
 
 type Camera struct {
@@ -53,8 +53,8 @@ func (c *Camera) Frames(at int, sized func(Size)) (<-chan rtc.Frame, func()) {
 				func() {
 					defer c.sessions.Leave(s, frames)
 					if sizes := c.sessions.Sizes(); at >= 0 && at < len(sizes) &&
-						sizes[at] != size {
-						size = sizes[at]
+						Size(sizes[at]) != size {
+						size = Size(sizes[at])
 						if sized != nil {
 							sized(size)
 						}

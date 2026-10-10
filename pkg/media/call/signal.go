@@ -118,20 +118,15 @@ func (c *Calls) answered(w http.ResponseWriter, r *http.Request) {
 	c.mu.Lock()
 	s := c.now
 	ok := s != nil && s.ID == m.Call && s.State == Calling && s.link != nil
-	var pics *pictures
 	if ok {
 		s.remote = Size{Width: m.Width, Height: m.Height}
-		pics = s.pics
 	}
 	c.mu.Unlock()
 	if !ok {
 		http.Error(w, "no such call", http.StatusNotFound)
 		return
 	}
-	if pics != nil {
-		pics.remote.resize(Size{Width: m.Width, Height: m.Height})
-		pics.replace()
-	}
+	c.show(s)
 	if err := s.link.Answered(m.SDP); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		c.fail(s, "answered", err)

@@ -5,11 +5,13 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/ygelfand/libcountertop/pkg/camera/session"
 	"github.com/ygelfand/libcountertop/pkg/media/rtc"
 )
 
-type Size = session.Size
+type Size struct {
+	Width  int `json:"width"`
+	Height int `json:"height"`
+}
 type Status struct {
 	Muted     bool `json:"muted"`
 	CameraOff bool `json:"camera_off"`

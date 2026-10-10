@@ -1,4 +1,4 @@
-package call
+package callvideo
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 
 	display "github.com/ygelfand/libcountertop/pkg/display/geometry"
 	"github.com/ygelfand/libcountertop/pkg/display/surface"
+	"github.com/ygelfand/libcountertop/pkg/media/call"
 	"github.com/ygelfand/libcountertop/pkg/media/rtc"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
@@ -29,6 +30,23 @@ const (
 	turnCheck   = 250 * time.Millisecond
 )
 
+type Size = call.Size
+
+type Display interface {
+	Helper() *surface.Client
+	Orientation() display.Orientation
+	Native() (int, int)
+}
+
+type Dependencies struct {
+	Display Display
+	Camera  *Camera
+}
+
+type Video struct{ o Dependencies }
+
+func New(o Dependencies) *Video { return &Video{o: o} }
+
 type Layout struct {
 	Remote  display.Rect
 	Picture display.Rect
@@ -37,7 +55,7 @@ type Layout struct {
 	Side    bool
 }
 
-func arrange(vw, vh int, remote, own Size) Layout {
+func Arrange(vw, vh int, remote, own Size) Layout {
 	full := fullScreen(vw, vh)
 	m := int(float64(min(vw, vh)) * selfMargin)
 	if remote.Width > 0 && remote.Height > 0 {
@@ -88,20 +106,8 @@ func fitOwn(box display.Rect, own Size, right bool) display.Rect {
 	return r
 }
 
-func (c *Calls) layout(vw, vh int) Layout {
-	c.mu.Lock()
-	var remote, own Size
-	if c.now != nil {
-		remote, own = c.now.remote, c.now.own
-	}
-	c.mu.Unlock()
-	return arrange(vw, vh, remote, own)
-}
-
-func (c *Calls) Arrange(vw, vh int) Layout { return c.layout(vw, vh) }
-
 type layer struct {
-	options Dependencies
+	display Display
 	id      uint32
 	z       int
 	size    Size
@@ -117,21 +123,13 @@ type layer struct {
 	failed error
 }
 
-type LayerStats struct {
-	Open   bool
-	Width  int
-	Height int
-	Frames uint64
-	Failed error
-}
-
-func (l *layer) stats() LayerStats {
+func (l *layer) stats() call.LayerStats {
 	if l == nil {
-		return LayerStats{}
+		return call.LayerStats{}
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	return LayerStats{
+	return call.LayerStats{
 		Open:   l.open,
 		Width:  l.size.Width,
 		Height: l.size.Height,
@@ -141,7 +139,7 @@ func (l *layer) stats() LayerStats {
 }
 
 func (l *layer) Show(f rtc.Frame) {
-	c := l.options.Display.Helper()
+	c := l.display.Helper()
 	if c == nil {
 		return
 	}
@@ -213,41 +211,36 @@ func (l *layer) Show(f rtc.Frame) {
 	}
 }
 
-func (l *layer) resize(sz Size) {
+func (l *layer) update(sz Size, hidden bool) {
 	if l == nil {
 		return
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if sz == l.size {
-		return
-	}
-	l.size = sz
-	if l.open {
-		if c := l.options.Display.Helper(); c != nil {
-			_ = c.VideoClose(l.id)
+	c := l.display.Helper()
+	if sz != l.size {
+		l.size = sz
+		if l.open {
+			if c != nil {
+				_ = c.VideoClose(l.id)
+			}
+			l.open, l.shown = false, false
 		}
-		l.open, l.shown = false, false
+	}
+	l.hidden = hidden
+	if c != nil && l.shown {
+		l.place(c)
 	}
 }
 
 func (l *layer) place(c *surface.Client) {
-	o := l.options.Display.Orientation()
-	fw, fh := l.options.Display.Native()
+	o := l.display.Orientation()
+	fw, fh := l.display.Native()
 	vw, vh := o.Size(fw, fh)
 	at := fit(l.box(vw, vh), l.size.Width, l.size.Height)
 	x, y, m, _ := o.Place(fw, fh, at, l.size.Width, l.size.Height)
 	if err := c.VideoPlace(l.id, x, y, m, l.z, !l.hidden); err != nil {
 		slog.Debug("call video place", "layer", l.id, "err", err)
-	}
-}
-
-func (l *layer) hide(on bool) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.hidden = on
-	if c := l.options.Display.Helper(); c != nil && l.shown {
-		l.place(c)
 	}
 }
 
@@ -257,7 +250,7 @@ func (l *layer) reorient() {
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if c := l.options.Display.Helper(); c != nil && l.shown {
+	if c := l.display.Helper(); c != nil && l.shown {
 		l.place(c)
 	}
 }
@@ -269,7 +262,7 @@ func (l *layer) close() {
 	if !l.open {
 		return
 	}
-	if c := l.options.Display.Helper(); c != nil {
+	if c := l.display.Helper(); c != nil {
 		_ = c.VideoClose(l.id)
 	}
 	l.open, l.shown = false, false
@@ -308,57 +301,62 @@ func corner(vw, vh int) display.Rect {
 }
 
 type pictures struct {
-	options Dependencies
+	display Display
 	workers sync.WaitGroup
+	mu      sync.Mutex
+	shown   call.Shown
 	remote  *layer
 	self    *layer
 	stop    func()
 }
 
-func (c *Calls) newPictures(s *session, remote Size) *pictures {
-	return &pictures{
-		options: c.options,
-		remote: &layer{options: c.options, id: remoteLayer, z: remoteZ, size: remote,
-			box:    func(vw, vh int) display.Rect { return c.layout(vw, vh).Remote },
-			broken: func() { c.requestKey(s) },
-		},
+func (v *Video) Start(f call.Feed) (call.Picture, rtc.Camera) {
+	p := &pictures{display: v.o.Display, shown: f.Shown}
+	p.remote = &layer{
+		display: v.o.Display,
+		id:      remoteLayer,
+		z:       remoteZ,
+		size:    f.Shown.Remote,
+		hidden:  !f.Shown.RemoteOn,
+		box:     func(vw, vh int) display.Rect { return p.layout(vw, vh).Remote },
+		broken:  f.Key,
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	p.stop = cancel
+	var sending rtc.Camera
+	if at, own, ok := v.o.Camera.Select(f.Stream); ok {
+		f.Sized(own)
+		p.mu.Lock()
+		p.shown.Own = own
+		p.mu.Unlock()
+		p.see(ctx, camera{source: v.o.Camera, at: at, sized: f.Sized}, own, f.Shown.SelfOn)
+		sending = camera{source: v.o.Camera, at: at}
+	}
+	p.workers.Add(1)
+	safe.Go("call video turn", func() { defer p.workers.Done(); p.follow(ctx) })
+	return p, sending
 }
 
-func (c *Calls) requestKey(s *session) {
-	c.mu.Lock()
-	link := s.link
-	c.mu.Unlock()
-	if link != nil {
-		link.RequestKey()
-	}
+func (p *pictures) layout(vw, vh int) Layout {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return Arrange(vw, vh, p.shown.Remote, p.shown.Own)
 }
 
-func (p *pictures) start(
-	ctx context.Context,
-	c *Calls,
-	s *session,
-	at int,
-	own Size,
-	visible bool,
-) {
+func (p *pictures) see(ctx context.Context, cam camera, own Size, visible bool) {
 	p.self = &layer{
-		options: c.options,
+		display: p.display,
 		id:      selfLayer,
 		z:       selfZ,
 		size:    own,
 		hidden:  !visible,
-		box:     func(vw, vh int) display.Rect { return c.layout(vw, vh).Self },
+		box:     func(vw, vh int) display.Rect { return p.layout(vw, vh).Self },
 	}
 	self := p.self
-	ctx, cancel := context.WithCancel(ctx)
-	frames, stop := camera{
-		source: c.options.Camera,
-		at:     at,
-		sized:  func(sz Size) { c.ownSized(s, sz) },
-	}.Frames()
-	p.stop = func() { cancel(); stop() }
-	p.workers.Add(2)
+	frames, release := cam.Frames()
+	cancel := p.stop
+	p.stop = func() { cancel(); release() }
+	p.workers.Add(1)
 	safe.Go("call self view", func() {
 		defer p.workers.Done()
 		for {
@@ -373,19 +371,18 @@ func (p *pictures) start(
 			}
 		}
 	})
-	safe.Go("call video turn", func() { defer p.workers.Done(); p.follow(ctx) })
 }
 
 func (p *pictures) follow(ctx context.Context) {
 	tick := time.NewTicker(turnCheck)
 	defer tick.Stop()
-	was := p.options.Display.Orientation()
+	was := p.display.Orientation()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-tick.C:
-			if now := p.options.Display.Orientation(); now != was {
+			if now := p.display.Orientation(); now != was {
 				was = now
 				p.replace()
 			}
@@ -394,34 +391,26 @@ func (p *pictures) follow(ctx context.Context) {
 }
 
 func (p *pictures) replace() {
-	if p == nil {
-		return
-	}
 	p.remote.reorient()
 	p.self.reorient()
 }
 
-func (p *pictures) showRemote(on bool) {
-	if p == nil || p.remote == nil {
-		return
-	}
-	p.remote.hide(!on)
+func (p *pictures) Show(f rtc.Frame) { p.remote.Show(f) }
+
+func (p *pictures) Update(sh call.Shown) {
+	p.mu.Lock()
+	p.shown = sh
+	p.mu.Unlock()
+	p.remote.update(sh.Remote, !sh.RemoteOn)
+	p.self.update(sh.Own, !sh.SelfOn)
 }
 
-func (p *pictures) showSelf(on bool) {
-	if p == nil || p.self == nil {
-		return
-	}
-	p.self.hide(!on)
+func (p *pictures) Stats() (remote, self call.LayerStats) {
+	return p.remote.stats(), p.self.stats()
 }
 
-func (p *pictures) close() {
-	if p == nil {
-		return
-	}
-	if p.stop != nil {
-		p.stop()
-	}
+func (p *pictures) Close() {
+	p.stop()
 	p.workers.Wait()
 	if p.self != nil {
 		p.self.close()

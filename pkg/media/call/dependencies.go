@@ -5,9 +5,6 @@ import (
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/audio/tone"
-	"github.com/ygelfand/libcountertop/pkg/display/geometry"
-	"github.com/ygelfand/libcountertop/pkg/display/shell"
-	"github.com/ygelfand/libcountertop/pkg/display/surface"
 	"github.com/ygelfand/libcountertop/pkg/media/callstatus"
 	"github.com/ygelfand/libcountertop/pkg/media/rtc"
 	"github.com/ygelfand/libcountertop/pkg/network/peer"
@@ -39,10 +36,40 @@ type Messages interface {
 	Info(title, body string, hold time.Duration)
 }
 
-type Display interface {
-	Helper() *surface.Client
-	Orientation() geometry.Orientation
-	Native() (int, int)
+type Stage interface {
+	Hold() (release func())
+	Redraw()
+}
+
+type Video interface {
+	Start(Feed) (Picture, rtc.Camera)
+}
+
+type Feed struct {
+	Stream schema.CallStream
+	Shown  Shown
+	Key    func()
+	Sized  func(Size)
+}
+
+type Shown struct {
+	Remote, Own      Size
+	RemoteOn, SelfOn bool
+}
+
+type Picture interface {
+	rtc.Screen
+	Update(Shown)
+	Stats() (remote, self LayerStats)
+	Close()
+}
+
+type LayerStats struct {
+	Open   bool
+	Width  int
+	Height int
+	Frames uint64
+	Failed error
 }
 
 type Sound interface {
@@ -57,11 +84,10 @@ type Dependencies struct {
 	Settings Settings
 	Peers    Peers
 	Port     int
-	Shell    *shell.Shell
 	Privacy  Privacy
 	Media    Media
 	Sound    Sound
-	Camera   *Camera
-	Display  Display
+	Stage    Stage
+	Video    Video
 	Messages Messages
 }

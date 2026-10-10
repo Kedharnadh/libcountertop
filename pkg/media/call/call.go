@@ -13,11 +13,9 @@ import (
 
 	"github.com/pion/webrtc/v4"
 
-	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/media/rtc"
 	discovery "github.com/ygelfand/libcountertop/pkg/network/peer"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
-	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 const (
@@ -76,17 +74,17 @@ type session struct {
 	workers  sync.WaitGroup
 	stopped  bool
 	Call
-	addr   string
-	offer  string
-	link   *rtc.Link
-	remote Size
-	own    Size
-	pics   *pictures
-	ctx    context.Context
-	stop   context.CancelFunc
-	quiet  context.CancelFunc
-	hold   *shell.Hold
-	unhook func()
+	addr    string
+	offer   string
+	link    *rtc.Link
+	remote  Size
+	own     Size
+	pic     Picture
+	ctx     context.Context
+	stop    context.CancelFunc
+	quiet   context.CancelFunc
+	release func()
+	unhook  func()
 }
 
 type Calls struct {
@@ -95,25 +93,8 @@ type Calls struct {
 	stop    context.CancelFunc
 	mu      sync.Mutex
 	now     *session
-	view    View
 	ha      entities
 }
-
-type View struct{}
-
-func (*View) Covers() bool { return true }
-
-func (*View) Wakes() bool { return true }
-
-func (*View) Shows(s schema.Stream) bool { return s == schema.StreamVoice }
-
-type Profile struct{ ID string }
-
-func (*Profile) Covers() bool { return true }
-
-type Directory struct{}
-
-func (*Directory) Covers() bool { return true }
 
 func New(o Dependencies) *Calls {
 	ctx, stop := context.WithCancel(context.Background())
@@ -123,8 +104,6 @@ func New(o Dependencies) *Calls {
 }
 
 func (c *Calls) Name() string { return "call" }
-
-func (c *Calls) Screen() *View { return &c.view }
 
 func (c *Calls) Now() (Call, bool) {
 	c.mu.Lock()
@@ -145,19 +124,28 @@ func (c *Calls) Stats() (Stats, bool) {
 	c.mu.Lock()
 	s := c.now
 	var link *rtc.Link
-	var pics *pictures
+	var pic Picture
 	if s != nil {
-		link, pics = s.link, s.pics
+		link, pic = s.link, s.pic
 	}
 	c.mu.Unlock()
 	if link == nil {
 		return Stats{}, false
 	}
 	st := Stats{Link: link.Stats()}
-	if pics != nil {
-		st.Remote, st.Self = pics.remote.stats(), pics.self.stats()
+	if pic != nil {
+		st.Remote, st.Self = pic.Stats()
 	}
 	return st, true
+}
+
+func (c *Calls) Sizes() (remote, own Size) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.now == nil {
+		return Size{}, Size{}
+	}
+	return c.now.remote, c.now.own
 }
 
 func (c *Calls) Talking() bool {
@@ -166,10 +154,6 @@ func (c *Calls) Talking() bool {
 }
 
 func (c *Calls) PausesWake() bool { return c.Talking() && c.options.Settings.Read().PauseWake }
-
-func (c *Calls) Open(p discovery.Peer) { c.options.Shell.Push(&Profile{ID: p.ID}) }
-
-func (c *Calls) Browse() { c.options.Shell.Push(&Directory{}) }
 
 func (c *Calls) Start(p discovery.Peer, video bool) error {
 	addr, err := route(p)
@@ -359,7 +343,7 @@ func (c *Calls) apply(s *session) {
 		return
 	}
 	s.Covered = covered
-	link, pics := s.link, s.pics
+	link := s.link
 	muted, blind := s.Muted || silenced, s.CameraOff || covered
 	c.mu.Unlock()
 	if link != nil {
@@ -367,7 +351,7 @@ func (c *Calls) apply(s *session) {
 		link.CameraOff(blind)
 		c.tell(s)
 	}
-	pics.showSelf(!blind)
+	c.show(s)
 }
 
 func (c *Calls) media(s *session) (rtc.Media, Size) {
@@ -377,22 +361,59 @@ func (c *Calls) media(s *session) (rtc.Media, Size) {
 		Received: c.received(s),
 	}
 	c.mu.Lock()
-	video, remote, off := s.Video, s.remote, s.CameraOff
+	if c.options.Video == nil {
+		s.Video = false
+	}
+	video, shown := s.Video, s.shown()
 	c.mu.Unlock()
 	if !video {
 		return m, Size{}
 	}
-	pics := c.newPictures(s, remote)
-	m.Screen = pics.remote
-	at, own, ok := c.options.Camera.Select(c.options.Settings.Read().Stream)
+	pic, cam := c.options.Video.Start(Feed{
+		Stream: c.options.Settings.Read().Stream,
+		Shown:  shown,
+		Key:    func() { c.requestKey(s) },
+		Sized:  func(sz Size) { c.ownSized(s, sz) },
+	})
+	m.Screen, m.Camera = pic, cam
 	c.mu.Lock()
-	s.pics, s.own = pics, own
+	s.pic = pic
+	own := s.own
 	c.mu.Unlock()
-	if ok {
-		m.Camera = camera{source: c.options.Camera, at: at}
-		pics.start(s.ctx, c, s, at, own, !off && !c.options.Privacy.CameraCovered())
-	}
 	return m, own
+}
+
+func (s *session) shown() Shown {
+	return Shown{
+		Remote:   s.remote,
+		Own:      s.own,
+		RemoteOn: !s.RemoteCameraOff,
+		SelfOn:   !s.CameraOff && !s.Covered,
+	}
+}
+
+func (c *Calls) show(s *session) {
+	c.mu.Lock()
+	pic, shown := s.pic, s.shown()
+	c.mu.Unlock()
+	if pic != nil {
+		pic.Update(shown)
+	}
+}
+
+func (c *Calls) requestKey(s *session) {
+	c.mu.Lock()
+	link := s.link
+	c.mu.Unlock()
+	if link != nil {
+		link.RequestKey()
+	}
+}
+
+func (c *Calls) redraw() {
+	if c.options.Stage != nil {
+		c.options.Stage.Redraw()
+	}
 }
 
 func (c *Calls) open(call Call, addr string) *session {
@@ -435,7 +456,7 @@ func (c *Calls) talking(s *session) {
 				return
 			case <-tick.C:
 				c.options.Peers.Touch(s.Peer.ID)
-				c.options.Shell.Redraw()
+				c.redraw()
 			}
 		}
 	})
@@ -485,7 +506,7 @@ func (c *Calls) finish(s *session, reason Reason) bool {
 		return false
 	}
 	c.now = nil
-	link, hold, pics, peer := s.link, s.hold, s.pics, s.Peer.Name
+	link, release, pic, peer := s.link, s.release, s.pic, s.Peer.Name
 	c.mu.Unlock()
 	s.unhook()
 	s.workerMu.Lock()
@@ -496,11 +517,15 @@ func (c *Calls) finish(s *session, reason Reason) bool {
 		_ = link.Close()
 	}
 	s.workers.Wait()
-	pics.close()
-	hold.Release()
+	if pic != nil {
+		pic.Close()
+	}
+	if release != nil {
+		release()
+	}
 	c.notice(peer, reason)
 	c.publish(nil)
-	c.options.Shell.Redraw()
+	c.redraw()
 	slog.Info("call ended", "peer", peer, "reason", reason)
 	return true
 }
@@ -511,22 +536,21 @@ func (c *Calls) changed(s *session) {
 		c.mu.Unlock()
 		return
 	}
-	if s.hold == nil {
+	if s.release == nil && c.options.Stage != nil {
 		c.mu.Unlock()
-		h := c.options.Shell.Hold(&c.view)
+		release := c.options.Stage.Hold()
 		c.mu.Lock()
 		if c.now != s {
 			c.mu.Unlock()
-			h.Release()
+			release()
 			return
 		}
-		s.hold = h
+		s.release = release
 	}
-	pics := s.pics
 	c.mu.Unlock()
-	pics.replace()
+	c.show(s)
 	c.publish(s)
-	c.options.Shell.Redraw()
+	c.redraw()
 }
 
 func newID() string {

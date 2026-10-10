@@ -7,6 +7,7 @@ import (
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
+	"github.com/ygelfand/libcountertop/pkg/display/callvideo"
 	"github.com/ygelfand/libcountertop/pkg/display/geometry"
 	"github.com/ygelfand/libcountertop/pkg/display/homeview"
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
@@ -18,7 +19,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/say"
 )
 
-func (cv *View) callScreen(v *call.View) *navigation.Screen {
+func (cv *View) callScreen(v *Talk) *navigation.Screen {
 	return &navigation.Screen{Fixed: true, Clear: true, View: v, Build: cv.callBody}
 }
 
@@ -72,7 +73,8 @@ func (cv *View) callBody(w *gogui.Window) gogui.View {
 	)
 
 	if c.Video && c.State == call.Talking {
-		l := cv.o.Calls.Arrange(vw, vh)
+		remote, own := cv.o.Calls.Sizes()
+		l := callvideo.Arrange(vw, vh, remote, own)
 		rect := func(r geometry.Rect) ui.Rect { return ui.Rect{X: r.X, Y: r.Y, W: r.W, H: r.H} }
 		var layers []gogui.View
 		if c.RemoteCameraOff {
@@ -345,7 +347,7 @@ func callStatus(c call.Call) string {
 	return fmt.Sprintf("%d:%02d", int(d.Minutes()), int(d.Seconds())%60)
 }
 
-func (cv *View) profileScreen(p *call.Profile) *navigation.Screen {
+func (cv *View) profileScreen(p *Profile) *navigation.Screen {
 	title := p.ID
 	if peer, ok := cv.o.Peers.Find(p.ID); ok {
 		title = peer.Name
@@ -357,14 +359,14 @@ func (cv *View) profileScreen(p *call.Profile) *navigation.Screen {
 	}
 }
 
-func (cv *View) profileBody(w *gogui.Window, prof *call.Profile) gogui.View {
+func (cv *View) profileBody(w *gogui.Window, prof *Profile) gogui.View {
 	p, ok := cv.o.Peers.Find(prof.ID)
 	if !ok {
 		return homeview.Column([]gogui.View{gogui.Label(say.T("call.gone"), widgets.Secondary())})
 	}
 	t := gogui.CurrentTheme().Cfg
 	vw, vh := w.WindowSize()
-	tall := min(float32(vh)*0.28, float32(vw)*0.6*pictureAspect)
+	tall := min(float32(vh)*0.18, float32(vw)*0.6*pictureAspect)
 	key, svg := devicePicture(p.Board)
 
 	addrs := make([]string, 0, len(p.Addrs))
@@ -415,32 +417,31 @@ func (cv *View) profileBody(w *gogui.Window, prof *call.Profile) gogui.View {
 	glyph := iconStyle(t.TextStyleDef.Color)
 	glyph.Size = reach() * 0.7
 	height := reach() * 1.8
-	var video func(gogui.EventCtx)
-	if p.Video() && cv.o.Video {
-		video = func(gogui.EventCtx) { cv.dial(p, true) }
+	keys := []gogui.View{
+		cv.o.UI.Toolkit.WideKey(
+			"profile-audio",
+			gogui.IconPhone,
+			glyph,
+			height,
+			style.Partial,
+			func(gogui.EventCtx) { cv.dial(p, false) },
+		),
+	}
+	if cv.video(p) {
+		keys = append(keys, cv.o.UI.Toolkit.WideKey(
+			"profile-video",
+			gogui.IconVideo,
+			glyph,
+			height,
+			style.Partial,
+			func(gogui.EventCtx) { cv.dial(p, true) },
+		))
 	}
 	rows = append(rows, gogui.Row(gogui.ContainerCfg{
 		Sizing:  gogui.FillFit,
 		Padding: gogui.NewPadding(reach()*0.5, 0, 0, 0),
 		Spacing: gogui.SpacingLarge,
-		Content: []gogui.View{
-			cv.o.UI.Toolkit.WideKey(
-				"profile-audio",
-				gogui.IconPhone,
-				glyph,
-				height,
-				style.Partial,
-				func(gogui.EventCtx) { cv.dial(p, false) },
-			),
-			cv.o.UI.Toolkit.WideKey(
-				"profile-video",
-				gogui.IconVideo,
-				glyph,
-				height,
-				style.Partial,
-				video,
-			),
-		},
+		Content: keys,
 	}))
 	return homeview.Column(rows)
 }

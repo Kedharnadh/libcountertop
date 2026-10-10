@@ -22,14 +22,8 @@ func (c *Calls) statusController() sharedstatus.Controller[*session] {
 				return nil, false
 			}
 			s.own = Size(sz)
-			pics := s.pics
 			c.mu.Unlock()
-			return func() {
-				if pics != nil {
-					pics.self.resize(Size(sz))
-					pics.replace()
-				}
-			}, true
+			return func() { c.show(s) }, true
 		},
 		Remote: func(s *session, sz sharedstatus.Size) (func(), bool) {
 			c.mu.Lock()
@@ -38,14 +32,8 @@ func (c *Calls) statusController() sharedstatus.Controller[*session] {
 				return nil, false
 			}
 			s.remote = Size(sz)
-			pics := s.pics
 			c.mu.Unlock()
-			return func() {
-				if pics != nil {
-					pics.remote.resize(Size(sz))
-					pics.replace()
-				}
-			}, true
+			return func() { c.show(s) }, true
 		},
 		Status: func(s *session, st sharedstatus.Status) (func(), bool) {
 			c.mu.Lock()
@@ -54,13 +42,8 @@ func (c *Calls) statusController() sharedstatus.Controller[*session] {
 				return nil, false
 			}
 			s.RemoteMuted, s.RemoteCameraOff = st.Muted, st.CameraOff
-			pics := s.pics
 			c.mu.Unlock()
-			return func() {
-				if pics != nil {
-					pics.showRemote(!st.CameraOff)
-				}
-			}, true
+			return func() { c.show(s) }, true
 		},
 		Changed: c.changed,
 	}}

@@ -88,7 +88,7 @@ func (c *Calls) publish(s *session) {
 
 func (c *Calls) store(s Setting, v string) error {
 	err := setting.Store(c.options.Settings, s, v)
-	c.options.Shell.Redraw()
+	c.redraw()
 	return err
 }
 

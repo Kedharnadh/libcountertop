@@ -101,14 +101,15 @@ func (cv *View) peerTile(id string, side float32, p peer.Peer, pal theme.Theme) 
 			do,
 		)
 	}
-	var video func(gogui.EventCtx)
-	if p.Video() && cv.o.Video {
-		video = func(gogui.EventCtx) { cv.dial(p, true) }
-	}
 	buttons := []gogui.View{
 		action("audio", gogui.IconPhone, func(gogui.EventCtx) { cv.dial(p, false) }),
-		action("info", gogui.IconInfo, func(gogui.EventCtx) { cv.o.Calls.Open(p) }),
-		action("video", gogui.IconVideo, video),
+		action("info", gogui.IconInfo, func(gogui.EventCtx) { cv.open(p) }),
+	}
+	if cv.video(p) {
+		buttons = append(
+			buttons,
+			action("video", gogui.IconVideo, func(gogui.EventCtx) { cv.dial(p, true) }),
+		)
 	}
 	tall := min(reach()*1.4, inner*pictureAspect)
 
@@ -152,6 +153,8 @@ func (cv *View) peerTile(id string, side float32, p peer.Peer, pal theme.Theme) 
 	cv.o.UI.Kit().Tile(&cfg, style.Rest)
 	return gogui.Column(cfg)
 }
+
+func (cv *View) video(p peer.Peer) bool { return p.Video() && cv.o.Video }
 
 func (cv *View) dial(p peer.Peer, video bool) {
 	if err := cv.o.Calls.Start(p, video); err != nil {

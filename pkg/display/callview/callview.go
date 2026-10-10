@@ -15,6 +15,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/media/call"
 	"github.com/ygelfand/libcountertop/pkg/network/peer"
 	"github.com/ygelfand/libcountertop/pkg/say"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 type Peers interface {
@@ -22,8 +23,36 @@ type Peers interface {
 	Find(id string) (peer.Peer, bool)
 }
 
+type Talk struct{}
+
+func (*Talk) Covers() bool { return true }
+
+func (*Talk) Wakes() bool { return true }
+
+func (*Talk) Shows(s schema.Stream) bool { return s == schema.StreamVoice }
+
+type Profile struct{ ID string }
+
+func (*Profile) Covers() bool { return true }
+
+type Directory struct{}
+
+func (*Directory) Covers() bool { return true }
+
+type Stage struct {
+	shell *shell.Shell
+	talk  Talk
+}
+
+func NewStage(s *shell.Shell) *Stage { return &Stage{shell: s} }
+
+func (st *Stage) Hold() func() { return st.shell.Hold(&st.talk).Release }
+
+func (st *Stage) Redraw() { st.shell.Redraw() }
+
 type Options struct {
 	UI    *widgets.UI
+	Shell *shell.Shell
 	Calls *call.Calls
 	Peers Peers
 	Voice volume.Channel
@@ -36,11 +65,11 @@ func New(o Options) *View { return &View{o: o} }
 
 func (cv *View) Screen(v shell.View) *navigation.Screen {
 	switch t := v.(type) {
-	case *call.View:
+	case *Talk:
 		return cv.callScreen(t)
-	case *call.Profile:
+	case *Profile:
 		return cv.profileScreen(t)
-	case *call.Directory:
+	case *Directory:
 		return cv.directoryScreen(t)
 	}
 	return nil
@@ -51,11 +80,15 @@ func (cv *View) Rail() drawer.Entry {
 		Name:  func() string { return say.T("call.tab") },
 		Order: drawer.OrderCalls,
 		Glyph: func() string { return gogui.IconPhone },
-		Open:  cv.o.Calls.Browse,
+		Open:  cv.browse,
 	}
 }
 
-func (cv *View) directoryScreen(d *call.Directory) *navigation.Screen {
+func (cv *View) browse() { cv.o.Shell.Push(&Directory{}) }
+
+func (cv *View) open(p peer.Peer) { cv.o.Shell.Push(&Profile{ID: p.ID}) }
+
+func (cv *View) directoryScreen(d *Directory) *navigation.Screen {
 	return &navigation.Screen{
 		Title: say.T("call.tab"),
 		View:  d,
