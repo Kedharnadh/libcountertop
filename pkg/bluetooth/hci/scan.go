@@ -17,11 +17,20 @@ const (
 	leAdvertisingReport = 0x02
 )
 
-// 0.625 ms units: 18.75 ms every 200 ms.
+// 0.625 ms units: a 200 ms interval, and the 2.5 ms shortest window the spec allows.
 const (
-	scanInterval = 320
-	scanWindow   = 30
+	scanInterval    = 320
+	scanWindowLeast = 4
 )
+
+type Scanning struct {
+	Active  bool
+	Percent int
+}
+
+func (sc Scanning) window() uint16 {
+	return uint16(min(max(scanInterval*sc.Percent/100, scanWindowLeast), scanInterval))
+}
 
 type Advertisement struct {
 	Address     [6]byte
@@ -38,15 +47,15 @@ func (a Advertisement) Addr() uint64 {
 	return v
 }
 
-func Scan(ctx context.Context, s *Session, active bool, found func(Advertisement)) error {
+func Scan(ctx context.Context, s *Session, sc Scanning, found func(Advertisement)) error {
 	got, done := s.Reports()
 	defer done()
 
-	if err := scanning(s, active, true); err != nil {
+	if err := scanning(s, sc, true); err != nil {
 		return err
 	}
 
-	defer scanning(s, active, false)
+	defer scanning(s, sc, false)
 
 	for {
 		select {
@@ -61,14 +70,14 @@ func Scan(ctx context.Context, s *Session, active bool, found func(Advertisement
 	}
 }
 
-func scanning(s *Session, active, on bool) error {
+func scanning(s *Session, sc Scanning, on bool) error {
 	if on {
 		params := make([]byte, 7)
-		if active {
+		if sc.Active {
 			params[0] = 0x01
 		}
 		binary.LittleEndian.PutUint16(params[1:], scanInterval)
-		binary.LittleEndian.PutUint16(params[3:], scanWindow)
+		binary.LittleEndian.PutUint16(params[3:], sc.window())
 
 		if _, err := s.Command(hciLEScanParams, params...); err != nil {
 			return fmt.Errorf("ble: the scan parameters: %w", err)

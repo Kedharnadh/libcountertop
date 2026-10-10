@@ -38,6 +38,7 @@ assistants.unset: Set the wake word in Home Assistant
 assistants.waiting: Waiting for the model
 bluetooth.group.bluetooth: Bluetooth
 bluetooth.setting.proxy: Bluetooth proxy
+bluetooth.setting.scan: Bluetooth scanning
 bluetooth.setting.speaker: Bluetooth speaker
 boot.leaving: Restarting
 boot.skip: Skip

@@ -30,7 +30,7 @@ const Group setting.Group = "Bluetooth"
 
 type Scanner interface {
 	Up() bool
-	Scan(context.Context, bool, func(hci.Advertisement)) error
+	Scan(context.Context, hci.Scanning, func(hci.Advertisement)) error
 	Advertise([]byte) error
 	StopAdvertising() error
 }
@@ -84,6 +84,16 @@ func NewTable() *setting.Table[schema.Bluetooth] {
 				},
 				func(c *schema.Bluetooth) *bool { return &c.Proxy },
 			),
+			setting.Pick(
+				setting.Setting[schema.Bluetooth]{
+					Name:  "scan",
+					Group: Group,
+					Icon:  "mdi:radar",
+					Local: true,
+				},
+				schema.ScanShares(),
+				func(c *schema.Bluetooth) *schema.ScanShare { return &c.Scan },
+			),
 		},
 		setting.Messages{Text: say.T, Missing: say.Missing},
 	)
@@ -96,7 +106,10 @@ func (b *Proxy) Handle(ctx context.Context, conn *esphome.Conn, msg proto.Messag
 	return b.proxy.Handle(ctx, conn, msg)
 }
 func (b *Proxy) Enabled() bool { return b.options.Settings.Read().Proxy }
-func (b *Proxy) Restore()      { b.knobs.Publish(); b.apply() }
+func (b *Proxy) scanning() hci.Scanning {
+	return hci.Scanning{Active: b.proxy.Active(), Percent: b.options.Settings.Read().Scan.Percent()}
+}
+func (b *Proxy) Restore() { b.knobs.Publish(); b.apply() }
 func (b *Proxy) SetProxy(on bool) {
 	if err := b.knobs.Change("proxy", setting.OnOff(on)); err != nil {
 		slog.Error("saving bluetooth proxy setting failed", "err", err)
@@ -188,7 +201,7 @@ func (b *Proxy) run(ctx context.Context) {
 	defer func() { stop(); delivery.Wait() }()
 	var cancel context.CancelFunc
 	var scanDone chan struct{}
-	var active bool
+	var running hci.Scanning
 	var generation uint64
 	finished := make(chan ended, 1)
 	retry := time.NewTimer(time.Hour)
@@ -209,8 +222,8 @@ func (b *Proxy) run(ctx context.Context) {
 	}
 	defer halt()
 	tune := func() bool {
-		want, mode := b.Enabled(), b.proxy.Active()
-		if cancel != nil && want && active == mode {
+		want, mode := b.Enabled(), b.scanning()
+		if cancel != nil && want && running == mode {
 			return true
 		}
 		halt()
@@ -223,7 +236,7 @@ func (b *Proxy) run(ctx context.Context) {
 			return false
 		}
 		scanCtx, stop := context.WithCancel(ctx)
-		cancel, scanDone, active = stop, make(chan struct{}), mode
+		cancel, scanDone, running = stop, make(chan struct{}), mode
 		done, g := scanDone, generation
 		safe.Go("bluetooth scanning", func() {
 			defer close(done)

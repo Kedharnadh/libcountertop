@@ -165,12 +165,12 @@ func (r *Radio) Line() (*Session, error) {
 	return r.sess, nil
 }
 
-func (r *Radio) Scan(ctx context.Context, active bool, found func(Advertisement)) error {
+func (r *Radio) Scan(ctx context.Context, sc Scanning, found func(Advertisement)) error {
 	s, err := r.Line()
 	if err != nil {
 		return err
 	}
-	return Scan(ctx, s, active, found)
+	return Scan(ctx, s, sc, found)
 }
 
 func (r *Radio) Speaker(ctx context.Context, name string, on Classic) error {
