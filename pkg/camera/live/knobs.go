@@ -343,7 +343,7 @@ func (c *Camera) Table() *setting.Table[Knobs] {
 			[]setting.Group{PictureGroup, ExposureGroup, BalanceGroup, StreamGroup},
 			c.rows(),
 			setting.Messages{Text: say.T, Missing: say.Missing},
-		)
+		).Local()
 	})
 	return c.table
 }

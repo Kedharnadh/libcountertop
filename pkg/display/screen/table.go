@@ -35,6 +35,7 @@ func rows(table func() *Table, uiSize func() string) []Setting {
 	return []Setting{
 		{
 			Name:  "backlight",
+			Local: true,
 			Group: Panel,
 			ID:    "backlight", Icon: "mdi:brightness-6",
 			Kind: setting.Number, Min: 0, Max: 100, Unit: "%", Slider: true,
@@ -50,6 +51,7 @@ func rows(table func() *Table, uiSize func() string) []Setting {
 		},
 		{
 			Name:  "auto",
+			Local: true,
 			Group: Panel,
 			ID:    "screen_mode",
 			Icon:  "mdi:brightness-auto",
@@ -90,6 +92,7 @@ func rows(table func() *Table, uiSize func() string) []Setting {
 		},
 		{
 			Name:  "size",
+			Local: true,
 			Group: Panel,
 			ID:    "screen_size", Icon: "mdi:resize",
 			Kind: setting.Choice, Options: plain(schema.ScreenSizes()),

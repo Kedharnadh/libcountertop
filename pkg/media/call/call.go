@@ -53,7 +53,7 @@ const (
 
 var (
 	ErrBusy    = errors.New("already in a call")
-	ErrNoRoute = errors.New("peer has no IPv4 address")
+	ErrNoRoute = discovery.ErrNoRoute
 )
 
 type Call struct {
@@ -156,7 +156,7 @@ func (c *Calls) Talking() bool {
 func (c *Calls) PausesWake() bool { return c.Talking() && c.options.Settings.Read().PauseWake }
 
 func (c *Calls) Start(p discovery.Peer, video bool) error {
-	addr, err := route(p)
+	addr, err := p.Addr()
 	if err != nil {
 		return err
 	}

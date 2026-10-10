@@ -482,6 +482,7 @@ settings.features: Connected services
 settings.language: Language
 settings.network: Network & internet
 settings.power: Restart
+settings.sync: Config sync
 settings.system: System
 settings.title: Settings
 settings.volume: Sound
@@ -514,6 +515,21 @@ style.skeuo: Skeuo
 style.standard: Standard
 style.terminal: Terminal
 style.title: Style
+sync.busy: "{{.Peer}} is busy"
+sync.cancelled: Sync cancelled
+sync.empty: No other devices to sync with
+sync.enter: "Enter the code shown on {{.Peer}}"
+sync.expired: The code expired
+sync.failed: Sync failed
+sync.matched: "Already matched {{.Peer}}"
+sync.received: "{{.N}} settings applied from {{.Peer}}"
+sync.receiving: Receiving settings…
+sync.sending: Sending settings…
+sync.sent: "Settings sent to {{.Peer}}"
+sync.show: "Enter this code on {{.Peer}}"
+sync.title: Config sync
+sync.tries: Too many wrong codes
+sync.wrong: "Wrong code, {{.N}} tries left"
 system.adb: ADB over network
 system.adb.hint: Unauthenticated root shell on 5555
 system.certificates: Verify certificates

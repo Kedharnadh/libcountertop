@@ -65,6 +65,7 @@ type BasicDependencies struct {
 	Idle                  *IdlePages
 	UISize                func() string
 	PowerPage, VisualPage func() shell.View
+	SyncPage              func() shell.View
 	Media                 MediaIdle
 	Home                  DashboardMode
 	HA                    HomeAccess

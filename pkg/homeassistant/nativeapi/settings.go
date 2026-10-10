@@ -14,7 +14,7 @@ func NewTable() *setting.Table[schema.API] {
 			setting.Setting[schema.API]{Name: "adopted", Group: Group},
 			func(c *schema.API) *bool { return &c.Adopted },
 		),
-	}, setting.Messages{Text: say.T, Missing: say.Missing})
+	}, setting.Messages{Text: say.T, Missing: say.Missing}).Local()
 }
 
 func (a *Server) Controls() *setting.Controls[schema.API] { return a.knobs }

@@ -1,6 +1,7 @@
 package setting
 
 import (
+	"errors"
 	"log/slog"
 	"strconv"
 	"sync"
@@ -192,4 +193,45 @@ func (c *Controls[T]) Change(name, value string) error {
 	}
 	c.Publish()
 	return nil
+}
+
+func (c *Controls[T]) Export() map[string]string {
+	at := c.Read()
+	out := map[string]string{}
+	for _, s := range c.Table.Rows() {
+		if s.Portable() {
+			out[s.Name] = s.Read(&at)
+		}
+	}
+	return out
+}
+
+func (c *Controls[T]) Import(values map[string]string) (int, error) {
+	var (
+		applied int
+		errs    []error
+	)
+	for name, value := range values {
+		s, ok := c.Table.Find(name)
+		if !ok || !s.Portable() {
+			continue
+		}
+		probe := c.Read()
+		if s.Read(&probe) == value {
+			continue
+		}
+		if err := s.Write(&probe, value); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		if err := c.Save(s, value); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		applied++
+	}
+	if applied > 0 {
+		c.Publish()
+	}
+	return applied, errors.Join(errs...)
 }

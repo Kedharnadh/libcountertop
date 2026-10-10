@@ -22,8 +22,11 @@ func NewTable() *Table {
 		return setting.Flag(Setting{Name: name, Group: Group, ID: id, Icon: icon}, field)
 	}
 	return setting.NewTable("weather", []setting.Group{Group}, []Setting{
-		setting.Words(Setting{Name: "entity", Group: Group, Icon: "mdi:weather-partly-cloudy"},
-			entityMost, func(c *schema.Weather) *string { return &c.Entity }),
+		setting.Words(
+			Setting{Name: "entity", Group: Group, Icon: "mdi:weather-partly-cloudy", Local: true},
+			entityMost,
+			func(c *schema.Weather) *string { return &c.Entity },
+		),
 		setting.Pick(Setting{Name: "look", Group: Group, Icon: "mdi:palette-outline"},
 			schema.WeatherLooks(), func(c *schema.Weather) *schema.WeatherLook { return &c.Look }),
 		flag("dashboard", "", "mdi:view-dashboard-outline",

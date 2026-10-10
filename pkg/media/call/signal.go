@@ -158,15 +158,6 @@ func (c *Calls) ended(w http.ResponseWriter, r *http.Request) {
 	c.close(s, reason)
 }
 
-func route(p discovery.Peer) (string, error) {
-	for _, a := range p.Addrs {
-		if a.To4() != nil {
-			return net.JoinHostPort(a.String(), strconv.Itoa(p.Port)), nil
-		}
-	}
-	return "", ErrNoRoute
-}
-
 func post(ctx context.Context, addr, what string, m envelope) (int, error) {
 	body, err := json.Marshal(m)
 	if err != nil {

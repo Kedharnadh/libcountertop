@@ -1,8 +1,6 @@
 package callview
 
 import (
-	"math"
-
 	gogui "github.com/go-gui-org/go-gui/gui"
 
 	"github.com/ygelfand/libcountertop/pkg/audio/volume"
@@ -107,7 +105,3 @@ func iconStyle(c gogui.Color) gogui.TextStyle {
 }
 
 func reach() float32 { return style.Reach() }
-
-func cell(width, gap float32, n int) float32 {
-	return float32(math.Floor(float64((width - gap*float32(n-1)) / float32(n))))
-}

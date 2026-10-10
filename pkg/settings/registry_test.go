@@ -123,3 +123,39 @@ func TestRegistryListsDomainsInOrder(t *testing.T) {
 		t.Errorf("All() = %v", got)
 	}
 }
+
+func TestASnapshotCarriesOnlyPortableSettings(t *testing.T) {
+	from := sample{On: true, Mode: "b", Name: "kitchen", Token: "s3cret"}
+	source := sampleControls(t, &from)
+	source.Table.rows[2].Local = true
+	var r Registry
+	r.Add(source)
+
+	snap := r.Export()
+	want := map[string]string{"on": "on", "mode": "b"}
+	if got := snap["sample"]; len(got) != len(want) || got["on"] != "on" || got["mode"] != "b" {
+		t.Fatalf("snapshot = %v, want %v", got, want)
+	}
+
+	var to sample
+	target := sampleControls(t, &to)
+	target.Table.rows[2].Local = true
+	var into Registry
+	into.Add(target)
+	snap["sample"]["name"] = "hallway"
+	snap["sample"]["token"] = "stolen"
+	snap["sample"]["gone"] = "x"
+	snap["other"] = map[string]string{"on": "off"}
+
+	applied, err := into.Import(snap)
+	if err != nil || applied != 2 {
+		t.Fatalf("Import = %d, %v; want 2 settings applied", applied, err)
+	}
+	if !to.On || to.Mode != "b" || to.Name != "" || to.Token != "" {
+		t.Fatalf("imported %+v; want only on and mode", to)
+	}
+
+	if applied, err := into.Import(snap); err != nil || applied != 0 {
+		t.Fatalf("second Import = %d, %v; want nothing left to change", applied, err)
+	}
+}

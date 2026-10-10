@@ -76,11 +76,13 @@ func (p *BasicPages) System() *shell.Page {
 					Value: c.Screen.Keyboard.Label(),
 				},
 				{Glyph: gogui.IconSync, Label: say.T("settings.power"), Kind: menu.Chevron},
+				{Glyph: gogui.IconExport, Label: say.T("settings.sync"), Kind: menu.Chevron},
 			}, []func(int){
 				p.open(func() shell.View { return p.Language() }),
 				p.open(func() shell.View { return p.DateTime() }),
 				p.open(func() shell.View { return p.Keyboard() }),
 				p.open(p.options.PowerPage),
+				p.open(p.options.SyncPage),
 			}
 	}}
 }

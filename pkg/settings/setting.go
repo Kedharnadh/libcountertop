@@ -107,6 +107,8 @@ type Setting[T any] struct {
 
 	Enables bool
 
+	Local bool
+
 	Options []Option
 
 	Read  func(*T) string
@@ -153,6 +155,15 @@ func (t *Table[T]) Alias(from, to string) *Table[T] {
 }
 
 func (t *Table[T]) Rows() []Setting[T] { return t.rows }
+
+func (t *Table[T]) Local() *Table[T] {
+	for i := range t.rows {
+		t.rows[i].Local = true
+	}
+	return t
+}
+
+func (s Setting[T]) Portable() bool { return !s.Local && s.Kind != Secret }
 
 func (t *Table[T]) Groups() []Group { return t.groups }
 

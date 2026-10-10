@@ -84,6 +84,7 @@ func controlRow(key string) Setting {
 	name := "control." + key
 	return Setting{
 		Name:  name,
+		Local: true,
 		Group: Group,
 		Kind:  setting.Toggle,
 		Read:  func(h *config.Home) string { return setting.OnOff(h.Control[key]) },
@@ -111,6 +112,7 @@ func groupRow(key string) Setting {
 	name := "group." + key
 	return Setting{
 		Name:  name,
+		Local: true,
 		Group: Group,
 		Kind:  setting.Number,
 		Max:   config.HomeGroupMost,
