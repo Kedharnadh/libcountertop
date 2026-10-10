@@ -25,7 +25,11 @@ func TestConv2DOverManyChannelsMatchesADirectSum(t *testing.T) {
 	y := out()
 
 	p := convParams{samePad: true, strideW: 1, strideH: 1, dilationW: 1, dilationH: 1}
-	if err := kernels[OpConv2D](&OpDesc{Op: OpConv2D, conv: p}, []*Tensor{x, w, bias}, []*Tensor{y}); err != nil {
+	if err := kernels[OpConv2D](
+		&OpDesc{Op: OpConv2D, conv: p},
+		[]*Tensor{x, w, bias},
+		[]*Tensor{y},
+	); err != nil {
 		t.Fatal(err)
 	}
 	shape(t, "conv", y.Shape, []int{1, ih, iw, oc})
@@ -42,7 +46,11 @@ func TestConv2DOverManyChannelsMatchesADirectSum(t *testing.T) {
 							continue
 						}
 						for c := range ic {
-							want += float64(x.F32[(iy*iw+ix)*ic+c]) * float64(w.F32[((f*kh+ky)*kw+kx)*ic+c])
+							want += float64(
+								x.F32[(iy*iw+ix)*ic+c],
+							) * float64(
+								w.F32[((f*kh+ky)*kw+kx)*ic+c],
+							)
 						}
 					}
 				}
