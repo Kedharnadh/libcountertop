@@ -23,8 +23,6 @@ type Player struct {
 	workers sync.WaitGroup
 	knobs   *Controls
 	state   *esphome.TextSensor
-	title   *esphome.TextSensor
-	artist  *esphome.TextSensor
 
 	out *core.Output
 
@@ -70,23 +68,6 @@ func New(options Dependencies) *Player {
 	}
 	p.state.Set(stateOff)
 
-	p.title = &esphome.TextSensor{
-		Base: esphome.Base{
-			ObjectID: "sendspin_title",
-			Name:     "Now playing",
-			Icon:     "mdi:music-note",
-			DeviceID: options.DeviceID,
-		},
-	}
-	p.artist = &esphome.TextSensor{
-		Base: esphome.Base{
-			ObjectID: "sendspin_artist",
-			Name:     "Artist",
-			Icon:     "mdi:account-music",
-			DeviceID: options.DeviceID,
-		},
-	}
-
 	return p
 }
 
@@ -115,7 +96,7 @@ const (
 func (p *Player) Name() string { return "sendspin" }
 
 func (p *Player) Entities() []esphome.Entity {
-	return append(p.knobs.Entities(), p.state, p.title, p.artist)
+	return append(p.knobs.Entities(), p.state)
 }
 
 func (p *Player) Settings() *Controls { return p.knobs }
@@ -202,9 +183,7 @@ func (p *Player) holds(s *core.Session) {
 	p.paused = false
 	p.playing = track{}
 	p.mu.Unlock()
-
-	p.title.Set("")
-	p.artist.Set("")
+	p.changed()
 
 	if s == nil {
 		p.options.Media.Ended(p)
@@ -242,9 +221,6 @@ func (p *Player) plays(t track) {
 	}
 	p.playing = t
 	p.mu.Unlock()
-
-	p.title.Set(t.Title)
-	p.artist.Set(t.Artist)
 	p.changed()
 
 	if !t.empty() {

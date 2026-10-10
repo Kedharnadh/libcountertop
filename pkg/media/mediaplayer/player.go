@@ -36,12 +36,15 @@ type Options[P Speaker] struct {
 	DuckDB         func() float64
 	Volume         Volume
 	Changed        func()
+	Device         uint32
 }
 
 type Player[P Speaker] struct {
 	Begun hook.Hook[nowplaying.Source]
 
 	mp     *esphome.MediaPlayer
+	title  *esphome.TextSensor
+	artist *esphome.TextSensor
 	stream *pcm.Stream
 	sound  *sound.Driver[P]
 	volume Volume
@@ -82,6 +85,18 @@ func New[P Speaker](o Options[P]) *Player[P] {
 			SupportedFormats: Formats(o.Rate, o.Channels),
 			SupportsPause:    true,
 		},
+		title: &esphome.TextSensor{Base: esphome.Base{
+			ObjectID: "now_playing",
+			Name:     "Now playing",
+			Icon:     "mdi:music-note",
+			DeviceID: o.Device,
+		}},
+		artist: &esphome.TextSensor{Base: esphome.Base{
+			ObjectID: "artist",
+			Name:     "Artist",
+			Icon:     "mdi:account-music",
+			DeviceID: o.Device,
+		}},
 		sound:  o.Sound,
 		volume: o.Volume,
 		notify: o.Changed,
@@ -107,6 +122,8 @@ func New[P Speaker](o Options[P]) *Player[P] {
 }
 
 func (p *Player[P]) Entity() *esphome.MediaPlayer { return p.mp }
+
+func (p *Player[P]) Track() []esphome.Entity { return []esphome.Entity{p.title, p.artist} }
 
 func (p *Player[P]) Stream() *pcm.Stream { return p.stream }
 
@@ -199,6 +216,12 @@ func (p *Player[P]) Mute(on bool) {
 
 func (p *Player[P]) Changed() {
 	p.mp.SetState(p.state())
+	now := p.Now()
+	if !now.Playing && !now.Paused {
+		now.Title, now.Artist = "", ""
+	}
+	show(p.title, now.Title)
+	show(p.artist, now.Artist)
 	if p.notify != nil {
 		p.notify()
 	}
@@ -330,6 +353,12 @@ func (p *Player[P]) Stop() {
 }
 
 func (p *Player[P]) source() nowplaying.Source { s, _ := p.owner.Get(); return s }
+
+func show(t *esphome.TextSensor, v string) {
+	if t.Get() != v {
+		t.Set(v)
+	}
+}
 
 func (p *Player[P]) external() nowplaying.Source {
 	if s := p.source(); s != nowplaying.Source(p.queue) {

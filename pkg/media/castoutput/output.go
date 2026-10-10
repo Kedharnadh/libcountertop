@@ -381,12 +381,15 @@ func (o *Output) Resume(src playback.Source) {
 		return
 	}
 	p.paused = false
-	hold := o.down || p.waiting
+	down, waiting := o.down, p.waiting
 	o.mu.Unlock()
-	if !hold {
+	if !down && !waiting {
 		o.resume()
 	}
 	o.feed.Unlock()
+	if down {
+		o.options.Took(o)
+	}
 	o.options.Media().Changed()
 }
 
