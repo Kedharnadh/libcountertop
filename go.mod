@@ -26,7 +26,7 @@ require (
 	github.com/pion/rtp v1.10.5
 	github.com/pion/webrtc/v4 v4.2.22
 	github.com/tphakala/go-aac v0.7.0
-	github.com/ygelfand/go-esphome-device v0.0.12
+	github.com/ygelfand/go-esphome-device v0.0.13
 	github.com/zserge/microwakeword v0.0.0-20260330234603-bfaf3840114e
 	golang.org/x/image v0.46.0
 	golang.org/x/sys v0.48.0
