@@ -4,9 +4,6 @@ import (
 	"context"
 	"testing"
 	"testing/synctest"
-
-	"github.com/ygelfand/libcountertop/pkg/display/videopage"
-	"github.com/ygelfand/libcountertop/pkg/media/videostream"
 )
 
 type exiting struct {
@@ -43,24 +40,5 @@ func TestStopJoinsTheAudioWorker(t *testing.T) {
 		}
 		close(s.finish)
 		<-stopped
-	})
-}
-
-func TestViewRetirementJoinsThePageWorker(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		o := newOutput()
-		cancelled, done := make(chan struct{}), make(chan struct{})
-		o.view, o.viewStop, o.viewDone, o.under = &videopage.Page{}, func() { close(cancelled) }, done, &videostream.Beneath{}
-		retired := make(chan struct{})
-		go func() { o.retireView(0); close(retired) }()
-		<-cancelled
-		synctest.Wait()
-		select {
-		case <-retired:
-			t.Fatal("view retired before its page worker exited")
-		default:
-		}
-		close(done)
-		<-retired
 	})
 }

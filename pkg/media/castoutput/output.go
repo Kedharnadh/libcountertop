@@ -1,28 +1,25 @@
 package castoutput
 
 import (
+	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"hash/maphash"
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"log/slog"
 	"net/http"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/audio/analysis"
 	"github.com/ygelfand/libcountertop/pkg/audio/ducking"
-	"github.com/ygelfand/libcountertop/pkg/display/surface"
-	"github.com/ygelfand/libcountertop/pkg/display/theme"
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
-	videoplayer "github.com/ygelfand/libcountertop/pkg/display/videopage"
 	"github.com/ygelfand/libcountertop/pkg/fetch"
 	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 	"github.com/ygelfand/libcountertop/pkg/media/pcm"
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
-	video "github.com/ygelfand/libcountertop/pkg/media/videostream"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
 
@@ -35,16 +32,9 @@ type Output struct {
 	control sync.Mutex
 	options Options
 	q       Queue
-	play    func(context.Context, video.Stream) (video.Report, error)
 
-	view      *videoplayer.Page
-	viewStop  context.CancelFunc
-	viewDone  chan struct{}
-	under     *video.Beneath
-	viewGen   int
-	viewTimer *time.Timer
-	handing   bool
-	handed    *card
+	handing bool
+	handed  *card
 
 	feed sync.Mutex
 
@@ -75,7 +65,10 @@ func pictureOf(raw []byte) picture {
 	return picture{raw: raw, id: maphash.Bytes(pictureSeed, raw)}
 }
 
-func (p picture) image() *ui.Image { return ui.Picture(p.raw, p.id) }
+func (p picture) decodes() bool {
+	c, _, err := image.DecodeConfig(bytes.NewReader(p.raw))
+	return err == nil && c.Width > 0 && c.Height > 0
+}
 
 type playing struct {
 	workers sync.WaitGroup
@@ -123,8 +116,9 @@ func (o *Output) Play(src playback.Source) {
 	ctx, stop := context.WithCancel(context.Background())
 	p := &playing{src: src, stop: stop}
 	p.card = &card{o: o, p: p}
+	screen := o.options.Screen
 	pics, pictured := src.(playback.Pictures)
-	pictured = pictured && pics.Pictured()
+	pictured = pictured && pics.Pictured() && screen != nil
 	if pictured {
 		p.seen = make(chan struct{})
 	}
@@ -135,10 +129,9 @@ func (o *Output) Play(src playback.Source) {
 	if h := o.handed; h != nil && art != "" && h.p.artURL == art {
 		p.art, p.artURL = h.p.art, art
 	}
-	view := o.view
 	o.mu.Unlock()
-	if view != nil {
-		view.SetNote("")
+	if screen != nil {
+		screen.Say("")
 	}
 
 	o.q.Drain()
@@ -150,16 +143,14 @@ func (o *Output) Play(src playback.Source) {
 	o.Changed(src)
 
 	if pictured {
-		if o.play == nil {
-			view, _ := o.hold(p.card)
-			if b, ok := src.(playback.Branded); ok && b.Logo() != "" {
-				url := b.Logo()
-				safe.Go("cast logo", func() {
-					if img := o.logoFor(url).image(); img != nil {
-						view.SetLogo(img)
-					}
-				})
-			}
+		screen.Hold(p.card)
+		if b, ok := src.(playback.Branded); ok && b.Logo() != "" {
+			url := b.Logo()
+			safe.Go("cast logo", func() {
+				if pic := o.logoFor(url); pic.raw != nil {
+					screen.Logo(pic.raw, pic.id)
+				}
+			})
 		}
 	}
 	o.worker(p, "cast output", func() { o.pump(ctx, p) })
@@ -168,211 +159,33 @@ func (o *Output) Play(src playback.Source) {
 	}
 }
 
-const viewGrace = 5 * time.Second
-
-func (o *Output) hold(c videoplayer.Controls) (*videoplayer.Page, *video.Beneath) {
-	o.mu.Lock()
-	o.viewGen++
-	if o.viewTimer != nil {
-		o.viewTimer.Stop()
-		o.viewTimer = nil
-	}
-	slog.Debug("cast video view held", "new", o.view == nil, "by", fmt.Sprintf("%T", c))
-	if o.view == nil {
-		ctx, stop := context.WithCancel(context.Background())
-		o.view, o.viewStop, o.under = o.options.NewPage(c), stop, o.options.NewUnder()
-		view := o.view
-		o.under.Stalled = func() { view.SetLoading(true) }
-		o.under.Resumed = func() { view.SetLoading(false) }
-		done := make(chan struct{})
-		o.viewDone = done
-		go func() { defer close(done); view.Run(ctx) }()
-	} else {
-		o.view.Follow(c)
-		o.view.SetLoading(true)
-	}
-	view, under := o.view, o.under
-	o.mu.Unlock()
-	return view, under
-}
-
-func (o *Output) letGo() {
-	o.mu.Lock()
-	view := o.view
-	if view == nil {
-		o.mu.Unlock()
-		return
-	}
-	handing, gen := o.handing, o.viewGen
-	if o.viewTimer != nil {
-		o.viewTimer.Stop()
-	}
-	o.viewTimer = time.AfterFunc(viewGrace, func() { o.retireView(gen) })
-	o.mu.Unlock()
-	if handing {
-		view.SetLoading(true)
-	} else {
-		view.SetPicture(false)
-	}
-}
-
-func (o *Output) retireView(gen int) {
-	o.mu.Lock()
-	if o.viewGen != gen || o.view == nil {
-		o.mu.Unlock()
-		return
-	}
-	stop, done, under := o.viewStop, o.viewDone, o.under
-	o.view, o.viewStop, o.viewDone, o.under, o.viewTimer = nil, nil, nil, nil, nil
-	o.mu.Unlock()
-	stop()
-	<-done
-	under.Clear()
-}
-
-const pictureWait = 30 * time.Second
-
 func (o *Output) picture(ctx context.Context, p *playing, pics playback.Pictures) {
-	play := o.play
-	var view *videoplayer.Page
-	if play == nil {
-		v, under := o.hold(p.card)
-		view = v
-		defer o.letGo()
-		play = func(ctx context.Context, s video.Stream) (video.Report, error) { return o.options.Video(ctx, under, s) }
-	}
-	err := o.pictureOnce(ctx, p, pics, play, view)
+	waiter, _ := p.src.(playback.Waiter)
+	err := o.options.Screen.Play(ctx, p.card, pics, Feed{
+		Clock: func() (time.Duration, bool) { return o.clock(p) },
+		Started: func() {
+			p.shown()
+			if waiter != nil {
+				waiter.Waiting(false)
+			}
+		},
+		Waiting: func(w bool) {
+			o.waiting(p, w)
+			if waiter != nil {
+				waiter.Waiting(w)
+			}
+		},
+		Handing: func() bool {
+			o.mu.Lock()
+			defer o.mu.Unlock()
+			return o.handing
+		},
+	})
 	if err == nil || ctx.Err() != nil {
 		return
 	}
 	slog.Warn("cast video", "err", err)
 	o.completed(p, err, true)
-}
-
-var errNoPicture = errors.New("cast video: no picture")
-
-func (o *Output) pictureOnce(
-	ctx context.Context,
-	p *playing,
-	pics playback.Pictures,
-	play func(context.Context, video.Stream) (video.Report, error),
-	view *videoplayer.Page,
-) error {
-	actx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	var began, late atomic.Bool
-	watch := time.AfterFunc(pictureWait, func() {
-		if !began.Load() {
-			late.Store(true)
-			cancel()
-		}
-	})
-	defer watch.Stop()
-
-	s, closer, err := streamOf(actx, pics)
-	if err != nil {
-		return err
-	}
-	defer closer.Close()
-	s.Clock = func() (time.Duration, bool) { return o.clock(p) }
-	waiter, _ := p.src.(playback.Waiter)
-	s.Started = func() {
-		began.Store(true)
-		p.shown()
-		if waiter != nil {
-			waiter.Waiting(false)
-		}
-		if view != nil {
-			view.SetFrame(int(s.Width), int(s.Height))
-			view.SetPicture(true)
-		}
-	}
-	s.Waiting = func(w bool) {
-		o.waiting(p, w)
-		if waiter != nil {
-			waiter.Waiting(w)
-		}
-		if view != nil {
-			view.SetLoading(w)
-		}
-	}
-	rep, err := play(actx, s)
-	slog.Info(
-		"cast video over",
-		"shown",
-		rep.Shown,
-		"dropped",
-		rep.Dropped,
-		"size",
-		fmt.Sprintf("%dx%d", s.Width, s.Height),
-		"err",
-		err,
-	)
-	if late.Load() {
-		return errNoPicture
-	}
-	return err
-}
-
-func streamOf(ctx context.Context, pics playback.Pictures) (video.Stream, io.Closer, error) {
-	if l, ok := pics.(playback.Live); ok {
-		p, err := l.Live(ctx)
-		if err != nil {
-			return video.Stream{}, nil, err
-		}
-		if p.Sealed != nil {
-			if !p.H264 {
-				return video.Stream{}, nil, errNoPicture
-			}
-			s := video.Stream{
-				Codec:   video.H264,
-				Width:   uint32(p.Width),
-				Height:  uint32(p.Height),
-				Session: p.Session,
-				Source:  sealedFrames(p.Sealed),
-			}
-			return s, io.NopCloser(nil), nil
-		}
-		if p.Next != nil {
-			if !p.H264 {
-				return video.Stream{}, nil, errNoPicture
-			}
-			s := video.Stream{
-				Codec:  video.H264,
-				Width:  uint32(p.Width),
-				Height: uint32(p.Height),
-				Source: liveFrames(p.Next),
-			}
-			return s, io.NopCloser(nil), nil
-		}
-	}
-	stream, from, err := pics.Pictures(ctx)
-	if err != nil {
-		return video.Stream{}, nil, err
-	}
-	if stream == nil {
-		return video.Stream{}, nil, errNoPicture
-	}
-	s, err := video.WebM(stream, from)
-	if err != nil {
-		stream.Close()
-		return video.Stream{}, nil, err
-	}
-	return s, stream, nil
-}
-
-type liveFrames func(context.Context) ([]byte, time.Duration, error)
-
-func (f liveFrames) Next(ctx context.Context) (video.Frame, error) {
-	data, at, err := f(ctx)
-	return video.Frame{Data: data, At: at}, err
-}
-
-type sealedFrames func(context.Context) ([]byte, time.Duration, *surface.Crypt, error)
-
-func (f sealedFrames) Next(ctx context.Context) (video.Frame, error) {
-	data, at, k, err := f(ctx)
-	return video.Frame{Data: data, At: at, Crypt: k}, err
 }
 
 func (o *Output) Stop(src playback.Source) {
@@ -437,7 +250,7 @@ func (o *Output) Attend(s *playback.Session) {
 	if s == nil {
 		o.note, o.sessArt = "", picture{}
 	}
-	idle, held := o.cur == nil, o.view != nil
+	idle, handing := o.cur == nil, o.handing
 	o.mu.Unlock()
 	if s == nil {
 		o.options.Media().Ended(o.standby)
@@ -449,8 +262,8 @@ func (o *Output) Attend(s *playback.Session) {
 		o.options.Media().Began(o.standby)
 	default:
 		o.options.Media().Release(o.standby)
-		if held {
-			o.letGo()
+		if screen := o.options.Screen; screen != nil {
+			screen.Release(handing)
 		}
 	}
 }
@@ -467,11 +280,10 @@ func (o *Output) fail(err error, unseen bool) {
 	o.dropHanded()
 	o.mu.Lock()
 	o.note = err.Error()
-	view, idle := o.view, o.cur == nil
+	idle := o.cur == nil
 	o.mu.Unlock()
-	if view != nil && (idle || unseen) {
-		view.SetPicture(false)
-		view.SetNote(err.Error())
+	if screen := o.options.Screen; screen != nil && (idle || unseen) {
+		screen.Fail(err.Error())
 	}
 	o.options.Media().Changed()
 }
@@ -496,10 +308,10 @@ func (o *Output) standBy() {
 		if o.sess == s {
 			o.sessArt = pic
 		}
-		view, idle := o.view, o.cur == nil
+		idle := o.cur == nil
 		o.mu.Unlock()
-		if view != nil && idle {
-			view.SetLogo(pic.image())
+		if screen := o.options.Screen; screen != nil && idle {
+			screen.Logo(pic.raw, pic.id)
 		}
 		o.options.Media().Changed()
 	})
@@ -816,7 +628,7 @@ func fetchImage(url, what string) picture {
 		return picture{}
 	}
 	pic := pictureOf(body)
-	if pic.image() == nil {
+	if !pic.decodes() {
 		return picture{}
 	}
 	return pic
@@ -920,16 +732,13 @@ func (c *card) Now() nowplaying.Now {
 
 func (c *card) Open() bool {
 	c.o.mu.Lock()
-	view, cur := c.o.view, c.o.cur
+	cur := c.o.cur
 	c.o.mu.Unlock()
-	if cur != c.p || c.p.seen == nil {
+	screen := c.o.options.Screen
+	if cur != c.p || c.p.seen == nil || screen == nil {
 		return false
 	}
-	if view != nil {
-		view.Show()
-		return true
-	}
-	c.o.hold(c)
+	screen.Open(c)
 	return true
 }
 
@@ -957,17 +766,11 @@ func (c *card) Seek(to time.Duration) {
 	}
 }
 
-func (c *card) Marks() []videoplayer.Mark {
-	m, ok := c.p.src.(playback.Marked)
-	if !ok {
-		return nil
+func (c *card) Marks() []playback.Mark {
+	if m, ok := c.p.src.(playback.Marked); ok {
+		return m.Marks()
 	}
-	var out []videoplayer.Mark
-	for _, k := range m.Marks() {
-		out = append(out, videoplayer.Mark{From: k.From, To: k.To,
-			Color: theme.Color{R: byte(k.RGB >> 16), G: byte(k.RGB >> 8), B: byte(k.RGB)}})
-	}
-	return out
+	return nil
 }
 
 func (c *card) CanSeek() bool {
@@ -998,16 +801,11 @@ func (b *standby) Open() bool {
 	b.o.mu.Lock()
 	s, note, art, playing := b.o.sess, b.o.note, b.o.sessArt, b.o.cur != nil
 	b.o.mu.Unlock()
-	if s == nil || !s.Pictured || playing {
+	screen := b.o.options.Screen
+	if s == nil || !s.Pictured || playing || screen == nil {
 		return false
 	}
-	view, _ := b.o.hold(b)
-	view.SetPicture(false)
-	view.SetLoading(false)
-	view.SetNote(note)
-	if img := art.image(); img != nil {
-		view.SetLogo(img)
-	}
+	screen.Standby(b, note, art.raw, art.id)
 	return true
 }
 
@@ -1017,8 +815,9 @@ func (b *standby) Wakes() bool {
 	return b.o.sess != nil && b.o.sess.Pictured
 }
 
-func (b *standby) Seek(time.Duration) {}
-func (b *standby) CanSeek() bool      { return false }
+func (b *standby) Seek(time.Duration)     {}
+func (b *standby) CanSeek() bool          { return false }
+func (b *standby) Marks() []playback.Mark { return nil }
 
 func (b *standby) Label() string {
 	b.o.mu.Lock()
@@ -1055,9 +854,7 @@ type Options struct {
 	DuckDB         func() float64
 	Media          func() Media
 	Took, Gave     func(pcm.Producer)
-	NewPage        func(videoplayer.Controls) *videoplayer.Page
-	NewUnder       func() *video.Beneath
-	Video          func(context.Context, *video.Beneath, video.Stream) (video.Report, error)
+	Screen         Screen
 }
 
 func (o *Output) SetEnded(f func()) { o.mu.Lock(); o.ended = f; o.mu.Unlock() }

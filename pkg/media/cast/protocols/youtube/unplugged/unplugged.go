@@ -1,4 +1,4 @@
-package youtube
+package unplugged
 
 import (
 	"bytes"
@@ -19,6 +19,7 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/display/surface"
 	"github.com/ygelfand/libcountertop/pkg/media/cast/preferences"
+	"github.com/ygelfand/libcountertop/pkg/media/cast/protocols/youtube"
 	"github.com/ygelfand/libcountertop/pkg/media/cenc"
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
 	"github.com/ygelfand/libcountertop/pkg/media/sealed"
@@ -452,7 +453,7 @@ func (u *unplugged) heartbeat(ctx context.Context, token, data, interval string)
 		u.licMu.Lock()
 		ctt := u.ctt
 		u.licMu.Unlock()
-		at := strconv.FormatInt(time.Now().Add(-liveLead(u.prefs)).UnixMilli(), 10)
+		at := strconv.FormatInt(time.Now().Add(-youtube.LiveLead(u.prefs)).UnixMilli(), 10)
 		body := map[string]any{
 			"videoId":             u.id,
 			"sequenceNumber":      seq,
@@ -536,13 +537,19 @@ func nonEmpty(ss ...string) []string {
 	return out
 }
 
-func (u *unplugged) showing() (Track, string, string) {
+func (u *unplugged) Info() youtube.Track {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.info
+}
+
+func (u *unplugged) Showing() (youtube.Track, string, string) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	return u.info, u.album, u.mark
 }
 
-func (u *unplugged) onChange(f func()) {
+func (u *unplugged) OnChange(f func()) {
 	u.mu.Lock()
 	u.changed = f
 	u.mu.Unlock()
@@ -557,7 +564,7 @@ type unplugged struct {
 	params  string
 
 	Width, Height int
-	info          Track
+	info          youtube.Track
 	album         string
 	mark          string
 	changed       func()
@@ -569,21 +576,22 @@ type unplugged struct {
 	licMu sync.Mutex
 }
 
-func openUnplugged(
-	ctx context.Context,
-	env surfaceEnv,
-	id, params, ctt string,
-	at time.Duration,
-) (*unplugged, error) {
+func TV(helper func() *surface.Client) youtube.TV {
+	return func(ctx context.Context, r youtube.TVRequest) (youtube.TVStream, error) {
+		return open(ctx, helper(), r)
+	}
+}
+
+func open(ctx context.Context, surf *surface.Client, r youtube.TVRequest) (*unplugged, error) {
+	id, params, ctt, at := r.ID, r.Params, r.CTT, r.At
 	if ctt == "" {
 		return nil, errors.New("youtube tv: the phone sent no credential")
 	}
-	surf := env.surface()
-	a, err := unpluggedPlay(ctx, env.http, ctt, id, params)
+	a, err := unpluggedPlay(ctx, r.HTTP, ctt, id, params)
 	if err != nil {
 		return nil, err
 	}
-	video, audio := pickUnplugged(a.StreamingData.AdaptiveFormats, env.limits)
+	video, audio := pickUnplugged(a.StreamingData.AdaptiveFormats, r.Limits)
 	if video == nil || audio == nil {
 		return nil, errors.New("youtube tv: no H.264 and AAC formats offered")
 	}
@@ -592,17 +600,22 @@ func openUnplugged(
 		return nil, err
 	}
 	u := &unplugged{
-		hc: env.http, ctt: ctt, id: id, cpn: nonce(),
+		hc: r.HTTP, ctt: ctt, id: id, cpn: nonce(),
 		session: a.HeartbeatParams.DRMSessionID, params: a.StreamingData.DRMParams,
-		Width: video.Width, Height: video.Height, prefs: env.prefs,
+		Width: video.Width, Height: video.Height, prefs: r.Prefs,
 	}
-	u.p, err = sealed.Open("youtube tv", surf, cert, u.licensed, env.resample)
+	u.p, err = sealed.Open("youtube tv", surf, cert, u.licensed, r.Resample)
 	if err != nil {
 		return nil, err
 	}
 	run, cancel := context.WithCancel(context.Background())
 	u.cancel = cancel
-	u.info = Track{ID: id, Title: a.VideoDetails.Title, Author: a.VideoDetails.Author, Codec: "aac"}
+	u.info = youtube.Track{
+		ID:     id,
+		Title:  a.VideoDetails.Title,
+		Author: a.VideoDetails.Author,
+		Codec:  "aac",
+	}
 	if th := a.VideoDetails.Thumbnail.Thumbnails; len(th) > 0 {
 		u.info.Thumbnail = th[len(th)-1].URL
 		if strings.HasPrefix(u.info.Thumbnail, "//") {
@@ -625,7 +638,7 @@ func openUnplugged(
 		return nil, err
 	}
 	oldest, _ := strconv.ParseInt(a.PlayerConfig.Live.MinDvrSequence, 10, 64)
-	start := tvStart(head, oldest, liveLead(u.prefs), at, time.Now())
+	start := tvStart(head, oldest, youtube.LiveLead(u.prefs), at, time.Now())
 	go func() { u.fail(u.follow(run, video.URL, start, true)) }()
 	go func() { u.fail(u.follow(run, audio.URL, start, false)) }()
 	go u.guide(run)
@@ -796,7 +809,7 @@ const tvSegment = 5 * time.Second
 func tvStart(head, oldest int64, delay, at time.Duration, now time.Time) int64 {
 	lead := max(int64(delay/tvSegment), 1)
 	start := head - lead
-	if wallClock(at) {
+	if youtube.WallClock(at) {
 		if back := int64(now.Sub(time.Unix(0, 0).Add(at)) / tvSegment); back > lead {
 			start = max(head-back, oldest)
 		}
@@ -804,16 +817,13 @@ func tvStart(head, oldest int64, delay, at time.Duration, now time.Time) int64 {
 	return start
 }
 
-func liveLead(p preferences.Provider) time.Duration {
-	return time.Duration(p.Settings().YouTube.LiveDelay) * time.Second
-}
-
-type surfaceEnv struct {
-	http     *http.Client
-	surface  func() *surface.Client
-	resample func(from int) func([]int16) []int16
-	limits   playback.Target
-	prefs    preferences.Provider
-}
-
 func within(v, most int) bool { return most <= 0 || v <= most }
+
+func wait(ctx context.Context, d time.Duration) {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+	case <-t.C:
+	}
+}

@@ -5,7 +5,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/ygelfand/libcountertop/pkg/display/surface"
+	"github.com/ygelfand/libcountertop/pkg/media/cenc"
 )
 
 type Branded interface {
@@ -45,7 +45,7 @@ type Picture struct {
 	Width, Height int
 	Next          func(context.Context) (data []byte, at time.Duration, err error)
 	Session       uint32
-	Sealed        func(context.Context) (data []byte, at time.Duration, crypt *surface.Crypt, err error)
+	Sealed        func(context.Context) (data []byte, at time.Duration, crypt *cenc.Crypt, err error)
 }
 
 type Live interface {

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -158,14 +159,12 @@ func crypt(s cenc.Sample, subs []cenc.Subsample) *surface.Crypt {
 	if !s.Encrypted {
 		return nil
 	}
-	k := &surface.Crypt{Mode: surface.CryptCENC, Key: s.KeyID, IV: s.IV}
-	for _, x := range subs {
-		k.Subsamples = append(
-			k.Subsamples,
-			surface.Subsample{Clear: x.Clear, Encrypted: x.Encrypted},
-		)
+	return &cenc.Crypt{
+		Mode:       cenc.CryptCENC,
+		Key:        s.KeyID,
+		IV:         s.IV,
+		Subsamples: slices.Clone(subs),
 	}
-	return k
 }
 
 func (p *Player) anchor(at time.Duration) time.Duration {

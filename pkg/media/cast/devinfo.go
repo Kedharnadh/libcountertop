@@ -12,9 +12,6 @@ const (
 	TypeDeviceInfo    = "DEVICE_INFO"
 )
 
-// A stock Lenovo Smart Display 10 reports this in DEVICE_INFO, not its ca record.
-const InfoCapabilities = 231429
-
 type deviceInfo struct {
 	Type                 string `json:"type"`
 	RequestID            int    `json:"requestId"`
@@ -47,7 +44,7 @@ func (r *Receiver) discovery(m Message) ([]Message, error) {
 		DeviceID:             d.ID,
 		FriendlyName:         d.Name,
 		DeviceModel:          d.Model,
-		DeviceCapabilities:   InfoCapabilities,
+		DeviceCapabilities:   d.Profile.Info,
 		DeviceIconURL:        IconPath,
 		ControlNotifications: 1,
 		WifiProximityID:      d.Proximity(),

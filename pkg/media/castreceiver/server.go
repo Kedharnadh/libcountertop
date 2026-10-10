@@ -14,11 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ygelfand/libcountertop/pkg/display/surface"
 	"github.com/ygelfand/libcountertop/pkg/fetch"
 	"github.com/ygelfand/libcountertop/pkg/media/cast"
 	"github.com/ygelfand/libcountertop/pkg/media/cast/preferences"
-	_ "github.com/ygelfand/libcountertop/pkg/media/cast/protocols/all"
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
 	mdns "github.com/ygelfand/libcountertop/pkg/network/advertise"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
@@ -45,7 +43,7 @@ type Config struct {
 	Video    func() playback.Target
 	Output   func(ended func()) playback.Output
 	Resample func(from int) func(stereo []int16) []int16
-	Surface  func() *surface.Client
+	Apps     []cast.Maker
 
 	Preferences preferences.Provider
 }
@@ -164,7 +162,11 @@ func (s *Server) Up() error {
 		return fmt.Errorf("cast: listening on %d: %w", cast.Port, err)
 	}
 
-	device := cast.Identify(s.config.Hardware(), name, s.config.Model)
+	profile := cast.SmartDisplay
+	if s.config.Video == nil {
+		profile = cast.SmartSpeaker
+	}
+	device := cast.Identify(s.config.Hardware(), name, s.config.Model, profile)
 
 	advert, err := cast.NewAdvertiser(device, cast.Port)
 	if err != nil {
@@ -204,7 +206,7 @@ func (s *Server) Up() error {
 	service.Receiver.CRL = s.keys.CRL
 	service.Receiver.Identity = func() cast.Device { return device }
 	if s.protocols == nil {
-		s.protocols = cast.Protocols(s.env(name, device))
+		s.protocols = cast.Protocols(s.env(name, device), s.config.Apps)
 	}
 	for _, p := range s.protocols {
 		service.Receiver.Register(p)
@@ -318,7 +320,6 @@ func (s *Server) env(name string, device cast.Device) cast.Env {
 			}
 		}),
 		Resample:    s.config.Resample,
-		Surface:     s.config.Surface,
 		Preferences: s.config.Preferences,
 	}
 }

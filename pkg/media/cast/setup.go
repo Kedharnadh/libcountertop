@@ -96,7 +96,7 @@ func NewEureka(d Device, manufacturer, system string) Eureka {
 			Manufacturer:  manufacturer,
 			ProductName:   d.Model,
 			UDN:           d.UDN(),
-			Capabilities:  Capabilities{DisplaySupported: true},
+			Capabilities:  Capabilities{DisplaySupported: d.Profile.Display},
 		},
 		BuildInfo: BuildInfo{
 			BuildType:         BuildType,

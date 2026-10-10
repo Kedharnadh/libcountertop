@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/hook"
+	"github.com/ygelfand/libcountertop/pkg/media/cenc"
 )
 
 const (
@@ -56,9 +57,9 @@ const (
 )
 
 const (
-	CryptClear = 0
-	CryptCENC  = 1
-	CryptCBCS  = 2
+	CryptClear = cenc.CryptClear
+	CryptCENC  = cenc.CryptCENC
+	CryptCBCS  = cenc.CryptCBCS
 )
 
 var Widevine = [16]byte{
@@ -80,17 +81,12 @@ var Widevine = [16]byte{
 	0xed,
 }
 
-type Subsample struct{ Clear, Encrypted uint32 }
+type (
+	Subsample = cenc.Subsample
+	Crypt     = cenc.Crypt
+)
 
-type Crypt struct {
-	Mode       uint32
-	Key, IV    [16]byte
-	Subsamples []Subsample
-	Encrypt    uint32
-	Skip       uint32
-}
-
-func (k *Crypt) words() []uint32 {
+func cryptWords(k *Crypt) []uint32 {
 	w := make([]uint32, 12)
 	if k != nil {
 		w[0], w[1], w[2], w[3] = k.Mode, k.Encrypt, k.Skip, uint32(len(k.Subsamples))
@@ -468,7 +464,7 @@ func (c *Client) VideoCrypt(
 	us := uint64(pts / time.Microsecond)
 	words := append(
 		[]uint32{id, uint32(us), uint32(us >> 32), flags, uint32(len(data))},
-		k.words()...)
+		cryptWords(k)...)
 	if err := c.sendData(opVideoCrypt, data, words...); err != nil {
 		return Played{}, err
 	}
@@ -702,7 +698,7 @@ func (c *Client) AudioSample(
 	us := uint64(pts / time.Microsecond)
 	words := append(
 		[]uint32{id, uint32(us), uint32(us >> 32), flags, uint32(len(data))},
-		k.words()...)
+		cryptWords(k)...)
 	if err := c.sendData(opAudioSample, data, words...); err != nil {
 		return PCM{}, err
 	}

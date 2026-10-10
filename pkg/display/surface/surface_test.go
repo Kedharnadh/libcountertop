@@ -387,7 +387,7 @@ func TestAnAudioSampleComesBackAsPCM(t *testing.T) {
 
 func TestAClearSampleSendsAClearCryptHeader(t *testing.T) {
 	var k *Crypt
-	w := k.words()
+	w := cryptWords(k)
 	if len(w) != 12 {
 		t.Fatalf("%d words, want 12", len(w))
 	}

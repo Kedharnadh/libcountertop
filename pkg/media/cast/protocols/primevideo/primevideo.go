@@ -22,6 +22,7 @@ const (
 
 type Protocol struct {
 	env     cast.Env
+	helper  func() *surface.Client
 	auth    string
 	kept    cast.Kept
 	persist func() bool
@@ -72,13 +73,14 @@ type answer struct {
 	Error *failure `json:"error,omitempty"`
 }
 
-func init() {
-	cast.Define(Name, func(env cast.Env) cast.Protocol { return New(env) })
+func Maker(helper func() *surface.Client) cast.Maker {
+	return func(env cast.Env) cast.Protocol { return New(env, helper) }
 }
 
-func New(env cast.Env) *Protocol {
+func New(env cast.Env, helper func() *surface.Client) *Protocol {
 	p := &Protocol{
 		env:       env,
+		helper:    helper,
 		auth:      AuthHost,
 		persist:   func() bool { return env.Preferences.Settings().Prime.Persist },
 		locale:    "en_US",
@@ -464,10 +466,10 @@ func resolution(tallest int) string {
 }
 
 func (p *Protocol) surface() *surface.Client {
-	if p.env.Surface == nil {
+	if p.helper == nil {
 		return nil
 	}
-	return p.env.Surface()
+	return p.helper()
 }
 
 func (p *Protocol) current(t *title) bool {

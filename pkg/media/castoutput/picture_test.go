@@ -1,19 +1,42 @@
 package castoutput
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"io"
 	"testing"
 	"time"
 
-	video "github.com/ygelfand/libcountertop/pkg/media/videostream"
+	"github.com/ygelfand/libcountertop/pkg/media/playback"
 )
+
+type fakeScreen struct {
+	play func(ctx context.Context, f Feed) error
+}
+
+func (s *fakeScreen) Hold(Controls)                            {}
+func (s *fakeScreen) Open(Controls)                            {}
+func (s *fakeScreen) Held() bool                               { return false }
+func (s *fakeScreen) Release(bool)                             {}
+func (s *fakeScreen) Say(string)                               {}
+func (s *fakeScreen) Fail(string)                              {}
+func (s *fakeScreen) Logo([]byte, uint64)                      {}
+func (s *fakeScreen) Standby(Controls, string, []byte, uint64) {}
+
+func (s *fakeScreen) Play(ctx context.Context, _ Controls, _ playback.Pictures, f Feed) error {
+	return s.play(ctx, f)
+}
+
+func screened(play func(ctx context.Context, f Feed) error) *Output {
+	o := newOutput()
+	o.q = &fakeQueue{}
+	o.options.Screen = &fakeScreen{play: play}
+	return o
+}
 
 type pictured struct {
 	ending
-	webm  []byte
+	shows bool
 	reads int
 }
 
@@ -30,16 +53,20 @@ func (p *pictured) readCount() int {
 	return p.reads
 }
 
+func (p *pictured) Pictured() bool { return p.shows }
+
+func (p *pictured) Pictures(context.Context) (io.ReadCloser, time.Duration, error) {
+	return nil, 0, nil
+}
+
 func TestTheSoundWaitsForThePicture(t *testing.T) {
-	o := newOutput()
-	o.q = &fakeQueue{}
 	start := make(chan func(), 1)
-	o.play = func(ctx context.Context, s video.Stream) (video.Report, error) {
-		start <- s.Started
+	o := screened(func(ctx context.Context, f Feed) error {
+		start <- f.Started
 		<-ctx.Done()
-		return video.Report{}, nil
-	}
-	src := &pictured{webm: vp9Head()}
+		return nil
+	})
+	src := &pictured{shows: true}
 	o.Play(src)
 	t.Cleanup(func() { o.Stop(src) })
 
@@ -58,80 +85,43 @@ func TestTheSoundWaitsForThePicture(t *testing.T) {
 	}
 }
 
-func (p *pictured) Pictured() bool { return p.webm != nil }
-
-func (p *pictured) Pictures(context.Context) (io.ReadCloser, time.Duration, error) {
-	if p.webm == nil {
-		return nil, 0, nil
-	}
-	return io.NopCloser(bytes.NewReader(p.webm)), 0, nil
-}
-
-func el(id []byte, body ...[]byte) []byte {
-	b := bytes.Join(body, nil)
-	return append(append(append([]byte(nil), id...), 0x80|byte(len(b))), b...)
-}
-
-func vp9Head() []byte {
-	return el([]byte{0x18, 0x53, 0x80, 0x67}, el([]byte{0x16, 0x54, 0xAE, 0x6B}, el(
-		[]byte{0xAE},
-		el([]byte{0xD7}, []byte{1}),
-		el([]byte{0x86}, []byte("V_VP9")),
-		el(
-			[]byte{0xE0},
-			el([]byte{0xB0}, []byte{0x07, 0x80}),
-			el([]byte{0xBA}, []byte{0x04, 0x38}),
-		),
-	)))
-}
-
 func TestAPicturedSourcePlaysAgainstWhatHasBeenHeard(t *testing.T) {
-	q := &fakeQueue{}
-	o := newOutput()
-	o.q = q
-	got := make(chan video.Stream, 1)
-	o.play = func(_ context.Context, s video.Stream) (video.Report, error) {
-		got <- s
-		return video.Report{}, nil
-	}
-	src := &pictured{ending: ending{start: 10 * time.Second}, webm: vp9Head()}
+	got := make(chan Feed, 1)
+	o := screened(func(_ context.Context, f Feed) error {
+		got <- f
+		return nil
+	})
+	src := &pictured{ending: ending{start: 10 * time.Second}, shows: true}
 	o.Play(src)
 	t.Cleanup(func() { o.Stop(src) })
 
-	var s video.Stream
+	var f Feed
 	select {
-	case s = <-got:
+	case f = <-got:
 	case <-time.After(2 * time.Second):
 		t.Fatal("the pictures never played")
 	}
-	if s.Codec != video.VP9 || s.Width != 1920 || s.Height != 1080 {
-		t.Errorf("stream %+v", s)
-	}
-	if at, running := s.Clock(); at != 10*time.Second || !running {
+	if at, running := f.Clock(); at != 10*time.Second || !running {
 		t.Errorf("clock %v running %v, want 10s: where it starts, nothing heard yet", at, running)
 	}
 	o.Pause(src)
-	if _, running := s.Clock(); running {
+	if _, running := f.Clock(); running {
 		t.Error("the clock runs while paused")
 	}
 	o.Resume(src)
-	s.Waiting(true)
-	if _, running := s.Clock(); running {
+	f.Waiting(true)
+	if _, running := f.Clock(); running {
 		t.Error("the clock runs while the picture is waiting for frames")
 	}
-	s.Waiting(false)
-	if _, running := s.Clock(); !running {
+	f.Waiting(false)
+	if _, running := f.Clock(); !running {
 		t.Error("the clock stays stopped once the picture has frames again")
 	}
 }
 
 func TestAPictureThatFailsStopsTheSoundToo(t *testing.T) {
-	o := newOutput()
-	o.q = &fakeQueue{}
-	o.play = func(context.Context, video.Stream) (video.Report, error) {
-		return video.Report{}, errors.New("refused")
-	}
-	src := &pictured{webm: vp9Head()}
+	o := screened(func(context.Context, Feed) error { return errors.New("refused") })
+	src := &pictured{shows: true}
 	o.Play(src)
 	t.Cleanup(func() { o.Stop(src) })
 
@@ -149,28 +139,26 @@ func TestAPictureThatFailsStopsTheSoundToo(t *testing.T) {
 }
 
 func TestWaitingForFramesHoldsTheSound(t *testing.T) {
-	q := &fakeQueue{}
-	o := newOutput()
-	o.q = q
-	got := make(chan video.Stream, 1)
-	o.play = func(ctx context.Context, s video.Stream) (video.Report, error) {
-		s.Started()
-		got <- s
+	got := make(chan Feed, 1)
+	o := screened(func(ctx context.Context, f Feed) error {
+		f.Started()
+		got <- f
 		<-ctx.Done()
-		return video.Report{}, nil
-	}
+		return nil
+	})
+	q := o.q.(*fakeQueue)
 	src := &loud{}
 	o.Play(src)
 	t.Cleanup(func() { o.Stop(src) })
-	s := <-got
+	f := <-got
 	filled(t, q)
 
-	s.Waiting(true)
+	f.Waiting(true)
 	time.Sleep(200 * time.Millisecond)
 	if n := q.Queued(); n != 0 {
 		t.Errorf("%d frames queued for the speaker while the picture waits", n)
 	}
-	s.Waiting(false)
+	f.Waiting(false)
 	if q.Queued() == 0 {
 		t.Error("the sound did not come back with the picture")
 	}
@@ -180,18 +168,13 @@ type loud struct{ pictured }
 
 func (l *loud) Read(ctx context.Context, pcm []int16) (int, error) { return len(pcm), nil }
 func (l *loud) Pictured() bool                                     { return true }
-func (l *loud) Pictures(context.Context) (io.ReadCloser, time.Duration, error) {
-	return io.NopCloser(bytes.NewReader(vp9Head())), 0, nil
-}
 
 func TestASourceWithoutPicturesPlaysNone(t *testing.T) {
-	o := newOutput()
-	o.q = &fakeQueue{}
 	played := make(chan struct{}, 1)
-	o.play = func(context.Context, video.Stream) (video.Report, error) {
+	o := screened(func(context.Context, Feed) error {
 		played <- struct{}{}
-		return video.Report{}, nil
-	}
+		return nil
+	})
 	src := &pictured{}
 	o.Play(src)
 	t.Cleanup(func() { o.Stop(src) })
@@ -199,5 +182,20 @@ func TestASourceWithoutPicturesPlaysNone(t *testing.T) {
 	case <-played:
 		t.Error("a source with no picture stream played one")
 	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+func TestWithoutAScreenAPicturedSourceIsHeardAtOnce(t *testing.T) {
+	o := newOutput()
+	o.q = &fakeQueue{}
+	src := &pictured{shows: true}
+	o.Play(src)
+	t.Cleanup(func() { o.Stop(src) })
+	deadline := time.Now().Add(2 * time.Second)
+	for src.readCount() == 0 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if src.readCount() == 0 {
+		t.Error("the sound waited for a picture nothing will show")
 	}
 }

@@ -24,7 +24,7 @@ func TestDeviceInfoIsAnsweredTheWayAStockDeviceAnswers(t *testing.T) {
 	want := map[string]any{
 		"type": TypeDeviceInfo, "requestId": float64(5), "deviceId": kitchen.ID,
 		"friendlyName": "Kitchen", "deviceModel": "Panel",
-		"deviceCapabilities": float64(InfoCapabilities), "deviceIconUrl": "/setup/icon.png",
+		"deviceCapabilities": float64(SmartDisplay.Info), "deviceIconUrl": "/setup/icon.png",
 		"controlNotifications": float64(1), "wifiProximityId": kitchen.Proximity(),
 	}
 	for k, v := range want {

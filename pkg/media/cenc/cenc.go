@@ -15,6 +15,20 @@ const (
 
 type Subsample struct{ Clear, Encrypted uint32 }
 
+const (
+	CryptClear uint32 = 0
+	CryptCENC  uint32 = 1
+	CryptCBCS  uint32 = 2
+)
+
+type Crypt struct {
+	Mode       uint32
+	Key, IV    [16]byte
+	Subsamples []Subsample
+	Encrypt    uint32
+	Skip       uint32
+}
+
 type Track struct {
 	Format        string
 	Width, Height int

@@ -26,12 +26,12 @@ type Protocol struct {
 	keeper  *screens
 }
 
-func init() {
-	cast.Define(Name, func(env cast.Env) cast.Protocol { return New(env) })
+func Maker(tv TV) cast.Maker {
+	return func(env cast.Env) cast.Protocol { return New(env, tv) }
 }
 
-func New(env cast.Env) *Protocol {
-	k := newScreens(env)
+func New(env cast.Env, tv TV) *Protocol {
+	k := newScreens(env, tv)
 	return &Protocol{screens: k.screen, keeper: k}
 }
 

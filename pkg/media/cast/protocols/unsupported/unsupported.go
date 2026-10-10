@@ -9,12 +9,7 @@ import (
 
 type Protocol struct{ out playback.Attendant }
 
-func init() {
-	cast.Define(
-		cast.Unsupported,
-		func(env cast.Env) cast.Protocol { return &Protocol{out: env.Output} },
-	)
-}
+func Maker(env cast.Env) cast.Protocol { return &Protocol{out: env.Output} }
 
 func (p *Protocol) Name() string         { return cast.Unsupported }
 func (p *Protocol) Namespaces() []string { return nil }

@@ -25,6 +25,7 @@ var themes = map[string]string{
 
 type screens struct {
 	opts cast.Env
+	tv   TV
 
 	mu       sync.Mutex
 	id       preferences.YouTube
@@ -35,8 +36,8 @@ type screens struct {
 
 const Idle = 10 * time.Minute
 
-func newScreens(opts cast.Env) *screens {
-	s := &screens{opts: opts, id: opts.Preferences.Settings().YouTube}
+func newScreens(opts cast.Env, tv TV) *screens {
+	s := &screens{opts: opts, tv: tv, id: opts.Preferences.Settings().YouTube}
 	if s.id.Device == "" {
 		s.id.Device = uuid()
 		s.save()
@@ -46,7 +47,7 @@ func newScreens(opts cast.Env) *screens {
 
 func (s *screens) screen(app string) (string, string, bool) {
 	theme, ok := themes[app]
-	if !ok {
+	if !ok || (theme == ThemeTV && s.tv == nil) {
 		return "", "", false
 	}
 	s.mu.Lock()
@@ -89,7 +90,7 @@ func (s *screens) run(ctx context.Context) {
 	s.live = map[string]bool{}
 	onDemand := s.opts.Preferences.Settings().YouTube.OnDemand
 	for _, theme := range []string{ThemeMusic, ThemeYouTube, ThemeTV} {
-		s.stations[theme] = newStation(ctx, theme, s.opts)
+		s.stations[theme] = newStation(ctx, theme, s.opts, s.tv)
 	}
 	s.mu.Unlock()
 	slog.Info(

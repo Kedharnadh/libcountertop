@@ -2,10 +2,7 @@ package cast
 
 import (
 	"net/http"
-	"sort"
-	"sync"
 
-	"github.com/ygelfand/libcountertop/pkg/display/surface"
 	"github.com/ygelfand/libcountertop/pkg/media/cast/preferences"
 	"github.com/ygelfand/libcountertop/pkg/media/playback"
 )
@@ -32,8 +29,6 @@ type Env struct {
 
 	Resample func(from int) func(stereo []int16) []int16
 
-	Surface func() *surface.Client
-
 	Preferences preferences.Provider
 }
 
@@ -43,30 +38,12 @@ type Kept interface {
 	Clear() error
 }
 
-var (
-	definedMu sync.Mutex
-	defined   = map[string]func(Env) Protocol{}
-)
+type Maker func(Env) Protocol
 
-func Define(name string, make func(Env) Protocol) {
-	definedMu.Lock()
-	defer definedMu.Unlock()
-	defined[name] = make
-}
-
-func Protocols(env Env) []Protocol {
-	definedMu.Lock()
-	defer definedMu.Unlock()
-
-	names := make([]string, 0, len(defined))
-	for n := range defined {
-		names = append(names, n)
-	}
-	sort.Strings(names)
-
-	out := make([]Protocol, 0, len(names))
-	for _, n := range names {
-		out = append(out, defined[n](env))
+func Protocols(env Env, makers []Maker) []Protocol {
+	out := make([]Protocol, 0, len(makers))
+	for _, m := range makers {
+		out = append(out, m(env))
 	}
 	return out
 }

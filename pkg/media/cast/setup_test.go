@@ -5,7 +5,12 @@ import (
 	"testing"
 )
 
-var kitchen = Device{ID: "1b0cf94a40f35185c64b074179c1caa8", Name: "Kitchen", Model: "Panel"}
+var kitchen = Device{
+	ID:      "1b0cf94a40f35185c64b074179c1caa8",
+	Name:    "Kitchen",
+	Model:   "Panel",
+	Profile: SmartDisplay,
+}
 
 func answer(
 	t *testing.T,

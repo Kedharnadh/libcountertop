@@ -20,8 +20,18 @@ const (
 	CapabilityMultizone = 1 << 5
 )
 
-// The ca a stock Lenovo Smart Display 10 and a Google Nest Hub both advertise.
-const SmartDisplay = 231941
+type Profile struct {
+	Record  int
+	Info    int
+	Display bool
+}
+
+var (
+	// What a stock Lenovo Smart Display 10 and a Google Nest Hub both advertise.
+	SmartDisplay = Profile{Record: 231941, Info: 231429, Display: true}
+	// What a Google Home Mini advertises.
+	SmartSpeaker = Profile{Record: 199172, Info: 198660}
+)
 
 const Version = "05"
 
@@ -32,21 +42,21 @@ type Device struct {
 
 	Model string
 
-	Capabilities int
+	Profile Profile
 
 	Running bool
 
 	Status string
 }
 
-func Identify(mac, name, model string) Device {
+func Identify(mac, name, model string, p Profile) Device {
 	clean := strings.ReplaceAll(strings.ToLower(mac), ":", "")
 
 	return Device{
-		ID:           derive("cast-id", clean),
-		Name:         name,
-		Model:        model,
-		Capabilities: SmartDisplay,
+		ID:      derive("cast-id", clean),
+		Name:    name,
+		Model:   model,
+		Profile: p,
 	}
 }
 
@@ -69,7 +79,7 @@ func (d Device) Records() []string {
 		"md=" + d.Model,
 		"ic=" + IconPath,
 		"fn=" + d.Name,
-		"ca=" + fmt.Sprint(d.Capabilities),
+		"ca=" + fmt.Sprint(d.Profile.Record),
 		"st=" + status,
 		"bs=" + d.Proximity(),
 		"nf=1",
@@ -95,7 +105,7 @@ func (d Device) Valid() error {
 	if d.Name == "" {
 		return fmt.Errorf("cast: a device with no name would be listed as nothing")
 	}
-	if d.Capabilities == 0 {
+	if d.Profile.Record == 0 {
 		return fmt.Errorf("cast: a device claiming no capabilities is not offered for anything")
 	}
 	return nil

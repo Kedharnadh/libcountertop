@@ -299,6 +299,8 @@ func (r *Resolver) limits() playback.Target {
 	return r.target()
 }
 
+func within(v, most int) bool { return most <= 0 || v <= most }
+
 func bestVP9(formats yt.FormatList, limits playback.Target) *yt.Format {
 	var found []*yt.Format
 	for i := range formats {

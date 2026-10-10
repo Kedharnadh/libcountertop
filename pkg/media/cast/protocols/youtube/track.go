@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -52,10 +53,35 @@ type track struct {
 	base  time.Time
 	prefs preferences.Provider
 
-	tv *unplugged
+	tv TVStream
 }
 
-var errJumping = errors.New("youtube: jumping past a segment")
+type TVRequest struct {
+	HTTP     *http.Client
+	Resample func(from int) func([]int16) []int16
+	Limits   playback.Target
+	Prefs    preferences.Provider
+	ID       string
+	Params   string
+	CTT      string
+	At       time.Duration
+}
+
+type TVStream interface {
+	Info() Track
+	Read(ctx context.Context, out []int16) (int, error)
+	Picture() playback.Picture
+	Showing() (info Track, album, mark string)
+	OnChange(func())
+	Close()
+}
+
+type TV func(context.Context, TVRequest) (TVStream, error)
+
+var (
+	errJumping = errors.New("youtube: jumping past a segment")
+	errNoTV    = errors.New("youtube tv: this device does not play YouTube TV")
+)
 
 var (
 	_ playback.Source   = (*track)(nil)
@@ -101,9 +127,9 @@ func openLive(
 	l *Live,
 	at time.Duration,
 ) (*track, error) {
-	lead := liveLead(r.Preferences)
+	lead := LiveLead(r.Preferences)
 	var from time.Time
-	if wallClock(at) {
+	if WallClock(at) {
 		from = time.Unix(0, int64(at))
 	}
 	s, err := hls.Open(
@@ -141,29 +167,28 @@ func openLive(
 }
 
 func openTV(ctx context.Context, st *station, id string, at time.Duration) (*track, error) {
+	if st.tv == nil {
+		return nil, errNoTV
+	}
 	st.mu.Lock()
 	ctt, params := st.ctt, st.params
 	st.mu.Unlock()
-	u, err := openUnplugged(
-		ctx,
-		surfaceEnv{
-			http:     st.env.HTTP,
-			surface:  st.env.Surface,
-			resample: st.env.Resample,
-			limits:   st.resolve.limits(),
-			prefs:    st.env.Preferences,
-		},
-		id,
-		params,
-		ctt,
-		at,
-	)
+	u, err := st.tv(ctx, TVRequest{
+		HTTP:     st.env.HTTP,
+		Resample: st.env.Resample,
+		Limits:   st.resolve.limits(),
+		Prefs:    st.env.Preferences,
+		ID:       id,
+		Params:   params,
+		CTT:      ctt,
+		At:       at,
+	})
 	if err != nil {
 		return nil, err
 	}
-	t := &track{info: u.info, station: st, tv: u}
+	t := &track{info: u.Info(), station: st, tv: u}
 	if st.env.Output != nil {
-		u.onChange(func() { st.env.Output.Changed(t) })
+		u.OnChange(func() { st.env.Output.Changed(t) })
 	}
 	return t, nil
 }
@@ -174,7 +199,11 @@ const (
 	liveSlack   = 15 * time.Second
 )
 
-func wallClock(at time.Duration) bool { return at > wallFloor }
+func WallClock(at time.Duration) bool { return at > wallFloor }
+
+func LiveLead(p preferences.Provider) time.Duration {
+	return time.Duration(p.Settings().YouTube.LiveDelay) * time.Second
+}
 
 func (t *track) window() (oldest, edge time.Time, ok bool) {
 	if t.live == nil {
@@ -448,7 +477,7 @@ func (t *track) Logo() string {
 	return t.station.logo()
 }
 
-func (t *track) Pictured() bool { return t.station != nil && pictured(t.station.theme) }
+func (t *track) Pictured() bool { return t.station != nil && t.station.pictured() }
 
 func (t *track) Waiting(w bool) {
 	if t.station == nil {
@@ -469,7 +498,9 @@ func (t *track) tell() {
 	t.station.report(t.station.state())
 }
 
-func pictured(theme string) bool { return theme == ThemeYouTube || theme == ThemeTV }
+func (s *station) pictured() bool {
+	return s.env.Video != nil && (s.theme == ThemeYouTube || s.theme == ThemeTV)
+}
 
 func (t *track) Pictures(ctx context.Context) (io.ReadCloser, time.Duration, error) {
 	if !t.Pictured() {
@@ -539,12 +570,12 @@ func (t *track) Showing() playback.Showing {
 		Length: t.info.Duration,
 	}
 	if t.tv != nil {
-		info, album, mark := t.tv.showing()
+		info, album, mark := t.tv.Showing()
 		s.Title, s.Artist, s.Album, s.Art, s.Mark = info.Title, info.Author, album, info.Thumbnail, mark
 	}
 	if oldest, edge, ok := t.window(); ok && edge.Sub(oldest) >= rewindLeast && !t.base.IsZero() {
 		s.Length = edge.Sub(t.base)
-		s.LiveWithin = liveLead(t.prefs) + liveSlack
+		s.LiveWithin = LiveLead(t.prefs) + liveSlack
 	}
 	if t.station != nil {
 		s.HasPrevious, s.HasNext = t.station.around()

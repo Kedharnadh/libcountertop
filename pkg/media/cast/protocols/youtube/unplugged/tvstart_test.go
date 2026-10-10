@@ -1,16 +1,17 @@
-package youtube
+package unplugged
 
 import (
 	"testing"
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/media/cast/preferences"
+	"github.com/ygelfand/libcountertop/pkg/media/cast/protocols/youtube"
 )
 
 func TestYouTubeTVStartsWhereThePhoneAsked(t *testing.T) {
 	now := time.Unix(1_790_000_000, 0)
 	wall := func(ago time.Duration) time.Duration { return time.Duration(now.Add(-ago).Unix()) * time.Second }
-	delay := liveLead(preferences.Provider{})
+	delay := youtube.LiveLead(preferences.Provider{})
 	lead := max(int64(delay/tvSegment), 1)
 	const head, oldest = 10_000, 9_000
 
