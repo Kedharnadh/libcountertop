@@ -23,26 +23,42 @@ type (
 
 const Group setting.Group = "Alerts"
 
+type Sounds interface {
+	Sound(c, fallback schema.Chime) tone.Sound
+	Choices() []setting.Option
+}
+
 type Alerts struct {
 	*setting.Controls[schema.Alerts]
-	play func([]tone.Note)
+	sounds Sounds
+	play   func(tone.Sound)
 
 	mu         sync.Mutex
 	generation int
 	timer      *time.Timer
 }
 
-func New(at storage.Section[schema.Alerts], device uint32, play func([]tone.Note)) *Alerts {
+func New(
+	at storage.Section[schema.Alerts],
+	device uint32,
+	sounds Sounds,
+	play func(tone.Sound),
+) *Alerts {
+	var more func() []setting.Option
+	if sounds != nil {
+		more = sounds.Choices
+	}
 	return &Alerts{
 		Controls: &setting.Controls[schema.Alerts]{
-			Table:  NewTable(),
+			Table:  NewTable(more),
 			Device: device,
 			Read:   at.Read,
 			Save: func(s Setting, v string) error {
 				return setting.Store(at, s, v)
 			},
 		},
-		play: play,
+		sounds: sounds,
+		play:   play,
 	}
 }
 
@@ -52,17 +68,17 @@ func (a *Alerts) Current() schema.Alerts { return a.Read() }
 
 func (a *Alerts) Start(t schema.Tone) {
 	current := a.Read()
-	notes := tone.Wake(current.Chime(t))
+	snd := a.sound(current.Chime(t), schema.DefaultAlerts().Chime(t))
 	a.mu.Lock()
 	a.stopLocked()
 	generation := a.generation
 	a.mu.Unlock()
-	if len(notes) == 0 {
+	if snd.Empty() {
 		return
 	}
-	a.play(notes)
+	a.play(snd)
 	if t == schema.ToneAlert {
-		a.again(generation, notes, time.Now().Add(current.RingFor.After()))
+		a.again(generation, snd, time.Now().Add(current.RingFor.After()))
 	}
 }
 
@@ -73,20 +89,37 @@ func (a *Alerts) Stop() {
 }
 
 func (a *Alerts) Preview(c schema.Chime) {
-	if notes := tone.Wake(c); len(notes) > 0 {
-		a.play(notes)
+	if snd := a.sound(c, schema.ChimeNone); !snd.Empty() {
+		a.play(snd)
 	}
 }
 
 func (a *Alerts) RingTimer() {
-	if notes := tone.Wake(a.Read().Timer); len(notes) > 0 {
-		a.play(notes)
+	if snd := a.sound(a.Read().Timer, schema.DefaultAlerts().Timer); !snd.Empty() {
+		a.play(snd)
 	}
 }
 
 func (a *Alerts) RingFor() time.Duration { return a.Read().RingFor.After() }
 
-func (a *Alerts) again(generation int, notes []tone.Note, until time.Time) {
+func (a *Alerts) Tones() []setting.Option {
+	if a.sounds == nil {
+		return nil
+	}
+	return a.sounds.Choices()
+}
+
+func (a *Alerts) sound(c, fallback schema.Chime) tone.Sound {
+	if a.sounds == nil {
+		if _, custom := c.Custom(); custom {
+			c = fallback
+		}
+		return tone.Sound{Notes: tone.Wake(c)}
+	}
+	return a.sounds.Sound(c, fallback)
+}
+
+func (a *Alerts) again(generation int, snd tone.Sound, until time.Time) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.generation != generation || !time.Now().Add(repeatEvery).Before(until) {
@@ -99,8 +132,8 @@ func (a *Alerts) again(generation int, notes []tone.Note, until time.Time) {
 		if !live {
 			return
 		}
-		a.play(notes)
-		a.again(generation, notes, until)
+		a.play(snd)
+		a.again(generation, snd, until)
 	})
 }
 
@@ -112,10 +145,10 @@ func (a *Alerts) stopLocked() {
 	}
 }
 
-func NewTable() *Table {
+func NewTable(more func() []setting.Option) *Table {
 	chime := func(name, icon string, field func(*schema.Alerts) *schema.Chime) Setting {
 		return setting.Pick(
-			Setting{Name: name, Group: Group, Icon: icon},
+			Setting{Name: name, Group: Group, Icon: icon, More: more},
 			schema.AlertChimes(),
 			field,
 		)

@@ -162,9 +162,9 @@ func (p *AssistantPages) Tone(slot int) *shell.Page {
 				rows []menu.Row
 				acts []func(int)
 			)
-			for _, c := range config.Chimes() {
-				rows = append(rows, menu.Row{Label: c.Label(), Chosen: c == now})
-				acts = append(acts, p.UseTone(slot, c))
+			for _, c := range chimeChoices(config.Chimes(), p.options.Words.ToneChoices()) {
+				rows = append(rows, menu.Row{Label: c.label, Chosen: c.chime == now})
+				acts = append(acts, p.UseTone(slot, c.chime))
 			}
 			return rows, acts
 		},

@@ -43,6 +43,17 @@ func (c *Controls[T]) Entity(name string) esphome.Entity {
 
 func (c *Controls[T]) Publish() { c.PublishFrom(c.Read()) }
 
+func (c *Controls[T]) Refresh() {
+	c.once.Do(c.build)
+
+	for i, s := range c.rows {
+		if e, ok := c.built[i].(*esphome.Select); ok && s.More != nil {
+			e.SetOptions(s.Labels())
+		}
+	}
+	c.Publish()
+}
+
 func (c *Controls[T]) PublishFrom(at T) {
 	c.once.Do(c.build)
 

@@ -4,6 +4,7 @@ type Cast struct {
 	Receiver bool `json:"receiver"`
 
 	Oracle string `json:"oracle,omitempty"`
+	Bundle string `json:"bundle,omitempty"`
 
 	YouTube YouTube `json:"youtube,omitzero"`
 

@@ -22,6 +22,7 @@ func testKeys(t *testing.T) *keys {
 	k, err := newKeys(
 		"Kitchen",
 		filepath.Join(dir, "cast-credentials.json"),
+		filepath.Join(dir, "cast-bundle.json"),
 		filepath.Join(dir, "cast-authority.json"),
 	)
 	if err != nil {
@@ -66,7 +67,7 @@ func serve(t *testing.T, body []byte) string {
 
 func TestWithNoOracleTheCredentialsAreOurOwn(t *testing.T) {
 	k := testKeys(t)
-	wait := k.step(t.Context(), "")
+	wait := k.step(t.Context(), "", "")
 
 	if c := k.Current(); c == nil || c.Remote {
 		t.Fatalf("the credentials are %+v", c)
@@ -81,7 +82,7 @@ func TestAnOracleAnswerIsUsedKeptAndReadBack(t *testing.T) {
 	now := time.Now()
 	url := serve(t, oracleAnswer(t, k, now.Add(-time.Hour), now.Add(47*time.Hour), now))
 
-	wait := k.step(t.Context(), url)
+	wait := k.step(t.Context(), "", url)
 	c := k.Current()
 	if !c.Remote {
 		t.Fatal("the oracle's answer was not used")
@@ -89,7 +90,7 @@ func TestAnOracleAnswerIsUsedKeptAndReadBack(t *testing.T) {
 	if wait < 46*time.Hour || wait > 47*time.Hour {
 		t.Errorf("the next look is in %v, want at notAfter", wait)
 	}
-	if again := k.step(t.Context(), url); again < 46*time.Hour {
+	if again := k.step(t.Context(), "", url); again < 46*time.Hour {
 		t.Errorf("a current answer was asked for again, next look in %v", again)
 	}
 
@@ -106,7 +107,7 @@ func TestACertificateNotCurrentYetIsRetried(t *testing.T) {
 	now := time.Now()
 	url := serve(t, oracleAnswer(t, k, now.Add(time.Hour), now.Add(49*time.Hour), now))
 
-	if wait := k.step(t.Context(), url); wait != retry {
+	if wait := k.step(t.Context(), "", url); wait != retry {
 		t.Errorf("the next look is in %v, want %v", wait, retry)
 	}
 	if k.Current().Remote {
@@ -140,10 +141,11 @@ func TestClearingTheOracleGoesBackToOurOwn(t *testing.T) {
 	now := time.Now()
 	k.step(
 		t.Context(),
+		"",
 		serve(t, oracleAnswer(t, k, now.Add(-time.Hour), now.Add(47*time.Hour), now)),
 	)
 
-	k.step(t.Context(), "")
+	k.step(t.Context(), "", "")
 	if k.Current().Remote {
 		t.Error("the oracle's credentials stayed after the oracle was cleared")
 	}
@@ -152,16 +154,17 @@ func TestClearingTheOracleGoesBackToOurOwn(t *testing.T) {
 func TestTheDeviceChainIsMadeOnceAndKept(t *testing.T) {
 	dir := t.TempDir()
 	creds := filepath.Join(dir, "cast-credentials.json")
+	bundle := filepath.Join(dir, "cast-bundle.json")
 	chain := filepath.Join(dir, "cast-authority.json")
 
-	first, err := newKeys("Kitchen", creds, chain)
+	first, err := newKeys("Kitchen", creds, bundle, chain)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "cast-authority.json")); err != nil {
 		t.Fatalf("the chain was not kept: %v", err)
 	}
-	again, err := newKeys("Kitchen", creds, chain)
+	again, err := newKeys("Kitchen", creds, bundle, chain)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +172,7 @@ func TestTheDeviceChainIsMadeOnceAndKept(t *testing.T) {
 		t.Error("a second start made a new device certificate instead of reading the kept one")
 	}
 
-	renamed, err := newKeys("Den", creds, chain)
+	renamed, err := newKeys("Den", creds, bundle, chain)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,6 +193,7 @@ func TestAKeptChainThatDoesNotReadIsMadeAgain(t *testing.T) {
 	k, err := newKeys(
 		"Kitchen",
 		filepath.Join(dir, "cast-credentials.json"),
+		filepath.Join(dir, "cast-bundle.json"),
 		filepath.Join(dir, "cast-authority.json"),
 	)
 	if err != nil || k.Current() == nil {

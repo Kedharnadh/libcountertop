@@ -26,6 +26,11 @@ const crlURL = "https://clients3.google.com/cast/chromecast/device/crl"
 
 const crlEvery = 24 * time.Hour
 
+const (
+	oracleMost = 1 << 20
+	bundleMost = 16 << 20
+)
+
 type keys struct {
 	name      string
 	path      string
@@ -37,7 +42,17 @@ type keys struct {
 	retarget chan struct{}
 	changed  func(*cast.Credentials)
 	oracle   func() string
+	bundle   func() string
 	synced   func(do func()) (stop func())
+
+	bundlePath string
+	tried      string
+	dry        dryBundle
+}
+
+type dryBundle struct {
+	url   string
+	until time.Time
 }
 
 type held struct {
@@ -50,17 +65,18 @@ type cached struct {
 	Answer json.RawMessage `json:"answer"`
 }
 
-func newKeys(name, path, authorityPath string) (*keys, error) {
+func newKeys(name, path, bundlePath, authorityPath string) (*keys, error) {
 	a, err := authority(name, authorityPath)
 	if err != nil {
 		return nil, err
 	}
 	k := &keys{
-		name:      name,
-		path:      path,
-		authority: a,
-		crlURL:    crlURL,
-		retarget:  make(chan struct{}, 1),
+		name:       name,
+		path:       path,
+		bundlePath: bundlePath,
+		authority:  a,
+		crlURL:     crlURL,
+		retarget:   make(chan struct{}, 1),
 	}
 	if err := k.issue(time.Now()); err != nil {
 		return nil, err
@@ -115,7 +131,7 @@ func (k *keys) CRL() []byte {
 func (k *keys) revocations(ctx context.Context) {
 	for {
 		wait := crlEvery
-		body, err := ask(ctx, k.crlURL)
+		body, err := ask(ctx, k.crlURL, oracleMost)
 		switch {
 		case err != nil:
 			slog.Warn("fetching the cast revocation list", "err", err)
@@ -185,7 +201,7 @@ func (k *keys) run(ctx context.Context) {
 	go k.revocations(ctx)
 
 	for {
-		t := time.NewTimer(k.step(ctx, k.oracle()))
+		t := time.NewTimer(k.step(ctx, k.bundle(), k.oracle()))
 		select {
 		case <-ctx.Done():
 			t.Stop()
@@ -199,7 +215,63 @@ func (k *keys) run(ctx context.Context) {
 	}
 }
 
-func (k *keys) step(ctx context.Context, url string) time.Duration {
+func (k *keys) step(ctx context.Context, bundle, oracle string) time.Duration {
+	if bundle != "" {
+		if wait, ok := k.fromBundle(ctx, bundle, time.Now()); ok {
+			return wait
+		}
+	}
+	wait := k.fromOracle(ctx, oracle)
+	if k.dry.url == bundle && !k.dry.until.IsZero() {
+		wait = min(wait, time.Until(k.dry.until))
+	}
+	return wait
+}
+
+func (k *keys) fromBundle(ctx context.Context, url string, now time.Time) (time.Duration, bool) {
+	if h := k.held.Load(); h.creds.Remote && h.from == url && now.Before(h.creds.NotAfter) {
+		return h.creds.NotAfter.Sub(now), true
+	}
+	if k.dry.url == url && (k.dry.until.IsZero() || now.Before(k.dry.until)) {
+		return 0, false
+	}
+
+	b, err := k.loadBundle(ctx, url)
+	if err != nil {
+		slog.Warn("no cast bundle", "err", err)
+		k.dry = dryBundle{url: url}
+		return 0, false
+	}
+	c, next, err := b.Credentials(now)
+	if err != nil {
+		slog.Warn("reading the cast bundle", "err", err)
+		k.dry = dryBundle{url: url}
+		return 0, false
+	}
+	if c == nil {
+		slog.Warn("the cast bundle has no certificate for now", "next", next)
+		k.dry = dryBundle{url: url, until: next}
+		return 0, false
+	}
+	k.set(c, url)
+	return c.NotAfter.Sub(now), true
+}
+
+func (k *keys) loadBundle(ctx context.Context, url string) (*cast.Bundle, error) {
+	if c, ok := readKept(k.bundlePath); ok && c.URL == url {
+		return cast.ReadBundle(c.Answer)
+	}
+	if k.tried == url {
+		return nil, fmt.Errorf("the cast bundle from %s did not download", url)
+	}
+	k.tried = url
+	if err := os.Remove(k.bundlePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		slog.Warn("removing the kept cast bundle", "err", err)
+	}
+	return k.fetchBundle(ctx, url)
+}
+
+func (k *keys) fromOracle(ctx context.Context, url string) time.Duration {
 	now := time.Now()
 	h := k.held.Load()
 
@@ -223,7 +295,7 @@ func (k *keys) step(ctx context.Context, url string) time.Duration {
 		}
 	}
 
-	body, err := ask(ctx, url)
+	body, err := ask(ctx, url, oracleMost)
 	if err != nil {
 		slog.Warn("asking the cast oracle", "err", err)
 		return retry
@@ -244,13 +316,32 @@ func (k *keys) step(ctx context.Context, url string) time.Duration {
 	}
 
 	k.set(c, url)
-	if err := k.save(url, body); err != nil {
+	if err := saveCached(k.path, url, body); err != nil {
 		slog.Warn("keeping the cast oracle's answer", "err", err)
 	}
 	return c.NotAfter.Sub(theirs)
 }
 
-func ask(ctx context.Context, url string) ([]byte, error) {
+func (k *keys) fetchBundle(ctx context.Context, url string) (*cast.Bundle, error) {
+	body, err := ask(ctx, url, bundleMost)
+	if err != nil {
+		return nil, err
+	}
+	b, err := cast.ReadBundle(body)
+	if err != nil {
+		return nil, err
+	}
+	kept, err := json.Marshal(b)
+	if err == nil {
+		err = saveCached(k.bundlePath, url, kept)
+	}
+	if err != nil {
+		slog.Warn("keeping the cast bundle", "err", err)
+	}
+	return b, nil
+}
+
+func ask(ctx context.Context, url string, most int64) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -264,22 +355,18 @@ func ask(ctx context.Context, url string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("%s: %s", url, resp.Status)
 	}
-	return io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	return io.ReadAll(io.LimitReader(resp.Body, most))
 }
 
 func (k *keys) load(url string) (*cast.Credentials, string) {
 	if url == "" {
 		return nil, ""
 	}
-	raw, err := os.ReadFile(k.path)
-	if err != nil {
+	answer := readCached(k.path, url)
+	if answer == nil {
 		return nil, ""
 	}
-	var c cached
-	if err := json.Unmarshal(raw, &c); err != nil || c.URL != url {
-		return nil, ""
-	}
-	creds, _, err := cast.ParseOracle(c.Answer)
+	creds, _, err := cast.ParseOracle(answer)
 	if err != nil {
 		slog.Warn("reading the kept cast oracle answer", "err", err)
 		return nil, ""
@@ -287,13 +374,30 @@ func (k *keys) load(url string) (*cast.Credentials, string) {
 	return creds, url
 }
 
-func (k *keys) save(url string, answer []byte) error {
+func readCached(path, url string) []byte {
+	c, ok := readKept(path)
+	if !ok || c.URL != url {
+		return nil
+	}
+	return c.Answer
+}
+
+func readKept(path string) (cached, bool) {
+	var c cached
+	raw, err := os.ReadFile(path)
+	if err != nil || json.Unmarshal(raw, &c) != nil {
+		return cached{}, false
+	}
+	return c, true
+}
+
+func saveCached(path, url string, answer []byte) error {
 	data, err := json.Marshal(cached{URL: url, Answer: answer})
 	if err != nil {
 		return err
 	}
 
-	f, err := os.CreateTemp(filepath.Dir(k.path), filepath.Base(k.path)+".*")
+	f, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*")
 	if err != nil {
 		return err
 	}
@@ -315,7 +419,7 @@ func (k *keys) save(url string, answer []byte) error {
 	if err := f.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmp, k.path)
+	return os.Rename(tmp, path)
 }
 
 type kept struct{ path string }

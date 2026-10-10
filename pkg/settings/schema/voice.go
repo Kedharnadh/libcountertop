@@ -1,10 +1,18 @@
 package schema
 
 import (
+	"strings"
+
 	"github.com/ygelfand/libcountertop/pkg/say"
 )
 
 type Chime string
+
+const customChime = "tone:"
+
+func CustomChime(key string) Chime { return Chime(customChime + key) }
+
+func (c Chime) Custom() (key string, ok bool) { return strings.CutPrefix(string(c), customChime) }
 
 const (
 	ChimeNone Chime = "none"
@@ -20,6 +28,9 @@ const (
 )
 
 func (c Chime) Label() string {
+	if key, ok := c.Custom(); ok {
+		return key
+	}
 	switch c {
 	case ChimeMuteSwitch:
 		return "Mute tones"

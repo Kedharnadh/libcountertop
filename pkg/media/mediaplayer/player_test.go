@@ -31,6 +31,7 @@ func (*speaker) Adjust(func([]int16))                       {}
 func (*speaker) Drain()                                     {}
 func (*speaker) Queued() int                                { return 0 }
 func (*speaker) Chime(schema.Stream, float64, ...tone.Note) {}
+func (*speaker) Overlay(schema.Stream, []int16)             {}
 func (*speaker) PlayVoice([]int16)                          {}
 
 type volume struct{}

@@ -3,6 +3,7 @@ package setting
 import (
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -110,6 +111,7 @@ type Setting[T any] struct {
 	Local bool
 
 	Options []Option
+	More    func() []Option
 
 	Read  func(*T) string
 	Write func(*T, string) error
@@ -297,17 +299,26 @@ func (s Setting[T]) Label(o Option) string {
 	return o.Label
 }
 
+func (s Setting[T]) Choices() []Option {
+	if s.More == nil {
+		return s.Options
+	}
+	return append(slices.Clip(s.Options), s.More()...)
+}
+
 func (s Setting[T]) Values() []string {
-	out := make([]string, 0, len(s.Options))
-	for _, o := range s.Options {
+	choices := s.Choices()
+	out := make([]string, 0, len(choices))
+	for _, o := range choices {
 		out = append(out, o.Value)
 	}
 	return out
 }
 
 func (s Setting[T]) Labels() []string {
-	out := make([]string, 0, len(s.Options))
-	for _, o := range s.Options {
+	choices := s.Choices()
+	out := make([]string, 0, len(choices))
+	for _, o := range choices {
 		out = append(out, s.Label(o))
 	}
 	return out
@@ -327,7 +338,7 @@ func (s Setting[T]) Shows(c *T) string {
 }
 
 func (s Setting[T]) LabelOf(value string) string {
-	for _, o := range s.Options {
+	for _, o := range s.Choices() {
 		if o.Value == value {
 			return s.Label(o)
 		}
@@ -336,7 +347,7 @@ func (s Setting[T]) LabelOf(value string) string {
 }
 
 func (s Setting[T]) ValueOf(label string) string {
-	for _, o := range s.Options {
+	for _, o := range s.Choices() {
 		if s.Label(o) == label {
 			return o.Value
 		}
@@ -359,11 +370,7 @@ func (s Setting[T]) Level(c *T) int {
 func (s Setting[T]) Dim(c *T) bool { return s.Idle != nil && s.Idle(c) }
 
 func (s Setting[T]) Bad(v string, why string) error {
-	if s.Kind == Choice && len(s.Options) > 0 {
-		names := make([]string, 0, len(s.Options))
-		for _, o := range s.Options {
-			names = append(names, o.Value)
-		}
+	if names := s.Values(); s.Kind == Choice && len(names) > 0 {
 		return fmt.Errorf(
 			"%s: %s takes %s, not %q",
 			s.domain,

@@ -19,8 +19,13 @@ func (p *BasicPages) AlertsPage() *shell.Page {
 			a := p.options.Alerts.Current()
 			rings := config.RingDelays()
 			ring := menu.Steps(len(rings))
+			choices := chimeChoices(config.AlertChimes(), p.options.Alerts.Tones())
 			chime := func(label string, c config.Chime) menu.Row {
-				return menu.Row{Label: label, Kind: menu.Chevron, Value: c.Label()}
+				return menu.Row{
+					Label: label,
+					Kind:  menu.Chevron,
+					Value: chimeChoiceOf(choices, c).label,
+				}
 			}
 			rows := []menu.Row{
 				{
@@ -50,9 +55,11 @@ func (p *BasicPages) AlertsPage() *shell.Page {
 				return p.open(func() shell.View {
 					return Choose(
 						say.T("alerts.setting."+name),
-						config.AlertChimes(),
-						func() config.Chime { return read(p.options.Alerts.Current()) },
-						func(c config.Chime) { p.setAlertChime(name, c) },
+						choices,
+						func() chimeChoice {
+							return chimeChoiceOf(choices, read(p.options.Alerts.Current()))
+						},
+						func(c chimeChoice) { p.setAlertChime(name, c.chime) },
 						nil,
 					)
 				})

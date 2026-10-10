@@ -14,6 +14,14 @@ func Chime(rate, channels int, level float64, notes ...tone.Note) []int16 {
 	return out
 }
 
+func Scale(pcm []int16, level float64) []int16 {
+	out := make([]int16, len(pcm))
+	for i, v := range pcm {
+		out[i] = int16(float64(v) * level)
+	}
+	return out
+}
+
 func Tone(rate, channels int, n tone.Note, level float64) []int16 {
 	frames := rate * n.Ms / 1000
 	out := make([]int16, frames*channels)

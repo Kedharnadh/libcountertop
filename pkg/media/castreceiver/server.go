@@ -33,9 +33,11 @@ type Config struct {
 	Timezone func() string
 
 	CredentialsPath string
+	BundlePath      string
 	AuthorityPath   string
 	AppDir          string
 	Oracle          func() string
+	Bundle          func() string
 	Synced          func(do func()) (stop func())
 	Credentials     func(*cast.Credentials)
 
@@ -126,11 +128,17 @@ func (s *Server) keyed(name string) error {
 	if s.keys != nil {
 		return nil
 	}
-	k, err := newKeys(name, s.config.CredentialsPath, s.config.AuthorityPath)
+	k, err := newKeys(
+		name,
+		s.config.CredentialsPath,
+		s.config.BundlePath,
+		s.config.AuthorityPath,
+	)
 	if err != nil {
 		return err
 	}
 	k.oracle = s.config.Oracle
+	k.bundle = s.config.Bundle
 	k.synced = s.config.Synced
 	k.changed = s.config.Credentials
 	s.config.Credentials(k.Current())

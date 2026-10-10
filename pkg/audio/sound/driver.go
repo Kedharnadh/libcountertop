@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/audio/background"
+	"github.com/ygelfand/libcountertop/pkg/audio/mix"
 	"github.com/ygelfand/libcountertop/pkg/audio/tone"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
@@ -14,6 +15,7 @@ type Player interface {
 	Drain()
 	Queued() int
 	Chime(s schema.Stream, level float64, notes ...tone.Note)
+	Overlay(s schema.Stream, samples []int16)
 }
 
 type Background interface {
@@ -86,6 +88,19 @@ func (d *Driver[P]) Chime(s schema.Stream, notes []tone.Note) {
 		return
 	}
 	d.Interject(func(p P) { p.Chime(s, tone.Level, notes...) })
+}
+
+func (d *Driver[P]) Sound(s schema.Stream, level float64, snd tone.Sound) {
+	if d == nil || snd.Empty() {
+		return
+	}
+	d.Interject(func(p P) {
+		if len(snd.Clip) > 0 {
+			p.Overlay(s, mix.Scale(snd.Clip, level))
+			return
+		}
+		p.Chime(s, level, snd.Notes...)
+	})
 }
 
 func (d *Driver[P]) Silence() {

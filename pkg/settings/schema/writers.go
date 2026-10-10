@@ -93,6 +93,10 @@ func (w CastWriter) Oracle(url string) error {
 	return w.s.Update(func(c *Cast) { c.Oracle = url })
 }
 
+func (w CastWriter) Bundle(url string) error {
+	return w.s.Update(func(c *Cast) { c.Bundle = url })
+}
+
 func (w CastWriter) Screens(device, music, video string) error {
 	return w.s.Update(func(c *Cast) {
 		c.YouTube.Device, c.YouTube.Music, c.YouTube.Video = device, music, video

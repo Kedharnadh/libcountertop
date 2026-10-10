@@ -1,6 +1,7 @@
 package cast
 
 import (
+	"cmp"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -13,8 +14,10 @@ import (
 	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"math/big"
+	"slices"
 	"time"
 )
 
@@ -268,6 +271,147 @@ func ParseOracle(body []byte) (*Credentials, time.Time, error) {
 		NotAfter:      time.Unix(o.NotAfter, 0),
 		Remote:        true,
 	}, time.Unix(o.Now, 0), nil
+}
+
+// Certificates and keys are PEM; signatures are base64 over the peer certificate's DER.
+type Bundle struct {
+	Device       string       `json:"cpu"`
+	Intermediate string       `json:"ica"`
+	Peers        []BundlePeer `json:"certs"`
+}
+
+// NotBefore and NotAfter are Unix seconds, filled from the certificate when the bundle is first read.
+type BundlePeer struct {
+	Public    string `json:"pu"`
+	Private   string `json:"pr"`
+	SHA1      string `json:"sig_sha1"`
+	SHA256    string `json:"sig_sha256"`
+	NotBefore int64  `json:"notBefore,omitempty"`
+	NotAfter  int64  `json:"notAfter,omitempty"`
+}
+
+func ReadBundle(body []byte) (*Bundle, error) {
+	var b Bundle
+	if err := json.Unmarshal(body, &b); err != nil {
+		return nil, fmt.Errorf("cast: the bundle: %w", err)
+	}
+	if _, err := pemBlock(b.Device, "device certificate"); err != nil {
+		return nil, err
+	}
+	if _, err := pemBlock(b.Intermediate, "intermediate"); err != nil {
+		return nil, err
+	}
+	if len(b.Peers) == 0 {
+		return nil, fmt.Errorf("cast: the bundle has no peer certificates")
+	}
+	for i := range b.Peers {
+		p := &b.Peers[i]
+		if p.NotAfter != 0 {
+			continue
+		}
+		leaf, err := p.leaf()
+		if err != nil {
+			return nil, fmt.Errorf("cast: the bundle's peer %d: %w", i, err)
+		}
+		p.NotBefore, p.NotAfter = leaf.NotBefore.Unix(), leaf.NotAfter.Unix()
+	}
+	slices.SortFunc(
+		b.Peers,
+		func(x, y BundlePeer) int { return cmp.Compare(x.NotBefore, y.NotBefore) },
+	)
+	return &b, nil
+}
+
+func (b *Bundle) Credentials(now time.Time) (current *Credentials, next time.Time, err error) {
+	at := now.Unix()
+	pick := -1
+	for i, p := range b.Peers {
+		switch {
+		case at < p.NotBefore:
+			if next.IsZero() {
+				next = time.Unix(p.NotBefore, 0)
+			}
+		case at < p.NotAfter:
+			if pick < 0 || p.NotAfter > b.Peers[pick].NotAfter {
+				pick = i
+			}
+		}
+	}
+	if pick < 0 {
+		return nil, next, nil
+	}
+	device, _ := pemBlock(b.Device, "device certificate")
+	ica, _ := pemBlock(b.Intermediate, "intermediate")
+	c, err := b.Peers[pick].credentials(device, ica)
+	if err != nil {
+		return nil, next, fmt.Errorf("cast: the bundle's peer %d: %w", pick, err)
+	}
+	return c, next, nil
+}
+
+func (p BundlePeer) leaf() (*x509.Certificate, error) {
+	der, err := pemBlock(p.Public, "certificate")
+	if err != nil {
+		return nil, err
+	}
+	leaf, err := x509.ParseCertificate(der)
+	if err != nil {
+		return nil, fmt.Errorf("the certificate: %w", err)
+	}
+	return leaf, nil
+}
+
+func (p BundlePeer) credentials(device, ica []byte) (*Credentials, error) {
+	leaf, err := p.leaf()
+	if err != nil {
+		return nil, err
+	}
+	der := leaf.Raw
+	keyDER, err := pemBlock(p.Private, "private key")
+	if err != nil {
+		return nil, err
+	}
+	key, err := privateKey(keyDER)
+	if err != nil {
+		return nil, err
+	}
+	s1, err := signature(p.SHA1, "sha1")
+	if err != nil {
+		return nil, err
+	}
+	s256, err := signature(p.SHA256, "sha256")
+	if err != nil {
+		return nil, err
+	}
+	return &Credentials{
+		Peer:          tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key, Leaf: leaf},
+		Device:        device,
+		Intermediates: [][]byte{ica},
+		SHA1:          s1,
+		SHA256:        s256,
+		NotBefore:     leaf.NotBefore,
+		NotAfter:      leaf.NotAfter,
+		Remote:        true,
+	}, nil
+}
+
+func signature(text, hash string) ([]byte, error) {
+	if text == "" {
+		return nil, fmt.Errorf("no %s signature", hash)
+	}
+	b, err := base64.StdEncoding.DecodeString(text)
+	if err != nil {
+		return nil, fmt.Errorf("the %s signature: %w", hash, err)
+	}
+	return b, nil
+}
+
+func pemBlock(text, what string) ([]byte, error) {
+	block, _ := pem.Decode([]byte(text))
+	if block == nil {
+		return nil, fmt.Errorf("cast: the bundle's %s is not PEM", what)
+	}
+	return block.Bytes, nil
 }
 
 func privateKey(der []byte) (crypto.Signer, error) {

@@ -6,6 +6,7 @@ import (
 
 	esphome "github.com/ygelfand/go-esphome-device"
 
+	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
@@ -15,6 +16,7 @@ type Options struct {
 	Write    func(slot int) schema.WakeWriter
 	Wake     func(slot int)
 	Extras   func(slot int) []esphome.Entity
+	Tones    func() []setting.Option
 }
 
 type Settings struct {
@@ -75,7 +77,7 @@ func (s *Settings) newSlot(n int) slot {
 				Icon:     "mdi:music-note",
 				Category: esphome.CategoryConfig,
 			},
-			Options: labels(schema.Chimes()),
+			Options: s.toneLabels(),
 		},
 		delivery: &esphome.Select{
 			Base: esphome.Base{
@@ -146,12 +148,12 @@ func (s *Settings) newSlot(n int) slot {
 		slog.Info("wake sensitivity", "slot", n+1, "cutoff", v)
 	}
 	sl.tone.OnCommand = func(label string) {
-		tone, ok := byLabel(schema.Chimes(), label)
+		tone, ok := s.toneOf(label)
 		if !ok {
 			slog.Warn("unknown wake tone", "slot", n+1, "value", label)
 			return
 		}
-		sl.tone.Set(tone.Label())
+		sl.tone.Set(label)
 		if err := write().Tone(tone); err != nil {
 			slog.Error("saving the wake tone failed", "slot", n+1, "err", err)
 		}
@@ -217,7 +219,7 @@ func (s *Settings) Restore(words []schema.WakeWord) {
 		}
 
 		sl.threshold.Set(float32(saved.Threshold))
-		sl.tone.Set(saved.Tone.Label())
+		sl.tone.Set(s.toneLabel(saved.Tone))
 		sl.delivery.Set(saved.Delivery.Label())
 		sl.buffer.Set(float32(saved.Buffer))
 		sl.followUp.Set(float32(saved.FollowUp))
@@ -225,6 +227,49 @@ func (s *Settings) Restore(words []schema.WakeWord) {
 		sl.maxThink.Set(float32(saved.MaxThink))
 	}
 	slog.Info("restored", "what", "wake word settings", "slots", len(s.slots))
+}
+
+func (s *Settings) Refresh(words []schema.WakeWord) {
+	for _, sl := range s.slots {
+		sl.tone.SetOptions(s.toneLabels())
+	}
+	s.Restore(words)
+}
+
+func (s *Settings) tones() []setting.Option {
+	if s.options.Tones == nil {
+		return nil
+	}
+	return s.options.Tones()
+}
+
+func (s *Settings) toneLabels() []string {
+	out := labels(schema.Chimes())
+	for _, o := range s.tones() {
+		out = append(out, o.Label)
+	}
+	return out
+}
+
+func (s *Settings) toneLabel(c schema.Chime) string {
+	for _, o := range s.tones() {
+		if o.Value == string(c) {
+			return o.Label
+		}
+	}
+	return c.Label()
+}
+
+func (s *Settings) toneOf(label string) (schema.Chime, bool) {
+	if c, ok := byLabel(schema.Chimes(), label); ok {
+		return c, true
+	}
+	for _, o := range s.tones() {
+		if o.Label == label {
+			return schema.Chime(o.Value), true
+		}
+	}
+	return "", false
 }
 
 type labelled interface{ Label() string }

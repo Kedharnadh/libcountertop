@@ -121,6 +121,7 @@ func TestTheSwitchIsPublished(t *testing.T) {
 		"cast_prime_persist",
 		"cast_prime_skipintro",
 		"cast_oracle",
+		"cast_bundle",
 		"cast_credentials",
 		"cast_credentials_expire",
 	}

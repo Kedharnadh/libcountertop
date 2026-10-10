@@ -17,7 +17,8 @@ type (
 )
 
 const (
-	Group = setting.Group("Cast")
+	Group      = setting.Group("Cast")
+	PrimeGroup = setting.Group("Prime Video")
 
 	loungeAlways = "always"
 	loungeDemand = "demand"
@@ -27,7 +28,7 @@ func NewTable() *Table {
 	var t *Table
 	t = setting.NewTable(
 		"cast",
-		[]setting.Group{Group},
+		[]setting.Group{Group, PrimeGroup},
 		rows(func() *Table { return t }),
 		setting.Messages{Text: say.T, Missing: say.Missing},
 	)
@@ -35,9 +36,9 @@ func NewTable() *Table {
 }
 
 func rows(table func() *Table) []Setting {
-	toggle := func(name, icon string, field func(*schema.Cast) *bool) Setting {
+	toggle := func(name string, group setting.Group, icon string, field func(*schema.Cast) *bool) Setting {
 		return Setting{
-			Name: name, Group: Group, Icon: icon, Kind: setting.Toggle,
+			Name: name, Group: group, Icon: icon, Kind: setting.Toggle,
 			Read: func(c *schema.Cast) string { return setting.OnOff(*field(c)) },
 			Write: func(c *schema.Cast, v string) error {
 				on, ok := setting.Boolean(v)
@@ -50,7 +51,7 @@ func rows(table func() *Table) []Setting {
 		}
 	}
 	return []Setting{
-		toggle("receiver", "mdi:cast", func(c *schema.Cast) *bool { return &c.Receiver }),
+		toggle("receiver", Group, "mdi:cast", func(c *schema.Cast) *bool { return &c.Receiver }),
 		{
 			Name: "youtube.skip", Group: Group, ID: "youtube_sponsorblock",
 			Icon: "mdi:debug-step-over", Kind: setting.Text,
@@ -101,9 +102,9 @@ func rows(table func() *Table) []Setting {
 				return nil
 			},
 		},
-		toggle("prime.persist", "mdi:account-lock",
+		toggle("prime.persist", PrimeGroup, "mdi:account-lock",
 			func(c *schema.Cast) *bool { return &c.Prime.Persist }),
-		toggle("prime.skipintro", "mdi:skip-forward",
+		toggle("prime.skipintro", PrimeGroup, "mdi:skip-forward",
 			func(c *schema.Cast) *bool { return &c.Prime.SkipIntro }),
 	}
 }

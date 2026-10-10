@@ -44,6 +44,14 @@ func Pick[T any, V Labeled](s Setting[T], values []V, field func(*T) *V) Setting
 				return nil
 			}
 		}
+		if s.More != nil {
+			for _, o := range s.More() {
+				if o.Value == v || strings.EqualFold(o.Label, v) {
+					*field(c) = V(o.Value)
+					return nil
+				}
+			}
+		}
 		return fmt.Errorf("%s takes %s, not %q", s.Name, strings.Join(s.Values(), " or "), v)
 	}
 	return s

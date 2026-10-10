@@ -13,6 +13,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/visual"
 	"github.com/ygelfand/libcountertop/pkg/say"
+	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 	tz "github.com/ygelfand/libcountertop/pkg/timezone"
@@ -77,6 +78,7 @@ type AlertSettings interface {
 	Current() config.Alerts
 	Change(name, value string) error
 	Preview(config.Chime)
+	Tones() []setting.Option
 }
 type DashboardMode interface {
 	Enabled() bool

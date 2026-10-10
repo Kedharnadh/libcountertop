@@ -16,6 +16,7 @@ type fake struct{}
 func (*fake) Drain()                                     {}
 func (*fake) Queued() int                                { return 0 }
 func (*fake) Chime(schema.Stream, float64, ...tone.Note) {}
+func (*fake) Overlay(schema.Stream, []int16)             {}
 
 func driver() *Driver[*fake] { return NewDriver(&fake{}) }
 

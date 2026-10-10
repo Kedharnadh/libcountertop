@@ -23,6 +23,7 @@ type ReceiverOptions struct {
 	Settings storage.Section[schema.Cast]
 	DeviceID uint32
 	Network  func(ctx context.Context) bool
+	Want     func(setting.Group) bool
 	Server   Config
 }
 
@@ -37,6 +38,7 @@ type Receiver struct {
 	boot atomic.Pointer[startup.Progress]
 
 	oracle  *esphome.Text
+	bundle  *esphome.Text
 	source  *esphome.TextSensor
 	expires *esphome.Sensor
 }
@@ -48,6 +50,7 @@ func NewReceiver(opts ReceiverOptions) *Receiver {
 	r.knobs = &Controls{
 		Table:  NewTable(),
 		Device: opts.DeviceID,
+		Want:   opts.Want,
 		Read:   opts.Settings.Read,
 		Save:   r.save,
 	}
@@ -55,6 +58,15 @@ func NewReceiver(opts ReceiverOptions) *Receiver {
 		Base: esphome.Base{
 			ObjectID: "cast_oracle",
 			Name:     "Cast oracle",
+			Icon:     "mdi:certificate",
+			Category: esphome.CategoryConfig,
+		},
+		MaxLength: 255,
+	}
+	r.bundle = &esphome.Text{
+		Base: esphome.Base{
+			ObjectID: "cast_bundle",
+			Name:     "Cast bundle",
 			Icon:     "mdi:certificate",
 			Category: esphome.CategoryConfig,
 		},
@@ -78,16 +90,19 @@ func NewReceiver(opts ReceiverOptions) *Receiver {
 		DeviceClass: "timestamp",
 	}
 	for _, b := range []*esphome.Base{
-		&r.oracle.Base, &r.source.Base, &r.expires.Base,
+		&r.oracle.Base, &r.bundle.Base, &r.source.Base, &r.expires.Base,
 	} {
 		b.DeviceID = opts.DeviceID
 	}
 
 	r.oracle.Set(c.Oracle)
 	r.oracle.OnCommand = r.SetOracle
+	r.bundle.Set(c.Bundle)
+	r.bundle.OnCommand = r.SetBundle
 
 	server := opts.Server
 	server.Oracle = func() string { return r.settings.Read().Oracle }
+	server.Bundle = func() string { return r.settings.Read().Bundle }
 	server.Credentials = r.credentials
 	r.server = New(server)
 	return r
@@ -98,7 +113,7 @@ func (r *Receiver) write() schema.CastWriter { return schema.NewCastWriter(r.set
 func (r *Receiver) Name() string { return "cast receiver" }
 
 func (r *Receiver) Entities() []esphome.Entity {
-	return append(r.knobs.Entities(), r.oracle, r.source, r.expires)
+	return append(r.knobs.Entities(), r.oracle, r.bundle, r.source, r.expires)
 }
 
 func (r *Receiver) Settings() *Controls { return r.knobs }
@@ -155,6 +170,16 @@ func (r *Receiver) SetOracle(url string) {
 		return
 	}
 	r.oracle.Set(url)
+	r.server.Retarget()
+}
+
+func (r *Receiver) SetBundle(url string) {
+	url = strings.TrimSpace(url)
+	if err := r.write().Bundle(url); err != nil {
+		slog.Error("saving the cast bundle failed", "err", err)
+		return
+	}
+	r.bundle.Set(url)
 	r.server.Retarget()
 }
 
