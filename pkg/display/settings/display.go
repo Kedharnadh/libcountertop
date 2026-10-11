@@ -19,6 +19,12 @@ func (p *BasicPages) Display() *shell.Page {
 			cfg := p.state()
 			sizes := menu.Steps(len(config.ScreenSizes()))
 			auto := cfg.Screen.Mode == config.ModeAuto
+			hides := config.DockDelays()
+			dock := menu.Steps(len(hides))
+			hide := slices.Index(hides, cfg.Screen.DockHide)
+			if hide < 0 {
+				hide = slices.Index(hides, config.DelayNever)
+			}
 
 			rows := []menu.Row{
 				{
@@ -58,6 +64,13 @@ func (p *BasicPages) Display() *shell.Page {
 					Value: cfg.Idle.After.Label(),
 				},
 				SegmentRow(say.T("controls.dock"), config.Edges(), cfg.Screen.Drawer),
+				{
+					Label: say.T("controls.dock.hide"),
+					Kind:  menu.Slider,
+					Level: dock.Level(hide),
+					Snap:  dock.Snap,
+					Value: hides[hide].Label(),
+				},
 				SegmentRow(say.T("controls.volume"), config.Sides(), cfg.Screen.Volume),
 				{
 					Glyph: gogui.IconEye,
@@ -75,6 +88,7 @@ func (p *BasicPages) Display() *shell.Page {
 				p.open(func() shell.View { return p.DashboardPage() }),
 				p.open(func() shell.View { return p.options.Idle.Page() }),
 				SegmentPick(config.Edges(), p.options.Screen.SetDrawer),
+				func(level int) { p.options.Screen.SetDockHide(hides[dock.Index(level)]) },
 				SegmentPick(config.Sides(), p.setVolumeEdge),
 				func(int) { p.options.Privacy.SetMarks(!cfg.Screen.Marks) },
 			}

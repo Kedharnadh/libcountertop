@@ -1,8 +1,11 @@
 package drawer
 
 import (
+	"slices"
 	"testing"
 
+	"github.com/ygelfand/libcountertop/pkg/display/shell"
+	"github.com/ygelfand/libcountertop/pkg/input/touch"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
@@ -24,17 +27,41 @@ func TestTheOrderIsDeclaredNotTheOrderAdded(t *testing.T) {
 
 	for _, e := range []Entry{
 		{Name: called("Idle"), Order: OrderIdle},
-		{Name: called("Player"), Order: OrderPlayer},
+		{Name: called("Apps"), Order: OrderApps},
 		{Name: called("Settings"), Order: OrderSettings},
 	} {
 		r.Add(e)
 	}
 
-	want := []string{"Settings", "Player", "Idle"}
+	want := []string{"Settings", "Apps", "Idle"}
 	for i, e := range r.Entries() {
 		if e.Label() != want[i] {
 			t.Errorf("position %d is %s, want %s", i, e.Label(), want[i])
 		}
+	}
+}
+
+func TestAListIsAskedEachTimeAndSortedIn(t *testing.T) {
+	r := &Rail{}
+	r.Add(Entry{Name: called("Settings"), Order: OrderSettings})
+	r.Add(Entry{Name: called("Idle"), Order: OrderIdle})
+	docked := []string{"Player"}
+	r.AddList(func() []Entry {
+		var out []Entry
+		for n, name := range docked {
+			out = append(out, Entry{Name: called(name), Order: OrderFavorites + n})
+		}
+		return out
+	})
+
+	docked = []string{"Calls", "Player"}
+	var got []string
+	for _, e := range r.Entries() {
+		got = append(got, e.Label())
+	}
+	want := []string{"Settings", "Calls", "Player", "Idle"}
+	if !slices.Equal(got, want) {
+		t.Errorf("entries %v, want %v", got, want)
 	}
 }
 
@@ -57,10 +84,51 @@ func TestEqualOrdersFallBackToTheName(t *testing.T) {
 	}
 }
 
+func railFor(hide *schema.Delay) (*Rail, *shell.Shell) {
+	s := shell.New()
+	return New(Options{
+		Shell: s,
+		Edge:  func() schema.Edge { return schema.EdgeRight },
+		Hide:  func() schema.Delay { return *hide },
+	}), s
+}
+
+func TestASwipeShowsTheDockForTheChosenTime(t *testing.T) {
+	hide := schema.Delay15s
+	r, s := railFor(&hide)
+	defer s.Close()
+
+	r.Gesture(touch.Gesture{Kind: touch.Swipe, From: touch.Left})
+	if shown, _ := s.Dock(); shown {
+		t.Fatal("a swipe from the other edge showed the dock")
+	}
+	r.Gesture(touch.Gesture{Kind: touch.Swipe, From: touch.Right})
+	if shown, pinned := s.Dock(); !shown || pinned {
+		t.Errorf("dock shown %v pinned %v, want shown for a while", shown, pinned)
+	}
+}
+
+func TestNeverPinsTheDockAndATimeReleasesIt(t *testing.T) {
+	hide := schema.DelayNever
+	r, s := railFor(&hide)
+	defer s.Close()
+
+	r.Settle()
+	if shown, pinned := s.Dock(); !shown || !pinned {
+		t.Fatalf("never: dock shown %v pinned %v, want pinned", shown, pinned)
+	}
+
+	hide = schema.Delay15s
+	r.Settle()
+	if shown, _ := s.Dock(); shown {
+		t.Error("choosing a time left the dock pinned")
+	}
+}
+
 func TestTheDeclaredPlacesAreDistinct(t *testing.T) {
 	seen := map[int]bool{}
 
-	for _, at := range []int{OrderSettings, OrderPlayer, OrderIdle} {
+	for _, at := range []int{OrderSettings, OrderApps, OrderFavorites, OrderIdle} {
 		if seen[at] {
 			t.Errorf("two things are declared at %d", at)
 		}

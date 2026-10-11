@@ -5,6 +5,7 @@ import "github.com/ygelfand/libcountertop/pkg/settings/storage"
 type Shared struct {
 	Alerts    Alerts    `json:"alerts"`
 	API       API       `json:"api"`
+	Apps      Apps      `json:"apps"`
 	Bluetooth Bluetooth `json:"bluetooth"`
 	Call      Call      `json:"call"`
 	Camera    Camera    `json:"camera"`
@@ -30,6 +31,7 @@ func DefaultShared() Shared {
 	return Shared{
 		Alerts:    DefaultAlerts(),
 		API:       DefaultAPI(),
+		Apps:      DefaultApps(),
 		Bluetooth: DefaultBluetooth(),
 		Call:      DefaultCall(),
 		Camera:    DefaultCamera(),
@@ -56,12 +58,14 @@ func (s Shared) Clone() Shared {
 	s.Cast = s.Cast.Clone()
 	s.Camera = s.Camera.Clone()
 	s.Home = s.Home.Clone()
+	s.Apps = s.Apps.Clone()
 	return s
 }
 
 type Sections[C any] struct {
 	Alerts    storage.Binding[C, Alerts]
 	API       storage.Binding[C, API]
+	Apps      storage.Binding[C, Apps]
 	Bluetooth storage.Binding[C, Bluetooth]
 	Call      storage.Binding[C, Call]
 	Camera    storage.Binding[C, Camera]
@@ -87,6 +91,7 @@ func NewSections[C any](store func() *storage.Store[C], shared func(*C) *Shared)
 	return Sections[C]{
 		Alerts:    bind(store, shared, func(s *Shared) *Alerts { return &s.Alerts }),
 		API:       bind(store, shared, func(s *Shared) *API { return &s.API }),
+		Apps:      bind(store, shared, func(s *Shared) *Apps { return &s.Apps }),
 		Bluetooth: bind(store, shared, func(s *Shared) *Bluetooth { return &s.Bluetooth }),
 		Call:      bind(store, shared, func(s *Shared) *Call { return &s.Call }),
 		Camera:    bind(store, shared, func(s *Shared) *Camera { return &s.Camera }),

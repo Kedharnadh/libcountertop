@@ -37,6 +37,20 @@ func NewTable() *Table {
 			schema.IdleAligns(), func(c *schema.Idle) *schema.Align { return &c.Align }),
 		setting.Pick(Setting{Name: "size", Group: Group, Icon: "mdi:resize"},
 			schema.Sizes(), func(c *schema.Idle) *schema.Size { return &c.Size }),
+		setting.Pick(
+			Setting{Name: "night", Group: Group, ID: "night_mode", Icon: "mdi:weather-night"},
+			schema.Nights(),
+			func(c *schema.Idle) *schema.Night { return &c.Night },
+		),
+		setting.Count(Setting{
+			Name: "night.lux", Group: Group, ID: "night_lux", Icon: "mdi:brightness-4",
+			Min: 0, Max: 100, Unit: "lx",
+		}, func(c *schema.Idle) *int { return &c.NightLux }),
+		setting.Pick(
+			Setting{Name: "night.after", Group: Group, ID: "night_after", Icon: "mdi:timer-sand"},
+			schema.NightDelays(),
+			func(c *schema.Idle) *schema.Delay { return &c.NightAfter },
+		),
 	}
 	for n, id := range []string{"1", "2"} {
 		rows = append(rows,

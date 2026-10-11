@@ -3,35 +3,35 @@ package mediacard
 import (
 	"testing"
 
-	"github.com/ygelfand/libcountertop/pkg/display/drawer"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
-func TestTheRailOpensTheCardWithNothingPlaying(t *testing.T) {
+func TestTheAppOpensTheCardWithNothingPlaying(t *testing.T) {
 	stack := shell.New()
 	defer stack.Close()
 	c := New(Dependencies{Player: testPlayer{&testSource{}}, Idle: testIdle{}, Shell: stack})
 
-	rail := c.Rail()
-	if rail.Order != drawer.OrderPlayer || rail.Name() == "" || rail.Glyph() == "" {
-		t.Fatalf("rail entry %+v", rail)
+	app := c.App()
+	if app.ID != schema.AppPlayer || app.Label() == "" || app.Glyph() == "" {
+		t.Fatalf("app %+v", app)
 	}
-	rail.Open()
+	app.Open()
 	if stack.Top() != c.Page() {
-		t.Error("the rail did not put the card up")
+		t.Error("the app did not put the card up")
 	}
 }
 
-func TestTheRailOpensWhatIsPlaying(t *testing.T) {
+func TestTheAppOpensWhatIsPlaying(t *testing.T) {
 	stack := shell.New()
 	defer stack.Close()
 	src := &testSource{now: nowplaying.Now{Playing: true}}
 	c := New(Dependencies{Player: testPlayer{src}, Idle: testIdle{}, Shell: stack})
 	c.Began(src)
 
-	c.Rail().Open()
+	c.App().Open()
 	if stack.Top() != c.Page() {
-		t.Error("the rail did not open the playing card")
+		t.Error("the app did not open the playing card")
 	}
 }

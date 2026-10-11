@@ -173,6 +173,85 @@ func TestAListenerThatChangesTheStackIsHeardAfterwards(t *testing.T) {
 	}
 }
 
+func (s *Shell) dockStamp() uint64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.dockGen
+}
+
+func TestASwipedDockHidesWhenItsTimeRunsOut(t *testing.T) {
+	s := New()
+	defer s.Close()
+	s.ShowDock(time.Hour)
+	if shown, pinned := s.Dock(); !shown || pinned {
+		t.Fatalf("dock shown %v pinned %v, want shown and not pinned", shown, pinned)
+	}
+	s.dockIdled(s.dockStamp())
+	if shown, _ := s.Dock(); shown {
+		t.Error("the dock stayed after its time ran out")
+	}
+}
+
+func TestATouchKeepsASwipedDockOpen(t *testing.T) {
+	s := New()
+	defer s.Close()
+	s.ShowDock(time.Hour)
+	old := s.dockStamp()
+	s.Touch()
+	s.dockIdled(old)
+	if shown, _ := s.Dock(); !shown {
+		t.Error("a timer from before the touch hid the dock")
+	}
+}
+
+func TestAPinnedDockNeverTimesOut(t *testing.T) {
+	s := New()
+	defer s.Close()
+	s.ShowDock(0)
+	s.mu.Lock()
+	timer := s.dockTimer
+	s.mu.Unlock()
+	if timer != nil {
+		t.Error("a pinned dock started a timer")
+	}
+	if shown, pinned := s.Dock(); !shown || !pinned {
+		t.Errorf("dock shown %v pinned %v, want both", shown, pinned)
+	}
+}
+
+func TestACoveringViewHidesASwipedDockButNotAPinnedOne(t *testing.T) {
+	s := New()
+	defer s.Close()
+	page := &view{covers: true}
+	card := &view{}
+
+	s.ShowDock(time.Hour)
+	s.Push(card)
+	if shown, _ := s.Dock(); !shown {
+		t.Fatal("a view that does not cover hid the dock")
+	}
+	s.Push(page)
+	if shown, _ := s.Dock(); shown {
+		t.Fatal("a covering view left a swiped dock up")
+	}
+
+	s.Close()
+	s.ShowDock(0)
+	s.Push(page)
+	if shown, pinned := s.Dock(); !shown || !pinned {
+		t.Error("a covering view took a pinned dock away")
+	}
+}
+
+func TestTheDockIsNotPartOfTheStack(t *testing.T) {
+	s := New()
+	defer s.Close()
+	s.ShowDock(0)
+	if s.Open() || s.Top() != nil || len(s.Views()) != 0 {
+		t.Error("the dock counts as something open")
+	}
+}
+
 func TestAHoldRefusedByASleepingTopIsNotRecorded(t *testing.T) {
 	s := New()
 	defer s.Close()

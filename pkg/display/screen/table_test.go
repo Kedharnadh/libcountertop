@@ -11,17 +11,18 @@ func table() *Table { return NewTable(func() string { return schema.UISizeLarge 
 
 func TestTheEntityIdentifiersDoNotMove(t *testing.T) {
 	want := map[string]string{
-		"backlight": "backlight",
-		"auto":      "screen_mode",
-		"theme":     "theme",
-		"style":     "screen_style",
-		"size":      "screen_size",
-		"drawer":    "drawer_edge",
-		"alert":     "screen_alert",
-		"timer":     "screen_timer",
-		"keyboard":  "screen_keyboard",
-		"language":  "screen_language",
-		"marks":     "privacy_marks",
+		"backlight":   "backlight",
+		"auto":        "screen_mode",
+		"theme":       "theme",
+		"style":       "screen_style",
+		"size":        "screen_size",
+		"drawer":      "drawer_edge",
+		"drawer.hide": "dock_hide",
+		"alert":       "screen_alert",
+		"timer":       "screen_timer",
+		"keyboard":    "screen_keyboard",
+		"language":    "screen_language",
+		"marks":       "privacy_marks",
 	}
 
 	tb := table()

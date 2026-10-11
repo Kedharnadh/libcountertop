@@ -17,6 +17,8 @@ type Screen struct {
 
 	Drawer Edge `json:"drawer"`
 
+	DockHide Delay `json:"dock_hide"`
+
 	Volume Edge `json:"volume"`
 
 	Alert AlertStyle `json:"alert"`
@@ -46,6 +48,7 @@ func DefaultScreen() Screen {
 		Hours:     DefaultHourFormat,
 		Keyboard:  KeyboardCompact,
 		Drawer:    DefaultEdge,
+		DockHide:  DelayNever,
 		Volume:    DefaultEdge,
 		Alert:     DefaultAlertStyle,
 		Timer:     DefaultTimerStyle,

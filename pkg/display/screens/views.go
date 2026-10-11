@@ -45,8 +45,6 @@ func (a *App) screenFor(v shell.View) *Screen {
 		return &Screen{Title: say.T("player.now"), View: v, Fixed: true, Build: a.player.Body}
 	case a.o.Volume.Card():
 		return &Screen{View: v, Build: a.volumeCard}
-	case a.o.Drawer:
-		return &Screen{View: v, Build: func(w *gogui.Window) gogui.View { return a.rail(w, v) }}
 	}
 	return nil
 }
@@ -83,7 +81,7 @@ func (a *App) pickerScreen(p *homecontrol.Picker) *Screen {
 	}
 }
 
-func (a *App) rail(w *gogui.Window, v shell.View) gogui.View {
+func (a *App) rail(w *gogui.Window) gogui.View {
 	var entries []widgets.RailEntry
 	for _, e := range a.o.Drawer.Entries() {
 		glyph := ""
@@ -92,12 +90,16 @@ func (a *App) rail(w *gogui.Window, v shell.View) gogui.View {
 		}
 		entries = append(entries, widgets.RailEntry{Label: e.Label(), Glyph: glyph, Open: e.Open})
 	}
+	var close func()
+	if _, pinned := a.o.Shell.Dock(); !pinned {
+		close = a.o.Shell.HideDock
+	}
 	return a.ui.Toolkit.Rail(
 		w,
 		widgets.RailOptions{
 			Entries: entries,
 			Edge:    a.o.Settings().Screen.Drawer,
-			Close:   func() { a.o.Shell.Remove(v) },
+			Close:   close,
 		},
 	)
 }

@@ -33,9 +33,27 @@ type Auto struct {
 	shown     int
 	applied   int
 	told      Told
+	night     schema.Night
+	pinned    bool
 }
 
 func NewAuto(leastLux float64) *Auto { return &Auto{leastLux: leastLux} }
+
+func (a *Auto) Night(n schema.Night) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.night = n
+}
+
+func nightLevel(n schema.Night) (int, bool) {
+	switch n {
+	case schema.NightOff:
+		return 0, true
+	case schema.NightDim, schema.NightClock:
+		return Floor, true
+	}
+	return 0, false
+}
 
 func (a *Auto) Ambient() (float64, bool) {
 	a.mu.Lock()
@@ -53,20 +71,31 @@ func (a *Auto) Follow(lux float64, screen schema.Screen) Step {
 	a.following += settle * (lux - a.following)
 	step := Step{Ambient: a.following, Report: a.told.Worth(a.following, a.leastLux)}
 
-	if screen.Mode != schema.ModeAuto {
+	dim, dark := nightLevel(a.night)
+	if screen.Mode != schema.ModeAuto && !dark {
+		if a.pinned {
+			a.pinned = false
+			step.Level, step.Apply = screen.Backlight, true
+		}
 		a.applied = 0
 		return step
 	}
 
-	a.held = hold(a.held, a.following, lux)
-	want := Brightness(a.held, screen.Backlight)
-	if a.shown == 0 {
-		a.shown = want
+	if screen.Mode == schema.ModeAuto {
+		a.held = hold(a.held, a.following, lux)
+		want := Brightness(a.held, screen.Backlight)
+		if a.shown == 0 {
+			a.shown = want
+		}
+		a.shown = ramp(a.shown, want)
 	}
-	a.shown = ramp(a.shown, want)
-	if a.shown != a.applied {
-		a.applied = a.shown
-		step.Level, step.Apply = a.shown, true
+	level := a.shown
+	if dark {
+		level = dim
+	}
+	if level != a.applied || dark != a.pinned {
+		a.applied, a.pinned = level, dark
+		step.Level, step.Apply = level, true
 	}
 	return step
 }

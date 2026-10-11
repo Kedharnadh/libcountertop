@@ -141,6 +141,11 @@ func rows(table func() *Table, uiSize func() string) []Setting {
 			},
 		},
 		setting.Pick(
+			Setting{Name: "drawer.hide", Group: Panel, ID: "dock_hide", Icon: "mdi:dock-right"},
+			schema.DockDelays(),
+			func(s *schema.Screen) *schema.Delay { return &s.DockHide },
+		),
+		setting.Pick(
 			Setting{Name: "alert", Group: Panel, Icon: "mdi:message-alert-outline"},
 			schema.AlertStyles(),
 			func(s *schema.Screen) *schema.AlertStyle { return &s.Alert },

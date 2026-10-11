@@ -11,10 +11,10 @@ import (
 )
 
 const (
-	OrderSettings = 30
-	OrderCalls    = 35
-	OrderPlayer   = 40
-	OrderIdle     = 50
+	OrderSettings  = 30
+	OrderApps      = 35
+	OrderFavorites = 40
+	OrderIdle      = 90
 )
 
 type Entry struct {
@@ -37,6 +37,7 @@ func (e Entry) Label() string {
 type Options struct {
 	Shell *shell.Shell
 	Edge  func() schema.Edge
+	Hide  func() schema.Delay
 }
 
 type Rail struct {
@@ -44,6 +45,7 @@ type Rail struct {
 
 	mu      sync.Mutex
 	entries []Entry
+	lists   []func() []Entry
 }
 
 func New(opts Options) *Rail { return &Rail{opts: opts} }
@@ -56,10 +58,20 @@ func (r *Rail) Add(e Entry) {
 	r.entries = append(r.entries, e)
 }
 
+func (r *Rail) AddList(list func() []Entry) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.lists = append(r.lists, list)
+}
+
 func (r *Rail) Entries() []Entry {
 	r.mu.Lock()
 	out := append([]Entry(nil), r.entries...)
+	lists := slices.Clone(r.lists)
 	r.mu.Unlock()
+	for _, list := range lists {
+		out = append(out, list()...)
+	}
 
 	slices.SortStableFunc(out, func(a, b Entry) int {
 		if v := cmp.Compare(a.Order, b.Order); v != 0 {
@@ -75,12 +87,24 @@ func (r *Rail) Gesture(g touch.Gesture) {
 	if s.Open() || s.Closing() {
 		return
 	}
-	if g.Kind == touch.Swipe && g.From == AsTouch(r.opts.Edge()) {
-		s.Push(r)
+	if g.Kind != touch.Swipe || g.From != AsTouch(r.opts.Edge()) {
+		return
+	}
+	if shown, _ := s.Dock(); !shown {
+		s.ShowDock(r.opts.Hide().After())
 	}
 }
 
-func (r *Rail) Covers() bool { return false }
+func (r *Rail) Settle() {
+	s := r.opts.Shell
+	never := r.opts.Hide().After() == 0
+	switch _, pinned := s.Dock(); {
+	case never && !pinned:
+		s.ShowDock(0)
+	case !never && pinned:
+		s.HideDock()
+	}
+}
 
 func AsTouch(e schema.Edge) touch.Edge {
 	switch e {

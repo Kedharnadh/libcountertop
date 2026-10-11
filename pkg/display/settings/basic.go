@@ -29,6 +29,7 @@ type BasicState struct {
 type ScreenControl interface {
 	Set(string, string) error
 	SetDrawer(config.Edge)
+	SetDockHide(config.Delay)
 	SetBacklight(int)
 	SetMode(config.ScreenMode)
 	Use(string)

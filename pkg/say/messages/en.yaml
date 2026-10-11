@@ -25,6 +25,11 @@ align.random: Random
 align.right: Right
 api.group.api: Home Assistant
 api.setting.adopted: Adopted by Home Assistant
+apps.empty: No apps
+apps.hint: Tap the star to keep an app in the dock. Drag a tile to move it.
+apps.setting.dock: Apps in the dock
+apps.setting.order: App order
+apps.title: Apps
 assistants.off: "Off"
 assistants.reply: Response playback
 assistants.slot: Assistant {{.N}}
@@ -215,6 +220,7 @@ clock.setting.size: Clock size
 clock.title: Clock
 clock.zone: Time zone
 controls.dock: Dock position
+controls.dock.hide: Hide dock after
 controls.volume: Volume panel position
 datetime.title: Date & time
 debug.fps: Visual frame rate limit
@@ -225,13 +231,16 @@ debug.seed.value: "#{{.N}}"
 debug.title: Developer options
 debug.visuals: Visuals
 delay.10m: 10 minutes
+delay.10s: 10 seconds
 delay.15m: 15 minutes
+delay.15s: 15 seconds
 delay.1m: 1 minute
 delay.2m: 2 minutes
 delay.30m: 30 minutes
 delay.30s: 30 seconds
 delay.3m: 3 minutes
 delay.5m: 5 minutes
+delay.5s: 5 seconds
 delay.never: Never
 delivery.stream: Stream
 delivery.whole: Download first
@@ -344,6 +353,12 @@ idle.face: Clock face
 idle.label: Visual label
 idle.media: Close paused player after
 idle.media.hint: Audio and video players
+idle.night: Night mode
+idle.night.after: Starts after
+idle.night.hint: When the room is dark
+idle.night.lux: Darker than
+idle.night.lux.value: "{{.N}} lx"
+idle.night.mode: Mode
 idle.none: None
 idle.saver: Mode
 idle.saver.tessera: Set it up in Tessera's screen settings
@@ -351,6 +366,9 @@ idle.setting.after: Idle screen after
 idle.setting.align: Idle clock horizontal position
 idle.setting.face: Idle clock face
 idle.setting.media: Close paused player after
+idle.setting.night: Night mode
+idle.setting.night.after: Night mode after
+idle.setting.night.lux: Night mode below
 idle.setting.position: Idle clock vertical position
 idle.setting.saver: Screen saver mode
 idle.setting.size: Idle clock size
@@ -409,6 +427,10 @@ network.router: Router
 network.setting.verify: Verify certificates
 network.ssid: Wi-Fi network
 network.title: Network & internet
+night.clock: Dim to a clock
+night.dim: Dim
+night.none: Nothing
+night.off: Turn off the screen
 onboard.add: Scan the code, then add
 onboard.hint: Scan the code, then enter this address.
 onboard.or: or enter this address
@@ -465,6 +487,7 @@ screen.setting.alert: Alert style
 screen.setting.auto: Auto brightness
 screen.setting.backlight: Brightness
 screen.setting.drawer: Dock location
+screen.setting.drawer.hide: Hide dock after
 screen.setting.keyboard: Keyboard size
 screen.setting.language: Language
 screen.setting.marks: Privacy marks

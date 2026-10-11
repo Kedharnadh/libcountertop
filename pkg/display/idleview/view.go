@@ -34,6 +34,7 @@ type View struct {
 	shown   string
 	spot    Spot
 	moved   time.Time
+	night   config.Night
 
 	gmu    sync.Mutex
 	gl     [2]*shading
@@ -45,8 +46,47 @@ func New(options Dependencies) *View { return &View{options: options} }
 func (v *View) Covers() bool           { return true }
 func (v *View) Asleep() bool           { return true }
 func (v *View) Timeout() time.Duration { return forever }
-func (v *View) Keep(w, h int) []config.IdleVisual {
+
+func (v *View) Night() config.Night {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.night
+}
+
+func (v *View) setNight(n config.Night) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.night = n
+}
+
+func Dark(idle config.Idle, clock config.Face, n config.Night) config.Idle {
+	if !n.Quiet() {
+		return idle
+	}
+	idle.First, idle.Second = config.IdleVisual{}, config.IdleVisual{}
+	if n == config.NightOff {
+		idle.Face = config.FaceNone
+		return idle
+	}
+	if idle.Face == config.FaceNone {
+		idle.Face = clock
+	}
+	idle.Placement = config.Placement{
+		Position: config.PositionCenter,
+		Align:    config.AlignCenter,
+		Size:     config.SizeLarge,
+	}
+	return idle
+}
+
+func (v *View) read() Settings {
 	cfg := v.options.Read()
+	cfg.Idle = Dark(cfg.Idle, cfg.Clock.Face, v.Night())
+	return cfg
+}
+
+func (v *View) Keep(w, h int) []config.IdleVisual {
+	cfg := v.read()
 	slots := Chosen(cfg.Idle)
 
 	v.mu.Lock()
@@ -180,7 +220,7 @@ func (v *View) run(ctx context.Context) {
 		}
 		next = now.Add(frameEvery)
 
-		cfg := v.options.Read()
+		cfg := v.read()
 		if slots := Chosen(cfg.Idle); len(slots) > 0 {
 			if release == nil {
 				release = v.options.Visuals.Hold()

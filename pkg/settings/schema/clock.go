@@ -29,6 +29,9 @@ type Delay string
 
 const (
 	DelayNever Delay = "never"
+	Delay5s    Delay = "5s"
+	Delay10s   Delay = "10s"
+	Delay15s   Delay = "15s"
 	Delay30s   Delay = "30s"
 	Delay1m    Delay = "1m"
 	Delay2m    Delay = "2m"
@@ -45,6 +48,12 @@ func (d Delay) Label() string {
 	switch d {
 	case DelayNever:
 		return say.T("delay.never")
+	case Delay5s:
+		return say.T("delay.5s")
+	case Delay10s:
+		return say.T("delay.10s")
+	case Delay15s:
+		return say.T("delay.15s")
 	case Delay30s:
 		return say.T("delay.30s")
 	case Delay1m:
@@ -67,6 +76,12 @@ func (d Delay) Label() string {
 
 func (d Delay) After() time.Duration {
 	switch d {
+	case Delay5s:
+		return 5 * time.Second
+	case Delay10s:
+		return 10 * time.Second
+	case Delay15s:
+		return 15 * time.Second
 	case Delay30s:
 		return 30 * time.Second
 	case Delay1m:

@@ -33,7 +33,8 @@ func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
 		e.Consume()
 		e.Window.InvalidateLayout()
 	}
-	if a.o.Tessera != nil && a.o.Settings().Idle.Tessera() {
+	night := v.Night()
+	if a.o.Tessera != nil && a.o.Settings().Idle.Tessera() && !night.Quiet() {
 		if layers := a.o.Tessera.Saver(w, ui.Rect{W: vw, H: vh}); layers != nil {
 			v.Close()
 			return gogui.Column(gogui.ContainerCfg{
@@ -46,11 +47,12 @@ func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
 		}
 	}
 	cfg := a.o.Settings()
+	idle := idleview.Dark(cfg.Idle, cfg.Clock.Face, night)
 	pal := a.ui.Palette()
 	slots := v.Keep(vw, vh)
 	areas := idleview.Areas(vw, vh, len(slots))
-	spot := v.Spot(cfg.Idle, time.Now())
-	box := dashboard.Place(spot.At, spot.Align, cfg.Idle.Size, vw, vh)
+	spot := v.Spot(idle, time.Now())
+	box := dashboard.Place(spot.At, spot.Align, idle.Size, vw, vh)
 
 	var layers []gogui.View
 	if len(slots) == 0 {
@@ -73,7 +75,7 @@ func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
 				vh,
 				image.Rect(box.X, box.Y, box.X+box.W, box.Y+box.H),
 				pal.Background,
-			); backdrop != nil {
+			); backdrop != nil && !night.Quiet() {
 			layers = append(
 				layers,
 				widgets.Placed(
@@ -83,9 +85,9 @@ func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
 			)
 		}
 	}
-	if build, ok := clockview.Of(cfg.Idle.Face); ok {
+	if build, ok := clockview.Of(idle.Face); ok {
 		r := idleview.Reading(
-			idleview.Settings{Screen: cfg.Screen, Clock: cfg.Clock, Idle: cfg.Idle},
+			idleview.Settings{Screen: cfg.Screen, Clock: cfg.Clock, Idle: idle},
 			time.Now(),
 		)
 		tones := make([]visual.Traits, len(slots))
@@ -107,7 +109,7 @@ func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
 			})))
 		}
 	}
-	if r, ok := a.o.Forecast.Now(); ok && cfg.Weather.Idle {
+	if r, ok := a.o.Forecast.Now(); ok && cfg.Weather.Idle && !night.Quiet() {
 		layers = append(layers, a.weather.Layer(w, r, cfg.Weather.SaverLayout(), vw, vh, 0, pal))
 	}
 	return gogui.Column(gogui.ContainerCfg{

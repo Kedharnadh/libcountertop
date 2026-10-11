@@ -23,6 +23,7 @@ type EntityTile struct {
 	Picture       func(width, height float32) gogui.View
 	Body          func(width, height float32) gogui.View
 	Tap, Hold     func(gogui.EventCtx)
+	Pan           func(gogui.EventCtx)
 	Window        *gogui.Window
 }
 
@@ -101,11 +102,16 @@ func (u *UI) Entity(t EntityTile) gogui.View {
 		Disabled: !t.Available,
 		Content:  content,
 	}
-	if hold := t.Hold; hold != nil {
+	if t.Hold != nil || t.Pan != nil {
+		hold, pan := t.Hold, t.Pan
 		cfg.OnGesture = func(e gogui.EventCtx) {
-			if e.Event.GestureType == gogui.GestureLongPress &&
-				e.Event.GesturePhase == gogui.GesturePhaseBegan {
+			switch {
+			case hold != nil && e.Event.GestureType == gogui.GestureLongPress &&
+				e.Event.GesturePhase == gogui.GesturePhaseBegan:
 				hold(e)
+				e.Consume()
+			case pan != nil && e.Event.GestureType == gogui.GesturePan:
+				pan(e)
 				e.Consume()
 			}
 		}

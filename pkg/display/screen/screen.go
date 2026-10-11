@@ -185,6 +185,13 @@ func (s *Screen) SetDrawer(edge schema.Edge) {
 	s.knobs.Publish()
 }
 
+func (s *Screen) SetDockHide(v schema.Delay) {
+	if err := s.options.Settings.Update(func(c *schema.Screen) { c.DockHide = v }); err != nil {
+		slog.Error("saving a setting failed", "setting", "drawer.hide", "err", err)
+	}
+	s.knobs.Publish()
+}
+
 func (s *Screen) SetMode(mode schema.ScreenMode) {
 	if err := s.options.Settings.Update(func(c *schema.Screen) { c.Mode = mode }); err != nil {
 		slog.Error("saving a setting failed", "setting", "auto", "err", err)

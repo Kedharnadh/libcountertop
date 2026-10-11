@@ -39,6 +39,11 @@ type Shell struct {
 	pending    []notice
 	notifying  bool
 
+	dock      bool
+	dockHide  time.Duration
+	dockTimer *time.Timer
+	dockGen   uint64
+
 	Changed hook.Hook[Change]
 	Redrawn hook.Hook[struct{}]
 }
@@ -216,6 +221,9 @@ func (s *Shell) add(v View, hold bool) bool {
 	if !slices.Contains(s.stack, v) {
 		s.stack = append(s.stack, v)
 	}
+	if v.Covers() && s.dock && s.dockHide > 0 {
+		s.hideDock()
+	}
 	return true
 }
 
@@ -305,9 +313,68 @@ func (s *Shell) Close() {
 func (s *Shell) Redraw() { s.Redrawn.Emit(struct{}{}) }
 
 func (s *Shell) Touch() {
+	s.mu.Lock()
+	if s.dock && s.dockHide > 0 {
+		s.armDock()
+	}
+	s.mu.Unlock()
 	if s.Open() {
 		s.wake()
 	}
+}
+
+func (s *Shell) Dock() (shown, pinned bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.dock, s.dock && s.dockHide == 0
+}
+
+func (s *Shell) ShowDock(hide time.Duration) {
+	s.mu.Lock()
+	s.dock, s.dockHide = true, hide
+	s.armDock()
+	s.mu.Unlock()
+	s.Redraw()
+}
+
+func (s *Shell) HideDock() {
+	s.mu.Lock()
+	s.hideDock()
+	s.mu.Unlock()
+	s.Redraw()
+}
+
+func (s *Shell) hideDock() {
+	s.dock = false
+	s.stopDock()
+}
+
+func (s *Shell) armDock() {
+	s.stopDock()
+	if !s.dock || s.dockHide <= 0 {
+		return
+	}
+	generation := s.dockGen
+	s.dockTimer = time.AfterFunc(s.dockHide, func() { s.dockIdled(generation) })
+}
+
+func (s *Shell) stopDock() {
+	s.dockGen++
+	if s.dockTimer != nil {
+		s.dockTimer.Stop()
+		s.dockTimer = nil
+	}
+}
+
+func (s *Shell) dockIdled(generation uint64) {
+	s.mu.Lock()
+	if generation != s.dockGen {
+		s.mu.Unlock()
+		return
+	}
+	s.hideDock()
+	s.mu.Unlock()
+	s.Redraw()
 }
 
 func (s *Shell) idled(generation uint64) {

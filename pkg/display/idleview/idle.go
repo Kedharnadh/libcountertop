@@ -12,6 +12,7 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/visual"
+	"github.com/ygelfand/libcountertop/pkg/hook"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -30,20 +31,26 @@ type Options struct {
 	Ready    func() bool
 	Activity []Activity
 	Free     func() bool
+	Ambient  func() (lux float64, known bool)
 }
 
 type Idle struct {
+	Night hook.Hook[schema.Night]
+
 	options Options
 
 	knobs *setting.Controls[schema.Idle]
 
-	mu   sync.Mutex
-	hold *shell.Hold
-	woke time.Time
+	mu    sync.Mutex
+	hold  *shell.Hold
+	woke  time.Time
+	shown time.Time
+	night schema.Night
 }
 
 func NewIdle(options Options) *Idle {
-	i := &Idle{options: options}
+	i := &Idle{options: options, night: schema.NightNone}
+	options.View.setNight(schema.NightNone)
 	i.knobs = &setting.Controls[schema.Idle]{
 		Table:  NewTable(),
 		Device: options.DeviceID,
@@ -81,9 +88,11 @@ func (i *Idle) step() {
 		return
 	}
 	i.covered()
-	if due(i.options.Settings.Read().After.After(), i.quiet()) && i.free() {
+	c := i.options.Settings.Read()
+	if due(c.After.After(), i.quiet()) && i.free() {
 		i.Show()
 	}
+	i.dusk(c)
 }
 
 func (i *Idle) Lock() {
@@ -98,6 +107,67 @@ func (i *Idle) Show() {
 		return
 	}
 	i.hold = i.options.Shell.Hold(i.options.View)
+	i.shown = time.Now()
+}
+
+func (i *Idle) dusk(c schema.Idle) {
+	dark := c.Night.On() && i.dark(c.NightLux)
+	showing := i.showing()
+	after := c.NightAfter.After()
+
+	i.mu.Lock()
+	on, shown := i.night.On(), i.shown
+	i.mu.Unlock()
+
+	switch {
+	case on && !showing:
+		i.setNight(schema.NightNone)
+	case on && !dark:
+		i.setNight(schema.NightNone)
+		i.mu.Lock()
+		i.shown = time.Now()
+		i.mu.Unlock()
+	case on:
+		i.setNight(c.Night)
+	case !dark || after <= 0:
+	case showing:
+		if time.Since(shown) > after {
+			i.setNight(c.Night)
+		}
+	case c.After.After() <= 0 && due(after, i.quiet()) && i.free():
+		i.Show()
+		i.setNight(c.Night)
+	}
+}
+
+func (i *Idle) dark(below int) bool {
+	if i.options.Ambient == nil {
+		return false
+	}
+	lux, known := i.options.Ambient()
+	return known && lux < float64(below)
+}
+
+func (i *Idle) showing() bool {
+	i.mu.Lock()
+	hold := i.hold
+	i.mu.Unlock()
+	return hold.Held() && i.options.Shell.Visible(i.options.View)
+}
+
+func (i *Idle) setNight(n schema.Night) {
+	i.mu.Lock()
+	if i.night == n {
+		i.mu.Unlock()
+		return
+	}
+	i.night = n
+	i.mu.Unlock()
+
+	slog.Info("night mode", "mode", n)
+	i.options.View.setNight(n)
+	i.Night.Emit(n)
+	i.options.Shell.Redraw()
 }
 
 func (i *Idle) Wake() {
@@ -178,6 +248,18 @@ func (i *Idle) Saver() schema.HomeMode { return i.options.Settings.Read().Saver 
 
 func (i *Idle) SetSaver(v schema.HomeMode) {
 	i.set("saver", func(c *schema.Idle) { c.Saver = v })
+}
+
+func (i *Idle) SetNight(v schema.Night) {
+	i.set("night", func(c *schema.Idle) { c.Night = v })
+}
+
+func (i *Idle) SetNightLux(v int) {
+	i.set("night.lux", func(c *schema.Idle) { c.NightLux = v })
+}
+
+func (i *Idle) SetNightAfter(v schema.Delay) {
+	i.set("night.after", func(c *schema.Idle) { c.NightAfter = v })
 }
 
 func (i *Idle) SetFace(v schema.Face) {

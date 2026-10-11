@@ -52,7 +52,9 @@ func (kit *Toolkit) Rail(w *gogui.Window, options RailOptions) gogui.View {
 		}
 		cfg.Content = []gogui.View{face}
 		buttons = append(buttons, kit.Pressable(gogui.Row, cfg, func(gogui.EventCtx) {
-			close()
+			if close != nil {
+				close()
+			}
 			open()
 		}))
 	}
@@ -89,6 +91,9 @@ func (kit *Toolkit) Rail(w *gogui.Window, options RailOptions) gogui.View {
 		cfg.HAlign, cfg.VAlign = gogui.HAlignCenter, gogui.VAlignTop
 	case schema.EdgeBottom:
 		cfg.HAlign, cfg.VAlign = gogui.HAlignCenter, gogui.VAlignBottom
+	}
+	if close == nil {
+		return gogui.Column(cfg)
 	}
 	return kit.Pressable(gogui.Column, cfg, func(gogui.EventCtx) { close() })
 }

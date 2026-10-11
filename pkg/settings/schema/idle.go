@@ -10,6 +10,10 @@ type Idle struct {
 	First  IdleVisual `json:"first"`
 	Second IdleVisual `json:"second"`
 	Saver  HomeMode   `json:"saver"`
+
+	Night      Night `json:"night"`
+	NightLux   int   `json:"night_lux"`
+	NightAfter Delay `json:"night_after"`
 }
 
 func (c Idle) Tessera() bool { return c.Saver == HomeTessera }
@@ -76,12 +80,15 @@ func Sources() []Source { return []Source{SourceBoth, SourceMic, SourceSpeaker} 
 
 func DefaultIdle() Idle {
 	return Idle{
-		After:     DefaultDelay,
-		Media:     Delay5m,
-		Face:      DefaultFace,
-		Placement: Placement{Position: PositionRandom, Align: AlignRandom, Size: DefaultSize},
-		First:     IdleVisual{Source: SourceBoth},
-		Second:    IdleVisual{Source: SourceBoth},
-		Saver:     HomeNative,
+		After:      DefaultDelay,
+		Media:      Delay5m,
+		Face:       DefaultFace,
+		Placement:  Placement{Position: PositionRandom, Align: AlignRandom, Size: DefaultSize},
+		First:      IdleVisual{Source: SourceBoth},
+		Second:     IdleVisual{Source: SourceBoth},
+		Saver:      HomeNative,
+		Night:      NightClock,
+		NightLux:   DefaultNightLux,
+		NightAfter: DefaultNightAfter,
 	}
 }

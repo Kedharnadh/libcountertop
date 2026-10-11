@@ -253,8 +253,17 @@ func TestRestorePutsEveryEntityBack(t *testing.T) {
 		t.Error("restore left an entity behind")
 	}
 	for _, e := range r.Entities() {
-		if s, ok := e.(*esphome.Select); !ok || s.OnCommand == nil {
-			t.Errorf("%v takes no command", e)
+		switch e := e.(type) {
+		case *esphome.Select:
+			if e.OnCommand == nil {
+				t.Errorf("%v takes no command", e)
+			}
+		case *esphome.Number:
+			if e.OnCommand == nil {
+				t.Errorf("%v takes no command", e)
+			}
+		default:
+			t.Errorf("%v is neither a select nor a number", e)
 		}
 	}
 }

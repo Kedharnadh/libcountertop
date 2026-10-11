@@ -31,6 +31,67 @@ func TestASteadyRoomIsAppliedOnceAndThenLeft(t *testing.T) {
 	}
 }
 
+func TestNightPinsTheFloorAndDayRestoresAuto(t *testing.T) {
+	a := NewAuto(1)
+	auto := schema.Screen{Mode: schema.ModeAuto, Backlight: NeutralBias}
+	day := a.Follow(300, auto)
+
+	a.Night(schema.NightDim)
+	if step := a.Follow(300, auto); !step.Apply || step.Level != Floor {
+		t.Fatalf("night step %+v, want the floor applied", step)
+	}
+	if again := a.Follow(300, auto); again.Apply {
+		t.Errorf("a steady night applied %d again", again.Level)
+	}
+
+	a.Night(schema.NightNone)
+	if step := a.Follow(300, auto); !step.Apply || step.Level != day.Level {
+		t.Errorf("day step %+v, want %d back", step, day.Level)
+	}
+}
+
+func TestNightOffDarkensTheBacklight(t *testing.T) {
+	a := NewAuto(1)
+	a.Night(schema.NightOff)
+	if step := a.Follow(300, schema.Screen{Mode: schema.ModeAuto}); !step.Apply || step.Level != 0 {
+		t.Errorf("night off step %+v, want 0 applied", step)
+	}
+}
+
+func TestNightKeepsFollowingTheRoom(t *testing.T) {
+	a := NewAuto(1)
+	auto := schema.Screen{Mode: schema.ModeAuto, Backlight: NeutralBias}
+	a.Night(schema.NightClock)
+	for range 100 {
+		a.Follow(800, auto)
+	}
+	if lux, ok := a.Ambient(); !ok || lux < 790 {
+		t.Errorf("ambient during night is %v %v, want near 800", lux, ok)
+	}
+
+	a.Night(schema.NightNone)
+	if step := a.Follow(800, auto); !step.Apply || step.Level != Brightness(800, NeutralBias) {
+		t.Errorf("day step %+v, want the bright-room level", step)
+	}
+}
+
+func TestNightInManualModeRestoresTheChosenBacklight(t *testing.T) {
+	a := NewAuto(1)
+	manual := schema.Screen{Mode: schema.ModeManual, Backlight: 60}
+
+	a.Night(schema.NightDim)
+	if step := a.Follow(300, manual); !step.Apply || step.Level != Floor {
+		t.Fatalf("manual night step %+v, want the floor", step)
+	}
+	a.Night(schema.NightNone)
+	if step := a.Follow(300, manual); !step.Apply || step.Level != 60 {
+		t.Errorf("manual day step %+v, want 60 back", step)
+	}
+	if again := a.Follow(300, manual); again.Apply {
+		t.Errorf("manual mode applied %d after restoring", again.Level)
+	}
+}
+
 func TestLeavingManualModeAppliesAgain(t *testing.T) {
 	a := NewAuto(1)
 	auto := schema.Screen{Mode: schema.ModeAuto, Backlight: NeutralBias}

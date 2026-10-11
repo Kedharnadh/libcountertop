@@ -4,7 +4,7 @@ import (
 	gogui "github.com/go-gui-org/go-gui/gui"
 
 	"github.com/ygelfand/libcountertop/pkg/audio/volume"
-	"github.com/ygelfand/libcountertop/pkg/display/drawer"
+	"github.com/ygelfand/libcountertop/pkg/display/apps"
 	"github.com/ygelfand/libcountertop/pkg/display/navigation"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
@@ -73,10 +73,10 @@ func (cv *View) Screen(v shell.View) *navigation.Screen {
 	return nil
 }
 
-func (cv *View) Rail() drawer.Entry {
-	return drawer.Entry{
+func (cv *View) App() apps.App {
+	return apps.App{
+		ID:    schema.AppCalls,
 		Name:  func() string { return say.T("call.tab") },
-		Order: drawer.OrderCalls,
 		Glyph: func() string { return gogui.IconPhone },
 		Open:  cv.browse,
 	}

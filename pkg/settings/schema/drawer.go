@@ -30,3 +30,7 @@ func (e Edge) Label() string {
 func Edges() []Edge { return []Edge{EdgeLeft, EdgeRight, EdgeTop, EdgeBottom} }
 
 func Sides() []Edge { return []Edge{EdgeLeft, EdgeRight} }
+
+func DockDelays() []Delay {
+	return []Delay{Delay5s, Delay10s, Delay15s, Delay30s, Delay1m, DelayNever}
+}

@@ -34,9 +34,15 @@ type IdleClock interface {
 	SetFace(config.Face)
 	SetSaver(config.HomeMode)
 }
+type IdleNight interface {
+	SetNight(config.Night)
+	SetNightLux(int)
+	SetNightAfter(config.Delay)
+}
 type IdleActions interface {
 	IdleClock
 	IdleSlots
+	IdleNight
 	Placement
 }
 type WeatherCatalog interface {
@@ -180,7 +186,59 @@ func (p *IdlePages) Page() *shell.Page {
 				},
 			)
 			taps = append(taps, p.makePage(func() shell.View { return p.SaverWeather() }), nil)
-			return p.withSaver(c, rows, taps)
+			rows, taps = p.withSaver(c, rows, taps)
+			return append(rows, menu.Row{
+					Label: say.T("idle.night"),
+					Hint:  say.T("idle.night.hint"),
+					Kind:  menu.Chevron,
+					Value: c.Night.Label(),
+				}),
+				append(taps, p.makePage(func() shell.View { return p.Night() }))
+		},
+	}
+}
+
+func (p *IdlePages) Night() *shell.Page {
+	return &shell.Page{
+		Title: say.T("idle.night"),
+		Build: func() ([]menu.Row, []func(int)) {
+			c := p.options.Preferences.IdleState().Idle
+			i := p.options.Idle
+			delays := config.NightDelays()
+			wait := menu.Steps(len(delays))
+			rows := []menu.Row{
+				{Label: say.T("idle.night.mode"), Kind: menu.Chevron, Value: c.Night.Label()},
+				{
+					Label: say.T("idle.night.lux"),
+					Kind:  menu.Slider,
+					Level: c.NightLux,
+					Value: say.F("idle.night.lux.value", map[string]any{"N": c.NightLux}),
+					Dim:   !c.Night.On(),
+				},
+				{
+					Label: say.T("idle.night.after"),
+					Kind:  menu.Slider,
+					Level: wait.Level(max(slices.Index(delays, c.NightAfter), 0)),
+					Snap:  wait.Snap,
+					Value: c.NightAfter.Label(),
+					Dim:   !c.Night.On(),
+				},
+			}
+			taps := []func(int){
+				p.open(Choose(
+					say.T("idle.night.mode"),
+					config.Nights(),
+					func() config.Night { return p.options.Preferences.IdleState().Idle.Night },
+					i.SetNight,
+					nil,
+				)),
+				i.SetNightLux,
+				func(level int) { i.SetNightAfter(delays[wait.Index(level)]) },
+			}
+			if !c.Night.On() {
+				taps[1], taps[2] = func(int) {}, func(int) {}
+			}
+			return rows, taps
 		},
 	}
 }
