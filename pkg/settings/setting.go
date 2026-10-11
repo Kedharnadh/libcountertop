@@ -158,6 +158,24 @@ func (t *Table[T]) Alias(from, to string) *Table[T] {
 
 func (t *Table[T]) Rows() []Setting[T] { return t.rows }
 
+// Without returns a table omitting named settings, leaving the original intact.
+// Aliases to omitted settings no longer resolve in the returned table.
+func (t *Table[T]) Without(names ...string) *Table[T] {
+	rows := make([]Setting[T], 0, len(t.rows))
+	for _, row := range t.rows {
+		if !slices.Contains(names, row.Name) {
+			rows = append(rows, row)
+		}
+	}
+	filtered := NewTable(t.Domain, slices.Clone(t.groups), rows, t.messages)
+	for from, to := range t.alias {
+		if _, ok := filtered.Find(to); ok {
+			filtered.Alias(from, to)
+		}
+	}
+	return filtered
+}
+
 func (t *Table[T]) Local() *Table[T] {
 	for i := range t.rows {
 		t.rows[i].Local = true
