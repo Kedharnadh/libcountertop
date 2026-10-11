@@ -13,10 +13,19 @@ type Supplicant struct {
 	Sockets string
 	Iface   string
 	DHCP    string
+	// Client runs one supplicant command on the device; empty means wpa_cli.
+	Client string
+}
+
+func (s Supplicant) client() string {
+	if s.Client != "" {
+		return s.Client
+	}
+	return fmt.Sprintf("wpa_cli -p %s -i %s", s.Sockets, s.Iface)
 }
 
 func (s Supplicant) Cmd(words ...string) (string, error) {
-	cmd := fmt.Sprintf("wpa_cli -p %s -i %s %s", s.Sockets, s.Iface, strings.Join(words, " "))
+	cmd := s.client() + " " + strings.Join(words, " ")
 
 	out, err := s.Device.Shell(cmd)
 	if err != nil {
