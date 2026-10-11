@@ -119,11 +119,12 @@ func (a *Apps) tile(look *widgets.UI, n int, app App, g grid, count int) gogui.V
 	if docked {
 		mark = gogui.IconStar
 	}
-	st := gogui.CurrentTheme().TextStyleIconMedium
+	st := gogui.CurrentTheme().TextStyleIconLarge
 	st.Color = gogui.CurrentTheme().Cfg.TextStyleDef.Color
+	st.Size = g.side * 0.2
 	star := look.Presses.Pressable(gogui.Row, gogui.ContainerCfg{
 		ID:      "app-star-" + app.ID,
-		Padding: gogui.NoPadding,
+		Padding: gogui.PadAll(g.side * 0.06),
 		Content: []gogui.View{gogui.Label(mark, st)},
 	}, func(e gogui.EventCtx) {
 		a.SetDocked(app.ID, !docked)
