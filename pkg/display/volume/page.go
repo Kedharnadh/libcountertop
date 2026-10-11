@@ -1,13 +1,17 @@
 package volume
 
 import (
+	"log/slog"
 	"slices"
 	"sync"
 	"time"
 
+	"github.com/ygelfand/libcountertop/pkg/audio/tone"
+
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/say"
+	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
@@ -28,6 +32,8 @@ type PageOptions struct {
 	Streams   []schema.Stream
 	MainSteps int
 	Chimes    Chimes
+	Feedback  *tone.Feedback
+	Push      func(shell.View)
 }
 
 func NewPage(o PageOptions) *shell.Page {
@@ -51,7 +57,18 @@ func NewPage(o PageOptions) *shell.Page {
 				hear.after(s)
 			})
 		}
-		if o.Chimes != nil {
+		if o.Feedback != nil && o.Push != nil {
+			at := o.Feedback.Read()
+			for _, field := range o.Feedback.Table.Rows() {
+				rows = append(
+					rows,
+					menu.Row{Label: field.Named(), Kind: menu.Chevron, Value: field.Shows(&at)},
+				)
+				actions = append(actions, func(int) {
+					o.Push(feedbackChoice(o.Feedback, field))
+				})
+			}
+		} else if o.Chimes != nil {
 			chimes := schema.Chimes()
 			labels := make([]string, len(chimes))
 			for i, c := range chimes {
@@ -66,6 +83,29 @@ func NewPage(o PageOptions) *shell.Page {
 			actions = append(actions, func(i int) {
 				o.Chimes.SetChime(chimes[i])
 				o.Chimes.Preview(schema.StreamFeedback)
+			})
+		}
+		return rows, actions
+	}}
+}
+
+func feedbackChoice(f *tone.Feedback, field setting.Setting[schema.Feedback]) *shell.Page {
+	return &shell.Page{Title: field.Named(), Build: func() ([]menu.Row, []func(int)) {
+		now := f.Read()
+		values := field.Values()
+		rows := make([]menu.Row, 0, len(values))
+		actions := make([]func(int), 0, len(values))
+		for _, value := range values {
+			rows = append(
+				rows,
+				menu.Row{Label: field.LabelOf(value), Chosen: field.Read(&now) == value},
+			)
+			actions = append(actions, func(int) {
+				if err := f.Change(field.Name, value); err != nil {
+					slog.Error("saving feedback sound failed", "setting", field.Name, "err", err)
+					return
+				}
+				f.PreviewSetting(field.Name)
 			})
 		}
 		return rows, actions

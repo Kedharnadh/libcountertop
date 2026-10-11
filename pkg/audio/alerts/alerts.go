@@ -183,3 +183,20 @@ func NewTable(more func() []setting.Option) *Table {
 			schema.RingDelays(), func(a *schema.Alerts) *schema.Delay { return &a.RingFor }),
 	}, setting.Messages{Text: say.T, Missing: say.Missing})
 }
+
+// TimerTable contains only the controls needed by a device without messages.
+func TimerTable(more func() []setting.Option) *Table {
+	full := NewTable(more)
+	var rows []Setting
+	for _, row := range full.Rows() {
+		if row.Name == "timer" || row.Name == "ring_for" {
+			rows = append(rows, row)
+		}
+	}
+	return setting.NewTable(
+		"alerts",
+		[]setting.Group{Group},
+		rows,
+		setting.Messages{Text: say.T, Missing: say.Missing},
+	)
+}

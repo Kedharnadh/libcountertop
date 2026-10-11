@@ -18,9 +18,11 @@ type heard struct{ streams []schema.Stream }
 
 func (h *heard) Chime(s schema.Stream, _ []Note) { h.streams = append(h.streams, s) }
 
+func (h *heard) Sound(s schema.Stream, _ float64, _ Sound) { h.streams = append(h.streams, s) }
+
 func TestPreviewPlaysOnTheStreamAsked(t *testing.T) {
 	h := &heard{}
-	f := NewFeedback(&section{at: schema.DefaultFeedback()}, h, 0)
+	f := NewFeedback(&section{at: schema.DefaultFeedback()}, h, 0, FeedbackOptions{})
 
 	f.Preview(schema.StreamAlerts)
 	f.Preview(schema.StreamMain)
@@ -39,7 +41,12 @@ func TestPreviewPlaysOnTheStreamAsked(t *testing.T) {
 
 func TestNoDeviceChimeSilencesEveryFeedbackSound(t *testing.T) {
 	h := &heard{}
-	f := NewFeedback(&section{at: schema.Feedback{Chime: schema.ChimeNone}}, h, 0)
+	f := NewFeedback(
+		&section{at: schema.Feedback{Chime: schema.ChimeNone}},
+		h,
+		0,
+		FeedbackOptions{},
+	)
 
 	f.Preview(schema.StreamMedia)
 	f.Sound(ToneVolume)

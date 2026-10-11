@@ -27,12 +27,16 @@ var (
 )
 
 var wakeTones = map[schema.Chime][]Note{
-	schema.ChimeNone:    nil,
-	schema.ChimeChirp:   {{Freq: 784, Ms: 60}, {Freq: 1175, Ms: 90}},
-	schema.ChimeDing:    {{Freq: 1319, Ms: 200}},
-	schema.ChimeRise:    {{Freq: 659, Ms: 55}, {Freq: 880, Ms: 55}, {Freq: 1319, Ms: 110}},
-	schema.ChimeTimer:   ToneTimer,
-	schema.ChimeTrouble: ToneTrouble,
+	schema.ChimeNone:     nil,
+	schema.ChimeMuted:    ToneMute,
+	schema.ChimeUnmuted:  ToneUnmute,
+	schema.ChimeMuteHold: ToneMuteHold,
+	schema.ChimeCancel:   ToneCancel,
+	schema.ChimeChirp:    {{Freq: 784, Ms: 60}, {Freq: 1175, Ms: 90}},
+	schema.ChimeDing:     {{Freq: 1319, Ms: 200}},
+	schema.ChimeRise:     {{Freq: 659, Ms: 55}, {Freq: 880, Ms: 55}, {Freq: 1319, Ms: 110}},
+	schema.ChimeTimer:    ToneTimer,
+	schema.ChimeTrouble:  ToneTrouble,
 }
 
 func Wake(t schema.Chime) []Note { return wakeTones[t] }

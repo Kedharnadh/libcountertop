@@ -837,3 +837,11 @@ youtube.skip.none: None
 youtube.skip.some: "{{.N}} kinds"
 youtube.title: YouTube
 zone.title: Time zone
+
+feedback.setting.chime: Device chime
+feedback.setting.failure: Failure sound
+feedback.setting.cancel: Cancellation sound
+feedback.setting.mute: Mute sound
+feedback.setting.unmute: Unmute sound
+feedback.setting.hold: Mute hold sound
+microphone.setting.mute_sound: Mute sound

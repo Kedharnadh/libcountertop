@@ -5,7 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ygelfand/libcountertop/pkg/audio/tone"
+	"github.com/ygelfand/libcountertop/pkg/audio/tones"
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
+	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
@@ -88,5 +91,60 @@ func TestSoundPagePreviewsTheStreamOnceItSettles(t *testing.T) {
 	}
 	if got := chimes.heard(); len(got) != 1 || got[0] != schema.StreamAlerts {
 		t.Errorf("previewed %v, want alerts once", got)
+	}
+}
+
+type feedbackState struct{ at schema.Feedback }
+
+func (s *feedbackState) Read() schema.Feedback { return s.at }
+func (s *feedbackState) Update(fn func(*schema.Feedback)) error {
+	fn(&s.at)
+	return nil
+}
+
+type feedbackPlayer struct{ played tone.Sound }
+
+func (*feedbackPlayer) Chime(schema.Stream, []tone.Note)                     {}
+func (p *feedbackPlayer) Sound(_ schema.Stream, _ float64, sound tone.Sound) { p.played = sound }
+
+func TestSoundPageOffersAndPreviewsUploadedFeedback(t *testing.T) {
+	store := tones.New(tones.Options{Dir: t.TempDir(), Rate: tones.Rate, Channels: 1})
+	at := &feedbackState{at: schema.DefaultFeedback()}
+	player := &feedbackPlayer{}
+	feedback := tone.NewFeedback(at, player, 0, tone.FeedbackOptions{Sounds: store, Mute: true})
+	var opened shell.View
+	page := NewPage(PageOptions{Feedback: feedback, Push: func(v shell.View) { opened = v }})
+	rows, actions := page.Build()
+	if len(rows) != 5 {
+		t.Fatalf("sound page has %d feedback rows, want 5", len(rows))
+	}
+	// Upload after the page is created: each picker must read the latest choices.
+	if err := store.Write("bell", "Uploaded bell", 0, 1, []byte{1, 0, 2, 0}); err != nil {
+		t.Fatal(err)
+	}
+	for i, field := range feedback.Table.Rows() {
+		actions[i](0)
+		picker, ok := opened.(*shell.Page)
+		if !ok {
+			t.Fatalf("%s opened %T, want a choice page", field.Name, opened)
+		}
+		choices, picks := picker.Build()
+		index := -1
+		for n, row := range choices {
+			if row.Label == "Uploaded bell" {
+				index = n
+			}
+		}
+		if index < 0 {
+			t.Fatalf("%s picker omits uploaded sound", field.Name)
+		}
+		picks[index](0)
+		now := at.Read()
+		if got := field.Read(&now); got != "tone:bell" {
+			t.Errorf("%s saved %q", field.Name, got)
+		}
+		if len(player.played.Clip) != 2 {
+			t.Errorf("%s preview played %+v", field.Name, player.played)
+		}
 	}
 }

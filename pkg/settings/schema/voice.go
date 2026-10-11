@@ -25,6 +25,10 @@ const (
 	ChimeTimer      Chime = "timer"
 	ChimeTrouble    Chime = "trouble"
 	ChimeMuteSwitch Chime = "mute"
+	ChimeMuted      Chime = "muted"
+	ChimeUnmuted    Chime = "unmuted"
+	ChimeMuteHold   Chime = "mute_hold"
+	ChimeCancel     Chime = "cancel"
 )
 
 func (c Chime) Label() string {
@@ -32,6 +36,14 @@ func (c Chime) Label() string {
 		return key
 	}
 	switch c {
+	case ChimeMuted:
+		return "Mute"
+	case ChimeUnmuted:
+		return "Unmute"
+	case ChimeMuteHold:
+		return "Mute hold"
+	case ChimeCancel:
+		return "Cancel"
 	case ChimeMuteSwitch:
 		return "Mute tones"
 	case ChimeNone:
