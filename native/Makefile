@@ -14,9 +14,17 @@ CAMERA := $(NATIVE)/camera
 CAMERA_LIBS := camera_client gui utils binder $(if $(filter 25,$(API)),stagefright)
 CAMERA_GPU_LIBS := $(if $(filter 27,$(API)),-lEGL -lGLESv2)
 CAMERA_SOURCES := $(CAMERA)/camera.c $(CAMERA)/turn.c $(CAMERA)/cam2.c $(if $(filter 25,$(API)),$(CAMERA)/still.c)
+NDK_BIN := $(NDK)/toolchains/llvm/prebuilt/$(NDK_HOST)/bin
+NDK_CXX := $(NDK_BIN)/armv7a-linux-androideabi$(API)-clang++
+VOICE_BIN ?= $(OUT)/$(PREFIX)-voice
+VOICE := $(NATIVE)/voice
+NEEDLE := $(VOICE)/third_party/needle
+WHISTLE_ENGINE := _ZN12_GLOBAL__N_19g_whistleE
+WHISTLE_DEPTH := _ZN7whistle6Engine9set_depthEi
+VOICE_FLAGS := -O2 -Wall -Werror -I$(NATIVE) -I$(VOICE) -I$(NEEDLE)
 
-.PHONY: all surface camera camshim check-ndk test
-all: surface camera camshim
+.PHONY: all surface camera camshim voice check-ndk test test-voice
+all: surface camera camshim voice
 check-ndk:
 	@test "$(API)" = 25 -o "$(API)" = 27 || { echo "supported native API levels: 25, 27"; exit 1; }
 	@test -x "$(NDK_CC)" || { echo "no NDK clang at $(NDK_CC); set NDK or ANDROID_NDK_HOME"; exit 1; }
@@ -43,7 +51,29 @@ camshim: check-ndk
 	@mkdir -p $(dir $(CAMSHIM_BIN))
 	$(NDK_CC) $(FLAGS) -Wno-unused-parameter -shared -fPIC -o $(CAMSHIM_BIN) $(NATIVE)/camshim/camshim.c
 
+voice: check-ndk
+	@mkdir -p $(dir $(VOICE_BIN)) $(STUBS)/voice
+	@cd $(NEEDLE) && shasum -a 256 -c --quiet SHA256SUMS
+	$(NDK_BIN)/llvm-objcopy --globalize-symbol=$(WHISTLE_ENGINE) $(NEEDLE)/android-armv7/libneedle.a $(STUBS)/voice/libneedle.a
+	@$(NDK_BIN)/llvm-nm -S $(STUBS)/voice/libneedle.a | grep -q ' 00000004 B $(WHISTLE_ENGINE)$$' || { echo "libneedle.a: $(WHISTLE_ENGINE) missing or resized"; exit 1; }
+	@$(NDK_BIN)/llvm-nm $(STUBS)/voice/libneedle.a | grep -q ' [WT] $(WHISTLE_DEPTH)$$' || { echo "libneedle.a: $(WHISTLE_DEPTH) missing"; exit 1; }
+	$(NDK_CXX) $(VOICE_FLAGS) -std=c++17 -o $(VOICE_BIN) $(VOICE)/voice.cpp $(STUBS)/voice/libneedle.a \
+		-static-libstdc++ -s -llog -lm
+
 test:
 	@mkdir -p $(OUT)
 	$(or $(HOST_CC),cc) -O1 -g -Wall -Werror -fsanitize=undefined -fno-sanitize-recover=all -I$(NATIVE) -I$(SURFACE) -o $(OUT)/wire_test $(SURFACE)/wire.c $(SURFACE)/test/wire_test.c
 	$(OUT)/wire_test
+
+WHISTLE_MODEL_URL := https://huggingface.co/Cactus-Compute/whistle/resolve/ca5287601bef25af26dcf2e1b2bdc0843a7c19e5/whistle.cact
+WHISTLE_MODEL_SHA256 := b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb
+
+test-voice:
+	@test "$$(uname -s)-$$(uname -m)" = Linux-x86_64 || { echo "test-voice needs linux-x86_64 with clang and libc++ 21"; exit 1; }
+	@mkdir -p $(OUT)
+	@cd $(NEEDLE) && sha256sum -c --quiet SHA256SUMS
+	@test -f $(OUT)/whistle.cact || curl -sSfL -o $(OUT)/whistle.cact $(WHISTLE_MODEL_URL)
+	@echo "$(WHISTLE_MODEL_SHA256)  $(OUT)/whistle.cact" | sha256sum -c --quiet
+	objcopy --globalize-symbol=$(WHISTLE_ENGINE) $(NEEDLE)/linux-x86_64/libneedle.a $(OUT)/libneedle.a
+	$(or $(HOST_CXX),clang++) -stdlib=libc++ -O2 -std=c++17 -Wall -Werror -I$(NEEDLE) -o $(OUT)/depth_test $(VOICE)/test/depth_test.cpp $(OUT)/libneedle.a -lpthread -lm
+	$(OUT)/depth_test $(OUT)/whistle.cact $(VOICE)/test/speech.raw
