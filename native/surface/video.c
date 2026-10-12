@@ -106,7 +106,7 @@ static void *output(void *arg) {
 static void *make(void *arg) {
 	video *v = arg;
 	const char *mime = mime_of(v->kind);
-	int secure = v->crypto && AMediaCrypto_requiresSecureDecoderComponent(mime);
+	int secure = v->crypto && v->decoder[0] && AMediaCrypto_requiresSecureDecoderComponent(mime);
 	AMediaCodec *c = NULL;
 	if (!secure) c = AMediaCodec_createDecoderByType(mime);
 	else if (v->decoder[0]) c = AMediaCodec_createCodecByName(v->decoder);

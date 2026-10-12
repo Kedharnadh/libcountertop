@@ -30,14 +30,22 @@ type Network interface {
 	Wait(ctx context.Context) bool
 }
 
+type Level string
+
+const (
+	L1 Level = "L1"
+	L3 Level = "L3"
+)
+
 type Provisioner struct {
 	helper  func() *surface.Client
 	network Network
+	floor   Level
 	boot    atomic.Pointer[startup.Progress]
 }
 
-func New(helper func() *surface.Client, network Network) *Provisioner {
-	return &Provisioner{helper: helper, network: network}
+func New(helper func() *surface.Client, network Network, floor Level) *Provisioner {
+	return &Provisioner{helper: helper, network: network, floor: floor}
 }
 
 func (d *Provisioner) Name() string { return "drm" }
@@ -78,7 +86,7 @@ func (d *Provisioner) bring(ctx context.Context) startup.Progress {
 	if err != nil {
 		return startup.Progress{Failed: true, Doing: err.Error()}
 	}
-	if level != "L1" {
+	if Level(level) != L1 && Level(level) != d.floor {
 		return startup.Progress{
 			Failed: true,
 			Doing:  "Widevine " + level + ", no hardware decryption",

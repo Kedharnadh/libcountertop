@@ -63,6 +63,7 @@ func (a *App) pageScreen(p *shell.Page) *Screen {
 
 func (a *App) videoScreen(p *videopage.Page) *Screen {
 	return &Screen{
+		Clear: true,
 		View:  p,
 		Fixed: true,
 		Build: func(w *gogui.Window) gogui.View { return a.player.Video(w, p) },

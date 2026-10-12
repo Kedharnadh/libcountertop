@@ -31,6 +31,9 @@ int drm_open(uint32_t id, const uint8_t uuid[16], int privacy, const uint8_t *ce
 	if (!AMediaDrm_isCryptoSchemeSupported(uuid, NULL)) return ERR_DRM;
 	AMediaDrm *d = AMediaDrm_createByUUID(uuid);
 	if (!d) return ERR_DRM;
+	const char *level = NULL;
+	if (AMediaDrm_getPropertyString(d, "securityLevel", &level) == AMEDIA_OK && level && !strcmp(level, "L3"))
+		AMediaDrm_setPropertyString(d, "securityLevel", "L3");
 	AMediaDrmSessionId sid;
 	media_status_t st = AMediaDrm_openSession(d, &sid);
 	if (st != AMEDIA_OK) {
