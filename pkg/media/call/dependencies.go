@@ -8,6 +8,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/media/callstatus"
 	"github.com/ygelfand/libcountertop/pkg/media/rtc"
 	"github.com/ygelfand/libcountertop/pkg/network/peer"
+	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
@@ -77,7 +78,12 @@ type Sound interface {
 	Queued() int
 	Claim(string, func(context.Context) error)
 	Duck(bool)
-	Chime(schema.Stream, float64, ...tone.Note)
+	Tone(schema.Stream, float64, tone.Sound)
+}
+
+type Tones interface {
+	Sound(c, fallback schema.Chime) tone.Sound
+	Choices() []setting.Option
 }
 
 type Dependencies struct {
@@ -87,6 +93,7 @@ type Dependencies struct {
 	Privacy  Privacy
 	Media    Media
 	Sound    Sound
+	Tones    Tones
 	Stage    Stage
 	Video    Video
 	Messages Messages

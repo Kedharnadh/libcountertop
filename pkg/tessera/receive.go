@@ -370,6 +370,7 @@ func (s *Screen) tile(m message, initial bool) (string, bool) {
 			Controls   string `json:"controls"`
 			Inline     string `json:"inline"`
 			Guard      string `json:"guard"`
+			Flow       string `json:"flow"`
 			Refresh    int    `json:"refresh"`
 		}
 		_ = json.Unmarshal(m.O, &o)
@@ -388,6 +389,7 @@ func (s *Screen) tile(m message, initial bool) (string, bool) {
 			Controls:   o.Controls,
 			Inline:     o.Inline,
 			Guard:      o.Guard,
+			Flow:       o.Flow,
 			Refresh:    refresh,
 			Options:    m.O,
 			Parent:     -1,

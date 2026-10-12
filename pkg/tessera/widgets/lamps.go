@@ -14,6 +14,7 @@ import (
 const (
 	subLamps   = "lamps"
 	subEffects = "effects"
+	subHourly  = "hourly"
 )
 
 type sub struct {

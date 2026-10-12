@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	gogui "github.com/go-gui-org/go-gui/gui"
 	esphome "github.com/ygelfand/go-esphome-device"
 
 	"github.com/ygelfand/libcountertop/pkg/display/drawer"
@@ -18,10 +17,10 @@ import (
 )
 
 type App struct {
-	ID    string
-	Name  func() string
-	Glyph func() string
-	Open  func()
+	ID   string
+	Name func() string
+	Icon string
+	Open func()
 }
 
 func (a App) Label() string {
@@ -131,9 +130,16 @@ func (a *Apps) Rail() drawer.Entry {
 	return drawer.Entry{
 		Name:  func() string { return say.T("apps.title") },
 		Order: drawer.OrderApps,
-		Glyph: func() string { return gogui.IconAppMenu },
-		Open:  func() { a.options.Shell.Push(a.view) },
+		Icon:  "mdi:apps",
+		Open:  a.open,
 	}
+}
+
+func (a *Apps) open() {
+	a.mu.Lock()
+	a.drag = drag{from: -1}
+	a.mu.Unlock()
+	a.options.Shell.Push(a.view)
 }
 
 func (a *Apps) Dock() []drawer.Entry {
@@ -146,7 +152,7 @@ func (a *Apps) Dock() []drawer.Entry {
 		out = append(out, drawer.Entry{
 			Name:  app.Label,
 			Order: drawer.OrderFavorites + len(out),
-			Glyph: app.Glyph,
+			Icon:  app.Icon,
 			Open:  app.Open,
 		})
 	}

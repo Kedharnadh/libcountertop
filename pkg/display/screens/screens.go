@@ -39,7 +39,10 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
+	"github.com/ygelfand/libcountertop/pkg/homeassistant/calendar"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant/homecontrol"
+	"github.com/ygelfand/libcountertop/pkg/homeassistant/nws"
+	"github.com/ygelfand/libcountertop/pkg/homeassistant/todo"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant/weather"
 	"github.com/ygelfand/libcountertop/pkg/hook"
 	"github.com/ygelfand/libcountertop/pkg/input/touch"
@@ -151,8 +154,12 @@ type Options struct {
 	Saver     homeview.SaverMode
 	Tessera   *tesseraview.View
 	Forecast  Weather
+	Warnings  weatherview.Alerts
+	OpenRadar func(*nws.Alert)
 
 	WeatherEntities func() shell.View
+	Todo            *todo.Todo
+	Calendar        *calendar.Calendar
 	Player          playerview.Player
 	PlayerPage      func() shell.View
 	MediaVolume     volume.Channel
@@ -195,7 +202,14 @@ func New(o Options) *App {
 	}
 	a.alerts = alertview.View{UI: o.UI, Messages: o.Messages, Again: a.again}
 	a.timers = timerview.View{UI: o.UI, Timers: o.Timers, Again: a.again}
-	a.weather = weatherview.View{UI: o.UI, Again: a.again, Start: time.Now()}
+	a.weather = weatherview.View{
+		UI:      o.UI,
+		Again:   a.again,
+		Start:   time.Now(),
+		Alerts:  o.Warnings,
+		Radar:   o.OpenRadar,
+		Clock24: func() bool { return o.Settings().Screen.Hours == schema.TwentyFourHour },
+	}
 	a.boards = map[string]Board{homecontrol.TabKind: {Glyph: homeGlyph, Draw: a.homeBoard}}
 	for k, b := range o.Boards {
 		a.boards[k] = b
@@ -213,6 +227,8 @@ func New(o Options) *App {
 		Name:            o.DeviceName,
 		Weather:         o.Weather,
 		WeatherEntities: o.WeatherEntities,
+		Todo:            o.Todo,
+		Calendar:        o.Calendar,
 		Shell:           o.Shell,
 		Logo:            esphomeLogo,
 		Marks:           settings.ModeMarks{Tessera: tesseraview.Mark, Native: a.logo},
@@ -226,6 +242,8 @@ func New(o Options) *App {
 }
 
 func (a *App) Name() string { return "gui" }
+
+func (a *App) Gate(w *gogui.Window) gogui.View { return a.home.Gate(w) }
 
 func (a *App) sizeSetting() string {
 	if s := a.o.Settings().Screen.Size; s != "" {

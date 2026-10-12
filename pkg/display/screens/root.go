@@ -200,7 +200,7 @@ func (a *App) nativeDash(w *gogui.Window, vw, vh, top, margin int, pal theme.The
 	if build, ok := clockview.Of(cfg.Clock.Face); ok {
 		layers = append(layers, widgets.Placed(box, build(w, box, r, ink)))
 	}
-	if r, ok := a.o.Forecast.Now(); ok && cfg.Weather.Dashboard {
+	if r, ok := a.o.Forecast.Now(); (ok || a.weather.Alerting()) && cfg.Weather.Dashboard {
 		layers = append(
 			layers,
 			a.weather.Layer(w, r, cfg.Weather.WeatherLayout, vw, vh, float32(top), pal),

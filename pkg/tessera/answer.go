@@ -10,6 +10,7 @@ var features = []string{
 	"saver_items",
 	"speaker_groups",
 	"bar_status",
+	"weather_week",
 }
 
 func (s *Screen) answer(status string) map[string]any {

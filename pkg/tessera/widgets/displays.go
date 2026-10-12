@@ -30,12 +30,17 @@ func (v *View) bodyFor(
 	if t.Entity == energyEntity && f.fresh && len(t.ExtraNumbers("p")) >= 6 {
 		return v.energyBody(w, id, t, f)
 	}
-	if c.columns < 2 || !f.fresh || !available(t) {
+	if !f.fresh || !available(t) {
+		return nil
+	}
+	if t.Domain() == "weather" && t.Display == "forecast" && len(t.ExtraList("days")) > 0 &&
+		(c.columns >= 2 || c.rows >= 2) {
+		return forecastBody(w, t, l)
+	}
+	if c.columns < 2 {
 		return nil
 	}
 	switch {
-	case t.Domain() == "weather" && t.Display == "forecast" && len(t.ExtraList("days")) > 0:
-		return forecastBody(w, t, l)
 	case t.Domain() == "sun" && t.Display == "sunpath" && t.ExtraText("rise") != "" &&
 		t.ExtraText("set") != "":
 		v.tick(w, f.now, time.Minute)
@@ -69,6 +74,9 @@ func forecastBody(
 			}
 			if x, ok := d["l"].(float64); ok {
 				col = append(col, gogui.Label(temp(x), secondary()))
+			}
+			if x, ok := d["p"].(float64); ok && x > 0 && height >= reach*3.2 {
+				col = append(col, gogui.Label(l.Numbers.Localize(num(x))+"%", secondary()))
 			}
 			cols = append(cols, gogui.Column(gogui.ContainerCfg{
 				Width:   cell,

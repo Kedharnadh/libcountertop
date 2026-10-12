@@ -205,6 +205,18 @@ func (w *Weather) SetDashboard(on bool) { w.save("dashboard", w.set().Dashboard(
 
 func (w *Weather) SetIdle(on bool) { w.save("idle", w.set().Idle(on)) }
 
+func (w *Weather) SetAlerts(on bool) { w.save("alerts", w.set().Alerts(on)) }
+
+func (w *Weather) SetRadarSource(v schema.RadarSource) {
+	w.save("radar_source", w.set().RadarSource(v))
+}
+
+func (w *Weather) SetRadarRange(
+	v schema.RadarRange,
+) {
+	w.save("radar_range", w.set().RadarRange(v))
+}
+
 func (w *Weather) SetAnimate(on bool) { w.save("animate", w.set().Animate(on)) }
 
 func (w *Weather) SetThemed(on bool) { w.save("themed", w.set().Themed(on)) }

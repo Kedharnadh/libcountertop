@@ -60,6 +60,16 @@ func (c *Controller) Tick(at time.Duration, p []Progress, ready, skip bool) {
 	dt := at - c.last
 	c.last = at
 	c.At = at
+	if skip {
+		c.Trace, c.Header = 1, 1
+		if c.listed == 0 {
+			c.listed = at
+		}
+		if ready {
+			c.done, c.finishing, c.Ready = at, at, 1
+		}
+		return
+	}
 	if at > 2*time.Second {
 		up := 0
 		for _, r := range p {
@@ -72,7 +82,7 @@ func (c *Controller) Tick(at time.Duration, p []Progress, ready, skip bool) {
 			c.stepped = at
 		}
 		want := 1.0
-		if len(p) > 0 && !skip {
+		if len(p) > 0 {
 			want = float64(c.shown) / float64(len(p))
 		}
 		c.Trace = math.Min(want, c.Trace+dt.Seconds()/6)
@@ -95,7 +105,7 @@ func (c *Controller) Tick(at time.Duration, p []Progress, ready, skip bool) {
 	}
 	if c.finishing == 0 && c.listed != 0 && c.done != 0 && at-c.done >= 500*time.Millisecond &&
 		(!c.waited || at-c.listed >= 3*time.Second) &&
-		(Settled(p) || skip) {
+		Settled(p) {
 		c.finishing = at
 	}
 	if c.finishing != 0 && c.Trace >= 1 {

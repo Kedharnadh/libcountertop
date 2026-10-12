@@ -1,0 +1,8 @@
+US Census Bureau cartographic boundary files, 2023, 1:5,000,000, public domain
+https://www2.census.gov/geo/tiger/GENZ2023/shp/cb_2023_us_state_5m.zip -> states.outl
+https://www2.census.gov/geo/tiger/GENZ2023/shp/cb_2023_us_county_5m.zip -> counties.outl
+format: "OUTL1", uvarint ring count; per ring: uvarint point count, then zigzag-varint deltas of lon*10000, lat*10000
+states.labl, counties.labl: NAME from the same files, at the centroid of each area's largest ring, biggest land area first
+Natural Earth 1:10m populated places, public domain
+https://naciscdn.org/naturalearth/10m/cultural/ne_10m_populated_places_simple.zip -> cities.labl (US, CA, MX; by scalerank, then population)
+format: "LABL1", uvarint label count; per label: uvarint name length, UTF-8 name, zigzag-varint lon*10000, lat*10000, one rank byte

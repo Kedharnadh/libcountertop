@@ -12,6 +12,8 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/fetch"
 	discovery "github.com/ygelfand/libcountertop/pkg/network/peer"
+	"github.com/ygelfand/libcountertop/pkg/say"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 const postWait = 5 * time.Second
@@ -62,6 +64,7 @@ func (c *Calls) offered(w http.ResponseWriter, r *http.Request) {
 			p.Name = host
 		}
 	}
+	auto := cfg.Answers(p.ID)
 	c.mu.Lock()
 	if c.now != nil {
 		c.mu.Unlock()
@@ -75,7 +78,7 @@ func (c *Calls) offered(w http.ResponseWriter, r *http.Request) {
 			State:     Ringing,
 			Since:     time.Now(),
 			Video:     m.Video,
-			CameraOff: m.Video && cfg.AutoAnswer && !cfg.AutoVideo,
+			CameraOff: m.Video && auto && !cfg.AutoVideo,
 		},
 		net.JoinHostPort(host, strconv.Itoa(c.options.Port)),
 	)
@@ -93,16 +96,29 @@ func (c *Calls) offered(w http.ResponseWriter, r *http.Request) {
 		"video",
 		m.Video,
 		"auto",
-		cfg.AutoAnswer,
+		auto,
 	)
 	c.changed(s)
 	w.WriteHeader(http.StatusAccepted)
-	if cfg.AutoAnswer {
+	if auto {
+		c.options.Sound.Tone(
+			schema.StreamAlerts,
+			ringLevel,
+			c.tone(schema.ChimeDing, schema.ChimeDing),
+		)
+		if c.options.Messages != nil {
+			c.options.Messages.Info(p.Name, say.T("call.connected"), noticeFor)
+		}
 		c.Answer()
 		return
 	}
+	chime, fallback := cfg.Ring, schema.ChimeRing
+	if m.Video {
+		chime = cfg.VideoRing
+	}
+	snd := c.tone(chime, fallback)
 	s.worker("call ring", func() {
-		if ring(ringing, c.options.Sound) {
+		if ring(ringing, c.options.Sound, snd) {
 			slog.Info("call missed", "from", p.Name)
 			c.requestClose(s, ReasonUnanswered)
 		}

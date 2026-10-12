@@ -529,6 +529,18 @@ func (w WeatherWriter) Idle(v bool) error {
 	return w.s.Update(func(c *Weather) { c.Idle = v })
 }
 
+func (w WeatherWriter) Alerts(v bool) error {
+	return w.s.Update(func(c *Weather) { c.Alerts = v })
+}
+
+func (w WeatherWriter) RadarSource(v RadarSource) error {
+	return w.s.Update(func(c *Weather) { c.RadarSource = v })
+}
+
+func (w WeatherWriter) RadarRange(v RadarRange) error {
+	return w.s.Update(func(c *Weather) { c.RadarRange = v })
+}
+
 func (w WeatherWriter) Animate(v bool) error {
 	return w.s.Update(func(c *Weather) { c.Animate = v })
 }

@@ -12,7 +12,7 @@ import (
 )
 
 func named(id string) App {
-	return App{ID: id, Name: func() string { return id }, Glyph: func() string { return "" }}
+	return App{ID: id, Name: func() string { return id }}
 }
 
 func rig(t *testing.T) (*Apps, *storage.Store[schema.Apps], *shell.Shell) {
@@ -100,7 +100,7 @@ func TestTheDockShowsFavoritesInAppOrder(t *testing.T) {
 func TestTheAppsEntryOpensTheTiles(t *testing.T) {
 	a, _, s := rig(t)
 	entry := a.Rail()
-	if entry.Order != drawer.OrderApps || entry.Glyph() == "" {
+	if entry.Order != drawer.OrderApps || entry.Icon == "" {
 		t.Fatalf("entry %+v", entry)
 	}
 	entry.Open()

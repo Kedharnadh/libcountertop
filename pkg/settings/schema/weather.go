@@ -3,9 +3,12 @@ package schema
 import "github.com/ygelfand/libcountertop/pkg/say"
 
 type Weather struct {
-	Entity    string `json:"entity"`
-	Dashboard bool   `json:"dashboard"`
-	Idle      bool   `json:"idle"`
+	Entity      string      `json:"entity"`
+	Dashboard   bool        `json:"dashboard"`
+	Idle        bool        `json:"idle"`
+	Alerts      bool        `json:"alerts"`
+	RadarSource RadarSource `json:"radar_source"`
+	RadarRange  RadarRange  `json:"radar_range"`
 	WeatherLayout
 	Saver WeatherLayout `json:"saver"`
 }
@@ -57,7 +60,9 @@ func (l WeatherLook) Label() string { return say.T("weather.look." + string(l)) 
 
 func DefaultWeather() Weather {
 	return Weather{
-		Dashboard: true,
+		Dashboard:   true,
+		RadarSource: RadarAuto,
+		RadarRange:  Range200,
 		WeatherLayout: WeatherLayout{
 			Look:      WeatherCompact,
 			Animate:   true,

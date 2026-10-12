@@ -25,25 +25,19 @@ func (c conversation) Play(pcm []int16) {
 	}
 }
 
-var (
-	ringTone = []tone.Note{
-		{Freq: 1047, Ms: 110},
-		{Freq: 1319, Ms: 110},
-		{Freq: 1047, Ms: 110},
-		{Freq: 1319, Ms: 110},
-	}
-	ringbackTone = []tone.Note{{Freq: 440, Ms: 400}, {Ms: 200}, {Freq: 440, Ms: 400}}
-)
+func every(s tone.Sound, least time.Duration) time.Duration {
+	return max(least, s.Length()+time.Second)
+}
 
-func ring(ctx context.Context, sound Sound) bool {
+func ring(ctx context.Context, sound Sound, snd tone.Sound) bool {
 	sound.Duck(true)
 	defer sound.Duck(false)
 	over := time.NewTimer(ringFor)
 	defer over.Stop()
-	repeat := time.NewTicker(ringEvery)
+	repeat := time.NewTicker(every(snd, ringEvery))
 	defer repeat.Stop()
 	for ctx.Err() == nil {
-		sound.Chime(schema.StreamAlerts, ringLevel, ringTone...)
+		sound.Tone(schema.StreamAlerts, ringLevel, snd)
 		select {
 		case <-ctx.Done():
 			return false
@@ -55,11 +49,11 @@ func ring(ctx context.Context, sound Sound) bool {
 	return false
 }
 
-func ringback(ctx context.Context, sound Sound) {
-	repeat := time.NewTicker(ringbackEvery)
+func ringback(ctx context.Context, sound Sound, snd tone.Sound) {
+	repeat := time.NewTicker(every(snd, ringbackEvery))
 	defer repeat.Stop()
 	for ctx.Err() == nil {
-		sound.Chime(schema.StreamVoice, ringbackLevel, ringbackTone...)
+		sound.Tone(schema.StreamVoice, ringbackLevel, snd)
 		select {
 		case <-ctx.Done():
 			return

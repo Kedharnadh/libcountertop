@@ -24,6 +24,15 @@ var (
 		{Freq: 880, Ms: 160}, {Ms: 130},
 		{Freq: 880, Ms: 160},
 	}
+
+	ToneRing = []Note{
+		{Freq: 1047, Ms: 110},
+		{Freq: 1319, Ms: 110},
+		{Freq: 1047, Ms: 110},
+		{Freq: 1319, Ms: 110},
+	}
+
+	ToneRingback = []Note{{Freq: 440, Ms: 400}, {Ms: 200}, {Freq: 440, Ms: 400}}
 )
 
 var wakeTones = map[schema.Chime][]Note{
@@ -37,6 +46,8 @@ var wakeTones = map[schema.Chime][]Note{
 	schema.ChimeRise:     {{Freq: 659, Ms: 55}, {Freq: 880, Ms: 55}, {Freq: 1319, Ms: 110}},
 	schema.ChimeTimer:    ToneTimer,
 	schema.ChimeTrouble:  ToneTrouble,
+	schema.ChimeRing:     ToneRing,
+	schema.ChimeRingback: ToneRingback,
 }
 
 func Wake(t schema.Chime) []Note { return wakeTones[t] }

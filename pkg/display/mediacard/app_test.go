@@ -14,7 +14,7 @@ func TestTheAppOpensTheCardWithNothingPlaying(t *testing.T) {
 	c := New(Dependencies{Player: testPlayer{&testSource{}}, Idle: testIdle{}, Shell: stack})
 
 	app := c.App()
-	if app.ID != schema.AppPlayer || app.Label() == "" || app.Glyph() == "" {
+	if app.ID != schema.AppPlayer || app.Label() == "" || app.Icon == "" {
 		t.Fatalf("app %+v", app)
 	}
 	app.Open()

@@ -29,6 +29,8 @@ const (
 	ChimeUnmuted    Chime = "unmuted"
 	ChimeMuteHold   Chime = "mute_hold"
 	ChimeCancel     Chime = "cancel"
+	ChimeRing       Chime = "ring"
+	ChimeRingback   Chime = "ringback"
 )
 
 func (c Chime) Label() string {
@@ -56,6 +58,10 @@ func (c Chime) Label() string {
 		return say.T("chime.timer")
 	case ChimeTrouble:
 		return say.T("chime.trouble")
+	case ChimeRing:
+		return say.T("chime.ring")
+	case ChimeRingback:
+		return say.T("chime.ringback")
 	}
 	return say.T("chime.chirp")
 }
@@ -63,6 +69,8 @@ func (c Chime) Label() string {
 func Chimes() []Chime { return []Chime{ChimeNone, ChimeChirp, ChimeDing, ChimeRise} }
 
 func AlertChimes() []Chime { return append(Chimes(), ChimeTimer, ChimeTrouble) }
+
+func CallChimes() []Chime { return append(AlertChimes(), ChimeRing, ChimeRingback) }
 
 func (c Chime) Silent() bool { return c == ChimeNone }
 

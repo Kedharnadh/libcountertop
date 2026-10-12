@@ -2,9 +2,12 @@ package call
 
 import (
 	"log/slog"
+	"slices"
+	"strings"
 
 	esphome "github.com/ygelfand/go-esphome-device"
 
+	"github.com/ygelfand/libcountertop/pkg/audio/tone"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -20,7 +23,14 @@ type entities struct {
 	peer  *esphome.TextSensor
 }
 
-func NewTable() *setting.Table[config.Call] {
+func NewTable(more func() []setting.Option) *setting.Table[config.Call] {
+	chime := func(name, icon string, field func(*config.Call) *config.Chime) Setting {
+		return setting.Pick(
+			Setting{Name: name, Group: Group, Icon: icon, More: more},
+			config.CallChimes(),
+			field,
+		)
+	}
 	return setting.NewTable("call", []setting.Group{Group}, []Setting{
 		setting.Flag(
 			Setting{Name: "incoming", Group: Group, Icon: "mdi:phone-incoming"},
@@ -43,13 +53,28 @@ func NewTable() *setting.Table[config.Call] {
 			config.CallStreams(),
 			func(c *config.Call) *config.CallStream { return &c.Stream },
 		),
+		setting.Pick(
+			Setting{Name: "answer_from", Group: Group, Icon: "mdi:account-check"},
+			config.CallAudiences(),
+			func(c *config.Call) *config.CallAudience { return &c.AnswerFrom },
+		),
+		setting.Words(
+			Setting{Name: "answer_peers", Group: Group, Icon: "mdi:account-multiple", Local: true},
+			255,
+			func(c *config.Call) *string { return &c.AnswerPeers },
+		),
+		chime("ring", "mdi:bell-ring", func(c *config.Call) *config.Chime { return &c.Ring }),
+		chime("video_ring", "mdi:bell-ring-outline",
+			func(c *config.Call) *config.Chime { return &c.VideoRing }),
+		chime("ringback", "mdi:phone-outgoing",
+			func(c *config.Call) *config.Chime { return &c.Ringback }),
 	}, setting.Messages{Text: say.T, Missing: say.Missing})
 }
 
 func (c *Calls) build() {
 	c.ha = entities{
 		knobs: &setting.Controls[config.Call]{
-			Table: NewTable(),
+			Table: NewTable(c.Tones),
 			Read:  c.options.Settings.Read,
 			Save:  c.store,
 		},
@@ -108,3 +133,42 @@ func (c *Calls) SetPauseWake(on bool) { c.set("pause_wake", setting.OnOff(on)) }
 func (c *Calls) SetAutoVideo(on bool) { c.set("auto_video", setting.OnOff(on)) }
 
 func (c *Calls) SetStream(v config.CallStream) { c.set("stream", string(v)) }
+
+func (c *Calls) SetAnswerFrom(v config.CallAudience) { c.set("answer_from", string(v)) }
+
+func (c *Calls) ToggleAnswerPeer(id string) {
+	peers := c.options.Settings.Read().Peers()
+	if i := slices.Index(peers, id); i >= 0 {
+		peers = slices.Delete(peers, i, i+1)
+	} else {
+		peers = append(peers, id)
+	}
+	c.set("answer_peers", strings.Join(peers, " "))
+}
+
+func (c *Calls) SetRing(v config.Chime) { c.set("ring", string(v)) }
+
+func (c *Calls) SetVideoRing(v config.Chime) { c.set("video_ring", string(v)) }
+
+func (c *Calls) SetRingback(v config.Chime) { c.set("ringback", string(v)) }
+
+func (c *Calls) Tones() []setting.Option {
+	if c.options.Tones == nil {
+		return nil
+	}
+	return c.options.Tones.Choices()
+}
+
+func (c *Calls) Preview(v config.Chime) {
+	c.options.Sound.Tone(config.StreamAlerts, ringLevel, c.tone(v, config.ChimeNone))
+}
+
+func (c *Calls) tone(v, fallback config.Chime) tone.Sound {
+	if c.options.Tones == nil {
+		if _, custom := v.Custom(); custom {
+			v = fallback
+		}
+		return tone.Sound{Notes: tone.Wake(v)}
+	}
+	return c.options.Tones.Sound(v, fallback)
+}

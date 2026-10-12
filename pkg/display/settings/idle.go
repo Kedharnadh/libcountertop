@@ -56,6 +56,9 @@ type WeatherEntity interface {
 type WeatherPlaces interface {
 	SetDashboard(bool)
 	SetIdle(bool)
+	SetAlerts(bool)
+	SetRadarSource(config.RadarSource)
+	SetRadarRange(config.RadarRange)
 }
 type WeatherRendering interface {
 	SetAnimate(bool)
@@ -358,10 +361,30 @@ func (p *IdlePages) weatherPage(at weatherSpot) *shell.Page {
 		Build: func() ([]menu.Row, []func(int)) {
 			w := p.options.Preferences.IdleState().Weather
 			on, l := at.on(w), at.layout(w)
+			ranges := config.RadarRanges()
+			steps := menu.Steps(len(ranges))
 			rows := []menu.Row{
 				{Label: at.shown, Kind: menu.Toggle, On: on},
 				{Label: say.T("weather.look"), Kind: menu.Chevron, Value: l.Look.Label()},
 				{Label: say.T("weather.animate"), Kind: menu.Toggle, On: l.Animate},
+				{
+					Label: say.T("weather.setting.alerts"),
+					Hint:  say.T("weather.alerts.hint"),
+					Kind:  menu.Toggle,
+					On:    w.Alerts,
+				},
+				SegmentRow(
+					say.T("weather.setting.radar_source"),
+					config.RadarSources(),
+					w.RadarSource,
+				),
+				{
+					Label: say.T("weather.setting.radar_range"),
+					Kind:  menu.Slider,
+					Level: steps.Level(max(slices.Index(ranges, w.RadarRange), 0)),
+					Snap:  steps.Snap,
+					Value: w.RadarRange.Label(),
+				},
 				{
 					Label: say.T("weather.themed"),
 					Hint:  say.T("weather.themed.hint"),
@@ -373,6 +396,9 @@ func (p *IdlePages) weatherPage(at weatherSpot) *shell.Page {
 				func(int) { at.show(!on) },
 				p.makePage(func() shell.View { return p.WeatherLooks(read, at.set) }),
 				func(int) { at.set.SetAnimate(!l.Animate) },
+				func(int) { p.options.Weather.SetAlerts(!w.Alerts) },
+				SegmentPick(config.RadarSources(), p.options.Weather.SetRadarSource),
+				func(level int) { p.options.Weather.SetRadarRange(ranges[steps.Index(level)]) },
 				func(int) { at.set.SetThemed(!l.Themed) },
 			}
 			placed, placing := Placing{

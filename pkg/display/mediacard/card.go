@@ -15,6 +15,7 @@ import (
 
 type Source = nowplaying.Source
 type Opener = nowplaying.Opener
+type Presenter interface{ Presents() bool }
 type Player interface {
 	Now() nowplaying.Now
 	Holder() nowplaying.Source
@@ -156,6 +157,9 @@ func (c *Card) open() {
 		c.held = nil
 		c.mu.Unlock()
 		held.Release()
+		return
+	}
+	if p, ok := c.options.Shell.Top().(Presenter); ok && p.Presents() {
 		return
 	}
 	c.mu.Lock()

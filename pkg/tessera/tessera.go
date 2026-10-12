@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	Firmware = "0.52.0"
+	Firmware = "0.55.0"
 	protocol = 2
 	ready    = "Ready for tile configuration"
 )

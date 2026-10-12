@@ -305,7 +305,16 @@ func (h *Controller) Perform(
 }
 
 func (h *Controller) Template(ctx context.Context, tmpl string) (json.RawMessage, error) {
-	raw, err := h.call(ctx, carrier, carrierData(), nil, tmpl)
+	return h.Ask(ctx, carrier, carrierData(), nil, tmpl)
+}
+
+func (h *Controller) Ask(
+	ctx context.Context,
+	action string,
+	data, templates map[string]string,
+	tmpl string,
+) (json.RawMessage, error) {
+	raw, err := h.call(ctx, action, data, templates, tmpl)
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +324,7 @@ func (h *Controller) Template(ctx context.Context, tmpl string) (json.RawMessage
 	if err := json.Unmarshal(raw, &out); err != nil {
 		return nil, fmt.Errorf("homeassistant: the response: %w", err)
 	}
-	return out.Response, nil
+	return unwrap(out.Response), nil
 }
 
 const carrier = "recorder.get_statistics"

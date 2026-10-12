@@ -68,6 +68,7 @@ type Tile struct {
 	Controls   string
 	Inline     string
 	Guard      string
+	Flow       string
 	Refresh    int
 	Slot       int
 	Parent     int

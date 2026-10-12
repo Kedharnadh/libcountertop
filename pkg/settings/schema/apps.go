@@ -8,8 +8,13 @@ type Apps struct {
 }
 
 const (
-	AppPlayer = "player"
-	AppCalls  = "calls"
+	AppPlayer   = "player"
+	AppCalls    = "calls"
+	AppMirror   = "mirror"
+	AppShopping = "shopping"
+	AppCalendar = "calendar"
+	AppRadio    = "radio"
+	AppRadar    = "radar"
 )
 
 func DefaultApps() Apps { return Apps{Dock: []string{AppPlayer, AppCalls}} }

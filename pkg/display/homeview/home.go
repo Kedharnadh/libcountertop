@@ -3,6 +3,7 @@ package homeview
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -15,53 +16,18 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant"
+	"github.com/ygelfand/libcountertop/pkg/homeassistant/calendar"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant/homecontrol"
+	"github.com/ygelfand/libcountertop/pkg/homeassistant/todo"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	schema "github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
 
 func (view *Renderer) Body(w *gogui.Window) gogui.View {
-	ha := view.options.Client
-	device := map[string]any{"Name": view.options.Name()}
-	on := view.options.Engine.Enabled()
-	master := view.options.UI.Row(
-		"enabled",
-		"home",
-		menu.Row{Label: say.T("home.enabled"), Kind: menu.Toggle, On: on},
-		func(int) { view.options.Engine.SetEnabled(!on) },
-		false,
-	)
-	switch {
-	case !on:
-		return Column([]gogui.View{master})
-	case ha.Access() == homeassistant.Allowed:
-	case !ha.Connected():
-		return Column(
-			[]gogui.View{
-				master,
-				view.blocked(
-					w,
-					say.T("home.unconnected"),
-					say.F("home.unconnected.hint", device),
-					nil,
-				),
-			},
-		)
-	case ha.Access() == homeassistant.Unknown:
-		return Column([]gogui.View{master, view.blocked(w, say.T("home.checking"), "", nil)})
-	case ha.Access() == homeassistant.Refused:
-		return Column(
-			[]gogui.View{
-				master,
-				view.blocked(
-					w,
-					say.T("home.refused"),
-					say.F("home.refused.hint", device),
-					func(int) { ha.Probe() },
-				),
-			},
-		)
+	master, stop := view.gate(w)
+	if stop != nil {
+		return Column(stop)
 	}
 
 	engine := view.options.Engine
@@ -81,7 +47,123 @@ func (view *Renderer) Body(w *gogui.Window) gogui.View {
 			menu.Row{Label: schema.HomeTessera.Label(), Kind: menu.Chevron, Dim: !engine.Tessera()},
 			func(int) { view.options.Shell.Push(view.TesseraPage()) }, false),
 	)
+	says := say.T("weather.off")
+	if wc := view.options.Weather.Read(); wc.Entity != "" {
+		says = wc.Entity
+	}
+	views = append(views, widgets.Divider(), view.options.UI.Row("weather", "home",
+		menu.Row{Label: say.T("weather.title"), Kind: menu.Chevron, Value: says},
+		func(int) { view.options.Shell.Push(view.options.WeatherEntities()) }, false))
+	if t := view.options.Todo; t != nil {
+		list := say.T("todo.off")
+		if e := t.Entity(); e != "" {
+			list = t.Title(e)
+		}
+		views = append(views, view.options.UI.Row("todo", "home",
+			menu.Row{Label: say.T("todo.title"), Kind: menu.Chevron, Value: list},
+			func(int) { view.options.Shell.Push(view.TodoLists()) }, false))
+	}
+	if c := view.options.Calendar; c != nil {
+		chosen := say.T("calendar.off")
+		if n := len(c.Chosen()); n > 0 {
+			chosen = say.F("calendar.chosen", map[string]any{"N": n})
+		}
+		views = append(views, view.options.UI.Row("calendar", "home",
+			menu.Row{Label: say.T("calendar.app"), Kind: menu.Chevron, Value: chosen},
+			func(int) { view.options.Shell.Push(view.CalendarPage()) }, false))
+	}
 	return Column(views)
+}
+
+func (view *Renderer) CalendarPage() *shell.Page {
+	c := view.options.Calendar
+	c.Fetch()
+	return &shell.Page{
+		Title: say.T("calendar.app"),
+		Build: func() ([]menu.Row, []func(int)) {
+			spans := schema.CalendarSpans()
+			steps := menu.Steps(len(spans))
+			span := c.Span()
+			rows := []menu.Row{{
+				Label: say.T("calendar.setting.span"),
+				Kind:  menu.Slider,
+				Level: steps.Level(slices.Index(spans, span)),
+				Snap:  steps.Snap,
+				Value: span.Label(),
+			}}
+			taps := []func(int){func(level int) { c.SetSpan(spans[steps.Index(level)]) }}
+			list, err, fetched := c.Offered()
+			switch {
+			case !fetched:
+				return append(rows, menu.Row{Label: say.T("home.loading")}), append(taps, nil)
+			case err != nil:
+				return append(rows,
+						menu.Row{Label: say.T("home.failed"), Hint: err.Error()},
+						menu.Row{Label: say.T("home.retry")},
+					),
+					append(taps, nil, func(int) { c.Fetch() })
+			case len(list) == 0:
+				return append(rows, menu.Row{Label: say.T("calendar.none")}), append(taps, nil)
+			}
+			chosen := c.Chosen()
+			for _, e := range list {
+				rows = append(rows, menu.Row{
+					Label:  e.Name,
+					Hint:   e.ID,
+					Chosen: slices.Contains(chosen, e.ID),
+				})
+				taps = append(taps, func(int) { c.Toggle(e.ID) })
+			}
+			return rows, taps
+		},
+	}
+}
+
+func (view *Renderer) Gate(w *gogui.Window) gogui.View {
+	if !view.options.Engine.Enabled() {
+		return Column([]gogui.View{view.blocked(w, say.T("home.off"), say.T("home.off.hint"), nil)})
+	}
+	if _, stop := view.gate(w); stop != nil {
+		return Column(stop[1:])
+	}
+	return nil
+}
+
+func (view *Renderer) gate(w *gogui.Window) (gogui.View, []gogui.View) {
+	ha := view.options.Client
+	device := map[string]any{"Name": view.options.Name()}
+	on := view.options.Engine.Enabled()
+	master := view.options.UI.Row(
+		"enabled",
+		"home",
+		menu.Row{Label: say.T("home.enabled"), Kind: menu.Toggle, On: on},
+		func(int) { view.options.Engine.SetEnabled(!on) },
+		false,
+	)
+	switch {
+	case !on:
+		return master, []gogui.View{master}
+	case ha.Access() == homeassistant.Allowed:
+		return master, nil
+	case !ha.Connected():
+		return master, []gogui.View{
+			master,
+			view.blocked(w, say.T("home.unconnected"), say.F("home.unconnected.hint", device), nil),
+		}
+	case ha.Access() == homeassistant.Unknown:
+		return master, []gogui.View{master, view.blocked(w, say.T("home.checking"), "", nil)}
+	case ha.Access() == homeassistant.Refused:
+		return master, []gogui.View{
+			master,
+			view.blocked(
+				w,
+				say.T("home.refused"),
+				say.F("home.refused.hint", device),
+				func(int) { ha.Probe() },
+			),
+		}
+	}
+	return master, nil
 }
 
 func (view *Renderer) blocked(w *gogui.Window, title, hint string, retry func(int)) gogui.View {
@@ -390,6 +472,8 @@ type Dependencies struct {
 	Name            func() string
 	Weather         storage.Section[schema.Weather]
 	WeatherEntities func() shell.View
+	Todo            *todo.Todo
+	Calendar        *calendar.Calendar
 	Shell           *shell.Shell
 	Logo            string
 	Marks           settings.ModeMarks
@@ -484,18 +568,42 @@ func (view *Renderer) NativePage() *shell.Page {
 				})
 				taps = append(taps, func(int) { view.options.Shell.Push(engine.SelectionPage(s)) })
 			}
-			says := say.T("weather.off")
-			if wc := view.options.Weather.Read(); wc.Entity != "" {
-				says = wc.Entity
+			rows = append(rows, menu.Row{Label: say.T("home.refresh")})
+			taps = append(taps, func(int) { engine.Refresh() })
+			return rows, taps
+		},
+	}
+}
+
+func (view *Renderer) TodoLists() *shell.Page {
+	t := view.options.Todo
+	t.Fetch()
+	return &shell.Page{
+		Title: say.T("todo.entity"),
+		Build: func() ([]menu.Row, []func(int)) {
+			shown := t.Completed()
+			rows := []menu.Row{
+				{Label: say.T("todo.setting.completed"), Kind: menu.Toggle, On: shown},
 			}
-			rows = append(rows,
-				menu.Row{Label: say.T("weather.title"), Kind: menu.Chevron, Value: says},
-				menu.Row{Label: say.T("home.refresh")},
-			)
-			taps = append(taps,
-				func(int) { view.options.Shell.Push(view.options.WeatherEntities()) },
-				func(int) { engine.Refresh() },
-			)
+			taps := []func(int){func(int) { t.SetCompleted(!shown) }}
+			list, err, fetched := t.Offered()
+			switch {
+			case !fetched:
+				return append(rows, menu.Row{Label: say.T("home.loading")}), append(taps, nil)
+			case err != nil:
+				return append(rows,
+						menu.Row{Label: say.T("home.failed"), Hint: err.Error()},
+						menu.Row{Label: say.T("home.retry")},
+					),
+					append(taps, nil, func(int) { t.Fetch() })
+			case len(list) == 0:
+				return append(rows, menu.Row{Label: say.T("todo.none")}), append(taps, nil)
+			}
+			now := t.Entity()
+			for _, e := range list {
+				rows = append(rows, menu.Row{Label: e.Name, Hint: e.ID, Chosen: e.ID == now})
+				taps = append(taps, func(int) { t.SetEntity(e.ID) })
+			}
 			return rows, taps
 		},
 	}

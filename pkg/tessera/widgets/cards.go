@@ -664,13 +664,34 @@ func (v *View) weatherBody(
 	if x, ok := t.Number("humidity"); ok {
 		details = append(details, l.Numbers.Localize(num(x))+"%")
 	}
+	days := t.ExtraList("days")
+	if len(days) > 0 {
+		if hl := highLow(days[0], temp); hl != "" {
+			details = append(details, hl)
+		}
+	}
 	if x, ok := t.Number("wind_speed"); ok {
-		details = append(details, say.F("tessera.weather.wind", map[string]any{
-			"W": l.Numbers.Localize(num(math.Round(x))) + " " + t.Text("wind_speed_unit"),
+		wind := l.Numbers.Localize(num(math.Round(x))) + " " + t.Text("wind_speed_unit")
+		if b := bearing(t); b != "" {
+			wind = b + " " + wind
+		}
+		details = append(details, say.F("tessera.weather.wind", map[string]any{"W": wind}))
+	}
+	if x, ok := t.Number("pressure"); ok {
+		details = append(details, say.F("tessera.weather.pressure", map[string]any{
+			"P": l.Numbers.Localize(num(math.Round(x))) + " " + t.Text("pressure_unit"),
+		}))
+	}
+	if x, ok := t.Number("visibility"); ok {
+		details = append(details, say.F("tessera.weather.visibility", map[string]any{
+			"V": l.Numbers.Localize(num(math.Round(x))) + " " + t.Text("visibility_unit"),
 		}))
 	}
 	if len(details) > 0 {
 		out = append(out, gogui.Label(strings.Join(details, " · "), secondary()))
+	}
+	if weekly(t) {
+		return append(out, v.weekBody(w, t, l, width, temp)...)
 	}
 	if hours := t.ExtraList("hours"); len(hours) > 0 {
 		hours = hours[:min(len(hours), max(1, int(width/(reach*1.5))))]
@@ -699,45 +720,163 @@ func (v *View) weatherBody(
 			Content: cols,
 		}))
 	}
-	days := t.ExtraList("days")
 	if len(days) == 0 {
 		return append(out, gogui.Label(say.T("tessera.weather.none"), secondary()))
 	}
 	for _, d := range days {
 		name, _ := d["d"].(string)
 		c, _ := d["c"].(string)
-		var hl []string
-		if x, ok := d["h"].(float64); ok {
-			hl = append(hl, temp(x))
-		}
-		if x, ok := d["l"].(float64); ok {
-			hl = append(hl, temp(x))
-		}
 		rain := ""
 		if x, ok := d["p"].(float64); ok && x > 0 {
 			rain = l.Numbers.Localize(num(x)) + "%"
 		}
-		out = append(out, gogui.Row(gogui.ContainerCfg{
-			Width:   width,
-			Sizing:  gogui.FixedFit,
-			Padding: gogui.NoPadding,
-			Spacing: gogui.SpacingPx(reach * 0.3),
-			VAlign:  gogui.VAlignMiddle,
-			Content: []gogui.View{
-				gogui.Row(gogui.ContainerCfg{
-					Width:   reach * 2,
-					Sizing:  gogui.FixedFit,
-					Padding: gogui.NoPadding,
-					Content: []gogui.View{gogui.Label(name, gogui.CurrentTheme().Cfg.TextStyleDef)},
-				}),
-				symbol(c, reach*0.7),
-				gogui.Row(gogui.ContainerCfg{Sizing: gogui.FillFit, Padding: gogui.NoPadding,
-					Content: []gogui.View{gogui.Label(rain, secondary())}}),
-				gogui.Label(strings.Join(hl, " / "), gogui.CurrentTheme().Cfg.TextStyleDef),
-			},
-		}))
+		out = append(out, forecastRow(name, c, rain, highLow(d, temp), width))
 	}
 	return out
+}
+
+func weekly(t tessera.Tile) bool {
+	for _, d := range t.ExtraList("days") {
+		if _, ok := d["w"]; ok {
+			return true
+		}
+	}
+	for _, h := range t.ExtraList("hours") {
+		if _, ok := h["o"]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func (v *View) weekBody(
+	w *gogui.Window,
+	t tessera.Tile,
+	l tessera.Layout,
+	width float32,
+	temp func(float64) string,
+) []gogui.View {
+	hourly := v.aside().kind == subHourly
+	gap := style.Reach() * 0.25
+	each := (width - gap) / 2
+	out := []gogui.View{gogui.Row(gogui.ContainerCfg{
+		Width:   width,
+		Sizing:  gogui.FixedFit,
+		Padding: gogui.NoPadding,
+		Spacing: gogui.SpacingPx(gap),
+		Content: []gogui.View{
+			v.wordKey("tessera-weather-daily", say.T("tessera.weather.daily"), each, !hourly,
+				func(gogui.EventCtx) { v.setAside(sub{}) }),
+			v.wordKey("tessera-weather-hourly", say.T("tessera.weather.hourly"), each, hourly,
+				func(gogui.EventCtx) { v.setAside(sub{kind: subHourly}) }),
+		},
+	})}
+	amount := func(x float64) string {
+		if x <= 0 {
+			return ""
+		}
+		return l.Numbers.Localize(num(math.Round(x*10)/10)) + " " + t.Text("precipitation_unit")
+	}
+	if hourly {
+		for _, h := range t.ExtraList("hours") {
+			c, _ := h["c"].(string)
+			rain, _ := h["r"].(float64)
+			hot := ""
+			if x, ok := h["h"].(float64); ok {
+				hot = temp(x)
+			}
+			out = append(out, forecastRow(hourLabel(h, l.Clock24), c, amount(rain), hot, width))
+		}
+		return out
+	}
+	for _, d := range t.ExtraList("days") {
+		name, _ := d["d"].(string)
+		c, _ := d["c"].(string)
+		rain := amount(numberOf(d, "r"))
+		if x, ok := d["p"].(float64); ok && x > 0 {
+			rain = strings.TrimSpace(l.Numbers.Localize(num(x)) + "% " + rain)
+		}
+		out = append(out, forecastRow(name, c, rain, highLow(d, temp), width))
+	}
+	return out
+}
+
+func forecastRow(name, condition, rain, value string, width float32) gogui.View {
+	reach := style.Reach()
+	text := gogui.CurrentTheme().Cfg.TextStyleDef
+	return gogui.Row(gogui.ContainerCfg{
+		Width:   width,
+		Sizing:  gogui.FixedFit,
+		Padding: gogui.NoPadding,
+		Spacing: gogui.SpacingPx(reach * 0.3),
+		VAlign:  gogui.VAlignMiddle,
+		Content: []gogui.View{
+			gogui.Row(gogui.ContainerCfg{
+				Width:   reach * 2,
+				Sizing:  gogui.FixedFit,
+				Padding: gogui.NoPadding,
+				Content: []gogui.View{gogui.Label(name, text)},
+			}),
+			weatherSymbol(condition, reach*0.7),
+			gogui.Row(gogui.ContainerCfg{Sizing: gogui.FillFit, Padding: gogui.NoPadding,
+				Content: []gogui.View{gogui.Label(rain, secondary())}}),
+			gogui.Label(value, text),
+		},
+	})
+}
+
+func highLow(d map[string]any, temp func(float64) string) string {
+	var hl []string
+	if x, ok := d["h"].(float64); ok {
+		hl = append(hl, temp(x))
+	}
+	if x, ok := d["l"].(float64); ok {
+		hl = append(hl, temp(x))
+	}
+	return strings.Join(hl, " / ")
+}
+
+func numberOf(m map[string]any, key string) float64 {
+	x, _ := m[key].(float64)
+	return x
+}
+
+func hourLabel(h map[string]any, clock24 bool) string {
+	if at, ok := h["t"].(string); ok {
+		return at
+	}
+	o, ok := h["o"].(float64)
+	if !ok {
+		return ""
+	}
+	hour := int(o) % 24
+	if clock24 {
+		return fmt.Sprintf("%02d:00", hour)
+	}
+	switch {
+	case hour == 0:
+		return "12 AM"
+	case hour < 12:
+		return fmt.Sprintf("%d AM", hour)
+	case hour == 12:
+		return "12 PM"
+	}
+	return fmt.Sprintf("%d PM", hour-12)
+}
+
+func bearing(t tessera.Tile) string {
+	if s := t.Text("wind_bearing"); s != "" {
+		if _, err := strconv.ParseFloat(s, 64); err != nil {
+			return s
+		}
+	}
+	deg, ok := t.Number("wind_bearing")
+	if !ok {
+		return ""
+	}
+	points := []string{"N", "NE", "E", "SE", "S", "SW", "W", "NW"}
+	i := int(math.Mod(math.Round(deg/45)+8, 8))
+	return points[i]
 }
 
 func (v *View) vacuumBody(

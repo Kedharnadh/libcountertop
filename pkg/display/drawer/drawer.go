@@ -22,7 +22,7 @@ type Entry struct {
 
 	Order int
 
-	Glyph func() string
+	Icon string
 
 	Open func()
 }

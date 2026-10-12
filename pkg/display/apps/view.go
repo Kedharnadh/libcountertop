@@ -1,10 +1,12 @@
 package apps
 
 import (
+	"log/slog"
 	"time"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
+	"github.com/ygelfand/libcountertop/pkg/display/icons"
 	"github.com/ygelfand/libcountertop/pkg/display/navigation"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
@@ -13,7 +15,10 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/say"
 )
 
-const settle = 400 * time.Millisecond
+const (
+	settle = 400 * time.Millisecond
+	lift   = 1.1
+)
 
 func (a *Apps) Screens(look *widgets.UI) func(shell.View) *navigation.Screen {
 	return func(v shell.View) *navigation.Screen {
@@ -49,6 +54,19 @@ func (g grid) cell(n int) ui.Rect {
 	}
 }
 
+func (g grid) at(x, y float32, count int) int {
+	step := g.side + g.gap
+	col, row := int(x/step), int(y/step)
+	if x < 0 || y < 0 || col >= g.cols || x-float32(col)*step > g.side ||
+		y-float32(row)*step > g.side {
+		return -1
+	}
+	if n := row*g.cols + col; n < count {
+		return n
+	}
+	return -1
+}
+
 func (g grid) height(count int) float32 {
 	rows := (count + g.cols - 1) / g.cols
 	return max(0, float32(rows)*(g.side+g.gap)-g.gap)
@@ -75,20 +93,28 @@ func (a *Apps) body(w *gogui.Window, look *widgets.UI) gogui.View {
 	a.mu.Unlock()
 
 	var tiles []gogui.View
-	var lifted gogui.View
+	slot := 0
+	target := -1
+	if d.from >= 0 {
+		target = g.drop(d.from, d.dx, d.dy, len(list))
+	}
 	for n, app := range list {
-		at := g.cell(n)
-		tile := a.tile(look, n, app, g, len(list))
 		if n == d.from {
-			at.X += int(d.dx)
-			at.Y += int(d.dy)
-			lifted = widgets.Placed(at, tile)
 			continue
 		}
-		tiles = append(tiles, widgets.Placed(at, tile))
+		if slot == target {
+			slot++
+		}
+		tiles = append(tiles, widgets.Placed(g.cell(slot), a.tile(look, app, g.side)))
+		slot++
 	}
-	if lifted != nil {
-		tiles = append(tiles, lifted)
+	if d.from >= 0 {
+		grown := g.side * lift
+		at := g.cell(d.from)
+		at.X += int(d.dx - (grown-g.side)/2)
+		at.Y += int(d.dy - (grown-g.side)/2)
+		at.W, at.H = int(grown), int(grown)
+		tiles = append(tiles, widgets.Placed(at, a.tile(look, list[d.from], grown)))
 	}
 
 	content := []gogui.View{gogui.Column(gogui.ContainerCfg{
@@ -110,10 +136,33 @@ func (a *Apps) body(w *gogui.Window, look *widgets.UI) gogui.View {
 		Padding: gogui.NoPadding,
 		Spacing: gogui.SpacingPx(g.gap),
 		Content: content,
+		OnGesture: func(e gogui.EventCtx) {
+			slog.Debug(
+				"apps gesture",
+				"type",
+				e.Event.GestureType,
+				"phase",
+				e.Event.GesturePhase,
+				"x",
+				e.Event.CentroidX,
+				"y",
+				e.Event.CentroidY,
+			)
+			switch e.Event.GestureType {
+			case gogui.GesturePan:
+				a.pan(e, g, len(list))
+			case gogui.GestureSwipe:
+				a.end(true, g, len(list))
+			default:
+				return
+			}
+			e.Consume()
+			e.Window.InvalidateLayout()
+		},
 	}))
 }
 
-func (a *Apps) tile(look *widgets.UI, n int, app App, g grid, count int) gogui.View {
+func (a *Apps) tile(look *widgets.UI, app App, side float32) gogui.View {
 	docked := a.Docked(app.ID)
 	mark := gogui.IconStarO
 	if docked {
@@ -121,34 +170,58 @@ func (a *Apps) tile(look *widgets.UI, n int, app App, g grid, count int) gogui.V
 	}
 	st := gogui.CurrentTheme().TextStyleIconLarge
 	st.Color = gogui.CurrentTheme().Cfg.TextStyleDef.Color
-	st.Size = g.side * 0.2
+	st.Size = side * 0.2
 	star := look.Presses.Pressable(gogui.Row, gogui.ContainerCfg{
 		ID:      "app-star-" + app.ID,
-		Padding: gogui.PadAll(g.side * 0.06),
+		Padding: gogui.PadAll(side * 0.06),
 		Content: []gogui.View{gogui.Label(mark, st)},
 	}, func(e gogui.EventCtx) {
 		a.SetDocked(app.ID, !docked)
 		e.Consume()
 	})
 
-	glyph := ""
-	if app.Glyph != nil {
-		glyph = app.Glyph()
-	}
 	return look.Entity(widgets.EntityTile{
 		ID:        "app-" + app.ID,
-		Width:     g.side,
-		Height:    g.side,
-		Glyph:     glyph,
+		Width:     side,
+		Height:    side,
 		Name:      app.Label(),
 		Available: true,
-		Corner:    star,
+		Body: func(width, height float32) gogui.View {
+			return face(app, star, width, height)
+		},
 		Tap: func(gogui.EventCtx) {
 			if !a.settling() {
 				app.Open()
 			}
 		},
-		Pan: func(e gogui.EventCtx) { a.pan(n, e, g, count) },
+	})
+}
+
+func face(app App, star gogui.View, width, height float32) gogui.View {
+	t := gogui.CurrentTheme()
+	icon := t.TextStyleIconLarge
+	icon.Family = icons.Family
+	icon.Color = t.Cfg.TextStyleDef.Color
+	icon.Size = min(width, height) * 0.45
+	return gogui.Column(gogui.ContainerCfg{
+		Width:   width,
+		Height:  height,
+		Sizing:  gogui.FixedFixed,
+		Padding: gogui.NoPadding,
+		Spacing: gogui.SpacingPx(height * 0.04),
+		HAlign:  gogui.HAlignCenter,
+		VAlign:  gogui.VAlignMiddle,
+		Content: []gogui.View{
+			gogui.Label(icons.Glyph(icons.Named(app.Icon)), icon),
+			gogui.Label(app.Label(), t.Cfg.TextStyleDef),
+			gogui.Column(gogui.ContainerCfg{
+				Float:       true,
+				FloatAnchor: gogui.FloatTopRight,
+				FloatTieOff: gogui.FloatTopRight,
+				Padding:     gogui.NoPadding,
+				Content:     []gogui.View{star},
+			}),
+		},
 	})
 }
 
@@ -158,26 +231,32 @@ func (a *Apps) settling() bool {
 	return a.drag.from >= 0 || time.Since(a.drag.dropped) < settle
 }
 
-func (a *Apps) pan(n int, e gogui.EventCtx, g grid, count int) {
+func (a *Apps) pan(e gogui.EventCtx, g grid, count int) {
 	a.mu.Lock()
 	switch e.Event.GesturePhase {
 	case gogui.GesturePhaseBegan:
-		a.drag = drag{from: n, dx: e.Event.GestureDX, dy: e.Event.GestureDY}
+		s := e.Layout.Shape
+		from := g.at(e.Event.CentroidX-s.X, e.Event.CentroidY-s.Y, count)
+		a.drag = drag{from: from, dx: e.Event.GestureDX, dy: e.Event.GestureDY}
 	case gogui.GesturePhaseChanged:
-		if a.drag.from == n {
+		if a.drag.from >= 0 {
 			a.drag.dx += e.Event.GestureDX
 			a.drag.dy += e.Event.GestureDY
 		}
 	case gogui.GesturePhaseEnded, gogui.GesturePhaseCancelled:
-		d := a.drag
-		a.drag = drag{from: -1, dropped: time.Now()}
 		a.mu.Unlock()
-		if e.Event.GesturePhase == gogui.GesturePhaseEnded && d.from == n {
-			a.Move(n, g.drop(n, d.dx, d.dy, count))
-		}
-		a.options.Shell.Redraw()
+		a.end(e.Event.GesturePhase == gogui.GesturePhaseEnded, g, count)
 		return
 	}
 	a.mu.Unlock()
-	a.options.Shell.Redraw()
+}
+
+func (a *Apps) end(drop bool, g grid, count int) {
+	a.mu.Lock()
+	d := a.drag
+	a.drag = drag{from: -1, dropped: time.Now()}
+	a.mu.Unlock()
+	if drop && d.from >= 0 {
+		a.Move(d.from, g.drop(d.from, d.dx, d.dy, count))
+	}
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
+	"github.com/ygelfand/libcountertop/pkg/homeassistant/nws"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant/weather"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -27,10 +28,15 @@ type lookView func(
 ) gogui.View
 
 type View struct {
-	UI    *widgets.UI
-	Again func(w *gogui.Window, after time.Duration)
-	Start time.Time
+	UI      *widgets.UI
+	Again   func(w *gogui.Window, after time.Duration)
+	Start   time.Time
+	Alerts  Alerts
+	Radar   func(*nws.Alert)
+	Clock24 func() bool
 }
+
+func (v *View) since() float64 { return time.Since(v.Start).Seconds() }
 
 func (v *View) look(look schema.WeatherLook) lookView {
 	switch look {
@@ -53,7 +59,7 @@ func (v *View) phase(w *gogui.Window, l schema.WeatherLayout) float64 {
 		return 0
 	}
 	v.Again(w, weatherFrame)
-	return time.Since(v.Start).Seconds()
+	return v.since()
 }
 
 func (v *View) Layer(
@@ -64,15 +70,20 @@ func (v *View) Layer(
 	top float32,
 	ink theme.Theme,
 ) gogui.View {
-	r.Phase = v.phase(w, l)
-	build := v.look(l.Look)
 	size := style.Reach() * float32(0.5+l.Size.Share()*1.4)
 	margin := style.Reach() * 0.5
+	var shown gogui.View
+	if a, ok := v.alerting(); ok {
+		shown = v.alert(w, size, a, ink, l)
+	} else {
+		r.Phase = v.phase(w, l)
+		shown = v.look(l.Look)(w, size, r, ink, l)
+	}
 	return widgets.Placed(ui.Rect{W: vw, H: vh}, gogui.Column(widgets.Aligned(l.Placement,
 		gogui.ContainerCfg{
 			Sizing:  gogui.FillFill,
 			Padding: gogui.NewPadding(top+margin, margin, margin, margin),
-			Content: []gogui.View{build(w, size, r, ink, l)},
+			Content: []gogui.View{shown},
 		})))
 }
 

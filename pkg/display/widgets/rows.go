@@ -2,9 +2,11 @@ package widgets
 
 import (
 	"fmt"
+	"strings"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
+	"github.com/ygelfand/libcountertop/pkg/display/icons"
 	"github.com/ygelfand/libcountertop/pkg/display/interaction"
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
@@ -19,6 +21,10 @@ type RowRenderer struct {
 func icon(glyph string, c gogui.Color) gogui.View {
 	st := gogui.CurrentTheme().TextStyleIconMedium
 	st.Color = c
+	if name, ok := strings.CutPrefix(glyph, "mdi:"); ok {
+		st.Family = icons.Family
+		glyph = icons.Glyph(icons.Named(name))
+	}
 	return gogui.Label(glyph, st)
 }
 

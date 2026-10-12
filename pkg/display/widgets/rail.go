@@ -5,6 +5,7 @@ import (
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
+	"github.com/ygelfand/libcountertop/pkg/display/icons"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
@@ -27,6 +28,7 @@ func (kit *Toolkit) Rail(w *gogui.Window, options RailOptions) gogui.View {
 	mark := t.TextStyleIconLarge
 	mark.Color = t.Cfg.TextStyleDef.Color
 	mark.Size = style.Reach() * 0.9
+	mark.Family = icons.Family
 	cell := style.Reach() * 1.5
 	var buttons []gogui.View
 	for i, e := range options.Entries {

@@ -16,6 +16,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/media/rtc"
 	discovery "github.com/ygelfand/libcountertop/pkg/network/peer"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 const (
@@ -227,7 +228,8 @@ func (c *Calls) dial(s *session) {
 	c.mu.Lock()
 	s.quiet = quiet
 	c.mu.Unlock()
-	s.worker("call ringback", func() { ringback(ringing, c.options.Sound) })
+	back := c.tone(c.options.Settings.Read().Ringback, schema.ChimeRingback)
+	s.worker("call ringback", func() { ringback(ringing, c.options.Sound, back) })
 	select {
 	case <-s.ctx.Done():
 	case <-time.After(ringFor):

@@ -6,6 +6,8 @@ import (
 	gogui "github.com/go-gui-org/go-gui/gui"
 )
 
+func (a *App) Again(w *gogui.Window, after time.Duration) { a.again(w, after) }
+
 func (a *App) again(w *gogui.Window, after time.Duration) {
 	if a.ticking.Swap(true) {
 		return

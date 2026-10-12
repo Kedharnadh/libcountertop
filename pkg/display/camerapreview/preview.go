@@ -20,6 +20,14 @@ const (
 	camHold  = 5 * time.Second
 	camLayer = 900
 	camZ     = 6
+	mirrorZ  = -2
+)
+
+type Framing int
+
+const (
+	Inset Framing = iota
+	Mirrored
 )
 
 type Preview struct {
@@ -28,7 +36,8 @@ type Preview struct {
 	listen  sync.Once
 	cancel  context.CancelFunc
 	mu      sync.Mutex
-	pages   []*shell.Page
+	views   []shell.View
+	framing Framing
 	want    time.Time
 	live    bool
 	shown   bool
@@ -68,6 +77,11 @@ func New(options Dependencies) *Preview {
 }
 
 func (p *Preview) Page(page *shell.Page) *shell.Page {
+	p.Watch(page)
+	return page
+}
+
+func (p *Preview) Watch(v shell.View) {
 	p.listen.Do(func() {
 		p.options.Shell.Changed.Listen(func(c shell.Change) {
 			if !p.onScreen() {
@@ -86,26 +100,29 @@ func (p *Preview) Page(page *shell.Page) *shell.Page {
 	})
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.pages = append(p.pages, page)
-	return page
+	p.views = append(p.views, v)
 }
 
 func (p *Preview) onScreen() bool {
 	p.mu.Lock()
-	pages := append([]*shell.Page(nil), p.pages...)
+	views := append([]shell.View(nil), p.views...)
 	p.mu.Unlock()
-	for _, page := range pages {
-		if p.options.Shell.Visible(page) {
+	for _, v := range views {
+		if p.options.Shell.Visible(v) {
 			return true
 		}
 	}
 	return false
 }
 
-func (p *Preview) Want(box ui.Rect) bool {
+func (p *Preview) Want(box ui.Rect) bool { return p.watch(box, Inset) }
+
+func (p *Preview) WantMirror(box ui.Rect) bool { return p.watch(box, Mirrored) }
+
+func (p *Preview) watch(box ui.Rect, framing Framing) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.want, p.box = time.Now(), box
+	p.want, p.box, p.framing = time.Now(), box, framing
 	if !p.live && time.Since(p.bad) > camHold {
 		p.live = true
 		ctx, cancel := context.WithCancel(context.Background())
@@ -115,10 +132,10 @@ func (p *Preview) Want(box ui.Rect) bool {
 	return p.shown
 }
 
-func (p *Preview) watched() (ui.Rect, bool) {
+func (p *Preview) watched() (ui.Rect, Framing, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return p.box, time.Since(p.want) < camIdle
+	return p.box, p.framing, time.Since(p.want) < camIdle
 }
 
 func (p *Preview) run(ctx context.Context) {
@@ -139,10 +156,14 @@ func (p *Preview) run(ctx context.Context) {
 	p.options.Shell.Redraw()
 }
 
-func (p *Preview) place(c *surface.Client, box ui.Rect, w, h int, visible bool) error {
-	fit := Fit(w, h, box)
+func (p *Preview) place(c *surface.Client, box ui.Rect, framing Framing, w, h int) error {
+	fit, z := Fit(w, h, box), camZ
+	if framing == Mirrored {
+		fit, z = Cover(w, h, box), mirrorZ
+		fit = ui.Rect{X: fit.X + fit.W, Y: fit.Y, W: -fit.W, H: fit.H}
+	}
 	x, y, m := p.placement(fit, w, h)
-	return c.VideoPlace(camLayer, x, y, m, camZ, visible)
+	return c.VideoPlace(camLayer, x, y, m, z, true)
 }
 
 func (p *Preview) play(ctx context.Context) error {
@@ -167,7 +188,7 @@ func (p *Preview) play(ctx context.Context) error {
 
 	var config []byte
 	keyed := false
-	placed := ui.Rect{}
+	placed, framed := ui.Rect{}, Inset
 	orient := int(p.options.Display.Orientation())
 	check := time.NewTicker(250 * time.Millisecond)
 	defer check.Stop()
@@ -185,14 +206,15 @@ func (p *Preview) play(ctx context.Context) error {
 		case <-p.left:
 			return nil
 		case <-check.C:
-			box, watched := p.watched()
+			box, framing, watched := p.watched()
 			if !watched {
 				return nil
 			}
 			p.options.Shell.Redraw()
-			if o := int(p.options.Display.Orientation()); keyed && (box != placed || o != orient) {
-				placed, orient = box, o
-				if err := p.place(c, box, width, height, true); err != nil {
+			o := int(p.options.Display.Orientation())
+			if keyed && (box != placed || framing != framed || o != orient) {
+				placed, framed, orient = box, framing, o
+				if err := p.place(c, box, framing, width, height); err != nil {
 					return err
 				}
 			}
@@ -219,8 +241,8 @@ func (p *Preview) play(ctx context.Context) error {
 			}
 			if !keyed {
 				keyed = true
-				placed, _ = p.watched()
-				if err := p.place(c, placed, width, height, true); err != nil {
+				placed, framed, _ = p.watched()
+				if err := p.place(c, placed, framed, width, height); err != nil {
 					return err
 				}
 				p.mu.Lock()
@@ -255,11 +277,19 @@ func (p *Preview) feed(
 		case <-done:
 			return nil
 		case <-time.After(camRetry):
-			if _, watched := p.watched(); !watched {
+			if _, _, watched := p.watched(); !watched {
 				return context.Canceled
 			}
 		}
 	}
+}
+
+func Cover(w, h int, box ui.Rect) ui.Rect {
+	dw, dh := box.W, box.W*h/max(1, w)
+	if dh < box.H {
+		dw, dh = box.H*w/max(1, h), box.H
+	}
+	return ui.Rect{X: box.X + (box.W-dw)/2, Y: box.Y + (box.H-dh)/2, W: dw, H: dh}
 }
 
 func Fit(w, h int, box ui.Rect) ui.Rect {

@@ -38,6 +38,16 @@ func (p *LivePreview) View(w *gogui.Window, starting string, watch func(ui.Rect)
 	})
 }
 
+func Divider() gogui.View {
+	t := gogui.CurrentTheme().Cfg
+	return gogui.Row(gogui.ContainerCfg{
+		Height:  max(1, t.TextStyleDef.Size/16),
+		Sizing:  gogui.FillFixed,
+		Padding: gogui.NoPadding,
+		Color:   t.ColorTextSecondary.WithOpacity(0.35),
+	})
+}
+
 func Beside(w *gogui.Window, aside, list gogui.View) gogui.View {
 	vw, vh := w.WindowSize()
 	cfg := gogui.ContainerCfg{

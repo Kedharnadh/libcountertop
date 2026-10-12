@@ -1,0 +1,12 @@
+Silero VAD v6.2.3, MIT, https://github.com/snakers4/silero-vad
+https://raw.githubusercontent.com/snakers4/silero-vad/v6.2.3/src/silero_vad/data/silero_vad.onnx
+sha256 1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3
+silero.bin: python export.py silero_vad.onnx silero.bin (onnx, numpy), the 16 kHz branch, little-endian float32 in this order:
+encoder.0 weight [128][129][3], bias [128]
+encoder.1 weight [64][128][3], bias [64]
+encoder.2 weight [64][64][3], bias [64]
+encoder.3 weight [128][64][3], bias [128]
+lstm weight_ih [512][128], weight_hh [512][128], bias_ih [512], bias_hh [512]
+decoder weight [128], bias [1]
+sha256 2ff111bbd149549f539bdc239b24c3c124353bdd814a8486ec5025574466970f
+the STFT basis is a periodic Hann-windowed 256-point DFT and is computed, not stored

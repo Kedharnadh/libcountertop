@@ -109,7 +109,8 @@ func (a *App) idle(w *gogui.Window, v *idleview.View) gogui.View {
 			})))
 		}
 	}
-	if r, ok := a.o.Forecast.Now(); ok && cfg.Weather.Idle && !night.Quiet() {
+	if r, ok := a.o.Forecast.Now(); (ok || a.weather.Alerting()) && cfg.Weather.Idle &&
+		!night.Quiet() {
 		layers = append(layers, a.weather.Layer(w, r, cfg.Weather.SaverLayout(), vw, vh, 0, pal))
 	}
 	return gogui.Column(gogui.ContainerCfg{

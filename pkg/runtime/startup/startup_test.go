@@ -14,11 +14,21 @@ func TestSkipDoesNotBypassReadiness(t *testing.T) {
 	if c.Ready != 0 {
 		t.Fatalf("skipping without readiness gave finish=%v", c.Ready)
 	}
-	for at := 20 * time.Second; at < 24*time.Second; at += Frame {
-		c.Tick(at, p, true, true)
-	}
+	c.Tick(20*time.Second, p, true, true)
 	if c.Ready != 1 {
 		t.Fatalf("ready after skip gave finish=%v, want 1", c.Ready)
+	}
+}
+
+func TestSkipEndsAtOnce(t *testing.T) {
+	var c Controller
+	p := []Progress{{Name: "network"}, {Name: "display", Done: true}}
+	for at := Frame; at < 4*time.Second; at += Frame {
+		c.Tick(at, p, true, false)
+	}
+	c.Tick(4*time.Second, p, true, true)
+	if c.Ready != 1 || c.Trace != 1 {
+		t.Fatalf("skip gave finish=%v trace=%v, want 1 and 1", c.Ready, c.Trace)
 	}
 }
 func TestReadinessLossStopsHandover(t *testing.T) {

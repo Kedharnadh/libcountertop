@@ -22,16 +22,18 @@ func (s *callSound) Play(pcm []int16)                        { s.played = slices
 func (s *callSound) Queued() int                             { return s.queued }
 func (*callSound) Claim(string, func(context.Context) error) {}
 func (s *callSound) Duck(on bool)                            { s.ducked = append(s.ducked, on) }
-func (s *callSound) Chime(schema.Stream, float64, ...tone.Note) {
+func (s *callSound) Tone(schema.Stream, float64, tone.Sound) {
 	s.chimes++
 	s.stop()
 }
+
+var testRing = tone.Sound{Notes: tone.ToneRing}
 
 func TestCancelledRingingRestoresBackgroundAudio(t *testing.T) {
 	ctx, stop := context.WithCancel(context.Background())
 	defer stop()
 	sound := &callSound{stop: stop}
-	if ring(ctx, sound) {
+	if ring(ctx, sound, testRing) {
 		t.Fatal("cancelled ringing reported an unanswered timeout")
 	}
 	if sound.chimes != 1 || !slices.Equal(sound.ducked, []bool{true, false}) {
@@ -43,8 +45,8 @@ func TestStoppedCallsDoNotQueueAnotherTone(t *testing.T) {
 	ctx, stop := context.WithCancel(context.Background())
 	stop()
 	sound := &callSound{stop: stop}
-	ring(ctx, sound)
-	ringback(ctx, sound)
+	ring(ctx, sound, testRing)
+	ringback(ctx, sound, tone.Sound{Notes: tone.ToneRingback})
 	if sound.chimes != 0 {
 		t.Fatalf("queued %d chimes after cancellation", sound.chimes)
 	}

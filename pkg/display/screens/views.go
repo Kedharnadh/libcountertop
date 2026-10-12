@@ -6,6 +6,7 @@ import (
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
+	"github.com/ygelfand/libcountertop/pkg/display/icons"
 	"github.com/ygelfand/libcountertop/pkg/display/idleview"
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
@@ -85,10 +86,7 @@ func (a *App) pickerScreen(p *homecontrol.Picker) *Screen {
 func (a *App) rail(w *gogui.Window) gogui.View {
 	var entries []widgets.RailEntry
 	for _, e := range a.o.Drawer.Entries() {
-		glyph := ""
-		if e.Glyph != nil {
-			glyph = e.Glyph()
-		}
+		glyph := icons.Glyph(icons.Named(e.Icon))
 		entries = append(entries, widgets.RailEntry{Label: e.Label(), Glyph: glyph, Open: e.Open})
 	}
 	var close func()

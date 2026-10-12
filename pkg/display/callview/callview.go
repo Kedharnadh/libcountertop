@@ -75,10 +75,10 @@ func (cv *View) Screen(v shell.View) *navigation.Screen {
 
 func (cv *View) App() apps.App {
 	return apps.App{
-		ID:    schema.AppCalls,
-		Name:  func() string { return say.T("call.tab") },
-		Glyph: func() string { return gogui.IconPhone },
-		Open:  cv.browse,
+		ID:   schema.AppCalls,
+		Name: func() string { return say.T("call.tab") },
+		Icon: "mdi:home-sound-in",
+		Open: cv.browse,
 	}
 }
 

@@ -2,13 +2,11 @@ package playerview
 
 import (
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
-	"github.com/ygelfand/libcountertop/pkg/display/interaction"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	videoplayer "github.com/ygelfand/libcountertop/pkg/display/videopage"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
@@ -18,8 +16,6 @@ import (
 
 const (
 	videoSkip  = 10 * time.Second
-	spinDots   = 12
-	spinStep   = 100 * time.Millisecond
 	scrimAlpha = 170
 )
 
@@ -61,7 +57,13 @@ func (pv *Renderer) Video(w *gogui.Window, p *videoplayer.Page) gogui.View {
 	if look.Spinning {
 		layers = append(
 			layers,
-			floatAt(0, 0, float32(vw), float32(vh), spinner(vw, vh, time.Since(look.Began))),
+			floatAt(
+				0,
+				0,
+				float32(vw),
+				float32(vh),
+				widgets.Spinner(vw, vh, time.Since(look.Began)),
+			),
 		)
 	}
 	if look.Shown {
@@ -149,30 +151,6 @@ func backdrop(look videoplayer.Look, vw, vh int) gogui.View {
 		HAlign:  gogui.HAlignCenter,
 		VAlign:  gogui.VAlignMiddle,
 		Content: content,
-	})
-}
-
-func spinner(vw, vh int, since time.Duration) gogui.View {
-	r := float32(min(vw, vh)) / 14
-	dot := max(r/5, 3)
-	lead := int(since/spinStep) % spinDots
-	return gogui.DrawCanvas(gogui.DrawCanvasCfg{
-		Width: float32(vw), Height: float32(vh),
-		Version: uint64(lead),
-		OnDraw: func(dc *gogui.DrawContext) {
-			cx, cy := float32(vw)/2, float32(vh)/2
-			for i := range spinDots {
-				a := 2 * math.Pi * float64(i) / spinDots
-				x := cx + r*float32(math.Sin(a))
-				y := cy - r*float32(math.Cos(a))
-				age := (lead - i + spinDots) % spinDots
-				v := uint8(0xf0 - age*0xb0/spinDots)
-				dc.FilledPolygon(
-					interaction.Disc(x, y, dot),
-					gogui.Color{R: v, G: v, B: v, A: 0xff},
-				)
-			}
-		},
 	})
 }
 
