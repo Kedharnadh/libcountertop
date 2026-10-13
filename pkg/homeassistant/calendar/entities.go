@@ -20,12 +20,12 @@ const Group setting.Group = "Calendar"
 func NewTable() *Table {
 	return setting.NewTable("calendar", []setting.Group{Group}, []Setting{
 		setting.Words(
-			Setting{Name: "entities", Group: Group, Icon: "mdi:calendar-multiple", Local: true},
+			Setting{Name: "entities", Group: Group, Icon: "mdi:calendar-multiple", NoEntity: true},
 			entitiesMost,
 			func(c *schema.Calendar) *string { return &c.Entities },
 		),
 		setting.Pick(
-			Setting{Name: "span", Group: Group, Icon: "mdi:calendar-range", Local: true},
+			Setting{Name: "span", Group: Group, Icon: "mdi:calendar-range", NoEntity: true},
 			schema.CalendarSpans(),
 			func(c *schema.Calendar) *schema.CalendarSpan { return &c.Span },
 		),

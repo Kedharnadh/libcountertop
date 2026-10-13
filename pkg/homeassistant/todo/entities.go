@@ -20,16 +20,16 @@ const Group setting.Group = "Todo"
 func NewTable() *Table {
 	return setting.NewTable("todo", []setting.Group{Group}, []Setting{
 		setting.Words(
-			Setting{Name: "entity", Group: Group, Icon: "mdi:cart-outline", Local: true},
+			Setting{Name: "entity", Group: Group, Icon: "mdi:cart-outline", NoEntity: true},
 			entityMost,
 			func(c *schema.Todo) *string { return &c.Entity },
 		),
 		setting.Flag(
 			Setting{
-				Name:  "completed",
-				Group: Group,
-				Icon:  "mdi:checkbox-marked-outline",
-				Local: true,
+				Name:     "completed",
+				Group:    Group,
+				Icon:     "mdi:checkbox-marked-outline",
+				NoEntity: true,
 			},
 			func(c *schema.Todo) *bool { return &c.Completed },
 		),

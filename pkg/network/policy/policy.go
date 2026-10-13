@@ -24,7 +24,7 @@ func NewTable() *Table {
 		setting.Flag(Setting{
 			Name: "verify", Group: Group, ID: "verify_certificates", Icon: "mdi:certificate",
 		}, func(c *schema.Network) *bool { return &c.Verify }),
-	}, setting.Messages{Text: say.T, Missing: say.Missing}).Local()
+	}, setting.Messages{Text: say.T, Missing: say.Missing})
 }
 
 type Policy struct {

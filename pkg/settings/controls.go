@@ -79,6 +79,9 @@ func (c *Controls[T]) build() {
 			continue
 		}
 		for _, s := range c.Table.In(g) {
+			if s.NoEntity {
+				continue
+			}
 			e := c.entity(s, &at)
 			if e == nil {
 				continue

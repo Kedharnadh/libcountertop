@@ -110,6 +110,8 @@ type Setting[T any] struct {
 
 	Local bool
 
+	NoEntity bool
+
 	Options []Option
 	More    func() []Option
 

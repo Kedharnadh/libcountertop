@@ -19,7 +19,7 @@ func NewTable() *setting.Table[schema.RTSP] {
 			},
 			func(c *schema.RTSP) *bool { return &c.Enabled },
 		),
-	}, setting.Messages{Text: say.T, Missing: say.Missing}).Local()
+	}, setting.Messages{Text: say.T, Missing: say.Missing})
 }
 
 func Controls(
