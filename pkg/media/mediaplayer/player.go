@@ -184,7 +184,7 @@ func (p *Player[P]) play(url string, announcement bool) {
 func (p *Player[P]) announce(url string) {
 	p.Sounding(true)
 	claim := p.sound.Claim("announce", func(ctx context.Context, spk P) error {
-		samples, err := pcm.Fetch(ctx, url)
+		samples, err := pcm.Fetch(ctx, url, upsample.VoiceRate)
 		if err != nil {
 			return err
 		}

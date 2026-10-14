@@ -91,6 +91,37 @@ func TestAToneKeepsItsPitchAndItsLevel(t *testing.T) {
 	}
 }
 
+func TestDownsamplingDoesNotFoldHighTonesBack(t *testing.T) {
+	const peak = 10000
+	for _, c := range []struct {
+		from, to int
+		hz       float64
+	}{
+		{22050, 16000, 9000},
+		{22050, 16000, 10000},
+		{48000, 16000, 12000},
+		{44100, 16000, 20000},
+	} {
+		in := sine(c.from, c.hz, c.from, 1)
+		got := NewRational(c.from, c.to, 1).Run(in)[c.to/10:]
+		if rms := math.Sqrt(power(got, 0, 1)); rms > peak*0.01 {
+			t.Errorf("%.0f Hz from %d to %d came out at %.0f rms, want under 1%%",
+				c.hz, c.from, c.to, rms)
+		}
+	}
+}
+
+func TestDownsamplingKeepsSpeech(t *testing.T) {
+	const peak = 10000
+	for _, hz := range []float64{300, 1000, 3000, 6000} {
+		in := sine(22050, hz, 22050, 1)
+		got := NewRational(22050, 16000, 1).Run(in)[1600:]
+		if amp := level(got, 0, 1, 16000, hz); math.Abs(amp-peak)/peak > 0.05 {
+			t.Errorf("%.0f Hz came out at %.0f, want about %d", hz, amp, peak)
+		}
+	}
+}
+
 func TestBuffersJoinUpWhereTheyMeet(t *testing.T) {
 	in := sine(44100, 1000, 8192, 2)
 

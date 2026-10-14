@@ -45,7 +45,7 @@ func (t *Conversation) announce(a esphome.Announce) {
 }
 
 func (t *Conversation) play(ctx context.Context, url string, started func()) error {
-	samples, err := pcm.Fetch(ctx, url)
+	samples, err := pcm.Fetch(ctx, url, 16000)
 	if err != nil {
 		return err
 	}

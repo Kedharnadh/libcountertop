@@ -13,6 +13,7 @@ require (
 	github.com/go-gui-org/go-glyph v1.26.1
 	github.com/go-gui-org/go-gui v0.84.0
 	github.com/gorilla/websocket v1.5.3
+	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/kkdai/youtube/v2 v2.10.6
 	github.com/libp2p/zeroconf/v2 v2.2.0
 	github.com/mdlayher/genetlink v1.4.0

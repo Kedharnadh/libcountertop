@@ -12,6 +12,7 @@ type Rational struct {
 
 	channels int
 
+	taps   int
 	filter []float32
 
 	at int
@@ -29,10 +30,15 @@ func NewRational(from, to, channels int) *Rational {
 	}
 
 	g := gcd(from, to)
-	r := &Rational{up: to / g, down: from / g, channels: channels}
+	r := &Rational{up: to / g, down: from / g, channels: channels, taps: ratioTaps}
 
 	if from != to {
-		r.filter = lowpass(r.up, ratioTaps)
+		cut := 1.0
+		if to < from {
+			cut = 0.9 * float64(to) / float64(from)
+		}
+		r.taps = int(math.Ceil(ratioTaps / cut))
+		r.filter = lowpass(r.up, r.taps, cut)
 	}
 	r.Reset()
 	return r
@@ -48,7 +54,8 @@ func NewSkewable(from, to, channels int) *Rational {
 		up:       skewGrid,
 		down:     skewGrid,
 		channels: max(channels, 1),
-		filter:   lowpass(skewGrid, ratioTaps),
+		taps:     ratioTaps,
+		filter:   lowpass(skewGrid, ratioTaps, 1),
 	}
 	r.Reset()
 	return r
@@ -78,7 +85,7 @@ func (r *Rational) Run(in []int16) []int16 {
 		if idx >= frames {
 			break
 		}
-		if idx < ratioTaps-1 {
+		if idx < r.taps-1 {
 			r.at += r.down
 			continue
 		}
@@ -86,7 +93,7 @@ func (r *Rational) Run(in []int16) []int16 {
 		phase := r.at % r.up
 		for c := range ch {
 			var sum float32
-			for k := range ratioTaps {
+			for k := range r.taps {
 				sum += r.filter[phase+k*r.up] * float32(buf[(idx-k)*ch+c])
 			}
 			if sum > 32767 || sum < -32768 {
@@ -98,7 +105,7 @@ func (r *Rational) Run(in []int16) []int16 {
 	}
 
 	idx := min(r.at/r.up, frames)
-	drop := max(idx-(ratioTaps-1), 0)
+	drop := max(idx-(r.taps-1), 0)
 
 	r.at -= drop * r.up
 	r.tail = append(r.tail[:0], buf[drop*ch:]...)
@@ -110,8 +117,8 @@ func (r *Rational) Reset() {
 	r.at = 0
 	r.skew, r.owed = 0, 0
 
-	r.tail = append(r.tail[:0], make([]int16, (ratioTaps-1)*r.channels)...)
-	r.at = (ratioTaps - 1) * r.up
+	r.tail = append(r.tail[:0], make([]int16, (r.taps-1)*r.channels)...)
+	r.at = (r.taps - 1) * r.up
 }
 
 func (r *Rational) Clipped() uint64 { return r.clipped }
@@ -125,13 +132,13 @@ func (r *Rational) step() int {
 	return r.down + extra
 }
 
-func lowpass(phases, taps int) []float32 {
+func lowpass(phases, taps int, cut float64) []float32 {
 	n := phases * taps
 	h := make([]float32, n)
 
 	center := float64(n-1) / 2
 	for i := range h {
-		x := (float64(i) - center) / float64(phases)
+		x := cut * (float64(i) - center) / float64(phases)
 
 		s := 1.0
 		if x != 0 {
