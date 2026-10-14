@@ -2,36 +2,29 @@ package poster
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"image"
 	"log/slog"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	esphome "github.com/ygelfand/go-esphome-device"
 
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/hook"
-	"github.com/ygelfand/libcountertop/pkg/media/immich"
+	"github.com/ygelfand/libcountertop/pkg/media/photos"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
 
 const (
-	check      = 30 * time.Second
-	retryAfter = 5 * time.Minute
-	awayFor    = 5 * time.Minute
-	darkLux    = 3
-	lightLux   = 8
-	candidates = 8
+	check   = 30 * time.Second
+	awayFor = 5 * time.Minute
 )
 
 type Poster struct {
 	options Dependencies
-	dark    atomic.Bool
 	knobs   *Controls
 	next    *esphome.Button
 	showing *esphome.TextSensor
@@ -44,16 +37,12 @@ type Poster struct {
 	src     image.Image
 	version int
 	shownAt time.Time
-	failed  time.Time
-	lastErr string
 	made    *image.RGBA
 	madeFor string
-
-	fetch func(ctx context.Context, cfg config.Poster) (id string, data []byte, err error)
 }
 
 func New(o Dependencies) *Poster {
-	p := &Poster{options: o, kick: make(chan struct{}, 1), fetch: fetchFromImmich}
+	p := &Poster{options: o, kick: make(chan struct{}, 1)}
 	p.build()
 	return p
 }
@@ -90,18 +79,18 @@ func (p *Poster) Run(ctx context.Context) error {
 		} else if away && since < check {
 			away, woke = false, true
 		}
-		p.step(ctx, time.Now(), kicked, woke)
+		p.step(time.Now(), kicked, woke)
 	}
 }
 
-func (p *Poster) step(ctx context.Context, now time.Time, kicked, woke bool) {
+func (p *Poster) step(now time.Time, kicked, woke bool) {
 	cfg := p.options.Settings.Read()
-	if !cfg.Enabled || cfg.Server == "" {
+	if !cfg.Enabled {
 		p.drop()
 		return
 	}
 	p.mu.Lock()
-	have, shownAt, failed := p.src != nil, p.shownAt, p.failed
+	have, shownAt := p.src != nil, p.shownAt
 	p.mu.Unlock()
 
 	due := !have || kicked
@@ -113,28 +102,22 @@ func (p *Poster) step(ctx context.Context, now time.Time, kicked, woke bool) {
 			due = now.Sub(shownAt) >= cfg.Every.Period()
 		}
 	}
-	if !due || (!kicked && !failed.IsZero() && now.Sub(failed) < retryAfter) {
+	if !due {
 		return
 	}
 
-	id, data, err := p.fetch(ctx, cfg)
-	var src image.Image
-	if err == nil {
-		src, err = decode(data)
+	pic, ok := p.options.Photos.Next()
+	if !ok {
+		return
 	}
+	id := pic.ID
+	src, err := decode(pic.Data)
 	if err != nil {
-		p.mu.Lock()
-		p.failed = now
-		repeat := p.lastErr == err.Error()
-		p.lastErr = err.Error()
-		p.mu.Unlock()
-		if !repeat {
-			slog.Warn("fetching a poster failed", "err", err)
-		}
+		slog.Warn("decoding a poster failed", "asset", id, "err", err)
 		return
 	}
 	p.mu.Lock()
-	p.src, p.shownAt, p.failed, p.lastErr = src, now, time.Time{}, ""
+	p.src, p.shownAt = src, now
 	p.version++
 	p.made, p.madeFor = nil, ""
 	v := p.version
@@ -159,24 +142,7 @@ func (p *Poster) drop() {
 	}
 }
 
-func (p *Poster) Dark() bool { lux, ok := p.options.Ambient(); return settle(&p.dark, lux, ok) }
-
-func settle(state *atomic.Bool, lux float64, ok bool) bool {
-	switch {
-	case !ok:
-		state.Store(false)
-	case lux < darkLux:
-		state.Store(true)
-	case lux > lightLux:
-		state.Store(false)
-	}
-	return state.Load()
-}
-
 func (p *Poster) Backdrop(w, h int, box image.Rectangle, bg theme.Color) (*image.RGBA, string) {
-	if p.Dark() {
-		return nil, "dark"
-	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.src == nil {
@@ -194,40 +160,6 @@ func (p *Poster) Next() {
 	case p.kick <- struct{}{}:
 	default:
 	}
-}
-
-func fetchFromImmich(ctx context.Context, cfg config.Poster) (string, []byte, error) {
-	c := immich.New(cfg.Server, cfg.Key)
-	albums, tags, err := c.Resolve(ctx, config.Names(cfg.Albums), config.Names(cfg.Tags))
-	if err != nil {
-		return "", nil, err
-	}
-	found, err := c.Random(ctx, albums, tags, candidates)
-	if err != nil {
-		return "", nil, err
-	}
-	id := pick(found, cfg.Last)
-	if id == "" {
-		return "", nil, errors.New("poster: no pictures match the albums and tags")
-	}
-	data, err := c.Preview(ctx, id)
-	return id, data, err
-}
-
-func pick(found []immich.Asset, last string) string {
-	first := ""
-	for _, a := range found {
-		if a.Type != "" && a.Type != "IMAGE" {
-			continue
-		}
-		if first == "" {
-			first = a.ID
-		}
-		if a.ID != last {
-			return a.ID
-		}
-	}
-	return first
 }
 
 func (p *Poster) build() {
@@ -272,9 +204,13 @@ func (p *Poster) SetEvery(v config.PosterEvery) { p.change("every", string(v)) }
 
 type Touch interface{ Since() time.Duration }
 
+type Photos interface {
+	Next() (photos.Picture, bool)
+}
+
 type Dependencies struct {
 	Settings storage.Section[config.Poster]
 	Touch    Touch
-	Ambient  func() (float64, bool)
+	Photos   Photos
 	DeviceID uint32
 }

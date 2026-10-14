@@ -2,18 +2,15 @@ package poster
 
 import (
 	"bytes"
-	"context"
-	"errors"
 	"image"
 	"image/color"
 	"image/jpeg"
 	"math"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
-	"github.com/ygelfand/libcountertop/pkg/media/immich"
+	"github.com/ygelfand/libcountertop/pkg/media/photos"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
@@ -173,36 +170,6 @@ func stripesRGBA(w, h int) *image.RGBA {
 	return img
 }
 
-func TestAPickAvoidsTheLastPictureAndVideos(t *testing.T) {
-	found := []immich.Asset{
-		{ID: "v", Type: "VIDEO"},
-		{ID: "a", Type: "IMAGE"},
-		{ID: "b", Type: "IMAGE"},
-	}
-	if got := pick(found, "a"); got != "b" {
-		t.Errorf("picked %q after a", got)
-	}
-	if got := pick(found[:2], "a"); got != "a" {
-		t.Errorf("with only the last one left, picked %q", got)
-	}
-	if got := pick(found[:1], ""); got != "" {
-		t.Errorf("picked the video %q", got)
-	}
-}
-
-func TestDarkHasHysteresis(t *testing.T) {
-	var s atomic.Bool
-	for _, c := range []struct {
-		lux  float64
-		ok   bool
-		want bool
-	}{{50, true, false}, {2, true, true}, {5, true, true}, {9, true, false}, {5, true, false}, {1, true, true}, {1, false, false}} {
-		if got := settle(&s, c.lux, c.ok); got != c.want {
-			t.Errorf("%v lux (known %v): dark %v, want %v", c.lux, c.ok, got, c.want)
-		}
-	}
-}
-
 func BenchmarkCompose(b *testing.B) {
 	data := jpegOf(1440, 1080, color.RGBA{120, 140, 160, 255})
 	for _, sz := range [][2]int{{1920, 1200}, {1200, 1920}} {
@@ -219,51 +186,44 @@ func BenchmarkCompose(b *testing.B) {
 	}
 }
 
-func testPoster(
-	t *testing.T,
-	fetch func(context.Context, config.Poster) (string, []byte, error),
-) *Poster {
-	posterConfig = config.DefaultPoster()
-	p := New(testOptions())
-	p.mu.Lock()
-	p.src, p.shownAt, p.failed, p.lastErr, p.made, p.madeFor = nil, time.Time{}, time.Time{}, "", nil, ""
-	p.mu.Unlock()
-	p.fetch = fetch
-	t.Cleanup(func() { p.fetch = fetchFromImmich })
-	return p
+type fakePhotos struct {
+	calls int
+	empty bool
+	data  []byte
 }
 
-func TestTheScheduleFetchesWhenDueAndBacksOffAfterAFailure(t *testing.T) {
-	var calls int
-	var fail bool
-	pic := jpegOf(64, 48, color.RGBA{200, 50, 50, 255})
-	p := testPoster(t, func(context.Context, config.Poster) (string, []byte, error) {
-		calls++
-		if fail {
-			return "", nil, errors.New("down")
-		}
-		return "id" + string(rune('0'+calls)), pic, nil
-	})
-	ctx := context.Background()
+func (f *fakePhotos) Next() (photos.Picture, bool) {
+	f.calls++
+	if f.empty {
+		return photos.Picture{}, false
+	}
+	return photos.Picture{ID: "id" + string(rune('0'+f.calls)), Data: f.data}, true
+}
+
+func TestTheScheduleTakesTheNextPictureWhenDue(t *testing.T) {
+	src := &fakePhotos{data: jpegOf(64, 48, color.RGBA{200, 50, 50, 255})}
+	posterConfig = config.DefaultPoster()
+	o := testOptions()
+	o.Photos = src
+	p := New(o)
 	t0 := time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC)
 
-	p.step(ctx, t0, false, false)
-	if calls != 0 {
-		t.Fatalf("fetched %d times while off", calls)
+	p.step(t0, false, false)
+	if src.calls != 0 {
+		t.Fatalf("took %d pictures while off", src.calls)
 	}
 	if err := (posterWriter{}).Enabled(true); err != nil {
 		t.Fatal(err)
 	}
-	p.step(ctx, t0, false, false)
-	if calls != 0 {
-		t.Fatalf("fetched %d times with no server", calls)
+	src.empty = true
+	p.step(t0, false, false)
+	if img, _ := p.Backdrop(40, 60, image.Rectangle{}, theme.Color{}); img != nil {
+		t.Fatal("a backdrop with nothing cached")
 	}
-	if err := (posterWriter{}).Server("http://immich"); err != nil {
-		t.Fatal(err)
-	}
-	p.step(ctx, t0, false, false)
-	if calls != 1 || posterConfig.Last != "id1" {
-		t.Fatalf("first step: %d calls, last %q", calls, posterConfig.Last)
+	src.empty, src.calls = false, 0
+	p.step(t0, false, false)
+	if src.calls != 1 || posterConfig.Last != "id1" {
+		t.Fatalf("first step: %d calls, last %q", src.calls, posterConfig.Last)
 	}
 	if img, key := p.Backdrop(
 		40,
@@ -274,53 +234,40 @@ func TestTheScheduleFetchesWhenDueAndBacksOffAfterAFailure(t *testing.T) {
 		key == "" {
 		t.Fatal("no backdrop after a fetch")
 	}
-	p.step(ctx, t0.Add(59*time.Minute), false, false)
-	if calls != 1 {
-		t.Fatalf("hourly fetched again after 59 minutes")
+	p.step(t0.Add(59*time.Minute), false, false)
+	if src.calls != 1 {
+		t.Fatalf("hourly took another after 59 minutes")
 	}
-	p.step(ctx, t0.Add(61*time.Minute), false, false)
-	if calls != 2 {
-		t.Fatalf("hourly did not fetch after 61 minutes")
+	p.step(t0.Add(61*time.Minute), false, false)
+	if src.calls != 2 {
+		t.Fatalf("hourly did not take another after 61 minutes")
 	}
-
-	fail = true
-	t1 := t0.Add(3 * time.Hour)
-	p.step(ctx, t1, false, false)
-	p.step(ctx, t1.Add(time.Minute), false, false)
-	if calls != 4-1 {
-		t.Fatalf("retried within the backoff: %d calls", calls)
-	}
+	src.empty = true
+	p.step(t0.Add(3*time.Hour), true, false)
 	if img, _ := p.Backdrop(40, 60, image.Rectangle{}, theme.Color{}); img == nil {
-		t.Error("a failed fetch dropped the picture already shown")
-	}
-	p.step(ctx, t1.Add(retryAfter+time.Second), false, false)
-	if calls != 4 {
-		t.Fatalf("did not retry after the backoff: %d calls", calls)
-	}
-	p.step(ctx, t1.Add(retryAfter+2*time.Second), true, false)
-	if calls != 5 {
-		t.Fatalf("a kick did not fetch through the backoff: %d calls", calls)
+		t.Error("an empty source dropped the picture already shown")
 	}
 
-	fail = false
+	src.empty = false
+	t1 := t0.Add(4 * time.Hour)
 	if err := (posterWriter{}).Every(config.PosterWake); err != nil {
 		t.Fatal(err)
 	}
-	p.step(ctx, t1.Add(time.Hour), true, false)
-	n := calls
-	p.step(ctx, t1.Add(30*time.Hour), false, false)
-	if calls != n {
-		t.Fatalf("on-wake fetched without a wake")
+	p.step(t1, true, false)
+	n := src.calls
+	p.step(t1.Add(30*time.Hour), false, false)
+	if src.calls != n {
+		t.Fatalf("on-wake took one without a wake")
 	}
-	p.step(ctx, t1.Add(30*time.Hour), false, true)
-	if calls != n+1 {
-		t.Fatalf("on-wake did not fetch on a wake")
+	p.step(t1.Add(30*time.Hour), false, true)
+	if src.calls != n+1 {
+		t.Fatalf("on-wake did not take one on a wake")
 	}
 
 	if err := (posterWriter{}).Enabled(false); err != nil {
 		t.Fatal(err)
 	}
-	p.step(ctx, t1.Add(31*time.Hour), false, false)
+	p.step(t1.Add(31*time.Hour), false, false)
 	if img, _ := p.Backdrop(40, 60, image.Rectangle{}, theme.Color{}); img != nil {
 		t.Error("turning it off left the picture up")
 	}

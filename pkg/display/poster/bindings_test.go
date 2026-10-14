@@ -17,12 +17,6 @@ func (posterWriter) Enabled(
 	return nil
 }
 
-func (posterWriter) Server(
-	v string,
-) error {
-	posterConfig.Server = v
-	return nil
-}
 func (posterWriter) Every(v config.PosterEvery) error         { posterConfig.Every = v; return nil }
 func (posterWriter) Read() config.Poster                      { return posterConfig }
 func (posterWriter) Update(change func(*config.Poster)) error { change(&posterConfig); return nil }
@@ -34,6 +28,5 @@ func testOptions() Dependencies {
 	return Dependencies{
 		Settings: posterWriter{},
 		Touch:    posterTouch{},
-		Ambient:  func() (float64, bool) { return 10, true },
 	}
 }

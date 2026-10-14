@@ -28,13 +28,6 @@ func NewTable() *Table {
 }
 
 func rows(table func() *Table) []Setting {
-	text := func(name, icon string, kind setting.Kind, field func(*config.Poster) *string) Setting {
-		return Setting{
-			Name: name, Group: Group, Icon: icon, Kind: kind,
-			Read:  func(c *config.Poster) string { return *field(c) },
-			Write: func(c *config.Poster, v string) error { *field(c) = v; return nil },
-		}
-	}
 	return []Setting{
 		{
 			Name: "on", Group: Group, ID: "poster", Icon: "mdi:image-frame",
@@ -62,14 +55,6 @@ func rows(table func() *Table) []Setting {
 				return nil
 			},
 		},
-		text("server", "mdi:server", setting.Text,
-			func(c *config.Poster) *string { return &c.Server }),
-		text("key", "mdi:key", setting.Secret,
-			func(c *config.Poster) *string { return &c.Key }),
-		text("albums", "mdi:image-album", setting.Text,
-			func(c *config.Poster) *string { return &c.Albums }),
-		text("tags", "mdi:tag-multiple", setting.Text,
-			func(c *config.Poster) *string { return &c.Tags }),
 	}
 }
 

@@ -17,6 +17,7 @@ type Shared struct {
 	Idle      Idle      `json:"idle"`
 	Media     Media     `json:"media"`
 	Network   Network   `json:"network"`
+	Photos    Photos    `json:"photos"`
 	Poster    Poster    `json:"poster"`
 	Radio     Radio     `json:"radio"`
 	RTSP      RTSP      `json:"rtsp"`
@@ -47,6 +48,7 @@ func DefaultShared() Shared {
 		Idle:      DefaultIdle(),
 		Media:     DefaultMedia(),
 		Network:   DefaultNetwork(),
+		Photos:    DefaultPhotos(),
 		Poster:    DefaultPoster(),
 		Radio:     DefaultRadio(),
 		RTSP:      DefaultRTSP(),
@@ -86,6 +88,7 @@ type Sections[C any] struct {
 	Idle      storage.Binding[C, Idle]
 	Media     storage.Binding[C, Media]
 	Network   storage.Binding[C, Network]
+	Photos    storage.Binding[C, Photos]
 	Poster    storage.Binding[C, Poster]
 	Radio     storage.Binding[C, Radio]
 	RTSP      storage.Binding[C, RTSP]
@@ -116,6 +119,7 @@ func NewSections[C any](store func() *storage.Store[C], shared func(*C) *Shared)
 		Idle:      bind(store, shared, func(s *Shared) *Idle { return &s.Idle }),
 		Media:     bind(store, shared, func(s *Shared) *Media { return &s.Media }),
 		Network:   bind(store, shared, func(s *Shared) *Network { return &s.Network }),
+		Photos:    bind(store, shared, func(s *Shared) *Photos { return &s.Photos }),
 		Poster:    bind(store, shared, func(s *Shared) *Poster { return &s.Poster }),
 		Radio:     bind(store, shared, func(s *Shared) *Radio { return &s.Radio }),
 		RTSP:      bind(store, shared, func(s *Shared) *RTSP { return &s.RTSP }),

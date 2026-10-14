@@ -40,6 +40,7 @@ func TestSharedFlattensIntoTheEmbeddingStruct(t *testing.T) {
 		"media",
 		"network",
 		"own",
+		"photos",
 		"poster",
 		"radio",
 		"rtsp",

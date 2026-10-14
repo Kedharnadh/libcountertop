@@ -467,6 +467,37 @@ onboard.add: Scan the code, then add
 onboard.hint: Scan the code, then enter this address.
 onboard.or: or enter this address
 onboard.title: Add me to Home Assistant
+photos.entity.albums: Photo albums
+photos.entity.favorites: Photos favorites only
+photos.entity.interval: Photo interval
+photos.entity.key: Immich API key
+photos.entity.memories: Photo memories first
+photos.entity.motion.app: Photos app motion
+photos.entity.motion.dashboard: Wallpaper motion
+photos.entity.motion.saver: Photo screen saver motion
+photos.entity.people: Photo people
+photos.entity.server: Immich server
+photos.entity.tags: Photo tags
+photos.group.photos: Photos
+photos.setting.albums: Albums
+photos.setting.favorites: Favorites only
+photos.setting.interval: Next photo every
+photos.setting.key: API key
+photos.setting.memories: Memories first
+photos.setting.motion.app: Motion in the Photos app
+photos.setting.motion.dashboard: Motion on the wallpaper
+photos.setting.motion.saver: Motion in the screen saver
+photos.setting.people: People
+photos.setting.server: Immich server
+photos.setting.tags: Tags
+photos.status.connecting: Connecting…
+photos.status.empty: No photos match
+photos.status.key: Wrong API key
+photos.status.old: "Immich {{.Version}}: needs 3.2 or newer"
+photos.status.ready: "Connected · Immich {{.Version}}"
+photos.status.unknown: "Nothing named {{.Name}}"
+photos.status.unreachable: Can't reach the server
+photos.status.unset: Not set up
 place.horizontal: Horizontal position
 place.size: Size
 place.vertical: Vertical position
@@ -478,10 +509,8 @@ position.center: Center
 position.random: Random
 position.top: Top
 poster.daily: Daily
-poster.entity.albums: Poster albums
 poster.entity.every: Poster changes
 poster.entity.on: Poster
-poster.entity.tags: Poster tags
 poster.every: Change every
 poster.group.poster: Poster
 poster.hourly: Hourly
@@ -492,12 +521,8 @@ poster.option.every.daily: Daily
 poster.option.every.hourly: Hourly
 poster.option.every.never: Never
 poster.option.every.wake: On each wake
-poster.setting.albums: Albums
 poster.setting.every: Change every
-poster.setting.key: Immich API key
 poster.setting.on: Show wallpaper
-poster.setting.server: Immich server
-poster.setting.tags: Tags
 poster.show: Show wallpaper
 poster.wake: On each wake
 power.reboot: Restart device

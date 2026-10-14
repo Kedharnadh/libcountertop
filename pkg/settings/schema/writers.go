@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"strings"
 
 	"github.com/ygelfand/libcountertop/pkg/audio/ducking"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
@@ -269,22 +268,6 @@ func (w PosterWriter) Enabled(v bool) error {
 
 func (w PosterWriter) Every(v PosterEvery) error {
 	return w.s.Update(func(c *Poster) { c.Every = v })
-}
-
-func (w PosterWriter) Server(v string) error {
-	return w.s.Update(func(c *Poster) { c.Server = strings.TrimSpace(v) })
-}
-
-func (w PosterWriter) Key(v string) error {
-	return w.s.Update(func(c *Poster) { c.Key = strings.TrimSpace(v) })
-}
-
-func (w PosterWriter) Albums(v string) error {
-	return w.s.Update(func(c *Poster) { c.Albums = v })
-}
-
-func (w PosterWriter) Tags(v string) error {
-	return w.s.Update(func(c *Poster) { c.Tags = v })
 }
 
 func (w PosterWriter) Last(v string) error {

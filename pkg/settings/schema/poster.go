@@ -1,7 +1,6 @@
 package schema
 
 import (
-	"strings"
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/say"
@@ -10,10 +9,6 @@ import (
 type Poster struct {
 	Enabled bool        `json:"enabled"`
 	Every   PosterEvery `json:"every"`
-	Server  string      `json:"server"`
-	Key     string      `json:"key"`
-	Albums  string      `json:"albums"`
-	Tags    string      `json:"tags"`
 	Last    string      `json:"last"`
 }
 
@@ -52,14 +47,4 @@ func (p PosterEvery) Period() time.Duration {
 		return 24 * time.Hour
 	}
 	return 0
-}
-
-func Names(list string) []string {
-	var out []string
-	for s := range strings.SplitSeq(list, ",") {
-		if s = strings.TrimSpace(s); s != "" {
-			out = append(out, s)
-		}
-	}
-	return out
 }
