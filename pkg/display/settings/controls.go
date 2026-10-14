@@ -56,34 +56,44 @@ func PosterSays(p config.Poster) string {
 func (p *BasicPages) System() *shell.Page {
 	return &shell.Page{Title: say.T("system.title"), Build: func() ([]menu.Row, []func(int)) {
 		c := p.state()
-		return []menu.Row{
-				{
-					Glyph: gogui.IconTextSize,
-					Label: say.T("settings.language"),
-					Kind:  menu.Chevron,
-					Value: say.Name(say.Chosen()),
-				},
-				{
-					Glyph: gogui.IconClock,
-					Label: say.T("datetime.title"),
-					Kind:  menu.Chevron,
-					Value: zonepolicy.Label(p.options.Zone.ChosenZone()),
-				},
-				{
-					Glyph: gogui.IconKeyboard,
-					Label: say.T("keyboard.size"),
-					Kind:  menu.Chevron,
-					Value: c.Screen.Keyboard.Label(),
-				},
-				{Glyph: gogui.IconSync, Label: say.T("settings.power"), Kind: menu.Chevron},
-				{Glyph: gogui.IconExport, Label: say.T("settings.sync"), Kind: menu.Chevron},
-			}, []func(int){
-				p.open(func() shell.View { return p.Language() }),
-				p.open(func() shell.View { return p.DateTime() }),
-				p.open(func() shell.View { return p.Keyboard() }),
-				p.open(p.options.PowerPage),
-				p.open(p.options.SyncPage),
-			}
+		rows, acts := []menu.Row{
+			{
+				Glyph: gogui.IconTextSize,
+				Label: say.T("settings.language"),
+				Kind:  menu.Chevron,
+				Value: say.Name(say.Chosen()),
+			},
+			{
+				Glyph: gogui.IconClock,
+				Label: say.T("datetime.title"),
+				Kind:  menu.Chevron,
+				Value: zonepolicy.Label(p.options.Zone.ChosenZone()),
+			},
+			{
+				Glyph: gogui.IconKeyboard,
+				Label: say.T("keyboard.size"),
+				Kind:  menu.Chevron,
+				Value: c.Screen.Keyboard.Label(),
+			},
+			{Glyph: gogui.IconSync, Label: say.T("settings.power"), Kind: menu.Chevron},
+			{Glyph: gogui.IconExport, Label: say.T("settings.sync"), Kind: menu.Chevron},
+		}, []func(int){
+			p.open(func() shell.View { return p.Language() }),
+			p.open(func() shell.View { return p.DateTime() }),
+			p.open(func() shell.View { return p.Keyboard() }),
+			p.open(p.options.PowerPage),
+			p.open(p.options.SyncPage),
+		}
+		if p.options.Updates != nil {
+			rows = append(rows, menu.Row{
+				Glyph: gogui.IconDownload,
+				Label: say.T("update.title"),
+				Kind:  menu.Chevron,
+				Value: UpdateSays(p.options.Updates.Offer()),
+			})
+			acts = append(acts, p.open(func() shell.View { return p.Update() }))
+		}
+		return rows, acts
 	}}
 }
 func (p *BasicPages) DateTime() *shell.Page {

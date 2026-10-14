@@ -795,6 +795,18 @@ uisize.large: Large
 uisize.medium: Medium
 uisize.mini: Mini
 uisize.xlarge: Extra large
+update.available: "{{.Version}} available"
+update.channel: Update channel
+update.channel.dev: Development
+update.channel.stable: Stable
+update.check: Check for updates
+update.checking: Checking…
+update.current: Up to date
+update.install: "Download and install {{.Version}}"
+update.ready: Update available
+update.running: Current version
+update.title: Software update
+update.unreachable: Couldn't reach the update server
 upgrade.installing: Installing…
 upgrade.line: Updating to {{.Version}} · {{.Status}}
 upgrade.percent: "{{.N}}%"

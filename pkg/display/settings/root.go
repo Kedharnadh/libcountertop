@@ -70,7 +70,12 @@ func RootPage(o RootDependencies) *shell.Page {
 				add(s.Glyph, s.Label, "", s.Page)
 			}
 		}
-		add(gogui.IconGear, "settings.system", "", func() shell.View { return o.Basic.System() })
+		add(
+			gogui.IconGear,
+			"settings.system",
+			o.Basic.SystemSays(),
+			func() shell.View { return o.Basic.System() },
+		)
 		add(gogui.IconCode, "settings.debug", "", func() shell.View { return o.Basic.Debug() })
 		add(gogui.IconInfo, "settings.about", o.Version, o.AboutPage)
 		return rows, acts

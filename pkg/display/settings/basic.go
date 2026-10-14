@@ -73,6 +73,7 @@ type BasicDependencies struct {
 	HA                    HomeAccess
 	Marks                 ModeMarks
 	Alerts                AlertSettings
+	Updates               Updates
 	Previews              previews.Kit
 }
 type AlertSettings interface {

@@ -68,8 +68,24 @@ type Upgrade struct {
 
 func (up Upgrade) Active() bool { return up.Version != "" }
 
+type Finding int
+
+const (
+	Unchecked Finding = iota
+	Checking
+	Current
+	Available
+	Unreachable
+)
+
+type Offer struct {
+	Finding Finding
+	Release Release
+}
+
 type Firmware[M any] struct {
 	Upgrading hook.Hook[Upgrade]
+	Offered   hook.Hook[Offer]
 
 	deps Dependencies[M]
 
@@ -81,6 +97,7 @@ type Firmware[M any] struct {
 
 	mu      sync.Mutex
 	found   M
+	offer   Offer
 	upgrade Upgrade
 
 	announced     sync.Once
@@ -110,7 +127,7 @@ func New[M any](deps Dependencies[M]) *Firmware[M] {
 			Category: esphome.CategoryDiagnostic,
 		},
 		Options:   slices.Clone(deps.Channels),
-		OnCommand: u.choose,
+		OnCommand: u.Choose,
 	}
 	u.channel.Set(u.Channel())
 
@@ -122,7 +139,7 @@ func New[M any](deps Dependencies[M]) *Firmware[M] {
 			Icon:     "mdi:cloud-search",
 			Category: esphome.CategoryDiagnostic,
 		},
-		OnPress: u.checkLater,
+		OnPress: u.CheckLater,
 	}
 
 	u.status = &esphome.TextSensor{
@@ -206,7 +223,11 @@ func (u *Firmware[M]) Channel() string {
 	return u.deps.Channels[0]
 }
 
-func (u *Firmware[M]) choose(label string) {
+func (u *Firmware[M]) Channels() []string { return slices.Clone(u.deps.Channels) }
+
+func (u *Firmware[M]) Version() string { return u.deps.Version }
+
+func (u *Firmware[M]) Choose(label string) {
 	if !slices.Contains(u.deps.Channels, label) {
 		slog.Warn("unknown option", "setting", u.channel.ObjectID, "value", label)
 		return
@@ -216,15 +237,17 @@ func (u *Firmware[M]) choose(label string) {
 		slog.Error("saving a setting failed", "setting", u.channel.ObjectID, "err", err)
 	}
 	slog.Info("setting changed", "setting", u.channel.ObjectID, "using", label)
-	u.checkLater()
+	u.CheckLater()
 }
 
 func (u *Firmware[M]) Check(ctx context.Context) {
 	channel := u.Channel()
+	u.offered(Offer{Finding: Checking})
 
 	found, err := u.deps.Source.Fetch(ctx, channel)
 	if err != nil {
 		slog.Error("checking for an update failed", "channel", channel, "err", err)
+		u.offered(Offer{Finding: Unreachable})
 		return
 	}
 
@@ -233,6 +256,11 @@ func (u *Firmware[M]) Check(ctx context.Context) {
 	u.mu.Unlock()
 
 	release := u.deps.Source.Describe(found)
+	finding := Current
+	if Newer(release.Version, u.deps.Version) {
+		finding = Available
+	}
+	u.offered(Offer{Finding: finding, Release: release})
 	slog.Info(
 		"update check",
 		"channel",
@@ -245,17 +273,34 @@ func (u *Firmware[M]) Check(ctx context.Context) {
 	u.publish(release)
 }
 
-func (u *Firmware[M]) checkLater() {
+func (u *Firmware[M]) CheckLater() {
 	safe.Go("update check", func() { u.Check(context.Background()) })
+}
+
+func (u *Firmware[M]) InstallLater() {
+	safe.Go("update install", func() { u.Install(context.Background()) })
+}
+
+func (u *Firmware[M]) Offer() Offer {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.offer
+}
+
+func (u *Firmware[M]) offered(o Offer) {
+	u.mu.Lock()
+	u.offer = o
+	u.mu.Unlock()
+	u.Offered.Emit(o)
 }
 
 func (u *Firmware[M]) command(cmd esphome.UpdateCommand) {
 	switch cmd {
 	case esphome.UpdateCheck:
-		u.checkLater()
+		u.CheckLater()
 
 	case esphome.UpdateInstall:
-		safe.Go("update install", func() { u.Install(context.Background()) })
+		u.InstallLater()
 	}
 }
 

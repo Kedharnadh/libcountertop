@@ -15,6 +15,7 @@ func TestRootCreatesPagesOnlyWhenOpened(t *testing.T) {
 		Screen:       rootScreen{},
 		Volume:       rootVolume{},
 		Shell:        shell.New(),
+		Basic:        NewBasicPages(BasicDependencies{}),
 		Assistants:   &AssistantPages{options: AssistantDependencies{Slots: 0}},
 		NetworkPage:  page,
 		FeaturesPage: page,
