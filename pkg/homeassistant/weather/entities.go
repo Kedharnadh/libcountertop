@@ -23,7 +23,12 @@ func NewTable() *Table {
 	}
 	return setting.NewTable("weather", []setting.Group{Group}, []Setting{
 		setting.Words(
-			Setting{Name: "entity", Group: Group, Icon: "mdi:weather-partly-cloudy", NoEntity: true},
+			Setting{
+				Name:     "entity",
+				Group:    Group,
+				Icon:     "mdi:weather-partly-cloudy",
+				NoEntity: true,
+			},
 			entityMost,
 			func(c *schema.Weather) *string { return &c.Entity },
 		),

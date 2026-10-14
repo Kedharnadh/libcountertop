@@ -19,8 +19,16 @@ func NewTable() *Table {
 	rows := []Setting{
 		ids(Setting{Name: "order", Group: Group, ID: "app_order", Icon: "mdi:sort", NoEntity: true},
 			func(c *schema.Apps) *[]string { return &c.Order }),
-		ids(Setting{Name: "dock", Group: Group, ID: "app_dock", Icon: "mdi:dock-right", NoEntity: true},
-			func(c *schema.Apps) *[]string { return &c.Dock }),
+		ids(
+			Setting{
+				Name:     "dock",
+				Group:    Group,
+				ID:       "app_dock",
+				Icon:     "mdi:dock-right",
+				NoEntity: true,
+			},
+			func(c *schema.Apps) *[]string { return &c.Dock },
+		),
 	}
 	return setting.NewTable("apps", []setting.Group{Group}, rows,
 		setting.Messages{Text: say.T, Missing: say.Missing})
