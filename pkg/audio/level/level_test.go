@@ -12,12 +12,10 @@ const (
 
 func newLeveler() *Leveler {
 	return New(Config{
-		Rate:          testRate,
-		Frame:         testFrame,
-		ReferenceGain: 20,
-		Gain:          20,
-		Sensitivity:   8,
-		Leveling:      true,
+		Rate:        testRate,
+		Frame:       testFrame,
+		Sensitivity: 8,
+		Leveling:    true,
 	})
 }
 
@@ -396,6 +394,75 @@ func TestLevelIsRelativeToTheRoom(t *testing.T) {
 
 	if talking := level(newRoom(t), -32, 40); talking < 0.6 {
 		t.Errorf("speech 25 dB over the room reads %.2f, want most of the way up", talking)
+	}
+}
+
+func TestFloorLearnsAQuietRoom(t *testing.T) {
+	l := newLeveler()
+	settle(l, -78, 500)
+
+	if floor := l.Floor(); floor > -73 || floor < -83 {
+		t.Errorf("a room at -78 dBFS reads a floor of %.1f dBFS, want it within 5 dB", floor)
+	}
+}
+
+func TestPeakIsTheLoudestSinceItWasRead(t *testing.T) {
+	l := newLeveler()
+	settle(l, -60, 200)
+	l.Peak()
+
+	settle(l, -40, 20)
+	settle(l, -60, 200)
+
+	floor, loudest := l.Floor(), l.Peak()
+	if loudest-floor < 15 || loudest-floor > 25 {
+		t.Errorf(
+			"a voice 20 dB over the room peaks at %.1f dBFS over a floor of %.1f",
+			loudest,
+			floor,
+		)
+	}
+
+	if again := l.Peak(); again > -100 {
+		t.Errorf(
+			"read again with nothing heard, the peak is %.1f dBFS, want it back at the bottom",
+			again,
+		)
+	}
+}
+
+func TestLevelIsRelativeToAQuietRoom(t *testing.T) {
+	quiet, usual := newLeveler(), newLeveler()
+
+	settle(quiet, -78, 500)
+	settle(usual, -60, 200)
+
+	quietVoice := level(quiet, -60, 40)
+	usualVoice := level(usual, -42, 40)
+
+	if math.Abs(quietVoice-usualVoice) > 0.1 {
+		t.Errorf(
+			"a voice 18 dB over the room reads %.2f in a quiet room and %.2f in a usual one",
+			quietVoice,
+			usualVoice,
+		)
+	}
+
+	if still := level(quiet, -78, 200); still > 0.05 {
+		t.Errorf("the quiet room alone reads %.2f, want it at rest", still)
+	}
+}
+
+func TestQuietRoomAdaptsToASoftVoice(t *testing.T) {
+	l := newLeveler()
+	talk(l, -78, -62, 30)
+
+	if gain := 20 * math.Log10(float64(l.gain)); gain < startGainDB+3 {
+		t.Errorf(
+			"a voice at -62 dBFS in a room at -78 left the gain at %.1f dB, want it raised from %.1f",
+			gain,
+			startGainDB,
+		)
 	}
 }
 

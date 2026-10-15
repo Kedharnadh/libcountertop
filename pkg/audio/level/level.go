@@ -37,10 +37,8 @@ const (
 	levelRelease = 180 * time.Millisecond
 )
 
-const (
-	quietestAtGain = 16.0
-	quietestLimit  = 2.0
-)
+// 16-bit rounding error is spread evenly over one step; its average size is 1/√12 of a step.
+const quietest = 0.28867513459481287
 
 const fullScale = 32768
 
@@ -48,9 +46,6 @@ type Config struct {
 	Rate  int
 	Frame int
 
-	ReferenceGain int
-
-	Gain        int
 	Sensitivity int
 	Leveling    bool
 }
@@ -58,9 +53,6 @@ type Config struct {
 type Leveler struct {
 	gain float32
 
-	referenceGain int
-
-	least atomic.Uint32
 	quiet atomic.Int32
 
 	sounding bool
@@ -95,17 +87,16 @@ func New(c Config) *Leveler {
 	rate := float64(c.Rate)
 
 	l := &Leveler{
-		gain:          float32(math.Pow(10, startGainDB/20)),
-		referenceGain: c.ReferenceGain,
-		floor:         fullScale,
-		fall:          float32(1 - math.Exp(-frame/fallTime.Seconds())),
-		rise:          float32(1 - math.Exp(-frame/riseTime.Seconds())),
-		floorDown:     float32(1 - math.Exp(-frame/floorFall.Seconds())),
-		floorUp:       float32(1 - math.Exp(-frame/floorRise.Seconds())),
-		target:        float32(math.Pow(10, targetDBFS/20) * fullScale),
-		ceiling:       float32(math.Pow(10, maxGainDB/20)),
-		headroom:      float32(math.Pow(10, peakDBFS/20) * fullScale),
-		overFloor:     float32(math.Pow(10, speechOverFloorDB/20)),
+		gain:      float32(math.Pow(10, startGainDB/20)),
+		floor:     fullScale,
+		fall:      float32(1 - math.Exp(-frame/fallTime.Seconds())),
+		rise:      float32(1 - math.Exp(-frame/riseTime.Seconds())),
+		floorDown: float32(1 - math.Exp(-frame/floorFall.Seconds())),
+		floorUp:   float32(1 - math.Exp(-frame/floorRise.Seconds())),
+		target:    float32(math.Pow(10, targetDBFS/20) * fullScale),
+		ceiling:   float32(math.Pow(10, maxGainDB/20)),
+		headroom:  float32(math.Pow(10, peakDBFS/20) * fullScale),
+		overFloor: float32(math.Pow(10, speechOverFloorDB/20)),
 
 		levelUp:   float32(1 - math.Exp(-frame/levelAttack.Seconds())),
 		levelDown: float32(1 - math.Exp(-frame/levelRelease.Seconds())),
@@ -115,16 +106,11 @@ func New(c Config) *Leveler {
 		hpA:       float32(1 - math.Exp(-2*math.Pi*levelLowHz/rate)),
 	}
 
-	l.SetInputGain(c.Gain)
 	l.quiet.Store(int32(c.Sensitivity))
 	l.leveling.Store(c.Leveling)
 	l.wasLeveling = c.Leveling
 	l.publish()
 	return l
-}
-
-func (l *Leveler) SetInputGain(db int) {
-	l.least.Store(math.Float32bits(quietest(db - l.referenceGain)))
 }
 
 func (l *Leveler) SetSensitivity(db int) {
@@ -160,7 +146,8 @@ func (l *Leveler) Floor() float64 {
 }
 
 func (l *Leveler) Peak() float64 {
-	return float64(math.Float32frombits(l.peak.Swap(0)))
+	loudest := max(math.Float32frombits(l.peak.Swap(0)), quietest)
+	return 20 * math.Log10(float64(loudest)/fullScale)
 }
 
 func (l *Leveler) Gain() float64 {
@@ -211,26 +198,25 @@ func (l *Leveler) observe(frame []int16) (rms, peak float32) {
 	l.bandRMS = float32(math.Sqrt(band / float64(len(frame))))
 
 	if !l.sounding {
-		least := math.Float32frombits(l.least.Load())
-		l.floor = follow(l.floor, rms, l.floorDown, l.floorUp, least)
-		l.bandFloor = follow(l.bandFloor, l.bandRMS, l.floorDown, l.floorUp, least)
+		l.floor = follow(l.floor, rms, l.floorDown, l.floorUp)
+		l.bandFloor = follow(l.bandFloor, l.bandRMS, l.floorDown, l.floorUp)
 		l.shownFloor.Store(math.Float32bits(l.bandFloor))
+
+		if l.bandRMS > math.Float32frombits(l.peak.Load()) {
+			l.peak.Store(math.Float32bits(l.bandRMS))
+		}
 	}
 
 	l.publishLevel(l.bandRMS)
 	return rms, peak
 }
 
-func quietest(overReference int) float32 {
-	return float32(max(quietestAtGain*math.Pow(10, float64(overReference)/20), quietestLimit))
-}
-
-func follow(floor, rms, down, up, least float32) float32 {
+func follow(floor, rms, down, up float32) float32 {
 	step := up
 	if rms < floor {
 		step = down
 	}
-	return max(floor+(rms-floor)*step, least)
+	return max(floor+(rms-floor)*step, quietest)
 }
 
 func levelFrom(overDB, quiet, span float64) float64 {
@@ -252,12 +238,7 @@ func (l *Leveler) publishLevel(rms float32) {
 	if want < was {
 		step = l.levelDown
 	}
-	now := was + (want-was)*step
-	l.level.Store(math.Float32bits(now))
-
-	if now > math.Float32frombits(l.peak.Load()) {
-		l.peak.Store(math.Float32bits(now))
-	}
+	l.level.Store(math.Float32bits(was + (want-was)*step))
 }
 
 func (l *Leveler) apply(frame []int16) {
