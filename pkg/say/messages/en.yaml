@@ -877,6 +877,7 @@ voice.group.voice: Voice commands
 voice.setting.commands: Voice commands
 volume.chime: Notification sound
 weather.alert.until: "Until {{.T}}"
+weather.alert.dismiss: Dismiss
 weather.alerts.hint: Severe US weather warnings for your home, from the National Weather Service
 weather.animate: Animate
 weather.cond.clear-night: Clear

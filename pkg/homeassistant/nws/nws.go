@@ -138,6 +138,20 @@ func (n *NWS) Dismiss(a Alert) {
 	n.redraw()
 }
 
+func (n *NWS) Home(ctx context.Context) (float64, float64, error) { return n.locate(ctx) }
+
+func (n *NWS) Load(body io.Reader) error {
+	alerts, err := parse(body)
+	if err != nil {
+		return err
+	}
+	n.mu.Lock()
+	n.loaded, n.problem, n.alerts = true, nil, alerts
+	n.mu.Unlock()
+	n.redraw()
+	return nil
+}
+
 func (n *NWS) redraw() {
 	if n.o.Redraw != nil {
 		n.o.Redraw()

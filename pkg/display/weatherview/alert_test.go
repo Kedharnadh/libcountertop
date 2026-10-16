@@ -19,7 +19,7 @@ func TestHazardOf(t *testing.T) {
 		"Civil Danger Warning":        hazardGeneric,
 	} {
 		if got := hazardOf(event); got != want {
-			t.Errorf("hazardOf(%q) = %d, want %d", event, got, want)
+			t.Errorf("hazardOf(%q) = %q, want %q", event, got, want)
 		}
 	}
 }
