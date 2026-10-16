@@ -229,6 +229,7 @@ func New(o Options) *App {
 		Volume: o.MediaVolume,
 		Shell:  o.Shell,
 		UI:     o.UI,
+		Dock:   func() schema.Edge { return o.Settings().Screen.Drawer },
 	})
 	a.home = homeview.New(homeview.Dependencies{
 		Engine:          o.Home,

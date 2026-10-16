@@ -11,6 +11,7 @@ import (
 	videoplayer "github.com/ygelfand/libcountertop/pkg/display/videopage"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 type Player interface {
@@ -24,6 +25,7 @@ type Dependencies struct {
 	Volume volume.Channel
 	Shell  *shell.Shell
 	UI     *widgets.UI
+	Dock   func() schema.Edge
 }
 type Renderer struct {
 	options Dependencies

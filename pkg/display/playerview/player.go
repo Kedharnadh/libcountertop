@@ -14,6 +14,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/media/nowplaying"
 	"github.com/ygelfand/libcountertop/pkg/say"
+	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
 const (
@@ -543,12 +544,16 @@ func (p *Renderer) Mini(w *gogui.Window) gogui.View {
 		OnClick: func(e gogui.EventCtx) { e.Consume() },
 		Content: content,
 	}))
+	pin := gogui.VAlignBottom
+	if p.options.Dock != nil && p.options.Dock() == schema.EdgeBottom {
+		pin = gogui.VAlignTop
+	}
 	return gogui.Column(gogui.ContainerCfg{
 		Width:   float32(vw),
 		Height:  float32(vh),
 		Sizing:  gogui.FixedFixed,
 		Padding: gogui.PaddingLarge,
-		VAlign:  gogui.VAlignBottom,
+		VAlign:  pin,
 		Content: []gogui.View{bar},
 	})
 }
