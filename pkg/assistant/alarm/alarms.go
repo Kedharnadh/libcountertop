@@ -35,6 +35,8 @@ const (
 
 	StoppedByHand  = "stopped"
 	StoppedRangOut = "rang_out"
+
+	Rehearsal = "rehearsal"
 )
 
 type Options struct {
@@ -53,6 +55,13 @@ type Dawn struct {
 }
 
 func (d Dawn) Rising() bool { return !d.Until.IsZero() }
+
+func (d Dawn) sooner(al Alarm, due, now time.Time) Dawn {
+	if al.Light <= 0 || due.Sub(now) > al.Light || (d.Rising() && !due.Before(d.Until)) {
+		return d
+	}
+	return Dawn{Alarm: al, From: due.Add(-al.Light), Until: due}
+}
 
 func (d Dawn) Share(now time.Time) float64 {
 	span := d.Until.Sub(d.From)
@@ -75,11 +84,22 @@ type Alarms struct {
 	snoozed map[string]time.Time
 	ringing *ringing
 	dawn    Dawn
+	trial   *rehearsal
 }
 
 type ringing struct {
-	alarm Alarm
-	stop  context.CancelFunc
+	alarm  Alarm
+	stop   context.CancelFunc
+	silent bool
+}
+
+type rehearsal struct {
+	alarm   Alarm
+	due     time.Time
+	look    schema.WakeLook
+	silent  bool
+	rang    bool
+	snoozed bool
 }
 
 func New(opts Options) *Alarms {
@@ -226,7 +246,39 @@ func (a *Alarms) finish(why string) bool {
 	slog.Info("alarm stopped", "name", al.Name, "why", why)
 	a.retire(al)
 	a.tell(EventStopped, al, map[string]string{"why": why})
+	if al.ID == Rehearsal {
+		a.mu.Lock()
+		a.trial = nil
+		a.mu.Unlock()
+		a.check(a.opts.Now())
+	}
 	return true
+}
+
+func (a *Alarms) Rehearse(light time.Duration, look schema.WakeLook, silent bool) {
+	now := a.opts.Now()
+	a.end()
+	a.mu.Lock()
+	a.trial = &rehearsal{
+		alarm: Alarm{
+			ID: Rehearsal, Name: "Rehearsal", On: true, Sound: schema.ChimeTimer,
+			Snooze: time.Minute, Volume: VolumeStatic, Light: light,
+		},
+		due:    now.Add(light),
+		look:   look,
+		silent: silent,
+	}
+	a.mu.Unlock()
+	a.check(now)
+}
+
+func (a *Alarms) Rehearsing() (schema.WakeLook, bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.trial == nil {
+		return "", false
+	}
+	return a.trial.look, true
 }
 
 func (a *Alarms) retire(al Alarm) {
@@ -275,8 +327,12 @@ func (a *Alarms) Snooze() bool {
 	}
 	until := a.opts.Now().Add(al.Snooze)
 	a.mu.Lock()
-	a.snoozed[al.ID] = until
-	a.saveSnoozesLocked()
+	if t := a.trial; al.ID == Rehearsal && t != nil {
+		t.due, t.rang, t.snoozed = until, false, true
+	} else {
+		a.snoozed[al.ID] = until
+		a.saveSnoozesLocked()
+	}
 	a.mu.Unlock()
 
 	slog.Info("alarm snoozed", "name", al.Name, "until", until.Format(time.TimeOnly))
@@ -297,9 +353,8 @@ func (a *Alarms) check(now time.Time) {
 			continue
 		}
 		if now.Before(due) {
-			if al.Light > 0 && due.Sub(now) <= al.Light &&
-				(!dawn.Rising() || due.Before(dawn.Until)) {
-				dawn = Dawn{Alarm: al, From: due.Add(-al.Light), Until: due}
+			if _, snoozed := a.snoozed[al.ID]; !snoozed {
+				dawn = dawn.sooner(al, due, now)
 			}
 			continue
 		}
@@ -319,15 +374,24 @@ func (a *Alarms) check(now time.Time) {
 			slog.Warn("saving alarms", "err", err)
 		}
 	}
+	if t := a.trial; t != nil {
+		switch {
+		case now.Before(t.due) && !t.snoozed:
+			dawn = dawn.sooner(t.alarm, t.due, now)
+		case !now.Before(t.due) && !t.rang:
+			t.rang = true
+			ring = append(ring, t.alarm)
+		}
+	}
 	moved := dawn.Alarm.ID != a.dawn.Alarm.ID || !dawn.Until.Equal(a.dawn.Until)
 	a.dawn = dawn
 	a.mu.Unlock()
 
-	if moved {
-		a.Dawning.Emit(dawn)
-	}
 	for _, al := range ring {
 		a.ring(al)
+	}
+	if moved {
+		a.Dawning.Emit(dawn)
 	}
 	if changed && len(ring) == 0 {
 		a.Changed.Emit(struct{}{})
@@ -360,8 +424,12 @@ func (a *Alarms) ring(al Alarm) {
 	}
 
 	ctx, stop := context.WithCancel(context.Background())
-	r := &ringing{alarm: al, stop: stop}
 	a.mu.Lock()
+	r := &ringing{
+		alarm:  al,
+		stop:   stop,
+		silent: al.ID == Rehearsal && a.trial != nil && a.trial.silent,
+	}
 	a.ringing = r
 	a.mu.Unlock()
 	a.Changed.Emit(struct{}{})
@@ -381,7 +449,7 @@ func (a *Alarms) sound(ctx context.Context, r *ringing) {
 	start := time.Now()
 	over := time.After(length)
 	for {
-		if a.opts.Chime != nil {
+		if a.opts.Chime != nil && !r.silent {
 			a.opts.Chime(r.alarm.Sound, r.alarm.share(time.Since(start)))
 		}
 		select {
@@ -421,6 +489,9 @@ func (a *Alarms) end() (Alarm, bool) {
 }
 
 func (a *Alarms) tell(name string, al Alarm, extra map[string]string) {
+	if al.ID == Rehearsal {
+		return
+	}
 	data := map[string]string{"id": al.ID, "name": al.Name, "time": al.Clock()}
 	maps.Copy(data, extra)
 	a.Told.Emit(component.Event{Name: name, Data: data})

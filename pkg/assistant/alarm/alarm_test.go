@@ -180,6 +180,78 @@ func TestSnoozeSurvivesARestart(t *testing.T) {
 	}
 }
 
+func TestARehearsalLightsRingsAndLeaves(t *testing.T) {
+	r := newRig(t)
+	r.alarms.Rehearse(time.Minute, schema.WakeEmber, true)
+	if !r.alarms.Dawn().Rising() {
+		t.Fatal("a rehearsal with a light did not start the light")
+	}
+	if look, ok := r.alarms.Rehearsing(); !ok || look != schema.WakeEmber {
+		t.Errorf("Rehearsing = %q %v, want ember", look, ok)
+	}
+	r.at(time.Minute)
+	if !r.alarms.Ringing() || r.alarms.Dawn().Rising() {
+		t.Fatal("the rehearsal did not ring at the end of its light")
+	}
+	if !r.alarms.Snooze() {
+		t.Fatal("the rehearsal could not be snoozed")
+	}
+	r.at(time.Minute + 30*time.Second)
+	if r.alarms.Dawn().Rising() {
+		t.Error("the light came back during a snooze")
+	}
+	r.at(2 * time.Minute)
+	if !r.alarms.Ringing() || !r.alarms.Stop() {
+		t.Fatal("the snoozed rehearsal did not ring again")
+	}
+	if _, ok := r.alarms.Rehearsing(); ok {
+		t.Error("the rehearsal outlived its stop")
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.chimes) > 0 || len(r.events) > 0 {
+		t.Errorf("a silent rehearsal chimed %v and told %v", r.chimes, r.events)
+	}
+	if len(r.alarms.List()) > 0 {
+		t.Error("the rehearsal was saved as an alarm")
+	}
+}
+
+func TestTheLightNeverDropsAsTheAlarmRings(t *testing.T) {
+	r := newRig(t)
+	r.set(Alarm{Hour: 7, On: true, Light: 10 * time.Minute})
+	r.at(55 * time.Minute)
+	var gaps int
+	look := func() {
+		al, ringing := r.alarms.Current()
+		if !r.alarms.Dawn().Rising() && (!ringing || al.Light <= 0) {
+			gaps++
+		}
+	}
+	r.alarms.Dawning.Listen(func(Dawn) { look() })
+	r.alarms.Changed.Listen(func(struct{}) { look() })
+	r.at(time.Hour)
+	if !r.alarms.Ringing() {
+		t.Fatal("the alarm did not ring")
+	}
+	if gaps > 0 {
+		t.Errorf("the light was neither rising nor ringing %d times as the alarm came due", gaps)
+	}
+}
+
+func TestSnoozedAlarmKeepsTheLightOff(t *testing.T) {
+	r := newRig(t)
+	r.set(Alarm{Hour: 7, On: true, Snooze: 9 * time.Minute, Light: 30 * time.Minute})
+	r.at(time.Hour)
+	if !r.alarms.Snooze() {
+		t.Fatal("Snooze did not quiet the alarm")
+	}
+	r.at(time.Hour + time.Minute)
+	if r.alarms.Dawn().Rising() {
+		t.Error("the light came back during a snooze")
+	}
+}
+
 func TestSettingATimeJustPastDoesNotRing(t *testing.T) {
 	r := newRig(t)
 	r.at(time.Hour + 20*time.Second)

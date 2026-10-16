@@ -2,6 +2,7 @@ package panel
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -18,12 +19,25 @@ func SetBacklight(percent int) error {
 		return err
 	}
 
-	percent = min(max(percent, 0), 100)
-	level := full * percent / 100
+	level := perceived(percent, full)
 	if err := os.WriteFile(Backlight, []byte(strconv.Itoa(level)), 0o644); err != nil {
 		return fmt.Errorf("backlight: %w", err)
 	}
 	return nil
+}
+
+// CIE 1976 lightness: L* = 116·Y^(1/3) − 16, linear below L* = 8.
+func perceived(percent, full int) int {
+	l := float64(min(max(percent, 0), 100))
+	if l == 0 {
+		return 0
+	}
+	y := l / 903.3
+	if l > 8 {
+		f := (l + 16) / 116
+		y = f * f * f
+	}
+	return max(1, int(math.Round(y*float64(full))))
 }
 
 func backlightMax() (int, error) {

@@ -80,9 +80,8 @@ func (a *Auto) Follow(lux float64, screen schema.Screen) Step {
 
 	if a.rising != nil {
 		if share, ok := a.rising(); ok {
-			level := Floor + int(
-				math.Round(min(max(share, 0), 1)*float64(max(screen.Backlight, Floor)-Floor)),
-			)
+			lift := min(max(share, 0), 1)
+			level := Floor + int(math.Round(lift*float64(max(screen.Backlight, Floor)-Floor)))
 			if level != a.applied || !a.pinned {
 				a.applied, a.pinned = level, true
 				step.Level, step.Apply = level, true

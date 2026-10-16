@@ -116,8 +116,8 @@ func TestAWakeLightRisesThroughNightAndHandsBack(t *testing.T) {
 	}
 	share = 0.5
 	half := a.Follow(1, manual)
-	if !half.Apply || half.Level <= Floor || half.Level >= 80 {
-		t.Errorf("halfway %+v, want between the floor and 80", half)
+	if !half.Apply || half.Level != 41 {
+		t.Errorf("halfway %+v, want 41", half)
 	}
 	share = 1
 	if step := a.Follow(1, manual); step.Level != 80 {

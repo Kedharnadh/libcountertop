@@ -13,6 +13,7 @@ import (
 type Alarms interface {
 	Dawn() alarm.Dawn
 	Current() (alarm.Alarm, bool)
+	Rehearsing() (schema.WakeLook, bool)
 }
 
 type Options struct {
@@ -38,7 +39,12 @@ func Kind(look schema.WakeLook) visual.Kind {
 	return visual.WakeSunrise
 }
 
-func (s *Source) Kind() visual.Kind { return Kind(s.o.Look()) }
+func (s *Source) Kind() visual.Kind {
+	if look, ok := s.o.Alarms.Rehearsing(); ok && look != "" {
+		return Kind(look)
+	}
+	return Kind(s.o.Look())
+}
 
 func (s *Source) Input() visual.Input {
 	now := time.Now()

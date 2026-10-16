@@ -54,8 +54,9 @@ void main() {
 
 	vec3 warm = mix(vec3(1.0, 0.36, 0.1), vec3(1.0, 0.8, 0.55), s);
 	float lit = smoothstep(0.0, 0.5, s);
-	sky += warm * 0.35 * exp(-d * 4.0) * lit;
-	sky += warm * 0.5 * exp(-d * 14.0) * lit;
+	float halo = lit * (1.0 - 0.7 * smoothstep(0.5, 1.0, s));
+	sky += warm * 0.35 * exp(-d * 4.0) * halo;
+	sky += warm * 0.5 * exp(-d * 14.0) * halo;
 	float horizonGlow = exp(-abs(float(uv.y) - 0.88) * 9.0) * exp(-abs(float(p.x - sun.x)) * 1.2);
 	sky += vec3(1.0, 0.42, 0.18) * horizonGlow * 0.45 * (1.0 - s) * lit;
 
