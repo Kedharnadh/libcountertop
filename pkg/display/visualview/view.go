@@ -45,6 +45,11 @@ func New(source Source, options Dependencies) *View { return &View{v: source, op
 
 func (w *View) Covers() bool { return true }
 
+func (w *View) Tap() bool {
+	s, ok := w.v.(interface{ Tap() bool })
+	return ok && s.Tap()
+}
+
 func (w *View) Wakes() bool {
 	s, ok := w.v.(shell.Waker)
 	return ok && s.Wakes()

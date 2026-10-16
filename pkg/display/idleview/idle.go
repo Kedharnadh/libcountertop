@@ -180,6 +180,21 @@ func (i *Idle) Wake() {
 	}
 }
 
+func (i *Idle) Suspend() (resume func()) {
+	i.mu.Lock()
+	showing, night := i.hold.Held(), i.night
+	i.mu.Unlock()
+	if !showing {
+		return nil
+	}
+	return func() {
+		i.Show()
+		if night.On() {
+			i.setNight(night)
+		}
+	}
+}
+
 func (i *Idle) covered() {
 	i.mu.Lock()
 	hold := i.hold

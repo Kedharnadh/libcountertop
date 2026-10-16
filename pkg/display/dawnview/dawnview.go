@@ -14,6 +14,7 @@ type Alarms interface {
 	Dawn() alarm.Dawn
 	Current() (alarm.Alarm, bool)
 	Rehearsing() (schema.WakeLook, bool)
+	Brighten()
 }
 
 type Options struct {
@@ -61,6 +62,11 @@ func (s *Source) Loudest() float64 { return 0 }
 
 func (s *Source) Wakes() bool { return true }
 
+func (s *Source) Tap() bool {
+	s.o.Alarms.Brighten()
+	return true
+}
+
 func (s *Source) clock(now time.Time) string {
 	if s.o.Clock24 != nil && s.o.Clock24() {
 		return now.Format("15:04")
@@ -76,17 +82,23 @@ func Showing(a Alarms) bool {
 	return ok && al.Light > 0
 }
 
+type Saver interface {
+	Suspend() (resume func())
+}
+
 type Light struct {
 	shell  *shell.Shell
 	alarms Alarms
 	view   shell.View
+	saver  Saver
 
-	mu   sync.Mutex
-	hold *shell.Hold
+	mu     sync.Mutex
+	hold   *shell.Hold
+	resume func()
 }
 
-func NewLight(sh *shell.Shell, alarms Alarms, view shell.View) *Light {
-	return &Light{shell: sh, alarms: alarms, view: view}
+func NewLight(sh *shell.Shell, alarms Alarms, view shell.View, saver Saver) *Light {
+	return &Light{shell: sh, alarms: alarms, view: view, saver: saver}
 }
 
 func (l *Light) Check() {
@@ -95,9 +107,16 @@ func (l *Light) Check() {
 	defer l.mu.Unlock()
 	switch {
 	case want && (l.hold == nil || !l.shell.Holding(l.view)):
+		if l.hold == nil {
+			l.resume = l.saver.Suspend()
+		}
 		l.hold = l.shell.Hold(l.view)
 	case !want && l.hold != nil:
 		l.hold.Release()
 		l.hold = nil
+		if resume := l.resume; resume != nil {
+			l.resume = nil
+			resume()
+		}
 	}
 }

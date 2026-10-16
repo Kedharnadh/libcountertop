@@ -17,6 +17,7 @@ import (
 
 type Alarms interface {
 	Current() (alarm.Alarm, bool)
+	Dawn() alarm.Dawn
 	Stop() bool
 	Snooze() bool
 }
@@ -36,6 +37,9 @@ func (v *View) Ringing() bool {
 func (v *View) Build(w *gogui.Window) gogui.View {
 	al, ok := v.Alarms.Current()
 	if !ok {
+		if d := v.Alarms.Dawn(); d.Full {
+			return v.overScene(w, d.Alarm)
+		}
 		return nil
 	}
 	if al.Light > 0 {

@@ -35,6 +35,7 @@ const (
 
 	StoppedByHand  = "stopped"
 	StoppedRangOut = "rang_out"
+	StoppedEarly   = "dismissed"
 
 	Rehearsal = "rehearsal"
 )
@@ -46,12 +47,14 @@ type Options struct {
 	Duck    func() (release func())
 	RingFor func() time.Duration
 	Now     func() time.Time
+	Trusted func() bool
 }
 
 type Dawn struct {
 	Alarm Alarm
 	From  time.Time
 	Until time.Time
+	Full  bool
 }
 
 func (d Dawn) Rising() bool { return !d.Until.IsZero() }
@@ -64,6 +67,9 @@ func (d Dawn) sooner(al Alarm, due, now time.Time) Dawn {
 }
 
 func (d Dawn) Share(now time.Time) float64 {
+	if d.Full {
+		return 1
+	}
 	span := d.Until.Sub(d.From)
 	if span <= 0 {
 		return 1
@@ -84,6 +90,7 @@ type Alarms struct {
 	snoozed map[string]time.Time
 	ringing *ringing
 	dawn    Dawn
+	skipped time.Time
 	trial   *rehearsal
 }
 
@@ -174,7 +181,11 @@ func (a *Alarms) Set(al Alarm) (Alarm, error) {
 	} else {
 		a.list = append(a.list, al)
 	}
-	a.next[al.ID] = al.Next(a.opts.Now())
+	if a.trusted() {
+		a.next[al.ID] = al.Next(a.opts.Now())
+	} else {
+		delete(a.next, al.ID)
+	}
 	a.unsnoozeLocked(al.ID)
 	err := a.saveLocked()
 	a.mu.Unlock()
@@ -236,7 +247,35 @@ func (a *Alarms) Current() (Alarm, bool) {
 	return a.ringing.alarm, true
 }
 
-func (a *Alarms) Stop() bool { return a.finish(StoppedByHand) }
+func (a *Alarms) Stop() bool {
+	if a.finish(StoppedByHand) {
+		return true
+	}
+	return a.dismiss()
+}
+
+func (a *Alarms) dismiss() bool {
+	a.mu.Lock()
+	var gone Alarm
+	switch d := a.dawn; {
+	case a.trial != nil:
+		gone, a.trial = a.trial.alarm, nil
+	case d.Rising():
+		gone = d.Alarm
+		a.next[gone.ID] = gone.Next(d.Until)
+		a.unsnoozeLocked(gone.ID)
+	}
+	a.mu.Unlock()
+	if gone.ID == "" {
+		return false
+	}
+	slog.Info("alarm dismissed", "name", gone.Name)
+	a.retire(gone)
+	a.tell(EventStopped, gone, map[string]string{"why": StoppedEarly})
+	a.check(a.opts.Now())
+	a.Changed.Emit(struct{}{})
+	return true
+}
 
 func (a *Alarms) finish(why string) bool {
 	al, ok := a.end()
@@ -300,6 +339,15 @@ func (a *Alarms) retire(al Alarm) {
 	a.Changed.Emit(struct{}{})
 }
 
+func (a *Alarms) Brighten() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.dawn.Rising() {
+		a.skipped = a.dawn.Until
+		a.dawn.Full = true
+	}
+}
+
 func (a *Alarms) Dawn() Dawn {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -315,17 +363,28 @@ func (a *Alarms) Snoozed(id string) (time.Time, bool) {
 
 func (a *Alarms) Snooze() bool {
 	a.mu.Lock()
-	r := a.ringing
+	r, d := a.ringing, a.dawn
 	a.mu.Unlock()
-	if r == nil || r.alarm.Snooze <= 0 {
-		return false
-	}
 
-	al, ok := a.end()
-	if !ok {
+	var (
+		al    Alarm
+		until time.Time
+	)
+	switch {
+	case r != nil:
+		if r.alarm.Snooze <= 0 {
+			return false
+		}
+		ended, ok := a.end()
+		if !ok {
+			return false
+		}
+		al, until = ended, a.opts.Now().Add(ended.Snooze)
+	case d.Rising() && d.Alarm.Snooze > 0:
+		al, until = d.Alarm, d.Until.Add(d.Alarm.Snooze)
+	default:
 		return false
 	}
-	until := a.opts.Now().Add(al.Snooze)
 	a.mu.Lock()
 	if t := a.trial; al.ID == Rehearsal && t != nil {
 		t.due, t.rang, t.snoozed = until, false, true
@@ -337,11 +396,15 @@ func (a *Alarms) Snooze() bool {
 
 	slog.Info("alarm snoozed", "name", al.Name, "until", until.Format(time.TimeOnly))
 	a.tell(EventSnoozed, al, map[string]string{"until": until.Format(time.RFC3339)})
+	a.check(a.opts.Now())
 	a.Changed.Emit(struct{}{})
 	return true
 }
 
 func (a *Alarms) check(now time.Time) {
+	if !a.trusted() {
+		return
+	}
 	var ring []Alarm
 	dawn := Dawn{}
 
@@ -353,9 +416,10 @@ func (a *Alarms) check(now time.Time) {
 			continue
 		}
 		if now.Before(due) {
-			if _, snoozed := a.snoozed[al.ID]; !snoozed {
-				dawn = dawn.sooner(al, due, now)
+			if _, snoozed := a.snoozed[al.ID]; snoozed {
+				al = al.snoozing()
 			}
+			dawn = dawn.sooner(al, due, now)
 			continue
 		}
 
@@ -376,13 +440,16 @@ func (a *Alarms) check(now time.Time) {
 	}
 	if t := a.trial; t != nil {
 		switch {
-		case now.Before(t.due) && !t.snoozed:
+		case now.Before(t.due) && t.snoozed:
+			dawn = dawn.sooner(t.alarm.snoozing(), t.due, now)
+		case now.Before(t.due):
 			dawn = dawn.sooner(t.alarm, t.due, now)
 		case !now.Before(t.due) && !t.rang:
 			t.rang = true
 			ring = append(ring, t.alarm)
 		}
 	}
+	dawn.Full = dawn.Rising() && dawn.Until.Equal(a.skipped)
 	moved := dawn.Alarm.ID != a.dawn.Alarm.ID || !dawn.Until.Equal(a.dawn.Until)
 	a.dawn = dawn
 	a.mu.Unlock()
@@ -402,7 +469,7 @@ func (a *Alarms) dueLocked(al Alarm, now time.Time) time.Time {
 	if at := a.snoozed[al.ID]; !at.IsZero() {
 		return at
 	}
-	if !al.On {
+	if !al.On || !a.trusted() {
 		return time.Time{}
 	}
 	next := a.next[al.ID]
@@ -468,6 +535,11 @@ func (a *Alarms) sound(ctx context.Context, r *ringing) {
 	}
 }
 
+func (al Alarm) snoozing() Alarm {
+	al.Light = min(al.Light, al.Snooze)
+	return al
+}
+
 func (al Alarm) share(rang time.Duration) float64 {
 	if al.Volume != VolumeGentle || al.Ramp <= 0 {
 		return 1
@@ -498,6 +570,8 @@ func (a *Alarms) tell(name string, al Alarm, extra map[string]string) {
 }
 
 func (a *Alarms) saveLocked() error { return a.opts.Saved.Set(slices.Clone(a.list)) }
+
+func (a *Alarms) trusted() bool { return a.opts.Trusted == nil || a.opts.Trusted() }
 
 func (a *Alarms) unsnoozeLocked(id string) {
 	if _, ok := a.snoozed[id]; !ok {

@@ -36,6 +36,7 @@ type Auto struct {
 	night     schema.Night
 	pinned    bool
 	rising    func() (float64, bool)
+	dawnFrom  int
 }
 
 func (a *Auto) Rising(share func() (float64, bool)) {
@@ -80,8 +81,12 @@ func (a *Auto) Follow(lux float64, screen schema.Screen) Step {
 
 	if a.rising != nil {
 		if share, ok := a.rising(); ok {
+			if a.dawnFrom == 0 {
+				a.dawnFrom = max(a.lit(screen), Floor)
+			}
 			lift := min(max(share, 0), 1)
-			level := Floor + int(math.Round(lift*float64(max(screen.Backlight, Floor)-Floor)))
+			top := max(screen.Backlight, Floor)
+			level := a.dawnFrom + int(math.Round(lift*float64(top-a.dawnFrom)))
 			if level != a.applied || !a.pinned {
 				a.applied, a.pinned = level, true
 				step.Level, step.Apply = level, true
@@ -89,6 +94,7 @@ func (a *Auto) Follow(lux float64, screen schema.Screen) Step {
 			return step
 		}
 	}
+	a.dawnFrom = 0
 
 	dim, dark := nightLevel(a.night)
 	if screen.Mode != schema.ModeAuto && !dark {
@@ -117,6 +123,16 @@ func (a *Auto) Follow(lux float64, screen schema.Screen) Step {
 		step.Level, step.Apply = level, true
 	}
 	return step
+}
+
+func (a *Auto) lit(screen schema.Screen) int {
+	if dim, dark := nightLevel(a.night); dark {
+		return dim
+	}
+	if a.applied == 0 {
+		return screen.Backlight
+	}
+	return a.applied
 }
 
 type Told struct {

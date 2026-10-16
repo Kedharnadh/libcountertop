@@ -58,7 +58,8 @@ func (r *rig) build() *Alarms {
 			r.chimes = append(r.chimes, share)
 			r.mu.Unlock()
 		},
-		Now: func() time.Time { return r.now },
+		Now:     func() time.Time { return r.now },
+		Trusted: func() bool { return r.now.After(monday.AddDate(-1, 0, 0)) },
 	})
 }
 
@@ -197,8 +198,8 @@ func TestARehearsalLightsRingsAndLeaves(t *testing.T) {
 		t.Fatal("the rehearsal could not be snoozed")
 	}
 	r.at(time.Minute + 30*time.Second)
-	if r.alarms.Dawn().Rising() {
-		t.Error("the light came back during a snooze")
+	if !r.alarms.Dawn().Rising() {
+		t.Error("the light did not climb again during the snooze")
 	}
 	r.at(2 * time.Minute)
 	if !r.alarms.Ringing() || !r.alarms.Stop() {
@@ -239,16 +240,165 @@ func TestTheLightNeverDropsAsTheAlarmRings(t *testing.T) {
 	}
 }
 
-func TestSnoozedAlarmKeepsTheLightOff(t *testing.T) {
+func TestBrighteningSkipsToTheEndOfTheLight(t *testing.T) {
 	r := newRig(t)
-	r.set(Alarm{Hour: 7, On: true, Snooze: 9 * time.Minute, Light: 30 * time.Minute})
-	r.at(time.Hour)
-	if !r.alarms.Snooze() {
-		t.Fatal("Snooze did not quiet the alarm")
+	r.set(Alarm{Hour: 7, On: true, Light: 10 * time.Minute})
+	r.at(52 * time.Minute)
+	r.alarms.Brighten()
+	r.at(53 * time.Minute)
+	if got := r.alarms.Dawn().Share(r.now); got != 1 {
+		t.Errorf("after Brighten the light is at %v, want 1", got)
 	}
-	r.at(time.Hour + time.Minute)
+	r.at(time.Hour)
+	if !r.alarms.Ringing() {
+		t.Error("the alarm did not ring after the light was skipped")
+	}
+}
+
+func TestStoppingDuringTheLightDismissesThatMorning(t *testing.T) {
+	r := newRig(t)
+	daily := r.set(Alarm{
+		Hour: 7, On: true, Light: 10 * time.Minute,
+		Days: Weekdays{time.Monday, time.Tuesday},
+	})
+	once := r.set(Alarm{Hour: 7, Minute: 30, On: true, Light: 10 * time.Minute})
+	r.at(55 * time.Minute)
+	if !r.alarms.Stop() {
+		t.Fatal("Stop during the light dismissed nothing")
+	}
 	if r.alarms.Dawn().Rising() {
-		t.Error("the light came back during a snooze")
+		t.Error("the light stayed up after it was dismissed")
+	}
+	r.at(time.Hour)
+	if r.alarms.Ringing() {
+		t.Fatal("the dismissed alarm rang anyway")
+	}
+	r.at(85 * time.Minute)
+	if !r.alarms.Stop() {
+		t.Fatal("Stop during the one-off's light dismissed nothing")
+	}
+	for _, al := range r.alarms.List() {
+		switch al.ID {
+		case daily.ID:
+			if !al.On {
+				t.Error("dismissing a repeating alarm switched it off")
+			}
+		case once.ID:
+			if al.On {
+				t.Error("a dismissed one-off is still on")
+			}
+		}
+	}
+	r.at(25 * time.Hour)
+	if !r.alarms.Ringing() {
+		t.Error("the repeating alarm did not ring the next morning")
+	}
+	if got := r.heard(); !slices.Contains(got, EventStopped+":"+StoppedEarly) {
+		t.Errorf("events %v, want a dismissed stop", got)
+	}
+}
+
+func TestSnoozingDuringTheLightPushesThatMorningBack(t *testing.T) {
+	r := newRig(t)
+	al := r.set(Alarm{Hour: 7, On: true, Snooze: 9 * time.Minute, Light: 10 * time.Minute})
+	r.at(52 * time.Minute)
+	if !r.alarms.Snooze() {
+		t.Fatal("Snooze during the light did nothing")
+	}
+	if r.alarms.Dawn().Rising() {
+		t.Error("the light stayed up after a snooze")
+	}
+	if until, ok := r.alarms.Snoozed(al.ID); !ok || !until.Equal(monday.Add(69*time.Minute)) {
+		t.Errorf("snoozed until %v %v, want 07:09", until, ok)
+	}
+	r.at(time.Hour)
+	if r.alarms.Ringing() {
+		t.Fatal("rang at the original time after a snooze")
+	}
+	if d := r.alarms.Dawn(); !d.From.Equal(monday.Add(time.Hour)) {
+		t.Errorf("the light came back at %v, want 07:00", d.From)
+	}
+	r.at(69 * time.Minute)
+	if !r.alarms.Ringing() {
+		t.Error("did not ring at 07:09")
+	}
+}
+
+func TestSnoozingARehearsalDuringItsLight(t *testing.T) {
+	r := newRig(t)
+	r.alarms.Rehearse(time.Minute, schema.WakeSunrise, true)
+	r.at(30 * time.Second)
+	if !r.alarms.Snooze() {
+		t.Fatal("Snooze during the rehearsal's light did nothing")
+	}
+	r.at(2*time.Minute - time.Second)
+	if r.alarms.Ringing() {
+		t.Fatal("rang before the snoozed time")
+	}
+	r.at(2 * time.Minute)
+	if !r.alarms.Ringing() {
+		t.Error("the snoozed rehearsal did not ring")
+	}
+}
+
+func TestStoppingARehearsalBeforeItRings(t *testing.T) {
+	r := newRig(t)
+	r.alarms.Rehearse(time.Minute, schema.WakeSunrise, true)
+	if !r.alarms.Stop() {
+		t.Fatal("Stop did not cancel the pending rehearsal")
+	}
+	if r.alarms.Dawn().Rising() {
+		t.Error("the light stayed up after the rehearsal was cancelled")
+	}
+	r.at(time.Minute)
+	if r.alarms.Ringing() {
+		t.Error("a cancelled rehearsal rang")
+	}
+}
+
+func TestASnoozeClimbsTheLightAgain(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		light time.Duration
+		from  time.Duration
+	}{
+		{"over the whole snooze", 30 * time.Minute, time.Hour},
+		{"over a light shorter than the snooze", 4 * time.Minute, 65 * time.Minute},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newRig(t)
+			r.set(Alarm{Hour: 7, On: true, Snooze: 9 * time.Minute, Light: tc.light})
+			r.at(time.Hour)
+			if !r.alarms.Snooze() {
+				t.Fatal("Snooze did not quiet the alarm")
+			}
+			r.at(tc.from + time.Second)
+			d := r.alarms.Dawn()
+			if !d.From.Equal(monday.Add(tc.from)) || !d.Until.Equal(monday.Add(69*time.Minute)) {
+				t.Errorf("light %v to %v, want %v to 07:09", d.From, d.Until, monday.Add(tc.from))
+			}
+			if d.Full || d.Share(monday.Add(tc.from)) != 0 {
+				t.Error("the light did not start again from dark")
+			}
+		})
+	}
+}
+
+func TestAOneOffSurvivesBootingWithTheClockUnset(t *testing.T) {
+	r := newRig(t)
+	r.set(Alarm{Hour: 7, On: true})
+
+	r.alarms = r.build()
+	r.now = time.Unix(17, 0).UTC()
+	r.alarms.check(r.now)
+
+	r.at(30 * time.Minute)
+	if !r.alarms.List()[0].On {
+		t.Fatal("the one-off was switched off once the clock was set")
+	}
+	r.at(time.Hour)
+	if !r.alarms.Ringing() {
+		t.Error("the one-off did not ring at 07:00 after the clock was set")
 	}
 }
 

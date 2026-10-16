@@ -15,22 +15,10 @@ const (
 	WakeEmber   Kind = "wake-ember"
 )
 
-var (
-	//go:embed wakesunrise.glsl
-	wakeSunriseShader string
-	//go:embed wakeember.glsl
-	wakeEmberShader string
-	//go:embed wakewhite.glsl
-	wakeWhiteShader string
-)
+//go:embed wakewhite.glsl
+var wakeWhiteShader string
 
 func init() {
-	register(WakeSunrise, func() Visual {
-		return &wake{shader: wakeSunriseShader, amount: 0.5, radius: 0.04}
-	})
-	register(WakeEmber, func() Visual {
-		return &wake{shader: wakeEmberShader, amount: 0.6, radius: 0.03}
-	})
 	register(WakeWhite, func() Visual {
 		return &wake{shader: wakeWhiteShader, amount: 0.35, radius: 0.06}
 	})

@@ -134,8 +134,10 @@ func (a *App) visualScreen(v *visualview.View) *Screen {
 				Sizing:  gogui.FillFill,
 				Padding: gogui.NoPadding,
 				OnClick: func(e gogui.EventCtx) {
-					a.o.Shell.Remove(v)
 					e.Consume()
+					if !v.Tap() {
+						a.o.Shell.Remove(v)
+					}
 					e.Window.InvalidateLayout()
 				},
 			})

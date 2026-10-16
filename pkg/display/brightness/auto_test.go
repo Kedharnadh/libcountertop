@@ -104,6 +104,26 @@ func TestLeavingManualModeAppliesAgain(t *testing.T) {
 	}
 }
 
+func TestAWakeLightStartsFromALitScreen(t *testing.T) {
+	a := NewAuto(1)
+	manual := schema.Screen{Mode: schema.ModeManual, Backlight: 80}
+	a.Follow(1, manual)
+	share, rising := 0.0, true
+	a.Rising(func() (float64, bool) { return share, rising })
+
+	if step := a.Follow(1, manual); step.Level != 80 {
+		t.Errorf("start of the wake light from a lit screen %+v, want 80", step)
+	}
+	rising = false
+	a.Follow(1, manual)
+	a.Night(schema.NightOff)
+	a.Follow(1, manual)
+	rising, share = true, 0
+	if step := a.Follow(1, manual); step.Level != Floor {
+		t.Errorf("start of the wake light from night %+v, want the floor", step)
+	}
+}
+
 func TestAWakeLightRisesThroughNightAndHandsBack(t *testing.T) {
 	a := NewAuto(1)
 	manual := schema.Screen{Mode: schema.ModeManual, Backlight: 80}
