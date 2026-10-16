@@ -1,22 +1,32 @@
 package settings
 
 import (
+	"context"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/assistant/turn"
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/hook"
 	"github.com/ygelfand/libcountertop/pkg/inference/wake"
+	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
+
+type WakeChooser interface {
+	Allowed() bool
+	Choose(ctx context.Context, slot int, phrase string) error
+}
 
 type AssistantDependencies struct {
 	Slots       int
 	Preferences Preferences
 	Models      func() []wake.Model
+	Phrases     func() []string
+	Chooser     WakeChooser
 	Requested   *hook.Hook[int]
 	Words       turn.Words
 	Look        *LookPages
@@ -38,6 +48,8 @@ const (
 	LeastSure = 50
 	MostSure  = 99
 )
+
+const chooseFor = 10 * time.Second
 
 func (p *AssistantPages) Page() *shell.Page {
 	return &shell.Page{
@@ -87,8 +99,11 @@ func (p *AssistantPages) Slot(slot int) *shell.Page {
 		Build: func() ([]menu.Row, []func(int)) {
 			saved := p.options.Preferences.Wake.Read().Slot(slot)
 
+			word, choose := p.wordRow(slot)
 			return []menu.Row{
 					{Label: say.T("assistants.talk"), Hint: say.T("assistants.talk.hint")},
+
+					word,
 
 					{
 						Label: say.T("assistants.threshold"),
@@ -114,12 +129,54 @@ func (p *AssistantPages) Slot(slot int) *shell.Page {
 					},
 				}, []func(int){
 					func(int) { p.options.Requested.Emit(slot) },
+					choose,
 					p.Threshold(slot),
 					p.open(func() shell.View { return p.Tone(slot) }),
 					p.open(func() shell.View { return p.Delivery(slot) }),
 					p.open(func() shell.View { return p.options.Look.Page(slot) }),
 				}
 		},
+	}
+}
+
+func (p *AssistantPages) wordRow(slot int) (menu.Row, func(int)) {
+	row := menu.Row{Label: say.T("assistants.word"), Kind: menu.Chevron, Value: p.Listening(slot)}
+	if p.options.Chooser == nil || p.options.Phrases == nil || !p.options.Chooser.Allowed() {
+		row.Dim, row.Hint = true, say.T("assistants.word.ha")
+		return row, func(int) {}
+	}
+	return row, p.open(func() shell.View { return p.Word(slot) })
+}
+
+func (p *AssistantPages) Word(slot int) *shell.Page {
+	return &shell.Page{
+		Title: say.T("assistants.word"),
+		Build: func() ([]menu.Row, []func(int)) {
+			now := p.options.Preferences.Wake.Read().Slot(slot).ID
+			current := ""
+			if now != "" {
+				current = p.Listening(slot)
+			}
+			rows := []menu.Row{{Label: say.T("assistants.off"), Chosen: current == ""}}
+			acts := []func(int){p.UseWord(slot, "")}
+			for _, phrase := range p.options.Phrases() {
+				rows = append(rows, menu.Row{Label: phrase, Chosen: phrase == current})
+				acts = append(acts, p.UseWord(slot, phrase))
+			}
+			return rows, acts
+		},
+	}
+}
+
+func (p *AssistantPages) UseWord(slot int, phrase string) func(int) {
+	return func(int) {
+		safe.Go("choosing a wake word", func() {
+			ctx, cancel := context.WithTimeout(context.Background(), chooseFor)
+			defer cancel()
+			if err := p.options.Chooser.Choose(ctx, slot, phrase); err != nil {
+				slog.Error("choosing the wake word failed", "slot", slot+1, "err", err)
+			}
+		})
 	}
 }
 

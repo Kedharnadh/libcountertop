@@ -360,6 +360,10 @@ func (a *App) Run(ctx context.Context) error {
 
 	stopTouch := a.o.Touch.Contacts.Listen(func(t touch.Contact) {
 		sh.Touch()
+		if t.Phase == touch.Down {
+			a.o.Messages.Dismiss(t.ID, image.Pt(t.X, t.Y))
+			a.o.Assistant.Cancel(t.ID)
+		}
 		if a.o.Messages.Took(t.ID) || a.o.Assistant.Took(t.ID) {
 			return
 		}

@@ -79,6 +79,8 @@ assistants.title: Voice assistants
 assistants.tone: Wake sound
 assistants.unset: Set the wake word in Home Assistant
 assistants.waiting: Waiting for the model
+assistants.word: Wake word
+assistants.word.ha: Enable actions or pick in Home Assistant
 bluetooth.group.bluetooth: Bluetooth
 bluetooth.setting.proxy: Bluetooth proxy
 bluetooth.setting.scan: Bluetooth scanning

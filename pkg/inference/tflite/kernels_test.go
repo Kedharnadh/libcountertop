@@ -238,3 +238,82 @@ func TestFusedReluClampsConvOutput(t *testing.T) {
 	}
 	f32(t, "conv+relu", y.F32, []float32{0})
 }
+
+func TestGreaterEqualBroadcastsToBools(t *testing.T) {
+	y := &Tensor{Type: Bool}
+	if err := kernels[OpGreaterEqual](
+		&OpDesc{},
+		[]*Tensor{tf([]int{3}, 0.2, 0.5, 0.9), tf([]int{}, 0.5)},
+		[]*Tensor{y},
+	); err != nil {
+		t.Fatal(err)
+	}
+	shape(t, "greater_equal", y.Shape, []int{3})
+	if y.I32[0] != 0 || y.I32[1] != 1 || y.I32[2] != 1 {
+		t.Errorf("greater_equal gave %v, want [0 1 1]", y.I32)
+	}
+}
+
+func TestReshapeToAScalar(t *testing.T) {
+	y := &Tensor{Type: Bool}
+	x := &Tensor{Type: Bool, Shape: []int{1, 1}, I32: []int32{1}}
+	if err := kernels[OpReshape](
+		&OpDesc{},
+		[]*Tensor{x, ti([]int{0})},
+		[]*Tensor{y},
+	); err != nil {
+		t.Fatal(err)
+	}
+	shape(t, "reshape", y.Shape, []int{})
+	if len(y.I32) != 1 || y.I32[0] != 1 {
+		t.Errorf("reshape to a scalar gave %v, want [1]", y.I32)
+	}
+}
+
+func TestIfRunsTheBranchItsConditionPicks(t *testing.T) {
+	branch := func(op Op) *Subgraph {
+		return &Subgraph{
+			Tensors: []*TensorDesc{
+				{Type: Float32, Shape: []int{2}},
+				{Type: Float32, Shape: []int{2}},
+			},
+			Ops:     []*OpDesc{{Op: op, Inputs: []int{0, 0}, Outputs: []int{1}}},
+			Inputs:  []int{0},
+			Outputs: []int{1},
+		}
+	}
+	m := &Model{Subgraphs: []*Subgraph{
+		{
+			Tensors: []*TensorDesc{
+				{Type: Bool, Shape: []int{}},
+				{Type: Float32, Shape: []int{2}},
+				{Type: Float32, Shape: []int{2}},
+			},
+			Ops: []*OpDesc{
+				{Op: OpIf, Inputs: []int{0, 1}, Outputs: []int{2}, then: 1, els: 2},
+			},
+			Inputs:  []int{0, 1},
+			Outputs: []int{2},
+		},
+		branch(OpAdd),
+		branch(OpMul),
+	}}
+	in, err := New(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		cond int32
+		want []float32
+	}{
+		{1, []float32{6, 8}},
+		{0, []float32{9, 16}},
+	} {
+		in.Input(0).I32 = []int32{tc.cond}
+		copy(in.Input(1).F32, []float32{3, 4})
+		if err := in.Invoke(); err != nil {
+			t.Fatal(err)
+		}
+		f32(t, "if", in.Output(0).F32, tc.want)
+	}
+}

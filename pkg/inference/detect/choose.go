@@ -9,6 +9,7 @@ import (
 type Slots interface {
 	Use(int, wake.Model) error
 	Clear(int)
+	Loaded(int) (wake.Model, bool)
 }
 
 func Choose(
@@ -27,17 +28,19 @@ func Choose(
 		m, ok := wake.Find(models, ids[slot])
 		if !ok {
 			slog.Warn("a chosen wake word is not on the device", "slot", slot+1, "id", ids[slot])
-			engine.Clear(slot)
+		} else if err := engine.Use(slot, m); err != nil {
+			slog.Error("loading a wake word failed", "slot", slot+1, "id", m.ID, "err", err)
+		} else {
+			accepted[slot] = m.ID
+			loaded = append(loaded, slot)
 			continue
 		}
 
-		if err := engine.Use(slot, m); err != nil {
-			slog.Error("loading a wake word failed", "slot", slot+1, "id", m.ID, "err", err)
-			engine.Clear(slot)
-			continue
+		if was, ok := engine.Loaded(slot); ok {
+			slog.Info("keeping the wake word already running", "slot", slot+1, "id", was.ID)
+			accepted[slot] = was.ID
+			loaded = append(loaded, slot)
 		}
-		accepted[slot] = m.ID
-		loaded = append(loaded, slot)
 	}
 	return accepted, loaded
 }

@@ -241,6 +241,7 @@ func (c *Conversation) handle(e event) {
 
 	case evAccepted:
 		if c.phase == phaseListening {
+			c.present()
 			c.options.Words.Chime(c.slot)
 			if c.options.Words.Tones(c.slot) {
 				c.quietUntil.Store(
@@ -552,6 +553,12 @@ func (c *Conversation) enter(p phase) {
 	c.phase = p
 	c.visible.Store(int32(p))
 	c.options.Source.SetAdapting(p != phaseListening)
+	if p != phaseListening {
+		c.present()
+	}
+}
+
+func (c *Conversation) present() {
 	c.show()
 	c.options.Presentation.Phase(c.slot, c.phase)
 }

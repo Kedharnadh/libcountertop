@@ -89,6 +89,7 @@ const (
 	OpExp            Op = 47
 	OpMaximum        Op = 55
 	OpMinimum        Op = 57
+	OpGreaterEqual   Op = 62
 	OpExpandDims     Op = 70
 	OpLog            Op = 73
 	OpSum            Op = 74
@@ -102,6 +103,7 @@ const (
 	OpFill           Op = 94
 	OpLeakyRelu      Op = 98
 	OpSquaredDiff    Op = 99
+	OpIf             Op = 118
 	OpBatchMatMul    Op = 126
 )
 
@@ -117,6 +119,7 @@ var opNames = map[Op]string{
 	OpReduceMax: "REDUCE_MAX", OpSquare: "SQUARE", OpLeakyRelu: "LEAKY_RELU",
 	OpShape: "SHAPE", OpReduceProd: "REDUCE_PROD", OpPack: "PACK", OpFill: "FILL",
 	OpSquaredDiff: "SQUARED_DIFFERENCE", OpBatchMatMul: "BATCH_MATMUL",
+	OpGreaterEqual: "GREATER_EQUAL", OpIf: "IF",
 }
 
 func (o Op) String() string {
@@ -184,6 +187,9 @@ type OpDesc struct {
 
 	adjX bool
 	adjY bool
+
+	then int
+	els  int
 }
 
 var errShort = errors.New("tflite: buffer too short")
@@ -340,6 +346,10 @@ func (o *OpDesc) decodeOptions(t table, present bool) {
 	case OpBatchMatMul:
 		o.adjX = t.boolf(0, false)
 		o.adjY = t.boolf(1, false)
+
+	case OpIf:
+		o.then = int(t.i32f(0, 0))
+		o.els = int(t.i32f(1, 0))
 	}
 }
 

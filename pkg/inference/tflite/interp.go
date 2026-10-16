@@ -53,14 +53,31 @@ func (t *Tensor) resize(shape []int) {
 }
 
 type Interpreter struct {
-	model   *Model
-	graph   *Subgraph
-	tensors []*Tensor
+	model    *Model
+	graph    *Subgraph
+	tensors  []*Tensor
+	branches map[int]*Interpreter
 }
 
 func New(m *Model) (*Interpreter, error) {
-	g := m.Subgraphs[0]
-	in := &Interpreter{model: m, graph: g, tensors: make([]*Tensor, len(g.Tensors))}
+	return build(m, 0, map[int]*Interpreter{})
+}
+
+func build(m *Model, at int, built map[int]*Interpreter) (*Interpreter, error) {
+	if at < 0 || at >= len(m.Subgraphs) {
+		return nil, fmt.Errorf("tflite: subgraph %d of %d", at, len(m.Subgraphs))
+	}
+	if in, ok := built[at]; ok {
+		return in, nil
+	}
+	g := m.Subgraphs[at]
+	in := &Interpreter{
+		model:    m,
+		graph:    g,
+		tensors:  make([]*Tensor, len(g.Tensors)),
+		branches: built,
+	}
+	built[at] = in
 
 	for i, d := range g.Tensors {
 		t := &Tensor{Name: d.Name, Type: d.Type, Shape: append([]int(nil), d.Shape...)}
@@ -87,11 +104,50 @@ func New(m *Model) (*Interpreter, error) {
 	}
 
 	for i, o := range g.Ops {
+		if o.Op == OpIf {
+			for _, b := range []int{o.then, o.els} {
+				if _, err := build(m, b, built); err != nil {
+					return nil, err
+				}
+			}
+			continue
+		}
 		if _, ok := kernels[o.Op]; !ok {
 			return nil, fmt.Errorf("tflite: operator %d is %s, which is not implemented", i, o.Op)
 		}
 	}
 	return in, nil
+}
+
+func (in *Interpreter) branch(o *OpDesc, ins, outs []*Tensor) error {
+	if len(ins) == 0 || ins[0] == nil || len(ins[0].I32) == 0 {
+		return fmt.Errorf("no condition")
+	}
+	b := in.branches[o.els]
+	if ins[0].I32[0] != 0 {
+		b = in.branches[o.then]
+	}
+	args := ins[1:]
+	if len(args) != len(b.graph.Inputs) || len(outs) != len(b.graph.Outputs) {
+		return fmt.Errorf(
+			"branch takes %d inputs and gives %d outputs, the op has %d and %d",
+			len(b.graph.Inputs), len(b.graph.Outputs), len(args), len(outs),
+		)
+	}
+	for i, x := range args {
+		y := b.Input(i)
+		y.resize(x.Shape)
+		copyData(y, x)
+	}
+	if err := b.Invoke(); err != nil {
+		return err
+	}
+	for i, y := range outs {
+		x := b.Output(i)
+		y.resize(x.Shape)
+		copyData(y, x)
+	}
+	return nil
 }
 
 func decode(t *Tensor, raw []byte) error {
@@ -150,7 +206,11 @@ func (in *Interpreter) Invoke() error {
 		for j, idx := range o.Outputs {
 			outs[j] = in.tensors[idx]
 		}
-		if err := kernels[o.Op](o, ins, outs); err != nil {
+		run := kernels[o.Op]
+		if o.Op == OpIf {
+			run = in.branch
+		}
+		if err := run(o, ins, outs); err != nil {
 			return fmt.Errorf("tflite: op %d (%s): %w", i, o.Op, err)
 		}
 	}

@@ -91,6 +91,16 @@ func (l *Library) Advertise() ([]esphome.WakeWord, int) {
 	return words, shadowed
 }
 
+func (l *Library) Phrases() []string {
+	words, _ := l.Advertise()
+	out := make([]string, 0, len(words))
+	for _, w := range words {
+		out = append(out, w.Phrase)
+	}
+	slices.Sort(out)
+	return out
+}
+
 // Home Assistant asks on connect and after every selection change, with the models in its custom_wake_words directory.
 func (l *Library) Answer(offered []esphome.ExternalWakeWord) []esphome.WakeWord {
 	l.Offered(offered)

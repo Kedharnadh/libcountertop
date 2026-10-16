@@ -1,8 +1,11 @@
 package settings
 
 import (
+	"context"
 	"testing"
 
+	"github.com/ygelfand/libcountertop/pkg/inference/wake"
+	"github.com/ygelfand/libcountertop/pkg/say"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
@@ -77,5 +80,37 @@ func TestEachSlotSetsItsOwnThreshold(t *testing.T) {
 	}
 	if got := m.Read().Slot(1).Threshold; got != 0.59 {
 		t.Errorf("slot 2 is at %v", got)
+	}
+}
+
+type chooser struct{ allowed bool }
+
+func (c chooser) Allowed() bool                           { return c.allowed }
+func (chooser) Choose(context.Context, int, string) error { return nil }
+
+func TestTheWakeWordRowNeedsActions(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		allowed bool
+	}{
+		{"actions off", false},
+		{"actions on", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := NewAssistantPages(AssistantDependencies{
+				Slots:       2,
+				Preferences: Preferences{Wake: &wakeMemory{wake: config.DefaultWake()}},
+				Models:      func() []wake.Model { return nil },
+				Phrases:     func() []string { return []string{"Okay Nabu"} },
+				Chooser:     chooser{allowed: tc.allowed},
+			})
+			row, _ := p.wordRow(0)
+			if row.Dim == tc.allowed {
+				t.Errorf("dim %v with actions allowed %v", row.Dim, tc.allowed)
+			}
+			if !tc.allowed && row.Hint != say.T("assistants.word.ha") {
+				t.Errorf("hint %q, want the enable-actions hint", row.Hint)
+			}
+		})
 	}
 }

@@ -108,6 +108,28 @@ func elementwise(f func(a, b float32) float32) kernel {
 	}
 }
 
+func compare(f func(a, b float32) bool) kernel {
+	return func(_ *OpDesc, in, out []*Tensor) error {
+		a, b, y := in[0], in[1], out[0]
+		shape, err := broadcastShape(a.Shape, b.Shape)
+		if err != nil {
+			return err
+		}
+		y.resize(shape)
+		as, bs := strides(a.Shape, shape), strides(b.Shape, shape)
+		idx := make([]int, len(shape))
+		ao, bo := 0, 0
+		for i := range y.Count() {
+			y.I32[i] = 0
+			if f(a.F32[ao], b.F32[bo]) {
+				y.I32[i] = 1
+			}
+			ao, bo = step(idx, shape, as, bs, ao, bo)
+		}
+		return nil
+	}
+}
+
 func leakyRelu(o *OpDesc, in, out []*Tensor) error {
 	alpha := o.alpha
 	x, y := in[0], out[0]
@@ -272,7 +294,8 @@ func reshape(o *OpDesc, in, out []*Tensor) error {
 	x, y := in[0], out[0]
 
 	var target []int
-	if len(in) > 1 && in[1] != nil && len(in[1].I32) > 0 {
+	if len(in) > 1 && in[1] != nil && (len(in[1].I32) > 0 || in[1].Count() == 0) {
+		target = []int{}
 		for _, v := range in[1].I32 {
 			target = append(target, int(v))
 		}
@@ -382,6 +405,7 @@ func init() {
 			d := a - b
 			return d * d
 		}),
+		OpGreaterEqual: compare(func(a, b float32) bool { return a >= b }),
 
 		OpLogistic: unary(func(v float32) float32 {
 			return float32(1 / (1 + math.Exp(-float64(v))))
