@@ -44,7 +44,7 @@ func TestLevelerStaysFiniteUnderAdversarialInput(t *testing.T) {
 				for i := range buf {
 					buf[i] = p.frame(k*testFrame + i)
 				}
-				l.apply(buf)
+				l.apply(buf, buf)
 			}
 
 			for what, v := range map[string]float64{
@@ -61,7 +61,7 @@ func TestLevelerStaysFiniteUnderAdversarialInput(t *testing.T) {
 			var loudest int16
 			for k := 0; k < 300; k++ {
 				say := speech(-30)
-				l.apply(say)
+				l.apply(say, say)
 				for _, v := range say {
 					if v > loudest {
 						loudest = v

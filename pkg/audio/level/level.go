@@ -125,17 +125,17 @@ func (l *Leveler) SetLeveling(on bool) {
 
 func (l *Leveler) SetPlayback(on bool) { l.sounding = on }
 
-func (l *Leveler) Process(frame []int16) {
+func (l *Leveler) Process(heard, frame []int16) {
 	on := l.leveling.Load()
 	switch {
 	case on:
-		l.apply(frame)
+		l.apply(heard, frame)
 	default:
 		if l.wasLeveling {
 			l.forget()
 		}
-		if len(frame) > 0 {
-			l.observe(frame)
+		if len(heard) > 0 {
+			l.observe(heard)
 		}
 	}
 	l.wasLeveling = on
@@ -178,11 +178,10 @@ func abs(s int16) int32 {
 	return int32(s)
 }
 
-func (l *Leveler) observe(frame []int16) (rms, peak float32) {
+func (l *Leveler) observe(frame []int16) (rms float32) {
 	var sum, band float64
 	for _, s := range frame {
 		sum += float64(s) * float64(s)
-		peak = max(peak, float32(abs(s)))
 
 		v := float32(s)
 		for i := range l.lp {
@@ -208,7 +207,15 @@ func (l *Leveler) observe(frame []int16) (rms, peak float32) {
 	}
 
 	l.publishLevel(l.bandRMS)
-	return rms, peak
+	return rms
+}
+
+func loudest(frame []int16) float32 {
+	var peak int32
+	for _, s := range frame {
+		peak = max(peak, abs(s))
+	}
+	return float32(peak)
 }
 
 func follow(floor, rms, down, up float32) float32 {
@@ -241,11 +248,12 @@ func (l *Leveler) publishLevel(rms float32) {
 	l.level.Store(math.Float32bits(was + (want-was)*step))
 }
 
-func (l *Leveler) apply(frame []int16) {
+func (l *Leveler) apply(heard, frame []int16) {
 	if len(frame) == 0 {
 		return
 	}
-	rms, peak := l.observe(frame)
+	rms := l.observe(heard)
+	peak := loudest(frame)
 
 	if !l.sounding && rms > l.floor*l.overFloor {
 		want := min(max(l.target/rms, 1), l.ceiling)

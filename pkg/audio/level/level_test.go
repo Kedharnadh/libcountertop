@@ -43,10 +43,10 @@ func talk(l *Leveler, room, voice float64, seconds float64) []int16 {
 	for range int(seconds * testRate / testFrame / 20) {
 		for range 15 {
 			last = speech(voice)
-			l.apply(last)
+			l.apply(last, last)
 		}
 		for range 5 {
-			l.apply(speech(room))
+			l.apply(speech(room), speech(room))
 		}
 	}
 	return last
@@ -75,13 +75,13 @@ func TestLevelerHoldsItsGainUnderPlayback(t *testing.T) {
 
 			l.SetPlayback(true)
 			for range int(seconds * testRate / testFrame) {
-				l.apply(speech(echo))
+				l.apply(speech(echo), speech(echo))
 			}
 			now := 20 * math.Log10(float64(l.gain))
 
 			heard := make([]int16, testFrame)
 			copy(heard, speech(voice))
-			l.apply(heard)
+			l.apply(heard, heard)
 
 			if short := was - now; short > 1 {
 				t.Errorf(
@@ -109,7 +109,7 @@ func TestLevelerHoldsItsFloorUnderMusic(t *testing.T) {
 
 			l.SetPlayback(true)
 			for range int(seconds * testRate / testFrame) {
-				l.apply(speech(music))
+				l.apply(speech(music), speech(music))
 			}
 
 			if now := 20 * math.Log10(float64(l.floor)/fullScale); now-was > 1 {
@@ -137,7 +137,7 @@ func TestLevelerIsReadyWhenPlaybackStops(t *testing.T) {
 
 		l.SetPlayback(true)
 		for range int(30 * testRate / testFrame) {
-			l.apply(speech(-18))
+			l.apply(speech(-18), speech(-18))
 		}
 		l.SetPlayback(false)
 
@@ -149,7 +149,7 @@ func TestLevelerIsReadyWhenPlaybackStops(t *testing.T) {
 		for _, after := range []float64{0, 1, 5, 15, 30} {
 			if quiet {
 				for range int(after * testRate / testFrame) {
-					l.apply(speech(-65))
+					l.apply(speech(-65), speech(-65))
 				}
 			} else {
 				talk(l, -65, voice, after)
@@ -157,7 +157,7 @@ func TestLevelerIsReadyWhenPlaybackStops(t *testing.T) {
 
 			heard := make([]int16, testFrame)
 			copy(heard, speech(voice))
-			l.apply(heard)
+			l.apply(heard, heard)
 
 			if now := 20 * math.Log10(float64(l.gain)); was-now > 1 {
 				t.Errorf(
@@ -177,7 +177,7 @@ func TestLevelerStopsAtTheCeiling(t *testing.T) {
 	l := newLeveler()
 
 	for range 500 {
-		l.apply(speech(-70))
+		l.apply(speech(-70), speech(-70))
 	}
 
 	if gain := 20 * math.Log10(float64(l.gain)); gain > maxGainDB+0.5 {
@@ -200,12 +200,12 @@ func TestLevelerIgnoresSilence(t *testing.T) {
 	l := newLeveler()
 
 	for range 200 {
-		l.apply(speech(-45))
+		l.apply(speech(-45), speech(-45))
 	}
 	spoken := l.gain
 
 	for range 500 {
-		l.apply(make([]int16, testFrame))
+		l.apply(make([]int16, testFrame), make([]int16, testFrame))
 	}
 
 	if l.gain != spoken {
@@ -232,9 +232,9 @@ func TestOneLoudFrameDoesNotTakeTheGainAway(t *testing.T) {
 	talk(l, -65, -45, 30)
 	settled := l.gain
 
-	l.apply(speech(-3))
+	l.apply(speech(-3), speech(-3))
 	for range 5 {
-		l.apply(speech(-65))
+		l.apply(speech(-65), speech(-65))
 	}
 	if l.gain < settled*0.9 {
 		t.Errorf(
@@ -254,7 +254,7 @@ func TestLevelerDoesNotClipPeakySpeech(t *testing.T) {
 	var worst float64 = -100
 	for range 300 {
 		frame := peaky(-35, 16)
-		l.apply(frame)
+		l.apply(frame, frame)
 		worst = max(worst, peakOf(frame))
 	}
 
@@ -272,7 +272,7 @@ func TestLevelerDoesNotFollowTheRoom(t *testing.T) {
 		start := l.gain
 
 		for range 1000 {
-			l.apply(speech(room))
+			l.apply(speech(room), speech(room))
 		}
 
 		if l.gain != start {
@@ -286,12 +286,12 @@ func TestLevelerFollowsWhatStandsAboveTheRoom(t *testing.T) {
 		l := newLeveler()
 
 		for range 200 {
-			l.apply(speech(room))
+			l.apply(speech(room), speech(room))
 		}
 		quiet := l.gain
 
 		for range 200 {
-			l.apply(speech(room + speechOverFloorDB + 6))
+			l.apply(speech(room+speechOverFloorDB+6), speech(room+speechOverFloorDB+6))
 		}
 
 		if l.gain == quiet {
@@ -325,10 +325,10 @@ func TestTurningLevelingOffForgetsAndLeavesFramesAlone(t *testing.T) {
 
 	for range 10 * testRate / testFrame / 20 {
 		for range 15 {
-			l.Process(speech(-45))
+			l.Process(speech(-45), speech(-45))
 		}
 		for range 5 {
-			l.Process(speech(-65))
+			l.Process(speech(-65), speech(-65))
 		}
 	}
 	if l.Gain() == fresh {
@@ -338,7 +338,7 @@ func TestTurningLevelingOffForgetsAndLeavesFramesAlone(t *testing.T) {
 	l.leveling.Store(false)
 	frame := speech(-45)
 	want := append([]int16(nil), frame...)
-	l.Process(frame)
+	l.Process(frame, frame)
 
 	if got := l.Gain(); got != fresh {
 		t.Errorf("gain reads %.2f dB after leveling went off, want %.2f", got, fresh)
@@ -403,6 +403,23 @@ func TestFloorLearnsAQuietRoom(t *testing.T) {
 
 	if floor := l.Floor(); floor > -73 || floor < -83 {
 		t.Errorf("a room at -78 dBFS reads a floor of %.1f dBFS, want it within 5 dB", floor)
+	}
+}
+
+func TestFloorIsTheRoomNotTheSuppressedFrame(t *testing.T) {
+	l := newLeveler()
+	for range 500 {
+		l.apply(speech(-78), make([]int16, testFrame))
+	}
+
+	if floor := l.Floor(); floor > -73 || floor < -83 {
+		t.Errorf(
+			"a room heard at -78 dBFS reads a floor of %.1f dBFS from a suppressed frame",
+			floor,
+		)
+	}
+	if gain := 20 * math.Log10(float64(l.gain)); gain > startGainDB+1 {
+		t.Errorf("the room alone raised the gain to %.1f dB from %.1f", gain, startGainDB)
 	}
 }
 
