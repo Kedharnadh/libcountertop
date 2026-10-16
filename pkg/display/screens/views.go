@@ -51,7 +51,7 @@ func (a *App) screenFor(v shell.View) *Screen {
 }
 
 func (a *App) pageScreen(p *shell.Page) *Screen {
-	return &Screen{
+	s := &Screen{
 		Title: p.Title,
 		View:  p,
 		Build: func(w *gogui.Window) gogui.View {
@@ -60,6 +60,12 @@ func (a *App) pageScreen(p *shell.Page) *Screen {
 			})
 		},
 	}
+	if len(p.Actions) > 0 {
+		s.Foot = func(w *gogui.Window) gogui.View {
+			return a.ui.Toolkit.ActionBar(w, p.Actions, a.ui.Palette())
+		}
+	}
+	return s
 }
 
 func (a *App) videoScreen(p *videopage.Page) *Screen {

@@ -45,6 +45,11 @@ func New(source Source, options Dependencies) *View { return &View{v: source, op
 
 func (w *View) Covers() bool { return true }
 
+func (w *View) Wakes() bool {
+	s, ok := w.v.(shell.Waker)
+	return ok && s.Wakes()
+}
+
 func (w *View) Timeout() time.Duration { return shell.SettingsTimeout }
 
 func (w *View) Keep(width, height int) {

@@ -1,12 +1,13 @@
 package schema
 
 type Alerts struct {
-	Info    Chime `json:"info"`
-	Success Chime `json:"success"`
-	Warning Chime `json:"warning"`
-	Alert   Chime `json:"alert"`
-	Timer   Chime `json:"timer"`
-	RingFor Delay `json:"ring_for"`
+	Info    Chime    `json:"info"`
+	Success Chime    `json:"success"`
+	Warning Chime    `json:"warning"`
+	Alert   Chime    `json:"alert"`
+	Timer   Chime    `json:"timer"`
+	RingFor Delay    `json:"ring_for"`
+	Wake    WakeLook `json:"wake"`
 }
 
 func DefaultAlerts() Alerts {
@@ -17,6 +18,7 @@ func DefaultAlerts() Alerts {
 		Alert:   ChimeTrouble,
 		Timer:   ChimeTimer,
 		RingFor: Delay15m,
+		Wake:    WakeSunrise,
 	}
 }
 

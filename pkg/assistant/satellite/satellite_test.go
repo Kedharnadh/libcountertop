@@ -81,6 +81,77 @@ func TestStopTakesTheTimerFirst(t *testing.T) {
 	}
 }
 
+type fakeAlarms struct {
+	ringing, snoozable bool
+	stopped, snoozed   bool
+}
+
+func (f *fakeAlarms) Ringing() bool { return f.ringing }
+
+func (f *fakeAlarms) Stop() bool {
+	if !f.ringing {
+		return false
+	}
+	f.ringing, f.stopped = false, true
+	return true
+}
+
+func (f *fakeAlarms) Snooze() bool {
+	if !f.ringing || !f.snoozable {
+		return false
+	}
+	f.ringing, f.snoozed = false, true
+	return true
+}
+
+func TestAnAlarmStopsBeforeATimer(t *testing.T) {
+	s, _, tm, _, _, _ := fixture()
+	al := &fakeAlarms{ringing: true}
+	s.options.Alarms = al
+	tm.ringing = true
+
+	if !s.Stop() || !al.stopped || tm.stopped {
+		t.Errorf("alarm stopped %v, timer stopped %v", al.stopped, tm.stopped)
+	}
+}
+
+func TestTappingTheActionButtonStopsAnAlarm(t *testing.T) {
+	s, _, _, _, _, _ := fixture()
+	al := &fakeAlarms{ringing: true, snoozable: true}
+	s.options.Alarms = al
+	s.Action()
+	if !al.stopped || al.snoozed {
+		t.Errorf("tap: stopped %v snoozed %v", al.stopped, al.snoozed)
+	}
+}
+
+func TestHoldingTheActionButtonSnoozesWhenItCan(t *testing.T) {
+	s, _, _, _, _, _ := fixture()
+	al := &fakeAlarms{ringing: true, snoozable: true}
+	s.options.Alarms = al
+	s.ActionHold(1)
+	if !al.snoozed || al.stopped {
+		t.Errorf("snoozable alarm: snoozed %v stopped %v", al.snoozed, al.stopped)
+	}
+
+	fixed := &fakeAlarms{ringing: true}
+	s.options.Alarms = fixed
+	s.ActionHold(1)
+	if !fixed.stopped {
+		t.Error("an alarm with snooze off kept ringing after a hold")
+	}
+}
+
+func TestTheStopWordStopsARingingAlarm(t *testing.T) {
+	s, _, _, _, _, _ := fixture()
+	al := &fakeAlarms{ringing: true, snoozable: true}
+	s.options.Alarms = al
+	s.Interrupt()
+	if !al.stopped {
+		t.Error("the stop word left the alarm ringing")
+	}
+}
+
 func TestTheStopWordNeedsSomethingToStop(t *testing.T) {
 	s, _, tm, snd, pl, _ := fixture()
 

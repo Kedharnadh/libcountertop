@@ -14,6 +14,7 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/display/timerview"
 
+	"github.com/ygelfand/libcountertop/pkg/display/alarmview"
 	"github.com/ygelfand/libcountertop/pkg/display/alertview"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
@@ -155,6 +156,7 @@ type Options struct {
 	Tessera   *tesseraview.View
 	Forecast  Weather
 	Warnings  weatherview.Alerts
+	Alarms    alarmview.Alarms
 	OpenRadar func(*nws.Alert)
 
 	WeatherEntities func() shell.View
@@ -186,6 +188,7 @@ type App struct {
 	alerts  alertview.View
 	timers  timerview.View
 	weather weatherview.View
+	alarms  alarmview.View
 
 	ticking atomic.Bool
 
@@ -202,6 +205,12 @@ func New(o Options) *App {
 	}
 	a.alerts = alertview.View{UI: o.UI, Messages: o.Messages, Again: a.again}
 	a.timers = timerview.View{UI: o.UI, Timers: o.Timers, Again: a.again}
+	a.alarms = alarmview.View{
+		UI:      o.UI,
+		Alarms:  o.Alarms,
+		Again:   a.again,
+		Clock24: func() bool { return o.Settings().Screen.Hours == schema.TwentyFourHour },
+	}
 	a.weather = weatherview.View{
 		UI:      o.UI,
 		Again:   a.again,
@@ -422,6 +431,7 @@ func (a *App) Run(ctx context.Context) error {
 	})
 	defer stopMoved()
 	for _, o := range []*navigation.Overlay{
+		{Priority: priorityAlarm, Build: a.alarm, Covers: a.alarmRinging},
 		{Priority: priorityAlert, Build: a.alert, Covers: a.alertCovers},
 		{Priority: priorityNotice, Build: a.timer, Covers: a.timerCovers},
 		{Priority: priorityNotice + 1, Build: a.assistantPanel, Covered: a.o.Stage.Unstage},

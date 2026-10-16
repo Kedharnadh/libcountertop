@@ -216,6 +216,7 @@ func (a *App) page(w *gogui.Window, p *Screen) gogui.View {
 			Title:   p.Title,
 			Fixed:   p.Fixed,
 			Build:   p.Build,
+			Foot:    p.Foot,
 			Back:    func() { a.o.Shell.Pop() },
 			Gesture: a.ui.HoldStill,
 			Room:    a.ui.Editor.Room(w),

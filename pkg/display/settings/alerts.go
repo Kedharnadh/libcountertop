@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"slices"
 
+	"github.com/ygelfand/libcountertop/pkg/display/dawnview"
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/previews"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
@@ -50,6 +51,11 @@ func (p *BasicPages) AlertsPage() *shell.Page {
 					Snap:  ring.Snap,
 					Value: a.RingFor.Label(),
 				},
+				{
+					Label: say.T("alerts.setting.wake"),
+					Kind:  menu.Chevron,
+					Value: a.Wake.Label(),
+				},
 			}
 			pick := func(name string, read func(config.Alerts) config.Chime) func(int) {
 				return p.open(func() shell.View {
@@ -75,6 +81,7 @@ func (p *BasicPages) AlertsPage() *shell.Page {
 				func(level int) {
 					p.setAlertSetting("ring_for", string(rings[ring.Index(level)]))
 				},
+				p.open(func() shell.View { return p.WakePage() }),
 			}
 			return rows, acts
 		},
@@ -90,6 +97,16 @@ func (p *BasicPages) setAlertSetting(name, value string) {
 	if err := p.options.Alerts.Change(name, value); err != nil {
 		slog.Error("saving an alert setting failed", "name", name, "err", err)
 	}
+}
+
+func (p *BasicPages) WakePage() *shell.Page {
+	return Tiles(
+		say.T("alerts.setting.wake"),
+		config.WakeLooks(),
+		func() config.WakeLook { return p.options.Alerts.Current().Wake },
+		func(w config.WakeLook) { p.setAlertSetting("wake", string(w)) },
+		func(w config.WakeLook) menu.Preview { return dawnview.Preview(w) },
+	)
 }
 
 func (p *BasicPages) AlertStylePage() *shell.Page {

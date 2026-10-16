@@ -8,12 +8,50 @@ about.title: About
 about.version: Version
 access.group.access: Access
 access.setting.adb: ADB over network
+alarm.add: Add alarm
+alarm.app: Alarms
+alarm.daily: Every day
+alarm.day.fri: Friday
+alarm.day.mon: Monday
+alarm.day.sat: Saturday
+alarm.day.sun: Sunday
+alarm.day.thu: Thursday
+alarm.day.tue: Tuesday
+alarm.day.wed: Wednesday
+alarm.delete: Delete alarm
+alarm.edit: Alarm
+alarm.hour: Hour
+alarm.light: Wake light
+alarm.minute: Minute
+alarm.minutes: "{{.N}} min"
+alarm.name: Name
+alarm.off: "Off"
+alarm.on: Alarm on
+alarm.once: Once
+alarm.ramp: Gentle start
+alarm.repeat: Repeat
+alarm.save: Save
+alarm.seconds: "{{.N}} s"
+alarm.snooze: Snooze
+alarm.snooze_for: "Snooze {{.N}} min"
+alarm.snoozed: "Snoozed until {{.T}}"
+alarm.stop: Stop
+alarm.sound: Sound
+alarm.state.off: "Off"
+alarm.state.on: "On"
+alarm.volume: Volume
+alarm.volume.gentle: Gentle
+alarm.volume.silent: Silent
+alarm.volume.static: Steady
+alarm.weekdays: Weekdays
+alarm.weekends: Weekends
 alerts.page: Alerts & Alarms
 alerts.setting.alert: Alert chime
 alerts.setting.info: Info chime
 alerts.setting.ring_for: Timer rings for
 alerts.setting.success: Success chime
 alerts.setting.timer: Timer sound
+alerts.setting.wake: Wake light
 alerts.setting.warning: Warning chime
 alertstyle.banner: Banner
 alertstyle.card: Card
@@ -876,6 +914,9 @@ visual.thunderstorm: Thunderstorm
 voice.group.voice: Voice commands
 voice.setting.commands: Voice commands
 volume.chime: Notification sound
+wake.ember: Ember
+wake.sunrise: Sunrise
+wake.white: White
 weather.alert.until: "Until {{.T}}"
 weather.alert.dismiss: Dismiss
 weather.alerts.hint: Severe US weather warnings for your home, from the National Weather Service

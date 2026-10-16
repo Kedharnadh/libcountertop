@@ -103,3 +103,30 @@ func TestLeavingManualModeAppliesAgain(t *testing.T) {
 		t.Error("returning to auto did not reapply the level")
 	}
 }
+
+func TestAWakeLightRisesThroughNightAndHandsBack(t *testing.T) {
+	a := NewAuto(1)
+	manual := schema.Screen{Mode: schema.ModeManual, Backlight: 80}
+	a.Night(schema.NightOff)
+	share, rising := 0.0, true
+	a.Rising(func() (float64, bool) { return share, rising })
+
+	if step := a.Follow(1, manual); !step.Apply || step.Level != Floor {
+		t.Fatalf("start of the wake light %+v, want the floor", step)
+	}
+	share = 0.5
+	half := a.Follow(1, manual)
+	if !half.Apply || half.Level <= Floor || half.Level >= 80 {
+		t.Errorf("halfway %+v, want between the floor and 80", half)
+	}
+	share = 1
+	if step := a.Follow(1, manual); step.Level != 80 {
+		t.Errorf("end of the wake light %+v, want 80", step)
+	}
+
+	rising = false
+	a.Night(schema.NightNone)
+	if step := a.Follow(1, manual); !step.Apply || step.Level != 80 {
+		t.Errorf("after the wake light %+v, want the manual 80 reapplied", step)
+	}
+}

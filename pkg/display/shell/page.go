@@ -15,6 +15,15 @@ type Page struct {
 	Tiles func() ([]menu.Cell, []func(int))
 
 	Preview func(at ui.Rect) bool
+
+	Actions []Action
+}
+
+type Action struct {
+	Label  string
+	Glyph  string
+	Danger bool
+	Do     func()
 }
 
 func (p *Page) Covers() bool { return true }

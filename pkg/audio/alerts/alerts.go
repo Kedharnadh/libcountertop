@@ -31,7 +31,7 @@ type Sounds interface {
 type Alerts struct {
 	*setting.Controls[schema.Alerts]
 	sounds Sounds
-	play   func(tone.Sound)
+	play   func(tone.Sound, float64)
 
 	mu         sync.Mutex
 	generation int
@@ -42,7 +42,7 @@ func New(
 	at storage.Section[schema.Alerts],
 	device uint32,
 	sounds Sounds,
-	play func(tone.Sound),
+	play func(tone.Sound, float64),
 ) *Alerts {
 	var more func() []setting.Option
 	if sounds != nil {
@@ -76,7 +76,7 @@ func (a *Alerts) Start(t schema.Tone) {
 	if snd.Empty() {
 		return
 	}
-	a.play(snd)
+	a.play(snd, Level)
 	if t == schema.ToneAlert {
 		a.again(generation, snd, time.Now().Add(current.RingFor.After()))
 	}
@@ -90,13 +90,19 @@ func (a *Alerts) Stop() {
 
 func (a *Alerts) Preview(c schema.Chime) {
 	if snd := a.sound(c, schema.ChimeNone); !snd.Empty() {
-		a.play(snd)
+		a.play(snd, Level)
 	}
 }
 
 func (a *Alerts) RingTimer() {
 	if snd := a.sound(a.Read().Timer, schema.DefaultAlerts().Timer); !snd.Empty() {
-		a.play(snd)
+		a.play(snd, Level)
+	}
+}
+
+func (a *Alerts) RingAlarm(c schema.Chime, share float64) {
+	if snd := a.sound(c, schema.DefaultAlerts().Timer); !snd.Empty() {
+		a.play(snd, Level*min(max(share, 0), 1))
 	}
 }
 
@@ -132,7 +138,7 @@ func (a *Alerts) again(generation int, snd tone.Sound, until time.Time) {
 		if !live {
 			return
 		}
-		a.play(snd)
+		a.play(snd, Level)
 		a.again(generation, snd, until)
 	})
 }
@@ -181,6 +187,8 @@ func NewTable(more func() []setting.Option) *Table {
 		),
 		setting.Pick(Setting{Name: "ring_for", Group: Group, Icon: "mdi:timer-cancel-outline"},
 			schema.RingDelays(), func(a *schema.Alerts) *schema.Delay { return &a.RingFor }),
+		setting.Pick(Setting{Name: "wake", Group: Group, Icon: "mdi:weather-sunset-up"},
+			schema.WakeLooks(), func(a *schema.Alerts) *schema.WakeLook { return &a.Wake }),
 	}, setting.Messages{Text: say.T, Missing: say.Missing})
 }
 

@@ -17,13 +17,27 @@ const (
 )
 
 func Render(r *gpu.Renderer, k visual.Kind, w, h, frames int, label string) (*image.RGBA, error) {
+	return shade(r, k, w, h, frames, visual.Input{Mic: Loud(), Speaker: Loud(), Label: label})
+}
+
+func RenderWake(
+	r *gpu.Renderer,
+	k visual.Kind,
+	w, h int,
+	dawn float64,
+	label string,
+) (*image.RGBA, error) {
+	return shade(r, k, w, h, 4, visual.Input{Label: label, Dawn: dawn})
+}
+
+func shade(r *gpu.Renderer, k visual.Kind, w, h, frames int, x visual.Input) (*image.RGBA, error) {
 	l, err := r.OpenOffscreen(w, h)
 	if err != nil {
 		return nil, err
 	}
 	defer l.Close()
 	v := visual.New(k)
-	x := visual.Input{Mic: Loud(), Speaker: Loud(), Dt: ThumbStep, Label: label}
+	x.Dt = ThumbStep
 	for i := range frames {
 		x.Now = time.Duration(i+1) * ThumbStep
 		x.Replying = i >= frames/2

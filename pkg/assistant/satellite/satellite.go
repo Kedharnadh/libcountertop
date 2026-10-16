@@ -25,6 +25,12 @@ type Timers interface {
 	Stop() bool
 }
 
+type Alarms interface {
+	Ringing() bool
+	Stop() bool
+	Snooze() bool
+}
+
 type Sound interface {
 	Busy() bool
 	Silence()
@@ -39,6 +45,7 @@ type Options struct {
 	Slots   int
 	Initial []string
 	Timers  Timers
+	Alarms  Alarms
 	Sound   Sound
 	Player  Player
 	Save    func(slot int, id string) error
@@ -95,12 +102,26 @@ func (s *Satellite) Action() {
 	s.turn.Start(0)
 }
 
+func (s *Satellite) ActionHold(slot int) {
+	if s.alarmRinging() {
+		if !s.options.Alarms.Snooze() {
+			s.options.Alarms.Stop()
+		}
+		return
+	}
+	s.turn.Start(slot)
+}
+
+func (s *Satellite) alarmRinging() bool {
+	return s.options.Alarms != nil && s.options.Alarms.Ringing()
+}
+
 func (s *Satellite) Interrupt() {
 	if s.turn.Phase() == turn.Listening {
 		slog.Debug("stop word ignored, the turn is listening")
 		return
 	}
-	if !s.options.Sound.Busy() && !s.options.Timers.Ringing() {
+	if !s.options.Sound.Busy() && !s.options.Timers.Ringing() && !s.alarmRinging() {
 		if playing, _ := s.options.Player.Playing(); !playing {
 			slog.Debug("stop word ignored, nothing to stop")
 			return
@@ -110,6 +131,9 @@ func (s *Satellite) Interrupt() {
 }
 
 func (s *Satellite) Stop() bool {
+	if s.options.Alarms != nil && s.options.Alarms.Stop() {
+		return true
+	}
 	if s.options.Timers.Stop() {
 		return true
 	}

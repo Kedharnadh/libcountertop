@@ -35,6 +35,13 @@ type Auto struct {
 	told      Told
 	night     schema.Night
 	pinned    bool
+	rising    func() (float64, bool)
+}
+
+func (a *Auto) Rising(share func() (float64, bool)) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.rising = share
 }
 
 func NewAuto(leastLux float64) *Auto { return &Auto{leastLux: leastLux} }
@@ -70,6 +77,19 @@ func (a *Auto) Follow(lux float64, screen schema.Screen) Step {
 	}
 	a.following += settle * (lux - a.following)
 	step := Step{Ambient: a.following, Report: a.told.Worth(a.following, a.leastLux)}
+
+	if a.rising != nil {
+		if share, ok := a.rising(); ok {
+			level := Floor + int(
+				math.Round(min(max(share, 0), 1)*float64(max(screen.Backlight, Floor)-Floor)),
+			)
+			if level != a.applied || !a.pinned {
+				a.applied, a.pinned = level, true
+				step.Level, step.Apply = level, true
+			}
+			return step
+		}
+	}
 
 	dim, dark := nightLevel(a.night)
 	if screen.Mode != schema.ModeAuto && !dark {

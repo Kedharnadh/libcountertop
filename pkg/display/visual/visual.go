@@ -156,6 +156,8 @@ type Input struct {
 	Now, Dt time.Duration
 
 	Label string
+
+	Dawn float64
 }
 
 type gate struct{ lo, hi, talk float64 }

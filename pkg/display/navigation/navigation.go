@@ -13,6 +13,7 @@ import (
 type Screen struct {
 	Title        string
 	Build        func(*gui.Window) gui.View
+	Foot         func(*gui.Window) gui.View
 	Clear, Fixed bool
 	View         shell.View
 }
