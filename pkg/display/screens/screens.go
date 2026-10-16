@@ -385,6 +385,7 @@ func (a *App) Run(ctx context.Context) error {
 		r.Touch(p, uint64(t.ID), float32(t.X), float32(t.Y))
 		if t.Phase == touch.Up {
 			w.QueueCommand(func(w *gogui.Window) {
+				a.ui.Gestures.Lift()
 				a.ui.Presses.Lift(w)
 				if !a.ui.Editor.Typing(w) {
 					w.ClearFocus()

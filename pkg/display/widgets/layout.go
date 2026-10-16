@@ -90,6 +90,8 @@ func (g *Gestures) Grip(v gogui.View) gogui.View {
 	})
 }
 
+func (g *Gestures) Lift() { g.gripped = false }
+
 func (g *Gestures) HoldStill(e gogui.EventCtx) {
 	phase, ok := panning(e)
 	if ok {
