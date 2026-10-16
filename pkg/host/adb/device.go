@@ -15,7 +15,7 @@ import (
 // `adb shell` on older adb returns adb's status, not the command's.
 const rcMarker = "__adb_rc="
 
-const backTimeout = 5 * time.Second
+const backTimeout = 30 * time.Second
 
 type Device struct {
 	serial string
