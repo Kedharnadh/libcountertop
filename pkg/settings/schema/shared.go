@@ -3,6 +3,7 @@ package schema
 import "github.com/ygelfand/libcountertop/pkg/settings/storage"
 
 type Shared struct {
+	AirPlay   AirPlay   `json:"airplay"`
 	Alerts    Alerts    `json:"alerts"`
 	API       API       `json:"api"`
 	Apps      Apps      `json:"apps"`
@@ -34,6 +35,7 @@ type Shared struct {
 
 func DefaultShared() Shared {
 	return Shared{
+		AirPlay:   DefaultAirPlay(),
 		Alerts:    DefaultAlerts(),
 		API:       DefaultAPI(),
 		Apps:      DefaultApps(),
@@ -99,6 +101,7 @@ type Sections[C any] struct {
 	Update    storage.Binding[C, Update]
 	Visual    storage.Binding[C, Visual]
 	Voice     storage.Binding[C, Voice]
+	AirPlay   storage.Binding[C, AirPlay]
 	Wake      storage.Binding[C, Wake]
 	Weather   storage.Binding[C, Weather]
 }
@@ -130,6 +133,7 @@ func NewSections[C any](store func() *storage.Store[C], shared func(*C) *Shared)
 		Update:    bind(store, shared, func(s *Shared) *Update { return &s.Update }),
 		Visual:    bind(store, shared, func(s *Shared) *Visual { return &s.Visual }),
 		Voice:     bind(store, shared, func(s *Shared) *Voice { return &s.Voice }),
+		AirPlay:   bind(store, shared, func(s *Shared) *AirPlay { return &s.AirPlay }),
 		Wake:      bind(store, shared, func(s *Shared) *Wake { return &s.Wake }),
 		Weather:   bind(store, shared, func(s *Shared) *Weather { return &s.Weather }),
 	}

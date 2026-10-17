@@ -94,6 +94,25 @@ func TestLightBackWakesToTheSaverAndRestartsTheWait(t *testing.T) {
 	r.nightIs(t, schema.NightNone)
 }
 
+func TestNightHoldsThroughLightAtTheThreshold(t *testing.T) {
+	r, lux := darkRig(t, schema.NightClock, schema.Delay1m)
+	edge := float64(r.store.Get().NightLux)
+	r.still = time.Minute + time.Second
+	r.step()
+	r.saverRanFor(r.store.Get().NightAfter.After() + time.Second)
+	*lux = edge - 0.1
+	r.step()
+	r.nightIs(t, schema.NightClock)
+
+	*lux = edge + 0.1
+	r.step()
+	r.nightIs(t, schema.NightClock)
+
+	*lux = edge * 2
+	r.step()
+	r.nightIs(t, schema.NightNone)
+}
+
 func TestWithoutASaverNightStandsInForIt(t *testing.T) {
 	r, _ := darkRig(t, schema.NightClock, schema.DelayNever)
 	wait := r.store.Get().NightAfter.After()

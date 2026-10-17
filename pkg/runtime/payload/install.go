@@ -1,4 +1,4 @@
-package voice
+package payload
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-func install(path string, binary []byte) error {
+func Install(path string, binary []byte) error {
 	if len(binary) == 0 {
 		return nil
 	}

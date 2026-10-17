@@ -10,6 +10,7 @@ import (
 	esphome "github.com/ygelfand/go-esphome-device"
 
 	"github.com/ygelfand/libcountertop/pkg/inference/whistle"
+	"github.com/ygelfand/libcountertop/pkg/runtime/payload"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -129,7 +130,7 @@ func (l *Listener) save(s setting.Setting[schema.Voice], v string) error {
 }
 
 func (l *Listener) run(ctx context.Context) {
-	if err := install(l.opts.Helper, l.opts.Binary); err != nil {
+	if err := payload.Install(l.opts.Helper, l.opts.Binary); err != nil {
 		slog.Error("voice helper not installed", "path", l.opts.Helper, "err", err)
 		return
 	}

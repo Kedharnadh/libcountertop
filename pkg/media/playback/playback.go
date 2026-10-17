@@ -44,6 +44,7 @@ type Picture struct {
 	H264          bool
 	Width, Height int
 	Next          func(context.Context) (data []byte, at time.Duration, err error)
+	Sparse        bool
 	Session       uint32
 	Sealed        func(context.Context) (data []byte, at time.Duration, crypt *cenc.Crypt, err error)
 }

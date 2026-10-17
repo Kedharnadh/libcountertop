@@ -11,6 +11,7 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/display/videopage"
 	"github.com/ygelfand/libcountertop/pkg/media/castoutput"
+	"github.com/ygelfand/libcountertop/pkg/media/playback"
 	video "github.com/ygelfand/libcountertop/pkg/media/videostream"
 )
 
@@ -104,6 +105,36 @@ func TestNoStreamIsNoPicture(t *testing.T) {
 	f, _ := feed()
 	if err := s.Play(context.Background(), nil, webm(nil), f); !errors.Is(err, errNoPicture) {
 		t.Errorf("err %v, want %v", err, errNoPicture)
+	}
+}
+
+type sparse struct{}
+
+func (sparse) Pictured() bool { return true }
+
+func (sparse) Pictures(context.Context) (io.ReadCloser, time.Duration, error) {
+	return nil, 0, nil
+}
+
+func (sparse) Live(context.Context) (playback.Picture, error) {
+	next := func(context.Context) ([]byte, time.Duration, error) { return nil, 0, io.EOF }
+	return playback.Picture{H264: true, Width: 1088, Height: 1740, Next: next, Sparse: true}, nil
+}
+
+func TestASparsePictureReachesThePlayer(t *testing.T) {
+	s := New(Options{})
+	var got video.Stream
+	s.play = func(_ context.Context, st video.Stream) (video.Report, error) {
+		got = st
+		st.Started()
+		return video.Report{}, nil
+	}
+	f, _ := feed()
+	if err := s.Play(context.Background(), nil, sparse{}, f); err != nil {
+		t.Fatal(err)
+	}
+	if !got.Sparse || got.Codec != video.H264 {
+		t.Errorf("stream %+v, want a sparse H.264 stream", got)
 	}
 }
 

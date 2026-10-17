@@ -1,0 +1,3 @@
+https://github.com/openssl/openssl/releases/download/openssl-3.3.2/openssl-3.3.2.tar.gz
+./Configure android-arm -D__ANDROID_API__=25 no-shared no-tests no-apps no-docs no-engine no-dso no-ssl3 no-comp && make build_libs && make install_dev
+NDK r30 (30.0.16248370)

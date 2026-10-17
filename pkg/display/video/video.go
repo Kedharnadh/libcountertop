@@ -218,11 +218,16 @@ func (pl Player) On(
 	var last time.Duration
 	started := false
 	drained, waiting, stalled := false, false, false
-	defer func() {
-		if waiting && s.Waiting != nil {
+	resume := func() {
+		if !waiting {
+			return
+		}
+		waiting = false
+		if s.Waiting != nil {
 			s.Waiting(false)
 		}
-	}()
+	}
+	defer resume()
 	played := func(pl surface.Played) {
 		if int(pl.Shown) > rep.Shown {
 			watch.show(time.Now())
@@ -279,6 +284,7 @@ func (pl Player) On(
 				}
 				continue
 			}
+			resume()
 			last = f.At
 			pl, err := feed(f, 0)
 			if err != nil {
@@ -311,7 +317,7 @@ func (pl Player) On(
 				s.Started()
 			}
 		}
-		if watch.stalled(time.Now(), now, running, rep.Shown, len(frames), drained) {
+		if !s.Sparse && watch.stalled(time.Now(), now, running, rep.Shown, len(frames), drained) {
 			if st, ok := p.(staller); ok && !stalled {
 				st.Stalling()
 			}
@@ -323,11 +329,8 @@ func (pl Player) On(
 				}
 			}
 		}
-		if waiting && (len(frames) > 0 || drained) {
-			waiting = false
-			if s.Waiting != nil {
-				s.Waiting(false)
-			}
+		if len(frames) > 0 || drained {
+			resume()
 		}
 		if drained && (now >= last || !running) {
 			return rep, nil

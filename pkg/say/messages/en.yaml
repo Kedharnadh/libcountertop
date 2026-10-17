@@ -8,6 +8,8 @@ about.title: About
 about.version: Version
 access.group.access: Access
 access.setting.adb: ADB over network
+airplay.group.airplay: AirPlay
+airplay.setting.on: AirPlay
 alarm.add: Add alarm
 alarm.app: Alarms
 alarm.daily: Every day

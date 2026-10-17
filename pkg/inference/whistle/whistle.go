@@ -18,6 +18,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/audio/capture"
 	"github.com/ygelfand/libcountertop/pkg/audio/vad"
 	"github.com/ygelfand/libcountertop/pkg/hook"
+	"github.com/ygelfand/libcountertop/pkg/runtime/payload"
 )
 
 type Source interface {
@@ -141,7 +142,7 @@ func (c *Client) session(ctx context.Context) error {
 
 	cmd := exec.Command(c.opts.Helper, c.opts.Model, strconv.Itoa(c.opts.Depth))
 	cmd.ExtraFiles = []*os.File{theirs}
-	cmd.SysProcAttr = childAttr()
+	cmd.SysProcAttr = payload.DiesWithParent()
 	cmd.Stderr = os.Stderr
 	err = cmd.Start()
 	theirs.Close()

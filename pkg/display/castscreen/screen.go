@@ -271,6 +271,7 @@ func streamOf(ctx context.Context, pics playback.Pictures) (video.Stream, io.Clo
 				Width:  uint32(p.Width),
 				Height: uint32(p.Height),
 				Source: liveFrames(p.Next),
+				Sparse: p.Sparse,
 			}
 			return st, io.NopCloser(nil), nil
 		}

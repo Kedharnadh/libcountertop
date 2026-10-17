@@ -22,9 +22,17 @@ NEEDLE := $(VOICE)/third_party/needle
 WHISTLE_ENGINE := _ZN12_GLOBAL__N_19g_whistleE
 WHISTLE_DEPTH := _ZN7whistle6Engine9set_depthEi
 VOICE_FLAGS := -O2 -Wall -Werror -I$(NATIVE) -I$(VOICE) -I$(NEEDLE)
+AIRPLAY_BIN ?= $(OUT)/$(PREFIX)-airplay
+AIRPLAY := $(NATIVE)/airplay
+UXPLAY := $(AIRPLAY)/uxplay
+OPENSSL := $(AIRPLAY)/third_party/openssl
+PLIST := $(AIRPLAY)/third_party/libplist
+UXPLAY_SOURCES := $(wildcard $(UXPLAY)/*.c $(UXPLAY)/playfair/*.c $(UXPLAY)/llhttp/*.c $(UXPLAY)/mdnsd/*.c)
+UXPLAY_INCLUDES := -I$(UXPLAY) -I$(UXPLAY)/playfair -I$(UXPLAY)/llhttp -I$(UXPLAY)/mdnsd -I$(OPENSSL)/include -I$(PLIST)/include
+UXPLAY_FLAGS := -O2 -fPIC -w -D_GNU_SOURCE -DPLIST_210 -DPLIST_230 $(UXPLAY_INCLUDES)
 
-.PHONY: all surface camera camshim voice check-ndk test test-voice
-all: surface camera camshim voice
+.PHONY: all surface camera camshim voice airplay check-ndk test test-voice
+all: surface camera camshim voice airplay
 check-ndk:
 	@test "$(API)" = 25 -o "$(API)" = 27 || { echo "supported native API levels: 25, 27"; exit 1; }
 	@test -x "$(NDK_CC)" || { echo "no NDK clang at $(NDK_CC); set NDK or ANDROID_NDK_HOME"; exit 1; }
@@ -59,6 +67,19 @@ voice: check-ndk
 	@$(NDK_BIN)/llvm-nm $(STUBS)/voice/libneedle.a | grep -q ' [WT] $(WHISTLE_DEPTH)$$' || { echo "libneedle.a: $(WHISTLE_DEPTH) missing"; exit 1; }
 	$(NDK_CXX) $(VOICE_FLAGS) -std=c++17 -o $(VOICE_BIN) $(VOICE)/voice.cpp $(STUBS)/voice/libneedle.a \
 		-static-libstdc++ -s -llog -lm
+
+airplay: check-ndk
+	@mkdir -p $(dir $(AIRPLAY_BIN)) $(STUBS)/airplay
+	@cd $(OPENSSL) && shasum -a 256 -c --quiet SHA256SUMS
+	@cd $(PLIST) && shasum -a 256 -c --quiet SHA256SUMS
+	$(NDK_CC) -shared -DLIBBINDER -Wl,-soname,libbinder.so -o $(STUBS)/airplay/libbinder.so $(CAMERA)/stubs.c
+	@for f in $(UXPLAY_SOURCES); do \
+		o=$(STUBS)/airplay/$$(echo $${f#$(UXPLAY)/} | tr / _ | sed 's/\.c$$/.o/'); \
+		$(NDK_CC) $(UXPLAY_FLAGS) -c $$f -o $$o || exit 1; \
+	done
+	$(NDK_CC) $(FLAGS) $(UXPLAY_INCLUDES) -o $(AIRPLAY_BIN) $(AIRPLAY)/airplay.c $(AIRPLAY)/aac.c $(STUBS)/airplay/*.o \
+		$(PLIST)/android-armv7/libplist-2.0.a $(OPENSSL)/android-armv7/libcrypto.a -s \
+		-L$(STUBS)/airplay -lbinder -lmediandk -llog -lm -Wl,--allow-shlib-undefined
 
 test:
 	@mkdir -p $(OUT)

@@ -25,6 +25,7 @@ type Stream struct {
 	Width, Height uint32
 	Session       uint32
 	Source        Source
+	Sparse        bool
 	Clock         Clock
 	Over          Overlay
 	Started       func()

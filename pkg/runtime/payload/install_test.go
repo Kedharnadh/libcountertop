@@ -1,4 +1,4 @@
-package voice
+package payload
 
 import (
 	"os"
@@ -9,7 +9,7 @@ import (
 func TestInstallWritesAnExecutableOnlyWhenChanged(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "bin", "voice")
 
-	if err := install(path, []byte("v1")); err != nil {
+	if err := Install(path, []byte("v1")); err != nil {
 		t.Fatal(err)
 	}
 	info, err := os.Stat(path)
@@ -21,14 +21,14 @@ func TestInstallWritesAnExecutableOnlyWhenChanged(t *testing.T) {
 	}
 	first := info.ModTime()
 
-	if err := install(path, []byte("v1")); err != nil {
+	if err := Install(path, []byte("v1")); err != nil {
 		t.Fatal(err)
 	}
 	if again, _ := os.Stat(path); !again.ModTime().Equal(first) {
 		t.Error("an unchanged helper was rewritten")
 	}
 
-	if err := install(path, []byte("v2")); err != nil {
+	if err := Install(path, []byte("v2")); err != nil {
 		t.Fatal(err)
 	}
 	if got, _ := os.ReadFile(path); string(got) != "v2" {
@@ -41,7 +41,7 @@ func TestInstallWithoutABinaryLeavesThePathAlone(t *testing.T) {
 	if err := os.WriteFile(path, []byte("pushed by hand"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := install(path, nil); err != nil {
+	if err := Install(path, nil); err != nil {
 		t.Fatal(err)
 	}
 	if got, _ := os.ReadFile(path); string(got) != "pushed by hand" {

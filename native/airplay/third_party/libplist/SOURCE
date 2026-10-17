@@ -1,0 +1,4 @@
+https://github.com/libimobiledevice/libplist fe3dc34dc3484006e12b403f7ceb06f0ad40b6f4
+src/{base64,bplist,bytearray,common,hashtable,jplist,jsmn,oplist,out-default,out-limd,out-plutil,plist,ptrarray,time64,xplist}.c libcnary/{cnary,node,node_list}.c
+armv7a-linux-androideabi25-clang -O2 -fPIC -Iinclude -Isrc -Ilibcnary/include -DHAVE_STRNDUP -DHAVE_MEMMEM -DHAVE_GMTIME_R -DHAVE_LOCALTIME_R -DHAVE_TM_TM_GMTOFF -DHAVE_TM_TM_ZONE -DHAVE_STRPTIME -D_GNU_SOURCE -DPACKAGE_VERSION="2.6.0"
+NDK r30 (30.0.16248370)

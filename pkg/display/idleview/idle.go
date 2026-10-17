@@ -19,7 +19,10 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
 
-const check = 200 * time.Millisecond
+const (
+	check = 200 * time.Millisecond
+	lifts = 1.5
+)
 
 type Activity func() (since time.Duration, known bool)
 
@@ -111,13 +114,17 @@ func (i *Idle) Show() {
 }
 
 func (i *Idle) dusk(c schema.Idle) {
-	dark := c.Night.On() && i.dark(c.NightLux)
-	showing := i.showing()
-	after := c.NightAfter.After()
-
 	i.mu.Lock()
 	on, shown := i.night.On(), i.shown
 	i.mu.Unlock()
+
+	below := float64(c.NightLux)
+	if on {
+		below *= lifts
+	}
+	dark := c.Night.On() && i.dark(below)
+	showing := i.showing()
+	after := c.NightAfter.After()
 
 	switch {
 	case on && !showing:
@@ -140,12 +147,12 @@ func (i *Idle) dusk(c schema.Idle) {
 	}
 }
 
-func (i *Idle) dark(below int) bool {
+func (i *Idle) dark(below float64) bool {
 	if i.options.Ambient == nil {
 		return false
 	}
 	lux, known := i.options.Ambient()
-	return known && lux < float64(below)
+	return known && lux < below
 }
 
 func (i *Idle) showing() bool {
