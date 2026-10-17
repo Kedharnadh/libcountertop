@@ -160,11 +160,12 @@ func (o *Output) Render(from uint64, buf []int16) {
 		o.played = from
 	}
 
+	var spent []int16
 	if from > o.base && len(o.pcm) > 0 {
 		if gone := int((from - o.base) * Channels); gone >= len(o.pcm) {
 			o.pcm = o.pcm[:0]
 		} else {
-			o.pcm = append(o.pcm[:0], o.pcm[gone:]...)
+			spent, o.pcm = o.pcm[:gone], o.pcm[gone:]
 		}
 	}
 	if from > o.base {
@@ -174,13 +175,13 @@ func (o *Output) Render(from uint64, buf []int16) {
 	if o.held || !o.ready || from < o.base {
 		return
 	}
-	o.correct(from)
+	o.correct(from, spent)
 	for i := range min(len(buf), len(o.pcm)) {
 		buf[i] = scale(o.pcm[i], o.gain)
 	}
 }
 
-func (o *Output) correct(from uint64) {
+func (o *Output) correct(from uint64, spent []int16) {
 	if !o.anchored || len(o.pcm) < 2*Channels {
 		return
 	}
@@ -225,20 +226,24 @@ func (o *Output) correct(from uint64) {
 		slog.Debug("sendspin snapped later", "ms", n*1000/Rate)
 	case o.drift < -snapBand:
 		n := min(int(-o.drift), len(o.pcm)/Channels-1)
-		o.pcm = append(o.pcm[:0], o.pcm[n*Channels:]...)
+		o.pcm = o.pcm[n*Channels:]
 		o.frame -= uint64(n)
 		o.corrected -= int64(n)
 		o.drift = 0
 		slog.Debug("sendspin snapped earlier", "ms", n*1000/Rate)
 	case o.drift > driftBand:
-		o.pcm = append(o.pcm, o.pcm[:Channels]...)
-		copy(o.pcm[Channels:], o.pcm[:len(o.pcm)-Channels])
+		if k := len(spent); k >= Channels {
+			o.pcm = spent[k-Channels : k+len(o.pcm)]
+			copy(o.pcm, o.pcm[Channels:2*Channels])
+		} else {
+			o.pcm = append(o.pcm, o.pcm[:Channels]...)
+			copy(o.pcm[Channels:], o.pcm[:len(o.pcm)-Channels])
+		}
 		o.frame++
 		o.drift--
 		o.corrected++
 	case o.drift < -driftBand:
-		n := copy(o.pcm, o.pcm[Channels:])
-		o.pcm = o.pcm[:n]
+		o.pcm = o.pcm[Channels:]
 		o.frame--
 		o.drift++
 		o.corrected--

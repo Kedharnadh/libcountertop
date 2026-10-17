@@ -100,7 +100,7 @@ func (m *mirror) Read(ctx context.Context, pcm []int16) (int, error) {
 	now := time.Now()
 	if len(m.pending) > 0 {
 		n := copy(pcm[:len(pcm)/m.channels*m.channels], m.pending)
-		m.pending = append(m.pending[:0], m.pending[n:]...)
+		m.pending = m.pending[n:]
 		m.quiet = time.Time{}
 		return n, nil
 	}
