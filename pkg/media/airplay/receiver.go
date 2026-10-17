@@ -98,6 +98,12 @@ func (r *Receiver) Stop() {
 	}
 }
 
+func (r *Receiver) SetEnabled(on bool) {
+	if err := r.knobs.Change("on", setting.OnOff(on)); err != nil {
+		slog.Error("saving a setting failed", "setting", "airplay on", "err", err)
+	}
+}
+
 func (r *Receiver) Resize() {
 	r.mu.Lock()
 	live := r.live

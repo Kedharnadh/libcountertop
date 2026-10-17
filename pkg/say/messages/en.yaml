@@ -347,6 +347,8 @@ features.cast.hint: Cast from a phone or an app
 features.proxy: Bluetooth proxy
 features.proxy.hint: Bluetooth LE proxy for Home Assistant
 features.rtsp.hint: RTSP on port 8554
+features.airplay: AirPlay
+features.airplay.hint: Mirror from a Mac or iPhone
 features.sendspin: Sendspin
 features.sendspin.hint: Whole-home audio
 features.speaker: Bluetooth speaker
