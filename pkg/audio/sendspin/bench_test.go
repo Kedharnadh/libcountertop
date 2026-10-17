@@ -5,6 +5,7 @@ import "testing"
 func BenchmarkRenderWithSecondsQueued(b *testing.B) {
 	const period = 1024
 	o := NewOutput(nil)
+	o.queue = newQueue(queueFrames)
 	o.ready, o.anchored, o.frame = true, true, 0
 	chunk := tone(period, 1)
 	buf := frames(period)

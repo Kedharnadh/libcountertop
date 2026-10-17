@@ -11,6 +11,7 @@ func anchored(t *testing.T) *Output {
 	t.Helper()
 
 	o := NewOutput(nil)
+	o.queue = newQueue(queueFrames)
 	o.ready = true
 	o.anchored = true
 	o.frame = 1000
@@ -30,6 +31,12 @@ func tone(n int, v int16) []int16 {
 }
 
 func microsFor(n int64) int64 { return n * 1e6 / Rate }
+
+func queued(o *Output) []int16 {
+	s := frames(o.queue.frames())
+	o.queue.read(s)
+	return s
+}
 
 func rendered(o *Output, from uint64, n int) []int16 {
 	buf := frames(n)
@@ -119,8 +126,8 @@ func TestAbsurdlyDistantAudioIsRefused(t *testing.T) {
 	if o.dropped.Load() != 1 {
 		t.Errorf("dropped = %d, want 1", o.dropped.Load())
 	}
-	if len(o.pcm) != 0 {
-		t.Errorf("held %d samples, want none", len(o.pcm))
+	if n := o.queue.frames(); n != 0 {
+		t.Errorf("held %d frames, want none", n)
 	}
 }
 
@@ -152,8 +159,8 @@ func TestFlushDropsTheAnchor(t *testing.T) {
 	if o.anchored {
 		t.Error("still anchored after a flush")
 	}
-	if len(o.pcm) != 0 {
-		t.Errorf("held %d samples, want none", len(o.pcm))
+	if n := o.queue.frames(); n != 0 {
+		t.Errorf("held %d frames, want none", n)
 	}
 }
 
@@ -190,16 +197,17 @@ func TestDriftCorrectionRepeatsFramesWhenEarly(t *testing.T) {
 	if int64(o.frame) != 1000+o.corrected {
 		t.Fatalf("anchor frame %d did not move with the %d frames repeated", o.frame, o.corrected)
 	}
-	if got := len(o.pcm) / Channels; got != 4800+int(o.corrected) {
+	if got := o.queue.frames(); got != 4800+int(o.corrected) {
 		t.Fatalf("queue holds %d frames, want %d", got, 4800+int(o.corrected))
 	}
+	pcm := queued(o)
 	first := int16(heard - 1000)
 	for i := range int(o.corrected) + 1 {
-		if o.pcm[i*Channels] != first {
-			t.Fatalf("frame %d is %d, want a repeat of frame %d", i, o.pcm[i*Channels], first)
+		if pcm[i*Channels] != first {
+			t.Fatalf("frame %d is %d, want a repeat of frame %d", i, pcm[i*Channels], first)
 		}
 	}
-	if o.pcm[(int(o.corrected)+1)*Channels] != first+1 {
+	if pcm[(int(o.corrected)+1)*Channels] != first+1 {
 		t.Fatal("the original next frame did not follow the repeats")
 	}
 }
@@ -219,8 +227,8 @@ func TestDriftCorrectionSkipsFramesWhenLate(t *testing.T) {
 	if int64(o.frame) != 1000+o.corrected {
 		t.Fatalf("anchor frame %d did not move with the %d frames skipped", o.frame, -o.corrected)
 	}
-	if want := int16(heard-1000) + int16(-o.corrected); o.pcm[0] != want {
-		t.Fatalf("queue head is frame %d, want %d", o.pcm[0], want)
+	if want, head := int16(heard-1000)+int16(-o.corrected), queued(o)[0]; head != want {
+		t.Fatalf("queue head is frame %d, want %d", head, want)
 	}
 }
 
@@ -233,7 +241,7 @@ func TestDriftCorrectionSnapsLargeErrors(t *testing.T) {
 	if o.corrected < 2400-2*driftBand || o.corrected > 2400+driftBand {
 		t.Fatalf("corrected %d frames, want about 2400", o.corrected)
 	}
-	if o.pcm[0] != 0 || o.pcm[100*Channels] != 0 {
+	if pcm := queued(o); pcm[0] != 0 || pcm[100*Channels] != 0 {
 		t.Fatal("the snap did not insert silence at the head")
 	}
 	if int64(o.frame) != 1000+o.corrected {

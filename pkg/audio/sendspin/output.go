@@ -36,7 +36,7 @@ type Output struct {
 
 	base   uint64
 	played uint64
-	pcm    []int16
+	queue  queue
 
 	anchored bool
 	frame    uint64
@@ -79,6 +79,9 @@ func (o *Output) open(sampleRate, channels, bitDepth int) error {
 	}
 
 	o.mu.Lock()
+	if o.queue.capacity() == 0 {
+		o.queue = newQueue(queueFrames)
+	}
 	o.ready = true
 	o.mu.Unlock()
 
@@ -120,19 +123,21 @@ func (o *Output) write(at int64, samples []int16) {
 		frame = o.played
 	}
 
-	if len(o.pcm) == 0 {
+	if o.queue.frames() == 0 {
 		o.base = frame
 	}
 	if frame < o.base {
-		o.pcm = append(make([]int16, (o.base-frame)*Channels), o.pcm...)
+		if int(o.base-frame) > o.queue.room() {
+			o.dropped.Add(1)
+			return
+		}
+		o.queue.lead(int(o.base - frame))
 		o.base = frame
 	}
 
-	off := int(frame-o.base) * Channels
-	if need := off + len(samples); need > len(o.pcm) {
-		o.pcm = append(o.pcm, make([]int16, need-len(o.pcm))...)
+	if o.queue.put(int(frame-o.base), samples) < len(samples)/Channels {
+		o.dropped.Add(1)
 	}
-	copy(o.pcm[off:], samples)
 }
 
 func (o *Output) frameFor(at int64) uint64 {
@@ -160,29 +165,23 @@ func (o *Output) Render(from uint64, buf []int16) {
 		o.played = from
 	}
 
-	var spent []int16
-	if from > o.base && len(o.pcm) > 0 {
-		if gone := int((from - o.base) * Channels); gone >= len(o.pcm) {
-			o.pcm = o.pcm[:0]
-		} else {
-			spent, o.pcm = o.pcm[:gone], o.pcm[gone:]
-		}
-	}
 	if from > o.base {
+		o.queue.drop(int(from - o.base))
 		o.base = from
 	}
 
 	if o.held || !o.ready || from < o.base {
 		return
 	}
-	o.correct(from, spent)
-	for i := range min(len(buf), len(o.pcm)) {
-		buf[i] = scale(o.pcm[i], o.gain)
+	o.correct(from)
+	n := o.queue.read(buf)
+	for i := range n {
+		buf[i] = scale(buf[i], o.gain)
 	}
 }
 
-func (o *Output) correct(from uint64, spent []int16) {
-	if !o.anchored || len(o.pcm) < 2*Channels {
+func (o *Output) correct(from uint64) {
+	if !o.anchored || o.queue.frames() < 2 {
 		return
 	}
 	now := o.now
@@ -206,7 +205,7 @@ func (o *Output) correct(from uint64, spent []int16) {
 		slog.Debug("sendspin correction", "off_ms", int64(off)*1000/Rate,
 			"drift_ms", int64(o.drift)*1000/Rate, "from", from, "want", want,
 			"anchor_frame", o.frame, "corrected", o.corrected,
-			"queued_ms", len(o.pcm)/Channels*1000/Rate)
+			"queued_ms", o.queue.frames()*1000/Rate)
 	}
 
 	if off > maxSnap || off < -maxSnap {
@@ -218,32 +217,27 @@ func (o *Output) correct(from uint64, spent []int16) {
 
 	switch {
 	case o.drift > snapBand:
-		n := int(o.drift)
-		o.pcm = append(make([]int16, n*Channels), o.pcm...)
+		n := o.queue.lead(int(o.drift))
 		o.frame += uint64(n)
 		o.corrected += int64(n)
 		o.drift = 0
 		slog.Debug("sendspin snapped later", "ms", n*1000/Rate)
 	case o.drift < -snapBand:
-		n := min(int(-o.drift), len(o.pcm)/Channels-1)
-		o.pcm = o.pcm[n*Channels:]
+		n := min(int(-o.drift), o.queue.frames()-1)
+		o.queue.drop(n)
 		o.frame -= uint64(n)
 		o.corrected -= int64(n)
 		o.drift = 0
 		slog.Debug("sendspin snapped earlier", "ms", n*1000/Rate)
 	case o.drift > driftBand:
-		if k := len(spent); k >= Channels {
-			o.pcm = spent[k-Channels : k+len(o.pcm)]
-			copy(o.pcm, o.pcm[Channels:2*Channels])
-		} else {
-			o.pcm = append(o.pcm, o.pcm[:Channels]...)
-			copy(o.pcm[Channels:], o.pcm[:len(o.pcm)-Channels])
+		if !o.queue.repeat() {
+			return
 		}
 		o.frame++
 		o.drift--
 		o.corrected++
 	case o.drift < -driftBand:
-		o.pcm = o.pcm[Channels:]
+		o.queue.drop(1)
 		o.frame--
 		o.drift++
 		o.corrected--
@@ -263,7 +257,7 @@ func (o *Output) flush() {
 }
 
 func (o *Output) reset() {
-	o.pcm = o.pcm[:0]
+	o.queue.reset()
 	o.base = 0
 	o.anchored = false
 	o.drift = 0
@@ -274,7 +268,7 @@ func (o *Output) misses() (late, dropped int64) { return o.late.Load(), o.droppe
 func (o *Output) queuedMs() int {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	return len(o.pcm) / Channels * 1000 / Rate
+	return o.queue.frames() * 1000 / Rate
 }
 
 func (o *Output) setVolume(level int) {
