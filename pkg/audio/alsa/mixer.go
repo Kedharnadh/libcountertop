@@ -238,6 +238,13 @@ func (m *Mixer) SetEnum(name, item string) error {
 	if err != nil {
 		return err
 	}
+	if c.Type == TypeBoolean {
+		v, ok := switched(item)
+		if !ok {
+			return fmt.Errorf("alsa: %q is a switch, %q is neither On nor Off", name, item)
+		}
+		return m.Set(c, v)
+	}
 	if c.Type != TypeEnumerated {
 		return fmt.Errorf("alsa: %q is not an enumerated control", name)
 	}
@@ -258,6 +265,16 @@ func (m *Mixer) SetInt(name string, v uint32) error {
 		return fmt.Errorf("alsa: %q is an enumerated control", name)
 	}
 	return m.Set(c, v)
+}
+
+func switched(item string) (uint32, bool) {
+	switch {
+	case strings.EqualFold(item, "On"):
+		return 1, true
+	case strings.EqualFold(item, "Off"):
+		return 0, true
+	}
+	return 0, false
 }
 
 func (m *Mixer) GetEnum(name string) (string, error) {
