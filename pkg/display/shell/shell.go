@@ -27,6 +27,8 @@ type Sleeper interface{ Asleep() bool }
 
 type Waker interface{ Wakes() bool }
 
+type Keeper interface{ Keeps() bool }
+
 type Shell struct {
 	mu         sync.Mutex
 	stack      []View
@@ -291,6 +293,9 @@ func (s *Shell) Pop() {
 	s.mu.Lock()
 	gone := s.top()
 	s.mu.Unlock()
+	if k, ok := gone.(Keeper); ok && k.Keeps() {
+		return
+	}
 	if gone != nil {
 		s.Remove(gone)
 	}

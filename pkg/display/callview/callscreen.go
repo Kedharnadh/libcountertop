@@ -344,6 +344,9 @@ func callStatus(c call.Call) string {
 		}
 		return say.T("call.incoming")
 	}
+	if c.Reconnecting {
+		return say.T("call.reconnecting")
+	}
 	d := time.Since(c.Since).Truncate(time.Second)
 	return fmt.Sprintf("%d:%02d", int(d.Minutes()), int(d.Seconds())%60)
 }

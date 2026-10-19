@@ -27,6 +27,8 @@ func (*Talk) Covers() bool { return true }
 
 func (*Talk) Wakes() bool { return true }
 
+func (*Talk) Keeps() bool { return true }
+
 func (*Talk) Shows(s schema.Stream) bool { return s == schema.StreamVoice }
 
 type Profile struct{ ID string }

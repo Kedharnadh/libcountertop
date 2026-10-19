@@ -19,6 +19,8 @@ func (c *Calls) notice(peer string, reason Reason) {
 		body = say.T("call.dropped")
 	case ReasonFailed:
 		body = say.T("call.failed")
+	case ReasonUnreachable:
+		body = say.T("call.unreachable")
 	default:
 		return
 	}

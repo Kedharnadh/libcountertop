@@ -26,12 +26,16 @@ const (
 	PlayRate     = 48000
 	PlayChannels = 2
 	maxConceal   = 5
-	opusType     = 111
-	h264Type     = 102
-	videoClock   = 90000
-	videoLate    = 256
-	videoFrame   = 33 * time.Millisecond
-	keyEvery     = 500 * time.Millisecond
+
+	disconnectedAfter = 3 * time.Second
+	failedAfter       = 5 * time.Second
+	keepalive         = time.Second
+	opusType          = 111
+	h264Type          = 102
+	videoClock        = 90000
+	videoLate         = 256
+	videoFrame        = 33 * time.Millisecond
+	keyEvery          = 500 * time.Millisecond
 )
 
 type Audio interface {
@@ -101,12 +105,12 @@ type Link struct {
 	workers sync.WaitGroup
 	count   counters
 
-	pc    *webrtc.PeerConnection
-	track *webrtc.TrackLocalStaticSample
-	video *webrtc.TrackLocalStaticSample
-	talk  *webrtc.DataChannel
-	media Media
-	ended func(webrtc.PeerConnectionState)
+	pc     *webrtc.PeerConnection
+	track  *webrtc.TrackLocalStaticSample
+	video  *webrtc.TrackLocalStaticSample
+	talk   *webrtc.DataChannel
+	media  Media
+	report func(webrtc.PeerConnectionState)
 
 	muted   atomic.Bool
 	remote  atomic.Uint32
@@ -143,6 +147,7 @@ func api() (*webrtc.API, error) {
 	se := webrtc.SettingEngine{}
 	se.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)
 	se.SetNetworkTypes([]webrtc.NetworkType{webrtc.NetworkTypeUDP4})
+	se.SetICETimeouts(disconnectedAfter, failedAfter, keepalive)
 	return webrtc.NewAPI(
 		webrtc.WithMediaEngine(m),
 		webrtc.WithInterceptorRegistry(reg),
@@ -150,13 +155,13 @@ func api() (*webrtc.API, error) {
 	), nil
 }
 
-func New(m Media, ended func(webrtc.PeerConnectionState)) (*Link, error) {
-	return NewWithStreamID(m, ended, "countertop")
+func New(m Media, report func(webrtc.PeerConnectionState)) (*Link, error) {
+	return NewWithStreamID(m, report, "countertop")
 }
 
 func NewWithStreamID(
 	m Media,
-	ended func(webrtc.PeerConnectionState),
+	report func(webrtc.PeerConnectionState),
 	streamID string,
 ) (*Link, error) {
 	built, err := api()
@@ -182,7 +187,7 @@ func NewWithStreamID(
 		return nil, err
 	}
 	ctx, stop := context.WithCancel(context.Background())
-	l := &Link{pc: pc, track: track, media: m, ended: ended, ctx: ctx, stop: stop}
+	l := &Link{pc: pc, track: track, media: m, report: report, ctx: ctx, stop: stop}
 	l.worker(func() { l.drain(sender) })
 	switch {
 	case m.Camera != nil:
@@ -318,9 +323,12 @@ func (l *Link) state(s webrtc.PeerConnectionState) {
 				l.worker(l.film)
 			}
 		})
-	case webrtc.PeerConnectionStateFailed, webrtc.PeerConnectionStateClosed:
-		if l.ended != nil {
-			l.ended(s)
+	}
+	switch s {
+	case webrtc.PeerConnectionStateConnected, webrtc.PeerConnectionStateDisconnected,
+		webrtc.PeerConnectionStateFailed, webrtc.PeerConnectionStateClosed:
+		if l.report != nil {
+			l.report(s)
 		}
 	}
 }

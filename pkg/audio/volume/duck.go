@@ -39,6 +39,16 @@ func DuckTable() *setting.Table[schema.Media] {
 				return nil
 			},
 		},
+		setting.Pick(
+			setting.Setting[schema.Media]{
+				Name:  "buttons",
+				Group: MediaGroup,
+				ID:    "volume_buttons",
+				Icon:  "mdi:volume-vibrate",
+			},
+			schema.VolumeButtonModes(),
+			func(m *schema.Media) *schema.VolumeButtons { return &m.Buttons },
+		),
 	}, setting.Messages{Text: say.T, Missing: say.Missing})
 	return t
 }

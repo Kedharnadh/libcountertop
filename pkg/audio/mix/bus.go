@@ -2,6 +2,7 @@ package mix
 
 import (
 	"sync"
+	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
@@ -18,6 +19,7 @@ type lane struct {
 	Queue
 	gain  float32
 	muted bool
+	heard time.Time
 }
 
 func (l *lane) level() float32 {
@@ -95,6 +97,13 @@ func (b *Bus) Muted(s schema.Stream) bool {
 	return b.held(s).muted
 }
 
+func (b *Bus) Heard(s schema.Stream, within time.Duration) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	l, ok := b.lanes[s]
+	return ok && !l.heard.IsZero() && time.Since(l.heard) <= within
+}
+
 func (b *Bus) Attach(src Source) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -104,13 +113,20 @@ func (b *Bus) Attach(src Source) {
 func (b *Bus) Next(at uint64, out []int32) (queued int, rendered bool) {
 	clear(out)
 
+	now := time.Now()
 	b.mu.Lock()
 	for _, l := range b.lanes {
 		chunk := l.Next(len(out))
 		queued = max(queued, len(chunk))
 		add(out, chunk, l.level())
+		if len(chunk) > 0 {
+			l.heard = now
+		}
 	}
 	src, media := b.src, b.held(schema.StreamMedia).level()
+	if src != nil {
+		b.held(schema.StreamMedia).heard = now
+	}
 	b.mu.Unlock()
 
 	if src == nil {

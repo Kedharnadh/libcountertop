@@ -33,6 +33,7 @@ type PageOptions struct {
 	MainSteps int
 	Chimes    Chimes
 	Feedback  *tone.Feedback
+	Media     *setting.Controls[schema.Media]
 	Push      func(shell.View)
 }
 
@@ -56,6 +57,12 @@ func NewPage(o PageOptions) *shell.Page {
 				o.Levels.Set(s, level)
 				hear.after(s)
 			})
+		}
+		if o.Media != nil {
+			if field, ok := o.Media.Table.Find("buttons"); ok {
+				row, act := segments(o.Media, field)
+				rows, actions = append(rows, row), append(actions, act)
+			}
 		}
 		if o.Feedback != nil && o.Push != nil {
 			at := o.Feedback.Read()
@@ -87,6 +94,29 @@ func NewPage(o PageOptions) *shell.Page {
 		}
 		return rows, actions
 	}}
+}
+
+func segments[T any](c *setting.Controls[T], field setting.Setting[T]) (menu.Row, func(int)) {
+	at := c.Read()
+	values := field.Values()
+	labels := make([]string, len(values))
+	for i, v := range values {
+		labels[i] = field.LabelOf(v)
+	}
+	row := menu.Row{
+		Label:   field.Title(),
+		Kind:    menu.Segments,
+		Options: labels,
+		Level:   max(slices.Index(values, field.Read(&at)), 0),
+	}
+	return row, func(i int) {
+		if i < 0 || i >= len(values) {
+			return
+		}
+		if err := c.Change(field.Name, values[i]); err != nil {
+			slog.Error("saving a setting failed", "setting", c.Domain()+"."+field.Name, "err", err)
+		}
+	}
 }
 
 func feedbackChoice(f *tone.Feedback, field setting.Setting[schema.Feedback]) *shell.Page {

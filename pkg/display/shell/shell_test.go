@@ -23,6 +23,32 @@ func (v *view) Timeout() time.Duration {
 	return v.wait
 }
 
+type kept struct{ view }
+
+func (*kept) Keeps() bool { return true }
+
+func TestBackLeavesAKeptViewAndPopsOthers(t *testing.T) {
+	s := &Shell{}
+	call := &kept{view{covers: true}}
+	h := s.Hold(call)
+	s.Pop()
+	if got := s.Views(); len(got) != 1 || got[0] != call || !h.Held() {
+		t.Fatalf("back took the call away: %v", got)
+	}
+
+	page := &view{covers: true}
+	s.Push(page)
+	s.Pop()
+	if got := s.Views(); len(got) != 1 || got[0] != call {
+		t.Errorf("back over the call left %v, want the call", got)
+	}
+
+	h.Release()
+	if got := s.Views(); len(got) != 0 {
+		t.Errorf("releasing the call left %v", got)
+	}
+}
+
 func TestReleasingAHoldTakesAwayThatViewAndNoOther(t *testing.T) {
 	s := &Shell{}
 	player, page := &view{covers: true}, &view{covers: true}

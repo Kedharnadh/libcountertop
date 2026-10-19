@@ -90,6 +90,8 @@ bluetooth.setting.speaker: Bluetooth speaker
 boot.leaving: Restarting
 boot.skip: Skip
 boot.stranded: Lost contact with the screen
+buttons.dynamic: What's playing
+buttons.static: Main volume
 calendar.allday: All day
 calendar.app: Calendar
 calendar.chosen: "{{.N}} calendar{{if ne .N 1}}s{{end}}"
@@ -130,6 +132,7 @@ call.model: Model
 call.mute: Mute
 call.no: "No"
 call.pausewake: Pause wake word during calls
+call.reconnecting: Reconnecting…
 call.ring: Ring
 call.ringback: Ringback
 call.seen: Last seen
@@ -152,6 +155,7 @@ call.stream.sub: Sub
 call.tab: Intercom
 call.unanswered: No answer
 call.unavailable: Not taking calls
+call.unreachable: Can't be reached
 call.unmute: Unmute
 call.version: Version
 call.video: Video calls
@@ -481,8 +485,10 @@ look.stage.listening: Listening
 look.stage.responding: Responding
 look.stage.waiting: Waiting
 look.title: Visuals
+media.entity.buttons: Volume buttons
 media.entity.duck: Music ducking
 media.group.media: Media
+media.setting.buttons: Volume buttons
 media.setting.duck: Ducking depth
 microphone.group.microphone: Microphone
 microphone.setting.cancel: Microphone echo cancellation

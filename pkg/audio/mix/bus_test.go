@@ -3,6 +3,7 @@ package mix
 import (
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
@@ -125,5 +126,28 @@ func TestBusOverlayMixesWithinOneStream(t *testing.T) {
 	b.Next(0, out)
 	if want := []int32{15, 15, 5}; !slices.Equal(out, want) {
 		t.Errorf("overlaid %v, want %v", out, want)
+	}
+}
+
+func TestBusHearsWhatItRendered(t *testing.T) {
+	var b Bus
+	out := make([]int32, 2)
+	if b.Heard(schema.StreamVoice, time.Minute) {
+		t.Fatal("heard voice before any was pushed")
+	}
+
+	b.Push(schema.StreamVoice, []int16{1, 1})
+	b.Next(0, out)
+	if !b.Heard(schema.StreamVoice, time.Minute) || b.Heard(schema.StreamMedia, time.Minute) {
+		t.Error("after voice played, want voice heard and media not")
+	}
+	if b.Heard(schema.StreamVoice, 0) {
+		t.Error("voice heard within no time at all")
+	}
+
+	b.Attach(steady(1))
+	b.Next(0, out)
+	if !b.Heard(schema.StreamMedia, time.Minute) {
+		t.Error("an attached source did not count as media")
 	}
 }

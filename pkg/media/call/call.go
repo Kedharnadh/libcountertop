@@ -50,6 +50,7 @@ const (
 	ReasonUnavailable Reason = "unavailable"
 	ReasonDropped     Reason = "dropped"
 	ReasonFailed      Reason = "failed"
+	ReasonUnreachable Reason = "unreachable"
 )
 
 var (
@@ -67,6 +68,7 @@ type Call struct {
 	CameraOff       bool
 	RemoteMuted     bool
 	RemoteCameraOff bool
+	Reconnecting    bool
 }
 
 type session struct {
@@ -158,6 +160,7 @@ func (c *Calls) PausesWake() bool { return c.Talking() && c.options.Settings.Rea
 func (c *Calls) Start(p discovery.Peer, video bool) error {
 	addr, err := p.Addr()
 	if err != nil {
+		c.notice(p.Name, ReasonUnreachable)
 		return err
 	}
 	c.mu.Lock()
@@ -175,7 +178,7 @@ func (c *Calls) Start(p discovery.Peer, video bool) error {
 
 func (c *Calls) dial(s *session) {
 	m, own := c.media(s)
-	link, err := rtc.New(m, c.lost(s))
+	link, err := rtc.New(m, c.linked(s))
 	if err != nil {
 		c.fail(s, "link", err)
 		return
@@ -252,7 +255,7 @@ func (c *Calls) Answer() {
 
 func (c *Calls) answer(s *session) {
 	m, own := c.media(s)
-	link, err := rtc.New(m, c.lost(s))
+	link, err := rtc.New(m, c.linked(s))
 	if err != nil {
 		c.fail(s, "link", err)
 		return
@@ -460,9 +463,23 @@ func (c *Calls) talking(s *session) {
 	})
 }
 
-func (c *Calls) lost(s *session) func(webrtc.PeerConnectionState) {
+func (c *Calls) linked(s *session) func(webrtc.PeerConnectionState) {
 	return func(state webrtc.PeerConnectionState) {
-		if c.state(s) != Idle {
+		if c.state(s) == Idle {
+			return
+		}
+		switch state {
+		case webrtc.PeerConnectionStateDisconnected, webrtc.PeerConnectionStateConnected:
+			lost := state == webrtc.PeerConnectionStateDisconnected
+			c.mu.Lock()
+			was := s.Reconnecting
+			s.Reconnecting = lost
+			c.mu.Unlock()
+			if was != lost {
+				slog.Info("call link", "peer", s.Peer.Name, "state", state)
+				c.changed(s)
+			}
+		default:
 			slog.Info("call link lost", "peer", s.Peer.Name, "state", state)
 			c.end(s, ReasonDropped)
 		}
