@@ -71,6 +71,8 @@ apps.setting.dock: Apps in the dock
 apps.setting.order: App order
 apps.title: Apps
 assistants.off: "Off"
+assistants.pipeline: Pipeline
+assistants.pipeline.preferred: Preferred
 assistants.reply: Response playback
 assistants.slot: Assistant {{.N}}
 assistants.talk: Talk now

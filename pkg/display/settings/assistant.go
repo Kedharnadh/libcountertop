@@ -4,11 +4,13 @@ import (
 	"context"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/assistant/turn"
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
+	ha "github.com/ygelfand/libcountertop/pkg/homeassistant"
 	"github.com/ygelfand/libcountertop/pkg/hook"
 	"github.com/ygelfand/libcountertop/pkg/inference/wake"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
@@ -21,18 +23,36 @@ type WakeChooser interface {
 	Choose(ctx context.Context, slot int, phrase string) error
 }
 
+type PipelineChooser interface {
+	Allowed() bool
+	Read(ctx context.Context, slot int) (chosen string, options []string, err error)
+	Choose(ctx context.Context, slot int, option string) error
+}
+
 type AssistantDependencies struct {
 	Slots       int
 	Preferences Preferences
 	Models      func() []wake.Model
 	Phrases     func() []string
 	Chooser     WakeChooser
+	Pipelines   PipelineChooser
 	Requested   *hook.Hook[int]
 	Words       turn.Words
 	Look        *LookPages
 	Shell       *shell.Shell
 }
-type AssistantPages struct{ options AssistantDependencies }
+
+type pipeline struct {
+	chosen  string
+	options []string
+}
+
+type AssistantPages struct {
+	options AssistantDependencies
+
+	mu        sync.Mutex
+	pipelines map[int]pipeline
+}
 
 func NewAssistantPages(
 	o AssistantDependencies,
@@ -68,7 +88,10 @@ func (p *AssistantPages) Page() *shell.Page {
 					Hint:   p.Hearing(slot),
 					Chosen: false,
 				})
-				acts = append(acts, p.open(func() shell.View { return p.Slot(slot) }))
+				acts = append(acts, func(int) {
+					p.readPipeline(slot)
+					p.options.Shell.Push(p.Slot(slot))
+				})
 			}
 			return rows, acts
 		},
@@ -85,6 +108,9 @@ func (p *AssistantPages) Listening(slot int) string {
 func (p *AssistantPages) Hearing(slot int) string {
 	id := p.options.Preferences.Wake.Read().Slot(slot).ID
 	if id == "" {
+		if p.picks() {
+			return ""
+		}
 		return say.T("assistants.unset")
 	}
 	if _, ok := wake.Find(p.options.Models(), id); !ok {
@@ -100,10 +126,12 @@ func (p *AssistantPages) Slot(slot int) *shell.Page {
 			saved := p.options.Preferences.Wake.Read().Slot(slot)
 
 			word, choose := p.wordRow(slot)
+			assistant, pick := p.pipelineRow(slot)
 			return []menu.Row{
 					{Label: say.T("assistants.talk"), Hint: say.T("assistants.talk.hint")},
 
 					word,
+					assistant,
 
 					{
 						Label: say.T("assistants.threshold"),
@@ -130,6 +158,7 @@ func (p *AssistantPages) Slot(slot int) *shell.Page {
 				}, []func(int){
 					func(int) { p.options.Requested.Emit(slot) },
 					choose,
+					pick,
 					p.Threshold(slot),
 					p.open(func() shell.View { return p.Tone(slot) }),
 					p.open(func() shell.View { return p.Delivery(slot) }),
@@ -141,11 +170,102 @@ func (p *AssistantPages) Slot(slot int) *shell.Page {
 
 func (p *AssistantPages) wordRow(slot int) (menu.Row, func(int)) {
 	row := menu.Row{Label: say.T("assistants.word"), Kind: menu.Chevron, Value: p.Listening(slot)}
-	if p.options.Chooser == nil || p.options.Phrases == nil || !p.options.Chooser.Allowed() {
+	if !p.picks() {
 		row.Dim, row.Hint = true, say.T("assistants.word.ha")
 		return row, func(int) {}
 	}
 	return row, p.open(func() shell.View { return p.Word(slot) })
+}
+
+func (p *AssistantPages) pipelineRow(slot int) (menu.Row, func(int)) {
+	row := menu.Row{Label: say.T("assistants.pipeline"), Kind: menu.Chevron}
+	if p.options.Pipelines == nil || !p.options.Pipelines.Allowed() {
+		row.Dim, row.Hint = true, say.T("assistants.word.ha")
+		return row, func(int) {}
+	}
+	now, ok := p.pipeline(slot)
+	if !ok {
+		row.Dim = true
+		return row, func(int) {}
+	}
+	row.Value = pipelineName(now.chosen)
+	return row, p.open(func() shell.View { return p.Pipeline(slot) })
+}
+
+func (p *AssistantPages) Pipeline(slot int) *shell.Page {
+	return &shell.Page{
+		Title: say.T("assistants.pipeline"),
+		Build: func() ([]menu.Row, []func(int)) {
+			now, _ := p.pipeline(slot)
+			rows := make([]menu.Row, 0, len(now.options))
+			acts := make([]func(int), 0, len(now.options))
+			for _, option := range now.options {
+				rows = append(
+					rows,
+					menu.Row{Label: pipelineName(option), Chosen: option == now.chosen},
+				)
+				acts = append(acts, func(int) { p.choosePipeline(slot, option) })
+			}
+			return rows, acts
+		},
+	}
+}
+
+func pipelineName(option string) string {
+	if option == ha.PreferredPipeline {
+		return say.T("assistants.pipeline.preferred")
+	}
+	return option
+}
+
+func (p *AssistantPages) pipeline(slot int) (pipeline, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	now, ok := p.pipelines[slot]
+	return now, ok
+}
+
+func (p *AssistantPages) readPipeline(slot int) {
+	if p.options.Pipelines == nil || !p.options.Pipelines.Allowed() {
+		return
+	}
+	safe.Go("reading the assistant pipeline", func() {
+		ctx, cancel := context.WithTimeout(context.Background(), chooseFor)
+		defer cancel()
+		chosen, options, err := p.options.Pipelines.Read(ctx, slot)
+		if err != nil {
+			slog.Warn("reading the assistant pipeline failed", "slot", slot+1, "err", err)
+			return
+		}
+		p.mu.Lock()
+		if p.pipelines == nil {
+			p.pipelines = map[int]pipeline{}
+		}
+		p.pipelines[slot] = pipeline{chosen: chosen, options: options}
+		p.mu.Unlock()
+		p.options.Shell.Redraw()
+	})
+}
+
+func (p *AssistantPages) choosePipeline(slot int, option string) {
+	safe.Go("choosing the assistant pipeline", func() {
+		ctx, cancel := context.WithTimeout(context.Background(), chooseFor)
+		defer cancel()
+		if err := p.options.Pipelines.Choose(ctx, slot, option); err != nil {
+			slog.Error("choosing the assistant pipeline failed", "slot", slot+1, "err", err)
+			return
+		}
+		p.mu.Lock()
+		now := p.pipelines[slot]
+		now.chosen = option
+		p.pipelines[slot] = now
+		p.mu.Unlock()
+		p.options.Shell.Redraw()
+	})
+}
+
+func (p *AssistantPages) picks() bool {
+	return p.options.Chooser != nil && p.options.Phrases != nil && p.options.Chooser.Allowed()
 }
 
 func (p *AssistantPages) Word(slot int) *shell.Page {

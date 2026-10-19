@@ -17,10 +17,10 @@ func (p *LookPages) Page(slot int) *shell.Page {
 		Title: say.T("look.title"),
 		Build: func() ([]menu.Row, []func(int)) {
 			look := p.options.Preferences.Wake.Read().Slot(slot).Look
-			rows := []menu.Row{
-				{Label: say.T("look.place"), Kind: menu.Chevron, Value: look.Place.Label()},
+			rows := []menu.Row{SegmentRow(say.T("look.place"), config.LookPlaces(), look.Place)}
+			taps := []func(int){
+				SegmentPick(config.LookPlaces(), func(at config.LookPlace) { p.place(slot, at) }),
 			}
-			taps := []func(int){p.open(func() shell.View { return p.Place(slot) })}
 			for _, st := range config.Stages() {
 				rows = append(
 					rows,
@@ -44,32 +44,12 @@ func LookName(kind string) string {
 	return visual.Kind(kind).Label()
 }
 
-func (p *LookPages) Place(slot int) *shell.Page {
-	return &shell.Page{
-		Title: say.T("look.place"),
-		Build: func() ([]menu.Row, []func(int)) {
-			now := p.options.Preferences.Wake.Read().Slot(slot).Look.Place
-			var rows []menu.Row
-			var taps []func(int)
-			for _, value := range config.LookPlaces() {
-				rows = append(rows, menu.Row{Label: value.Label(), Chosen: value == now})
-				taps = append(taps, func(int) {
-					if err := p.options.Preferences.Word(
-						slot,
-						func(w *config.WakeWord) { w.Look.Place = value },
-					); err != nil {
-						slog.Error(
-							"saving the assistant visual placement failed",
-							"slot",
-							slot+1,
-							"err",
-							err,
-						)
-					}
-				})
-			}
-			return rows, taps
-		},
+func (p *LookPages) place(slot int, place config.LookPlace) {
+	if err := p.options.Preferences.Word(
+		slot,
+		func(w *config.WakeWord) { w.Look.Place = place },
+	); err != nil {
+		slog.Error("saving the assistant visual placement failed", "slot", slot+1, "err", err)
 	}
 }
 
