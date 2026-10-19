@@ -132,8 +132,9 @@ func TestASnapshotCarriesOnlyPortableSettings(t *testing.T) {
 	r.Add(source)
 
 	snap := r.Export()
-	want := map[string]string{"on": "on", "mode": "b"}
-	if got := snap["sample"]; len(got) != len(want) || got["on"] != "on" || got["mode"] != "b" {
+	want := map[string]string{"on": "on", "mode": "b", "token": "s3cret"}
+	if got := snap["sample"]; len(got) != len(want) || got["on"] != "on" || got["mode"] != "b" ||
+		got["token"] != "s3cret" {
 		t.Fatalf("snapshot = %v, want %v", got, want)
 	}
 
@@ -143,16 +144,15 @@ func TestASnapshotCarriesOnlyPortableSettings(t *testing.T) {
 	var into Registry
 	into.Add(target)
 	snap["sample"]["name"] = "hallway"
-	snap["sample"]["token"] = "stolen"
 	snap["sample"]["gone"] = "x"
 	snap["other"] = map[string]string{"on": "off"}
 
 	applied, err := into.Import(snap)
-	if err != nil || applied != 2 {
-		t.Fatalf("Import = %d, %v; want 2 settings applied", applied, err)
+	if err != nil || applied != 3 {
+		t.Fatalf("Import = %d, %v; want 3 settings applied", applied, err)
 	}
-	if !to.On || to.Mode != "b" || to.Name != "" || to.Token != "" {
-		t.Fatalf("imported %+v; want only on and mode", to)
+	if !to.On || to.Mode != "b" || to.Name != "" || to.Token != "s3cret" {
+		t.Fatalf("imported %+v; want on, mode and token", to)
 	}
 
 	if applied, err := into.Import(snap); err != nil || applied != 0 {

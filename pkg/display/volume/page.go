@@ -62,7 +62,7 @@ func NewPage(o PageOptions) *shell.Page {
 			for _, field := range o.Feedback.Table.Rows() {
 				rows = append(
 					rows,
-					menu.Row{Label: field.Named(), Kind: menu.Chevron, Value: field.Shows(&at)},
+					menu.Row{Label: field.Named(), Kind: menu.Chevron, Value: field.Visible(&at)},
 				)
 				actions = append(actions, func(int) {
 					o.Push(feedbackChoice(o.Feedback, field))

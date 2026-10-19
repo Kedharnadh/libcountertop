@@ -91,7 +91,7 @@ func (kit *Toolkit) Row(
 			},
 		}
 		content = append(content, render.Grip(kit.Slider(level)))
-	case menu.Field:
+	case menu.Field, menu.Password:
 		content = append(content, render.Field(page+"/"+id, r))
 	case menu.Segments:
 		content = append(content, kit.segments(id, r, tap))

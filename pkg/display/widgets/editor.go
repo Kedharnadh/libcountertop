@@ -81,6 +81,7 @@ func (e *Editor) Row(kit FieldStyle, id string, r menu.Row) gui.View {
 	return e.Field(kit, gui.InputCfg{
 		ID:            fid,
 		Text:          text,
+		IsPassword:    r.Kind == menu.Password,
 		Sizing:        gui.FillFit,
 		OnTextChanged: func(s string, ev gui.EventCtx) { e.drafts[fid] = s; ev.Window.InvalidateLayout() },
 		OnTextCommit: func(_ string, _ gui.InputCommitReason, ev gui.EventCtx) {

@@ -66,7 +66,7 @@ func (c *Controls[T]) PublishFrom(at T) {
 		case *esphome.Select:
 			e.Set(s.LabelOf(s.Read(&at)))
 		case *esphome.Text:
-			e.Set(s.Read(&at))
+			e.Set(s.Visible(&at))
 		}
 	}
 }
@@ -135,7 +135,7 @@ func (c *Controls[T]) entity(s Setting[T], at *T) esphome.Entity {
 		if s.Kind == Secret {
 			e.Mode = api.TextMode_TEXT_MODE_PASSWORD
 		}
-		e.Set(s.Read(at))
+		e.Set(s.Visible(at))
 		e.OnCommand = func(v string) { c.change(s, v) }
 		return e
 
@@ -185,7 +185,7 @@ func (c *Controls[T]) Value(name string) (string, error) {
 		return "", err
 	}
 	at := c.Read()
-	return s.Shows(&at), nil
+	return s.Visible(&at), nil
 }
 
 func (c *Controls[T]) Change(name, value string) error {

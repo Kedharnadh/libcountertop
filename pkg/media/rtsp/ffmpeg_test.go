@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -68,6 +69,9 @@ func TestFFmpegPlaysIt(t *testing.T) {
 	}
 
 	srv := NewServer()
+	var password atomic.Value
+	password.Store("")
+	srv.Auth = func() (string, string) { return "admin", password.Load().(string) }
 	st := NewStream()
 	srv.Handle("main", st)
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -92,19 +96,53 @@ func TestFFmpegPlaysIt(t *testing.T) {
 		}
 	}()
 
-	for _, transport := range []string{"tcp", "udp"} {
-		t.Run(transport, func(t *testing.T) {
-			run, cancel := context.WithTimeout(ctx, 20*time.Second)
-			defer cancel()
-			cmd := exec.CommandContext(run, "ffmpeg", "-v", "error", "-rtsp_transport", transport,
-				"-i", "rtsp://"+ln.Addr().String()+"/main", "-frames:v", "20", "-f", "null", "-")
-			out, err := cmd.CombinedOutput()
-			if err != nil {
-				t.Fatalf("ffmpeg: %v\n%s", err, out)
-			}
-			if s := strings.TrimSpace(string(out)); s != "" {
-				t.Errorf("ffmpeg complained:\n%s", s)
-			}
-		})
+	play := func(run context.Context, transport, userinfo string) ([]byte, error) {
+		return exec.CommandContext(
+			run,
+			"ffmpeg",
+			"-v",
+			"error",
+			"-rtsp_transport",
+			transport,
+			"-i",
+			"rtsp://"+userinfo+ln.Addr().String()+"/main",
+			"-frames:v",
+			"20",
+			"-f",
+			"null",
+			"-",
+		).
+			CombinedOutput()
+	}
+
+	for _, c := range []struct {
+		name, password, userinfo string
+		refused                  bool
+	}{
+		{name: "open"},
+		{name: "no credentials", password: "pw", refused: true},
+		{name: "wrong password", password: "pw", userinfo: "admin:nope@", refused: true},
+		{name: "digest", password: "pw", userinfo: "admin:pw@"},
+	} {
+		password.Store(c.password)
+		for _, transport := range []string{"tcp", "udp"} {
+			t.Run(c.name+"/"+transport, func(t *testing.T) {
+				run, cancel := context.WithTimeout(ctx, 20*time.Second)
+				defer cancel()
+				out, err := play(run, transport, c.userinfo)
+				if c.refused {
+					if err == nil || !strings.Contains(string(out), "401") {
+						t.Fatalf("ffmpeg = %v, want a 401 refusal\n%s", err, out)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatalf("ffmpeg: %v\n%s", err, out)
+				}
+				if s := strings.TrimSpace(string(out)); s != "" {
+					t.Errorf("ffmpeg complained:\n%s", s)
+				}
+			})
+		}
 	}
 }

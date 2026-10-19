@@ -278,8 +278,8 @@ type RTSPWriter struct{ s storage.Section[RTSP] }
 
 func NewRTSPWriter(s storage.Section[RTSP]) RTSPWriter { return RTSPWriter{s: s} }
 
-func (w RTSPWriter) Enabled(v bool) error {
-	return w.s.Update(func(c *RTSP) { c.Enabled = v })
+func (w RTSPWriter) All(v RTSP) error {
+	return w.s.Update(func(c *RTSP) { *c = v })
 }
 
 type ScreenWriter struct{ s storage.Section[Screen] }

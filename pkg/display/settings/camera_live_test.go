@@ -35,7 +35,6 @@ func livePages(t *testing.T) (*CameraPages[live.Knobs], *live.Camera) {
 	pages := NewCameraPages(CameraOptions[live.Knobs]{
 		Table:  cam.Table,
 		Read:   cam.Saved,
-		Stream: func() bool { return false },
 		Push:   func(shell.View) {},
 		Redraw: func() {},
 		Wrap:   func(p *shell.Page) *shell.Page { return p },
@@ -48,15 +47,8 @@ func TestTheCameraPageIsTheSections(t *testing.T) {
 	rows, acts := p.Page().Build()
 	shown := p.Shown()
 
-	if len(rows) != len(shown)+2 || len(acts) != len(rows) {
-		t.Fatalf(
-			"%d rows against %d sections, the stream switch and a reset",
-			len(rows),
-			len(shown),
-		)
-	}
-	if stream := rows[len(rows)-2]; stream.Kind != menu.Toggle {
-		t.Errorf("the row before reset is %+v, want the camera stream switch", stream)
+	if len(rows) != len(shown)+1 || len(acts) != len(rows) {
+		t.Fatalf("%d rows against %d sections and a reset", len(rows), len(shown))
 	}
 	if last := rows[len(rows)-1]; last.Kind == menu.Chevron || acts[len(acts)-1] == nil {
 		t.Errorf("the last row is %+v, want the reset action", last)

@@ -14,16 +14,14 @@ import (
 )
 
 type CameraOptions[K any] struct {
-	Table     func() *setting.Table[K]
-	Read      func() K
-	Save      func(string, string) error
-	Reset     func() error
-	Stream    func() bool
-	SetStream func(bool)
-	Push      func(shell.View)
-	Redraw    func()
-	Preview   func(ui.Rect) shell.Feed
-	Wrap      func(*shell.Page) *shell.Page
+	Table   func() *setting.Table[K]
+	Read    func() K
+	Save    func(string, string) error
+	Reset   func() error
+	Push    func(shell.View)
+	Redraw  func()
+	Preview func(ui.Rect) shell.Feed
+	Wrap    func(*shell.Page) *shell.Page
 }
 type CameraPages[K any] struct {
 	options  CameraOptions[K]
@@ -128,12 +126,6 @@ func (p *CameraPages[K]) makePage() *shell.Page {
 				})
 				taps = append(taps, p.open(func() *shell.Page { return p.Section(g) }))
 			}
-			rows = append(
-				rows,
-				menu.Row{Label: say.T("camera.stream"), Hint: say.T("features.rtsp.hint"),
-					Kind: menu.Toggle, On: p.options.Stream()},
-			)
-			taps = append(taps, func(int) { p.options.SetStream(!p.options.Stream()) })
 			p.mu.Lock()
 			armed := time.Since(p.armed) < resetWindow
 			p.mu.Unlock()
@@ -202,7 +194,7 @@ func (p *CameraPages[K]) Row(s setting.Setting[K], sh *K) (menu.Row, func(int)) 
 
 	case setting.Choice:
 		row.Kind = menu.Chevron
-		row.Value = s.Shows(sh)
+		row.Value = s.Visible(sh)
 		return row, Dimmed(&row, idle, p.open(func() *shell.Page { return p.Choice(s) }))
 	}
 

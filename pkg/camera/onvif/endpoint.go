@@ -6,6 +6,8 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+
+	"github.com/ygelfand/libcountertop/pkg/network/digest"
 )
 
 const SnapshotPath = "/onvif/snapshot.jpg"
@@ -15,6 +17,7 @@ type Config struct {
 	Device   Device
 	Hardware string
 	Snapshot func() ([]byte, error)
+	Auth     digest.Credentials
 }
 
 type Endpoint struct {
@@ -24,11 +27,12 @@ type Endpoint struct {
 
 func Serve(cfg Config) *Endpoint {
 	mux := http.NewServeMux()
+	svc := &Service{Auth: cfg.Auth, challenge: digest.New(cfg.Hardware)}
 	if cfg.Snapshot != nil {
 		cfg.Device.SnapshotPath = SnapshotPath
-		mux.HandleFunc(SnapshotPath, snapshot(cfg.Snapshot))
+		mux.HandleFunc(SnapshotPath, snapshot(cfg.Snapshot, svc))
 	}
-	svc := &Service{Device: cfg.Device}
+	svc.Device = cfg.Device
 	mux.Handle(DevicePath, svc)
 	mux.Handle(MediaPath, svc)
 
@@ -69,8 +73,13 @@ func (e *Endpoint) Close() {
 	}
 }
 
-func snapshot(still func() ([]byte, error)) http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
+func snapshot(still func() ([]byte, error), svc *Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !svc.Auth.Open() && !svc.allows(r) {
+			w.Header().Set("WWW-Authenticate", svc.challenge.Header())
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
 		jpeg, err := still()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusServiceUnavailable)

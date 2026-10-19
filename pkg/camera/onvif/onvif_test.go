@@ -71,8 +71,21 @@ func TestProbeTypes(t *testing.T) {
 
 func soap(t *testing.T, url, op, inner string) (int, string) {
 	t.Helper()
-	body := `<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:trt="http://www.onvif.org/ver10/media/wsdl" xmlns:tds="http://www.onvif.org/ver10/device/wsdl"><s:Body><` + op + `>` + inner + `</` + op + `></s:Body></s:Envelope>`
-	r, err := http.Post(url, "application/soap+xml", strings.NewReader(body))
+	return soapWith(t, url, op, inner, "", "")
+}
+
+func soapWith(t *testing.T, url, op, inner, header, authorization string) (int, string) {
+	t.Helper()
+	body := `<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:trt="http://www.onvif.org/ver10/media/wsdl" xmlns:tds="http://www.onvif.org/ver10/device/wsdl"><s:Header>` + header + `</s:Header><s:Body><` + op + `>` + inner + `</` + op + `></s:Body></s:Envelope>`
+	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/soap+xml")
+	if authorization != "" {
+		req.Header.Set("Authorization", authorization)
+	}
+	r, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}

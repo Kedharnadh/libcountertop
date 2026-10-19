@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ygelfand/libcountertop/pkg/network/digest"
 )
 
 const idle = 60 * time.Second
@@ -21,6 +23,7 @@ type Identity struct{ Name, CNAMEPrefix string }
 type Server struct {
 	identity Identity
 	Wait     time.Duration
+	Auth     digest.Credentials
 
 	mu      sync.Mutex
 	streams map[string]*Stream
@@ -71,7 +74,7 @@ func (s *Server) Serve(ln net.Listener) error {
 			}
 			return err
 		}
-		cn := &conn{srv: s, c: c}
+		cn := &conn{srv: s, c: c, challenge: digest.New(s.identity.Name)}
 		s.mu.Lock()
 		s.conns[cn] = true
 		s.mu.Unlock()
@@ -103,10 +106,11 @@ type request struct {
 }
 
 type conn struct {
-	srv *Server
-	c   net.Conn
-	wmu sync.Mutex
-	ses *session
+	srv       *Server
+	c         net.Conn
+	wmu       sync.Mutex
+	ses       *session
+	challenge digest.Challenge
 }
 
 func (c *conn) interleaved(channel byte, p []byte) error {
@@ -194,7 +198,7 @@ func readRequest(r *bufio.Reader) (*request, error) {
 }
 
 var reasons = map[int]string{
-	200: "OK", 400: "Bad Request", 404: "Not Found", 454: "Session Not Found",
+	200: "OK", 400: "Bad Request", 401: "Unauthorized", 404: "Not Found", 454: "Session Not Found",
 	461: "Unsupported Transport", 501: "Not Implemented", 503: "Service Unavailable",
 }
 
@@ -236,6 +240,10 @@ func streamPath(raw string) string {
 }
 
 func (c *conn) handle(req *request) (int, []string, string) {
+	if req.method != "OPTIONS" &&
+		!c.challenge.Allows(req.header["authorization"], req.method, c.srv.Auth) {
+		return 401, []string{"WWW-Authenticate: " + c.challenge.Header()}, ""
+	}
 	switch req.method {
 	case "OPTIONS":
 		return 200, []string{

@@ -23,6 +23,7 @@ const (
 	Slider
 	Field
 	Segments
+	Password
 )
 
 type Row struct {

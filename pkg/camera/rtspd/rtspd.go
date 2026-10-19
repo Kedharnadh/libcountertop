@@ -10,6 +10,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/camera/onvif"
 	"github.com/ygelfand/libcountertop/pkg/camera/session"
 	"github.com/ygelfand/libcountertop/pkg/media/rtsp"
+	"github.com/ygelfand/libcountertop/pkg/network/digest"
 )
 
 var paths = [...]string{"main", "sub"}
@@ -37,6 +38,7 @@ type Options struct {
 	FPS      int
 	Bitrate  func(width, height int) int
 	ONVIF    func() onvif.Config
+	Auth     digest.Credentials
 }
 
 type Server struct {
@@ -81,6 +83,7 @@ func (s *Server) Start() {
 		return
 	}
 	srv := rtsp.NewServerWithIdentity(s.options.Identity)
+	srv.Auth = s.options.Auth
 	served := s.options.Served()
 	for _, i := range served {
 		st := rtsp.NewStream()
@@ -132,5 +135,6 @@ func (s *Server) describe() *onvif.Endpoint {
 	cfg := s.options.ONVIF()
 	cfg.Device.RTSPPort = s.options.Port
 	cfg.Device.Profiles = s.Profiles
+	cfg.Auth = s.options.Auth
 	return onvif.Serve(cfg)
 }

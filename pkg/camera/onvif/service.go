@@ -1,6 +1,9 @@
 package onvif
 
 import (
+	"crypto/sha1"
+	"crypto/subtle"
+	"encoding/base64"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -8,6 +11,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/ygelfand/libcountertop/pkg/network/digest"
 )
 
 const (
@@ -40,6 +45,17 @@ type Device struct {
 type Service struct {
 	Device Device
 	Now    func() time.Time
+	Auth   digest.Credentials
+
+	challenge digest.Challenge
+}
+
+var preauth = map[string]bool{
+	"GetSystemDateAndTime":   true,
+	"GetServices":            true,
+	"GetServiceCapabilities": true,
+	"GetWsdlUrl":             true,
+	"GetEndpointReference":   true,
 }
 
 func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -52,8 +68,17 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	op, args := operation(body)
+	op, args, token := operation(body)
 	w.Header().Set("Content-Type", "application/soap+xml; charset=utf-8")
+	if !preauth[op] && !s.allows(r) && !token.matches(s.Auth) {
+		w.Header().Set("WWW-Authenticate", s.challenge.Header())
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = io.WriteString(
+			w,
+			envelope(senderFault("ter:NotAuthorized", "Sender not authorized")),
+		)
+		return
+	}
 	reply, ok := s.answer(op, args, r.Host)
 	if !ok {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -68,8 +93,39 @@ type arg struct {
 	Value   string `xml:",chardata"`
 }
 
-func operation(body []byte) (string, map[string]string) {
+type usernameToken struct {
+	Username string `xml:"Username"`
+	Password string `xml:"Password"`
+	Nonce    string `xml:"Nonce"`
+	Created  string `xml:"Created"`
+}
+
+func (t usernameToken) matches(creds digest.Credentials) bool {
+	if creds.Open() {
+		return true
+	}
+	user, password := creds()
+	nonce, err := base64.StdEncoding.DecodeString(strings.TrimSpace(t.Nonce))
+	if err != nil || t.Username != user {
+		return false
+	}
+	h := sha1.Sum(append(append(nonce, t.Created...), password...))
+	want := base64.StdEncoding.EncodeToString(h[:])
+	return subtle.ConstantTimeCompare([]byte(strings.TrimSpace(t.Password)), []byte(want)) == 1
+}
+
+func (s *Service) allows(r *http.Request) bool {
+	return s.challenge.Nonce != "" &&
+		s.challenge.Allows(r.Header.Get("Authorization"), r.Method, s.Auth)
+}
+
+func operation(body []byte) (string, map[string]string, usernameToken) {
 	var env struct {
+		Header struct {
+			Security struct {
+				Token usernameToken `xml:"UsernameToken"`
+			} `xml:"Security"`
+		} `xml:"Header"`
 		Body struct {
 			Inner struct {
 				XMLName xml.Name
@@ -78,13 +134,13 @@ func operation(body []byte) (string, map[string]string) {
 		} `xml:"Body"`
 	}
 	if err := xml.Unmarshal(body, &env); err != nil {
-		return "", nil
+		return "", nil, usernameToken{}
 	}
 	args := map[string]string{}
 	for _, a := range env.Body.Inner.Args {
 		args[a.XMLName.Local] = strings.TrimSpace(a.Value)
 	}
-	return env.Body.Inner.XMLName.Local, args
+	return env.Body.Inner.XMLName.Local, args, env.Header.Security.Token
 }
 
 func (s *Service) now() time.Time {
@@ -258,8 +314,11 @@ func envelope(body string) string {
 }
 
 func fault(op string) string {
-	return `<s:Fault><s:Code><s:Value>s:Sender</s:Value><s:Subcode><s:Value>ter:ActionNotSupported</s:Value></s:Subcode></s:Code>` +
-		`<s:Reason><s:Text xml:lang="en">` + escape(
-		op,
-	) + ` is not supported</s:Text></s:Reason></s:Fault>`
+	return senderFault("ter:ActionNotSupported", op+" is not supported")
+}
+
+func senderFault(code, reason string) string {
+	return `<s:Fault><s:Code><s:Value>s:Sender</s:Value><s:Subcode><s:Value>` + code +
+		`</s:Value></s:Subcode></s:Code><s:Reason><s:Text xml:lang="en">` + escape(reason) +
+		`</s:Text></s:Reason></s:Fault>`
 }

@@ -246,7 +246,6 @@ camera.setting.whitebalance: White balance
 camera.starting: Starting the camera
 camera.muted: Microphones are muted
 camera.shutter: Camera shutter is closed
-camera.stream: Camera stream
 cast.apps: Apps
 cast.enable: Enable
 cast.entity.receiver: Cast receiver
@@ -348,7 +347,8 @@ features.cast: Cast receiver
 features.cast.hint: Cast from a phone or an app
 features.proxy: Bluetooth proxy
 features.proxy.hint: Bluetooth LE proxy for Home Assistant
-features.rtsp.hint: RTSP on port 8554
+features.rtsp: Camera stream
+features.rtsp.hint: RTSP and ONVIF, for Home Assistant and recorders
 features.airplay: AirPlay
 features.airplay.hint: Mirror from a Mac or iPhone
 features.sendspin: Sendspin
@@ -604,8 +604,12 @@ rail.sleep: Sleep
 reply.download: Starts later, never gaps
 reply.stream: Starts sooner, can gap
 reply.title: Response playback
+rtsp.entity.password: RTSP password
+rtsp.entity.username: RTSP username
 rtsp.group.rtsp: RTSP
 rtsp.setting.enabled: RTSP server
+rtsp.setting.password: Password
+rtsp.setting.username: Username
 screen.setting.alert: Alert style
 screen.setting.auto: Auto brightness
 screen.setting.backlight: Brightness
@@ -635,6 +639,7 @@ settings.features: Connected services
 settings.language: Language
 settings.network: Network & internet
 settings.power: Restart
+settings.secret.set: Set
 settings.sync: Config sync
 settings.system: System
 settings.title: Settings

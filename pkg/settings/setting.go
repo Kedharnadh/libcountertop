@@ -185,7 +185,7 @@ func (t *Table[T]) Local() *Table[T] {
 	return t
 }
 
-func (s Setting[T]) Portable() bool { return !s.Local && s.Kind != Secret }
+func (s Setting[T]) Portable() bool { return !s.Local }
 
 func (t *Table[T]) Groups() []Group { return t.groups }
 
@@ -248,7 +248,7 @@ func (t *Table[T]) Sums(g Group, c *T) string {
 	}
 	for _, s := range in {
 		if s.Kind == Choice {
-			return s.Shows(c)
+			return s.Visible(c)
 		}
 	}
 	return ""
@@ -344,7 +344,7 @@ func (s Setting[T]) Labels() []string {
 	return out
 }
 
-func (s Setting[T]) Shows(c *T) string {
+func (s Setting[T]) Visible(c *T) string {
 	if s.IdleAs != "" && s.Idle != nil && s.Idle(c) {
 		return s.IdleAs
 	}
