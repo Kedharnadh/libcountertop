@@ -22,7 +22,7 @@ func StreamName(i int) string {
 }
 
 type Source interface {
-	Join(at int) (*session.Session, <-chan camerafeed.Frame, error)
+	JoinOrCard(at int) (*session.Session, <-chan camerafeed.Frame, error)
 	Leave(s *session.Session, frames <-chan camerafeed.Frame)
 	Sizes() []session.Size
 	RequestKey() error
@@ -36,7 +36,6 @@ type Options struct {
 	Served   func() []int
 	FPS      int
 	Bitrate  func(width, height int) int
-	Allowed  func() bool
 	ONVIF    func() onvif.Config
 }
 
@@ -86,12 +85,11 @@ func (s *Server) Start() {
 	for _, i := range served {
 		st := rtsp.NewStream()
 		p := &pump{
-			at:      i,
-			stream:  st,
-			source:  s.options.Source,
-			fps:     s.options.FPS,
-			helper:  s.options.Helper,
-			allowed: s.options.Allowed,
+			at:     i,
+			stream: st,
+			source: s.options.Source,
+			fps:    s.options.FPS,
+			helper: s.options.Helper,
 		}
 		st.OnDemand = p.demand
 		s.pumps[i] = p

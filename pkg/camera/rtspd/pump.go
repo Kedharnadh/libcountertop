@@ -1,23 +1,24 @@
 package rtspd
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
 	"time"
 
+	"github.com/ygelfand/libcountertop/pkg/camera/session"
 	"github.com/ygelfand/libcountertop/pkg/media/rtsp"
 )
 
 const linger = 15 * time.Second
 
 type pump struct {
-	at      int
-	stream  *rtsp.Stream
-	source  Source
-	fps     int
-	helper  string
-	allowed func() bool
+	at     int
+	stream *rtsp.Stream
+	source Source
+	fps    int
+	helper string
 
 	mu      sync.Mutex
 	running bool
@@ -33,9 +34,6 @@ func (p *pump) demand() {
 		if err := p.source.RequestKey(); err != nil {
 			slog.Debug("asking for a keyframe failed", "stream", StreamName(p.at), "err", err)
 		}
-		return
-	}
-	if !p.allowed() {
 		return
 	}
 	p.running = true
@@ -70,9 +68,18 @@ func (p *pump) run(stop chan struct{}) {
 }
 
 func (p *pump) feed(stop chan struct{}) error {
-	s, frames, err := p.source.Join(p.at)
+	for {
+		again, err := p.serve(stop)
+		if !again {
+			return err
+		}
+	}
+}
+
+func (p *pump) serve(stop chan struct{}) (bool, error) {
+	s, frames, err := p.source.JoinOrCard(p.at)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer p.source.Leave(s, frames)
 	sz := p.source.Sizes()[p.at]
@@ -87,13 +94,16 @@ func (p *pump) feed(stop chan struct{}) error {
 	for {
 		select {
 		case <-stop:
-			return nil
+			return false, nil
 		case <-s.Done():
-			return s.Err()
+			err := s.Err()
+			switched := errors.Is(err, session.ErrMuted) || errors.Is(err, session.ErrShutter) ||
+				errors.Is(err, session.ErrRestarted)
+			return switched && p.stream.Viewers() > 0, err
 		case f := <-frames:
-			if p.idle() || !p.allowed() {
+			if p.idle() {
 				slog.Info("rtsp stream down", "stream", StreamName(p.at))
-				return nil
+				return false, nil
 			}
 			p.stream.Write(f.Data, f.PTS)
 		}

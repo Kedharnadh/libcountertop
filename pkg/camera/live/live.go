@@ -10,8 +10,10 @@ import (
 	esphome "github.com/ygelfand/go-esphome-device"
 
 	"github.com/ygelfand/libcountertop/pkg/camera/camerafeed"
+	"github.com/ygelfand/libcountertop/pkg/camera/card"
 	"github.com/ygelfand/libcountertop/pkg/camera/session"
 	"github.com/ygelfand/libcountertop/pkg/hook"
+	"github.com/ygelfand/libcountertop/pkg/say"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
@@ -35,6 +37,7 @@ type Options struct {
 	Turn    func() int
 	Open    func(camerafeed.Config) (session.Transport, error)
 	Muted   func() bool
+	Covered func() bool
 	Restart func() error
 
 	Saved  func() schema.Camera
@@ -63,13 +66,31 @@ func New(o Options) *Camera {
 	c.hub = session.New(session.Options{
 		Snapshot: c.snapshot,
 		Open:     o.Open,
-		Muted:    o.Muted,
+		Blocked:  c.blocked,
+		Card:     drawCard,
 		Recover:  c.revive,
 		Wait:     Wait,
 		Settle:   Settle,
 		Keep:     o.Turn != nil,
 	})
 	return c
+}
+
+func (c *Camera) blocked() session.Block {
+	switch {
+	case c.options.Muted != nil && c.options.Muted():
+		return session.Muted
+	case c.options.Covered != nil && c.options.Covered():
+		return session.Shuttered
+	}
+	return session.Open
+}
+
+func drawCard(w, h int, b session.Block) []byte {
+	if b == session.Shuttered {
+		return card.Draw(w, h, "camera-off", say.T("camera.shutter"))
+	}
+	return card.Draw(w, h, "microphone-off", say.T("camera.muted"))
 }
 
 func (c *Camera) turn() int {

@@ -27,7 +27,6 @@ type Peers interface {
 
 type Privacy interface {
 	MicMuted() bool
-	CameraCovered() bool
 	Watch(func()) func()
 }
 

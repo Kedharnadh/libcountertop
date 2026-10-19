@@ -11,7 +11,10 @@ import (
 
 const (
 	magic   = 0x4d434e4c
-	version = 5
+	version = 6
+
+	modeCamera = 0
+	modeCard   = 1
 
 	frameKey    = 1
 	frameConfig = 2
@@ -48,6 +51,15 @@ type Config struct {
 	Turn int
 
 	Mirror bool
+
+	Card [2][]byte
+}
+
+func (c Config) mode() uint32 {
+	if c.Card[0] != nil {
+		return modeCard
+	}
+	return modeCamera
 }
 
 type Frame struct {
@@ -85,6 +97,12 @@ func Open(socket string, cfg Config) (*Stream, error) {
 		uint32(cfg.SubHeight),
 		uint32(cfg.SubBitrate),
 		turnWord(cfg.Turn, cfg.Mirror),
+		cfg.mode(),
+	}
+	if cfg.mode() == modeCard && (len(cfg.Card[0]) != cfg.Width*cfg.Height ||
+		len(cfg.Card[1]) != cfg.SubWidth*cfg.SubHeight) {
+		c.Close()
+		return nil, fmt.Errorf("mtkcamera: a card that does not match %dx%d", cfg.Width, cfg.Height)
 	}
 	if len(cfg.Params) > maxParams {
 		c.Close()
@@ -98,6 +116,12 @@ func Open(socket string, cfg Config) (*Stream, error) {
 	if _, err := io.WriteString(c, cfg.Params); err != nil {
 		c.Close()
 		return nil, fmt.Errorf("mtkcamera: %w", err)
+	}
+	for _, plane := range cfg.Card {
+		if _, err := c.Write(plane); err != nil {
+			c.Close()
+			return nil, fmt.Errorf("mtkcamera: %w", err)
+		}
 	}
 	if err := c.SetReadDeadline(time.Now().Add(15 * time.Second)); err != nil {
 		c.Close()

@@ -12,8 +12,27 @@ import (
 )
 
 var ErrMuted = errors.New("livecam: the camera is off while the microphones are muted")
+var ErrShutter = errors.New("livecam: the camera shutter is closed")
 var ErrNoStill = errors.New("livecam: the helper could not make a picture")
 var ErrRestarted = errors.New("livecam: the camera configuration changed")
+
+type Block int
+
+const (
+	Open Block = iota
+	Muted
+	Shuttered
+)
+
+func (b Block) Err() error {
+	switch b {
+	case Muted:
+		return ErrMuted
+	case Shuttered:
+		return ErrShutter
+	}
+	return nil
+}
 
 type Size struct {
 	Width  int `json:"width"`
@@ -42,23 +61,26 @@ type Snapshot struct {
 type Options struct {
 	Snapshot                   func() Snapshot
 	Open                       func(camerafeed.Config) (Transport, error)
-	Muted                      func() bool
+	Blocked                    func() Block
 	Recover                    func(error)
 	RestartError               error
 	Wait, Settle, Linger, Poll time.Duration
 	Depth                      int
 	Keep                       bool
+	Card                       func(w, h int, b Block) []byte
 }
 type Hub struct {
 	mu      sync.Mutex
 	options Options
 	cur     *Session
+	card    *Session
 	closed  bool
 }
 type Session struct {
 	hub      *Hub
 	stream   Transport
 	snapshot Snapshot
+	block    Block
 	out      [2][]chan camerafeed.Frame
 	config   [2][]byte
 	stills   []chan camerafeed.Frame
@@ -106,16 +128,22 @@ func (s *Session) Err() error {
 	}
 	return s.err
 }
-func (h *Hub) muted() bool { return h.options.Muted != nil && h.options.Muted() }
+func (h *Hub) blocked() Block {
+	if h.options.Blocked == nil {
+		return Open
+	}
+	return h.options.Blocked()
+}
+
 func (h *Hub) acquire() (*Session, error) {
 	if h.closed {
 		return nil, errors.New("livecam: hub is closed")
 	}
-	if h.muted() {
+	if b := h.blocked(); b != Open {
 		if h.cur != nil {
-			h.retire(h.cur, ErrMuted)
+			h.retire(h.cur, b.Err())
 		}
-		return nil, ErrMuted
+		return nil, b.Err()
 	}
 	snapshot := h.options.Snapshot()
 	if h.cur != nil && h.cur.snapshot.Key != snapshot.Key {
@@ -153,22 +181,24 @@ func (h *Hub) release(s *Session) {
 		return
 	}
 	s.users--
-	if s.users > 0 || h.cur != s {
+	if s.users > 0 || !h.current(s) {
 		return
 	}
-	if h.muted() {
-		h.retire(s, ErrMuted)
+	if b := h.blocked(); s.block == Open && b != Open {
+		h.retire(s, b.Err())
 		return
 	}
-	if h.options.Keep {
+	if s.block == Open && h.options.Keep {
 		return
 	}
 	s.idle.Schedule(h.options.Linger, &h.mu, func() {
-		if h.cur == s && s.users == 0 {
+		if h.current(s) && s.users == 0 {
 			h.retire(s, nil)
 		}
 	})
 }
+
+func (h *Hub) current(s *Session) bool { return s != nil && (h.cur == s || h.card == s) }
 
 func (h *Hub) retire(s *Session, cause error) {
 	s.idle.Cancel()
@@ -177,6 +207,9 @@ func (h *Hub) retire(s *Session, cause error) {
 	}
 	if h.cur == s {
 		h.cur = nil
+	}
+	if h.card == s {
+		h.card = nil
 	}
 	_ = s.stream.Close()
 }
@@ -190,6 +223,69 @@ func (h *Hub) Join(at int) (*Session, <-chan camerafeed.Frame, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	return h.subscribe(s, at)
+}
+
+func (h *Hub) JoinOrCard(at int) (*Session, <-chan camerafeed.Frame, error) {
+	if at < 0 || at >= 2 {
+		return nil, nil, fmt.Errorf("livecam: invalid stream %d", at)
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	b := h.blocked()
+	if h.options.Card == nil || b == Open {
+		s, err := h.acquire()
+		if err != nil {
+			return nil, nil, err
+		}
+		return h.subscribe(s, at)
+	}
+	s, err := h.acquireCard(b)
+	if err != nil {
+		return nil, nil, err
+	}
+	return h.subscribe(s, at)
+}
+
+func (h *Hub) acquireCard(b Block) (*Session, error) {
+	if h.closed {
+		return nil, errors.New("livecam: hub is closed")
+	}
+	if h.cur != nil {
+		h.retire(h.cur, b.Err())
+	}
+	snapshot := h.options.Snapshot()
+	if h.card != nil && (h.card.snapshot.Key != snapshot.Key || h.card.block != b) {
+		h.retire(h.card, h.options.RestartError)
+	}
+	if h.card == nil {
+		cfg := snapshot.Config
+		cfg.Card[0] = h.options.Card(cfg.Width, cfg.Height, b)
+		if cfg.SubWidth > 0 {
+			cfg.Card[1] = h.options.Card(cfg.SubWidth, cfg.SubHeight, b)
+		}
+		stream, err := h.options.Open(cfg)
+		if err != nil {
+			return nil, err
+		}
+		s := &Session{
+			hub:      h,
+			stream:   stream,
+			snapshot: snapshot,
+			block:    b,
+			done:     make(chan struct{}),
+			opened:   time.Now(),
+		}
+		h.card = s
+		go h.read(s)
+		go h.follow(s)
+	}
+	h.card.idle.Cancel()
+	h.card.users++
+	return h.card, nil
+}
+
+func (h *Hub) subscribe(s *Session, at int) (*Session, <-chan camerafeed.Frame, error) {
 	if at == 1 && s.snapshot.Config.SubWidth <= 0 {
 		h.release(s)
 		return nil, nil, fmt.Errorf("livecam: stream %d is unavailable", at)
@@ -247,7 +343,7 @@ func (h *Hub) keep() {
 			h.mu.Unlock()
 			return
 		}
-		if h.cur == nil && !h.muted() {
+		if h.cur == nil && h.blocked() == Open {
 			s, err := h.acquire()
 			if err != nil {
 				slog.Debug("opening the camera failed", "err", err)
@@ -262,10 +358,13 @@ func (h *Hub) keep() {
 func (h *Hub) RequestKey() error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.cur == nil {
-		return errors.New("livecam: no camera open")
+	switch {
+	case h.cur != nil:
+		return h.cur.stream.AskKey()
+	case h.card != nil:
+		return h.card.stream.AskKey()
 	}
-	return h.cur.stream.AskKey()
+	return errors.New("livecam: no camera open")
 }
 func (h *Hub) SetParams(params string) error {
 	h.mu.Lock()
@@ -337,6 +436,9 @@ func (h *Hub) Close() {
 	if h.cur != nil {
 		h.retire(h.cur, nil)
 	}
+	if h.card != nil {
+		h.retire(h.card, nil)
+	}
 }
 func (h *Hub) follow(s *Session) {
 	ticker := time.NewTicker(h.options.Poll)
@@ -346,15 +448,19 @@ func (h *Hub) follow(s *Session) {
 		case <-s.done:
 			return
 		case <-ticker.C:
-			muted := h.muted()
+			b := h.blocked()
 			snapshot := h.options.Snapshot()
 			h.mu.Lock()
-			if h.cur != s {
+			if !h.current(s) {
 				h.mu.Unlock()
 				return
 			}
-			if muted {
-				h.retire(s, ErrMuted)
+			if b != s.block {
+				cause := b.Err()
+				if s.block != Open {
+					cause = h.options.RestartError
+				}
+				h.retire(s, cause)
 				h.mu.Unlock()
 				return
 			}
@@ -383,7 +489,7 @@ func (h *Hub) read(s *Session) {
 			if s.err == nil {
 				s.err = err
 			}
-			if h.cur == s {
+			if h.current(s) {
 				h.retire(s, err)
 			}
 			h.mu.Unlock()

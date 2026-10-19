@@ -19,6 +19,7 @@
 
 #define EARLY_US 4000
 #define LATE_US 40000
+#define STALE_US 100000
 
 static int64_t mono_us(void) {
 	struct timespec ts;
@@ -66,6 +67,7 @@ static void broke(video *v, const char *where, ssize_t r) {
 
 static void *output(void *arg) {
 	video *v = arg;
+	int64_t rendered = 0;
 	while (!v->closing) {
 		if (v->flushing) {
 			park(v);
@@ -90,14 +92,20 @@ static void *output(void *arg) {
 			if (v->closing || v->flushing) { abandon = 1; break; }
 			int running;
 			int64_t now = media_now(v, &running);
-			if (info.presentationTimeUs < now - LATE_US) { render = 0; break; }
+			if (info.presentationTimeUs < now - LATE_US) {
+				render = mono_us() - rendered >= STALE_US;
+				break;
+			}
 			if (v->shown == 0) break;
 			if (running && info.presentationTimeUs <= now + EARLY_US) break;
 			usleep(2000);
 		}
 		if (abandon) continue;
 		AMediaCodec_releaseOutputBuffer(v->codec, idx, render);
-		if (render) v->shown++;
+		if (render) {
+			v->shown++;
+			rendered = mono_us();
+		}
 		else v->dropped++;
 	}
 	return NULL;

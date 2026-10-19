@@ -2,6 +2,7 @@ package callvideo
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -46,10 +47,12 @@ func (c *Camera) Frames(at int, sized func(Size)) (<-chan rtc.Frame, func()) {
 		defer close(out)
 		var size Size
 		for ctx.Err() == nil {
-			s, frames, err := c.sessions.Join(at)
-			if err != nil {
+			s, frames, err := c.sessions.JoinOrCard(at)
+			switch {
+			case errors.Is(err, camerasession.ErrMuted), errors.Is(err, camerasession.ErrShutter):
+			case err != nil:
 				slog.Warn("call camera", "err", err)
-			} else {
+			default:
 				func() {
 					defer c.sessions.Leave(s, frames)
 					if sizes := c.sessions.Sizes(); at >= 0 && at < len(sizes) &&

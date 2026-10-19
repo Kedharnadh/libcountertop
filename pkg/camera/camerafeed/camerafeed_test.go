@@ -37,11 +37,11 @@ func fake(t *testing.T, status uint32, frames [][]byte) chan []uint32 {
 			return
 		}
 		defer c.Close()
-		req := make([]uint32, 12)
+		req := make([]uint32, 13)
 		if err := binary.Read(c, binary.LittleEndian, req); err != nil {
 			return
 		}
-		extra := make([]byte, req[11])
+		extra := make([]byte, req[12])
 		if _, err := io.ReadFull(c, extra); err != nil {
 			return
 		}
@@ -106,7 +106,8 @@ func TestOpenAsksForWhatWasConfiguredAndFramesComeBackWhole(t *testing.T) {
 		req[8] != 480 ||
 		req[9] != 1000000 ||
 		req[10] != 3 ||
-		req[11] != 21 {
+		req[11] != modeCamera ||
+		req[12] != 21 {
 		t.Errorf("asked for %v", req)
 	}
 

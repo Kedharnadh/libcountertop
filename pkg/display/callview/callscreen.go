@@ -122,7 +122,7 @@ func (cv *View) callBody(w *gogui.Window) gogui.View {
 				),
 			)
 		}
-		if c.CameraOff || c.Covered {
+		if c.CameraOff {
 			layers = append(layers, widgets.Placed(rect(l.Self), gogui.Column(gogui.ContainerCfg{
 				Sizing:  gogui.FillFill,
 				Padding: gogui.NoPadding,

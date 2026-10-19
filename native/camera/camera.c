@@ -33,6 +33,9 @@ extern int codec_idr(void *codec) __asm__("_ZN7android10MediaCodec15requestIDRFr
 #define logw(...) __android_log_print(ANDROID_LOG_WARN, TAG, __VA_ARGS__)
 
 #define COLOR_FORMAT_SURFACE 0x7F000789
+#define COLOR_FORMAT_YUV420SP 21
+#define COLOR_FORMAT_YUV420P 19
+#define CARD_FPS 2
 #define AVC_PROFILE_BASELINE 0x01
 #define AVC_PROFILE_HIGH 0x08
 #define AVC_LEVEL_31 0x200
@@ -76,6 +79,8 @@ typedef struct {
 	uint32_t w, h;
 	int still;
 	int want;
+	uint8_t *card[2];
+	uint32_t cw[2], ch[2];
 	char *extra;
 	char range[32];
 	turner *turn;
@@ -236,6 +241,8 @@ static void close_session(session *s) {
 			ANativeWindow_release(s->win[i]);
 			s->win[i] = NULL;
 		}
+		free(s->card[i]);
+		s->card[i] = NULL;
 	}
 }
 
@@ -246,7 +253,8 @@ static int producer(ANativeWindow *win, void **gbp) {
 	return *gbp ? 0 : -1;
 }
 
-static int open_encoder(session *s, int at, uint32_t w, uint32_t h, uint32_t fps, uint32_t bitrate, uint32_t keyframe) {
+static int open_encoder(session *s, int at, uint32_t w, uint32_t h, uint32_t fps, uint32_t bitrate, uint32_t keyframe,
+	int32_t color) {
 	AMediaCodec **codec = &s->codec[at];
 	*codec = AMediaCodec_createEncoderByType("video/avc");
 	if (!*codec) return ERR_ENCODER;
@@ -254,7 +262,7 @@ static int open_encoder(session *s, int at, uint32_t w, uint32_t h, uint32_t fps
 	AMediaFormat_setString(f, AMEDIAFORMAT_KEY_MIME, "video/avc");
 	AMediaFormat_setInt32(f, AMEDIAFORMAT_KEY_WIDTH, (int32_t)w);
 	AMediaFormat_setInt32(f, AMEDIAFORMAT_KEY_HEIGHT, (int32_t)h);
-	AMediaFormat_setInt32(f, AMEDIAFORMAT_KEY_COLOR_FORMAT, COLOR_FORMAT_SURFACE);
+	AMediaFormat_setInt32(f, AMEDIAFORMAT_KEY_COLOR_FORMAT, color);
 	AMediaFormat_setInt32(f, AMEDIAFORMAT_KEY_BIT_RATE, (int32_t)bitrate);
 	AMediaFormat_setInt32(f, AMEDIAFORMAT_KEY_FRAME_RATE, (int32_t)fps);
 	AMediaFormat_setInt32(f, AMEDIAFORMAT_KEY_I_FRAME_INTERVAL, (int32_t)keyframe);
@@ -278,6 +286,7 @@ static int open_encoder(session *s, int at, uint32_t w, uint32_t h, uint32_t fps
 		logw("encoder configure %dx%d@%u: %d", w, h, fps, st);
 		return ERR_ENCODER;
 	}
+	if (color != COLOR_FORMAT_SURFACE) return AMediaCodec_start(*codec) == AMEDIA_OK ? OK : ERR_ENCODER;
 	#if __ANDROID_API__ >= 26
  if (AMediaCodec_createInputSurface(*codec, &s->win[at]) != AMEDIA_OK || !s->win[at]) return ERR_ENCODER;
 #else
@@ -542,15 +551,85 @@ static void stream(int conn, session *s) {
 		(unsigned long long)frames[SUB]);
 }
 
+static int card_encoder(session *s, int at, uint32_t w, uint32_t h, uint32_t bitrate, uint32_t keyframe) {
+	if (open_encoder(s, at, w, h, CARD_FPS, bitrate, keyframe, COLOR_FORMAT_YUV420SP) == OK) return OK;
+	if (s->codec[at]) AMediaCodec_delete(s->codec[at]);
+	s->codec[at] = NULL;
+	return open_encoder(s, at, w, h, CARD_FPS, bitrate, keyframe, COLOR_FORMAT_YUV420P);
+}
+
+static void feed(session *s, int at, int64_t us) {
+	ssize_t i = AMediaCodec_dequeueInputBuffer(s->codec[at], 0);
+	if (i < 0) return;
+	size_t cap = 0, stride = s->cw[at], rows = s->ch[at];
+	uint8_t *buf = AMediaCodec_getInputBuffer(s->codec[at], (size_t)i, &cap);
+#if __ANDROID_API__ >= 28
+	AMediaFormat *f = AMediaCodec_getInputFormat(s->codec[at]);
+	int32_t v;
+	if (f) {
+		if (AMediaFormat_getInt32(f, "stride", &v) && v >= (int32_t)stride) stride = (size_t)v;
+		if (AMediaFormat_getInt32(f, "slice-height", &v) && v >= (int32_t)rows) rows = (size_t)v;
+		AMediaFormat_delete(f);
+	}
+#endif
+	size_t size = stride * rows * 3 / 2;
+	if (!buf || cap < size) {
+		logw("card: input buffer %zu bytes, want %zu", cap, size);
+		AMediaCodec_queueInputBuffer(s->codec[at], (size_t)i, 0, 0, (uint64_t)us, 0);
+		return;
+	}
+	const uint8_t *y = s->card[at];
+	for (size_t r = 0; r < rows; r++) {
+		uint8_t *line = buf + r * stride;
+		if (r < s->ch[at]) {
+			memcpy(line, y + r * s->cw[at], s->cw[at]);
+			memset(line + s->cw[at], y[r * s->cw[at]], stride - s->cw[at]);
+		} else {
+			memset(line, y[0], stride);
+		}
+	}
+	memset(buf + stride * rows, 128, stride * rows / 2);
+	AMediaCodec_queueInputBuffer(s->codec[at], (size_t)i, 0, size, (uint64_t)us, 0);
+}
+
+static void card_stream(int conn, session *s) {
+	uint64_t frames[2] = {0, 0};
+	int64_t next = 0;
+	while (!gone(conn, s)) {
+		int64_t now = now_ms();
+		if (now >= next) {
+			for (int i = 0; i < 2; i++)
+				if (s->codec[i]) feed(s, i, now * 1000);
+			next = now + CARD_MS;
+		}
+		int64_t wait = (next - now_ms()) * 1000 / (s->codec[SUB] ? 2 : 1);
+		if (wait < 0) wait = 0;
+		if (drain(conn, s, MAIN, wait, frames)) break;
+		if (s->codec[SUB] && drain(conn, s, SUB, wait, frames)) break;
+	}
+	logi("card client gone after %llu main and %llu sub frames", (unsigned long long)frames[MAIN],
+		(unsigned long long)frames[SUB]);
+}
+
+static pthread_mutex_t camera_mu = PTHREAD_MUTEX_INITIALIZER;
+
+static int read_card(int conn, session *s, int at, uint32_t w, uint32_t h) {
+	s->cw[at] = w;
+	s->ch[at] = h;
+	s->card[at] = malloc((size_t)w * h);
+	return s->card[at] ? read_full(conn, s->card[at], (size_t)w * h) : -1;
+}
+
 static void serve(int conn) {
 	uint32_t req[OPEN_WORDS];
 	if (read_full(conn, req, sizeof req) < 0 || req[0] != MAGIC) return;
 
 	uint32_t w = req[2], h = req[3], fps = req[4], bitrate = req[5], keyframe = req[6];
-	uint32_t sw = req[7], sh = req[8], sbitrate = req[9], quarters = req[10];
+	uint32_t sw = req[7], sh = req[8], sbitrate = req[9], quarters = req[10], mode = req[11];
 	uint32_t st = OK;
 	session s = {.want = WANT_MAIN | WANT_SUB};
 	uint32_t n = 0;
+	int locked = 0;
 	if (req[1] == VERSION) {
 		if (read_full(conn, &n, sizeof n) < 0 || n > MAX_PARAMS) return;
 		s.extra = calloc(1, n + 1);
@@ -567,13 +646,30 @@ static void serve(int conn) {
 	else if (sw && (!sh || !sbitrate || sw > 4096 || sh > 4096)) st = ERR_ARGS;
 	s.w = w;
 	s.h = h;
-	if (st == OK) st = (uint32_t)open_encoder(&s, MAIN, w, h, fps, bitrate, keyframe ? keyframe : 1);
-	if (st == OK && sw) st = (uint32_t)open_encoder(&s, SUB, sw, sh, fps, sbitrate, keyframe ? keyframe : 1);
-	if (st == OK) st = (uint32_t)open_camera(&s, w, h, fps, sw, sh, quarters);
+	if (st == OK && mode == MODE_CARD) {
+		if (read_card(conn, &s, MAIN, w, h) < 0 || (sw && read_card(conn, &s, SUB, sw, sh) < 0)) {
+			close_session(&s);
+			free(s.extra);
+			return;
+		}
+		uint32_t key = keyframe ? keyframe : 1;
+		st = (uint32_t)card_encoder(&s, MAIN, w, h, bitrate, key);
+		if (st == OK && sw) st = (uint32_t)card_encoder(&s, SUB, sw, sh, sbitrate, key);
+	} else if (st == OK) {
+		pthread_mutex_lock(&camera_mu);
+		locked = 1;
+		st = (uint32_t)open_encoder(&s, MAIN, w, h, fps, bitrate, keyframe ? keyframe : 1, COLOR_FORMAT_SURFACE);
+		if (st == OK && sw)
+			st = (uint32_t)open_encoder(&s, SUB, sw, sh, fps, sbitrate, keyframe ? keyframe : 1, COLOR_FORMAT_SURFACE);
+		if (st == OK) st = (uint32_t)open_camera(&s, w, h, fps, sw, sh, quarters);
+	}
 
 	uint32_t reply[REPLY_WORDS] = {st, w, h, fps};
 	struct iovec iov = {reply, sizeof reply};
-	if (send_all(conn, &iov, 1, sizeof reply) == 0 && st == OK) {
+	if (send_all(conn, &iov, 1, sizeof reply) == 0 && st == OK && mode == MODE_CARD) {
+		logi("card %ux%u, sub %ux%u", w, h, sw, sh);
+		card_stream(conn, &s);
+	} else if (st == OK && s.codec[MAIN]) {
 		logi("streaming %ux%u@%u at %u bps, sub %ux%u at %u bps, turn %d", w, h, fps, bitrate, sw, sh, sbitrate,
 			quarters == NO_TURN ? -1 : (int)quarters);
 		stream(conn, &s);
@@ -581,10 +677,18 @@ static void serve(int conn) {
 		logw("open %ux%u@%u failed: %u", w, h, fps, st);
 	}
 	close_session(&s);
+	if (locked) pthread_mutex_unlock(&camera_mu);
 	free(s.extra);
 #if __ANDROID_API__ < 26
  free(s.csd);
 #endif
+}
+
+static void *serving(void *arg) {
+	int conn = (int)(intptr_t)arg;
+	serve(conn);
+	close(conn);
+	return NULL;
 }
 
 static int listener(void) {
@@ -613,7 +717,11 @@ int main(void) {
 	for (;;) {
 		int conn = accept(lsock, NULL, NULL);
 		if (conn < 0) continue;
-		serve(conn);
-		close(conn);
+		pthread_t t;
+		if (pthread_create(&t, NULL, serving, (void *)(intptr_t)conn) != 0) {
+			close(conn);
+			continue;
+		}
+		pthread_detach(t);
 	}
 }

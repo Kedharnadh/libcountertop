@@ -65,7 +65,6 @@ type Call struct {
 	Muted           bool
 	Video           bool
 	CameraOff       bool
-	Covered         bool
 	RemoteMuted     bool
 	RemoteCameraOff bool
 }
@@ -337,16 +336,14 @@ func (c *Calls) Camera(on bool) {
 }
 
 func (c *Calls) apply(s *session) {
-	covered := c.options.Privacy.CameraCovered()
 	silenced := c.options.Privacy.MicMuted()
 	c.mu.Lock()
 	if c.now != s {
 		c.mu.Unlock()
 		return
 	}
-	s.Covered = covered
 	link := s.link
-	muted, blind := s.Muted || silenced, s.CameraOff || covered
+	muted, blind := s.Muted || silenced, s.CameraOff
 	c.mu.Unlock()
 	if link != nil {
 		link.Mute(muted)
@@ -390,7 +387,7 @@ func (s *session) shown() Shown {
 		Remote:   s.remote,
 		Own:      s.own,
 		RemoteOn: !s.RemoteCameraOff,
-		SelfOn:   !s.CameraOff && !s.Covered,
+		SelfOn:   !s.CameraOff,
 	}
 }
 
@@ -421,7 +418,6 @@ func (c *Calls) redraw() {
 func (c *Calls) open(call Call, addr string) *session {
 	ctx, stop := context.WithCancel(c.ctx)
 	s := &session{Call: call, addr: addr, ctx: ctx, stop: stop, quiet: func() {}}
-	s.Covered = c.options.Privacy.CameraCovered()
 	s.unhook = c.options.Privacy.Watch(func() {
 		c.apply(s)
 		c.changed(s)

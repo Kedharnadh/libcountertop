@@ -126,7 +126,7 @@ func (p *Preview) watch(box ui.Rect, framing Framing) shell.Feed {
 	defer p.mu.Unlock()
 	p.want, p.box, p.framing = time.Now(), box, framing
 	hold := camHold
-	if errors.Is(p.last, session.ErrMuted) {
+	if blocked(p.last) {
 		hold = muteHold
 	}
 	if !p.live && time.Since(p.bad) > hold {
@@ -140,8 +140,14 @@ func (p *Preview) watch(box ui.Rect, framing Framing) shell.Feed {
 		return shell.Feed{Live: true}
 	case errors.Is(p.last, session.ErrMuted):
 		return shell.Feed{Glyph: "mdi:microphone-off", Note: say.T("camera.muted")}
+	case errors.Is(p.last, session.ErrShutter):
+		return shell.Feed{Glyph: "mdi:camera-off", Note: say.T("camera.shutter")}
 	}
 	return shell.Feed{Note: say.T("camera.starting")}
+}
+
+func blocked(err error) bool {
+	return errors.Is(err, session.ErrMuted) || errors.Is(err, session.ErrShutter)
 }
 
 func (p *Preview) watched() (ui.Rect, Framing, bool) {
@@ -159,8 +165,7 @@ func (p *Preview) run(ctx context.Context) {
 	}
 	if err != nil {
 		p.bad = time.Now()
-		quiet := errors.Is(err, session.ErrMuted) ||
-			(p.last != nil && err.Error() == p.last.Error())
+		quiet := blocked(err) || (p.last != nil && err.Error() == p.last.Error())
 		if !quiet {
 			slog.Warn("the camera preview stopped", "err", err)
 		}

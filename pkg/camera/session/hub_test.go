@@ -124,7 +124,7 @@ func TestConfigurationReplacementAndMuteRetireTheCorrectSession(t *testing.T) {
 	h := New(
 		Options{
 			Snapshot: func() Snapshot { return Snapshot{Config: camerafeed.Config{Width: 640}, Key: fmt.Sprint(shape.Load())} },
-			Muted:    muted.Load,
+			Blocked:  func() Block { return blockedIf(muted.Load()) },
 			Open: func(camerafeed.Config) (Transport, error) {
 				f := fakeStream()
 				streams = append(streams, f)
@@ -289,5 +289,92 @@ func TestKeepReopensAfterTheHelperGoesAway(t *testing.T) {
 	case <-opened:
 	case <-time.After(time.Second):
 		t.Fatal("the camera was not reopened")
+	}
+}
+
+func blockedIf(muted bool) Block {
+	if muted {
+		return Muted
+	}
+	return Open
+}
+
+func TestBlockedStreamsGetTheirCardAndUnblockingEndsIt(t *testing.T) {
+	var block atomic.Int32
+	block.Store(int32(Muted))
+	opened := make(chan camerafeed.Config, 4)
+	drawn := make(chan Block, 8)
+	h := New(Options{
+		Snapshot: func() Snapshot {
+			return Snapshot{
+				Config: camerafeed.Config{Width: 4, Height: 2, SubWidth: 2, SubHeight: 2},
+				Key:    "one",
+			}
+		},
+		Open: func(c camerafeed.Config) (Transport, error) {
+			opened <- c
+			return fakeStream(), nil
+		},
+		Blocked: func() Block { return Block(block.Load()) },
+		Card: func(w, h int, b Block) []byte {
+			drawn <- b
+			return make([]byte, w*h)
+		},
+		Poll: 5 * time.Millisecond,
+	})
+	t.Cleanup(h.Close)
+
+	if _, _, err := h.Join(0); !errors.Is(err, ErrMuted) {
+		t.Fatalf("Join while muted = %v, want ErrMuted", err)
+	}
+	s, _, err := h.JoinOrCard(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := <-opened
+	if len(c.Card[0]) != 8 || len(c.Card[1]) != 4 {
+		t.Fatalf(
+			"opened with card planes of %d and %d bytes, want 8 and 4",
+			len(c.Card[0]),
+			len(c.Card[1]),
+		)
+	}
+	if b := <-drawn; b != Muted {
+		t.Fatalf("drew the card for %v, want Muted", b)
+	}
+	<-drawn
+
+	block.Store(int32(Shuttered))
+	select {
+	case <-s.Done():
+	case <-time.After(time.Second):
+		t.Fatal("the mute card kept running after the shutter closed instead")
+	}
+	if _, _, err := h.Join(0); !errors.Is(err, ErrShutter) {
+		t.Fatalf("Join with the shutter closed = %v, want ErrShutter", err)
+	}
+	s, _, err = h.JoinOrCard(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-opened
+	if b := <-drawn; b != Shuttered {
+		t.Fatalf("drew the card for %v, want Shuttered", b)
+	}
+
+	block.Store(int32(Open))
+	select {
+	case <-s.Done():
+	case <-time.After(time.Second):
+		t.Fatal("the card kept running after the camera was unblocked")
+	}
+	if err := s.Err(); !errors.Is(err, ErrRestarted) {
+		t.Errorf("the card ended with %v, want ErrRestarted", err)
+	}
+	if _, _, err := h.JoinOrCard(0); err != nil {
+		t.Fatal(err)
+	}
+	if c := <-opened; c.Card[0] != nil {
+		t.Error("after unmuting, JoinOrCard opened another card instead of the camera")
 	}
 }
