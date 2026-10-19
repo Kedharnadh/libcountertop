@@ -319,7 +319,9 @@ func (pv *Renderer) videoTransport(
 			control{glyph: gogui.IconBackward, do: func() { c.Seek(c.Now().Elapsed - videoSkip) }},
 		)
 	}
-	shown = append(shown, middle)
+	if now.Can.Has(nowplaying.CanPause) {
+		shown = append(shown, middle)
+	}
 	if c.CanSeek() {
 		shown = append(
 			shown,

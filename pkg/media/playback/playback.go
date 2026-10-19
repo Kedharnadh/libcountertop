@@ -130,6 +130,7 @@ type Showing struct {
 	LiveWithin time.Duration
 
 	HasNext, HasPrevious bool
+	NoPause              bool
 
 	Upcoming []Upcoming
 }

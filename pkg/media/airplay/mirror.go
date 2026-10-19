@@ -123,7 +123,9 @@ func (m *mirror) Read(ctx context.Context, pcm []int16) (int, error) {
 
 func (m *mirror) Start() time.Duration { return 0 }
 
-func (m *mirror) Showing() playback.Showing { return playback.Showing{Title: m.client} }
+func (m *mirror) Showing() playback.Showing {
+	return playback.Showing{Title: m.client, NoPause: true}
+}
 
 func (m *mirror) Label() string { return "AirPlay" }
 

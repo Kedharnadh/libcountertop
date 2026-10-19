@@ -48,6 +48,120 @@ extern void rb_decstrong(const void *self, const void *id) __asm__("_ZNK7android
 extern void *s8_ctor(void *self, const char *s) __asm__("_ZN7android7String8C1EPKc");
 #if __ANDROID_API__ >= 29
 #error "Android 10 and later dropped these SurfaceControl setters for transactions"
+#elif __ANDROID_API__ >= 28
+extern void sf_create_(void **sret, void *client, const void *name, uint32_t w, uint32_t h, int32_t format,
+	uint32_t flags, void *parent, int32_t wtype, int32_t uid)
+	__asm__("_ZN7android21SurfaceComposerClient13createSurfaceERKNS_7String8EjjijPNS_14SurfaceControlEii");
+#define sf_create(sret, client, name, w, h, format, flags) sf_create_(sret, client, name, w, h, format, flags, NULL, 0, 0)
+extern void *tx_copy(void *self, const void *from) __asm__("_ZN7android21SurfaceComposerClient11TransactionC1ERKS1_");
+extern int tx_apply(void *self, int sync) __asm__("_ZN7android21SurfaceComposerClient11Transaction5applyEb");
+extern void *tx_layer(void *self, void *const *sc, int32_t z)
+	__asm__("_ZN7android21SurfaceComposerClient11Transaction8setLayerERKNS_2spINS_14SurfaceControlEEEi");
+extern void *tx_position(void *self, void *const *sc, float x, float y)
+	__asm__("_ZN7android21SurfaceComposerClient11Transaction11setPositionERKNS_2spINS_14SurfaceControlEEEff");
+extern void *tx_size(void *self, void *const *sc, uint32_t w, uint32_t h)
+	__asm__("_ZN7android21SurfaceComposerClient11Transaction7setSizeERKNS_2spINS_14SurfaceControlEEEjj");
+extern void *tx_alpha(void *self, void *const *sc, float a)
+	__asm__("_ZN7android21SurfaceComposerClient11Transaction8setAlphaERKNS_2spINS_14SurfaceControlEEEf");
+extern void *tx_matrix(void *self, void *const *sc, float dsdx, float dtdx, float dtdy, float dsdy)
+	__asm__("_ZN7android21SurfaceComposerClient11Transaction9setMatrixERKNS_2spINS_14SurfaceControlEEEffff");
+extern void *tx_show(void *self, void *const *sc) __asm__("_ZN7android21SurfaceComposerClient11Transaction4showERKNS_2spINS_14SurfaceControlEEE");
+extern void *tx_hide(void *self, void *const *sc) __asm__("_ZN7android21SurfaceComposerClient11Transaction4hideERKNS_2spINS_14SurfaceControlEEE");
+extern int sf_info(void *const *display, void *info)
+	__asm__("_ZN7android21SurfaceComposerClient14getDisplayInfoERKNS_2spINS_7IBinderEEEPNS_11DisplayInfoE");
+extern void *tx_projection(void *self, void *const *display, uint32_t orientation, const int32_t *layers, const int32_t *frame)
+	__asm__("_ZN7android21SurfaceComposerClient11Transaction20setDisplayProjectionERKNS_2spINS_7IBinderEEEjRKNS_4RectES9_");
+extern int ss_capture(const void *display, int32_t left, int32_t top, int32_t right, int32_t bottom, uint32_t w, uint32_t h,
+	int32_t min_z, int32_t max_z, int identity, uint32_t rotation, void **out)
+	__asm__("_ZN7android16ScreenshotClient7captureERKNS_2spINS_7IBinderEEENS_4RectEjjiibjPNS1_INS_13GraphicBufferEEE");
+extern int gb_lock(void *self, uint32_t usage, void **bits) __asm__("_ZN7android13GraphicBuffer4lockEjPPv");
+extern int gb_unlock(void *self) __asm__("_ZN7android13GraphicBuffer6unlockEv");
+
+#define SW_READ_OFTEN 0x3
+// ANDROID_NATIVE_BUFFER_MAGIC, '_bfr'.
+#define BUFFER_MAGIC 0x5f626672
+
+typedef struct {
+	int magic, version;
+	void *reserved[4];
+	void (*inc)(void *self);
+	void (*dec)(void *self);
+	int width, height, stride, format;
+} native_buffer;
+
+typedef struct {
+	void *gb;
+	native_buffer *buf;
+	void *bits;
+} shot;
+
+static native_buffer *buffer_of(void *gb) {
+	for (int off = 0; off < 64; off += 4)
+		if (*(uint32_t *)((char *)gb + off) == BUFFER_MAGIC)
+			return (native_buffer *)((char *)gb + off);
+	return NULL;
+}
+
+static uint32_t tx[64];
+static pthread_once_t tx_once = PTHREAD_ONCE_INIT;
+static pthread_mutex_t tx_lock = PTHREAD_MUTEX_INITIALIZER;
+
+// Fire OS 7's Transaction: an unordered_map with max_load_factor at 0x14, DisplayStates of 0x40 bytes sized at 0x28.
+static void tx_init(void) {
+	uint32_t from[64] = {0};
+	const float one = 1.0f;
+	memcpy((char *)from + 0x14, &one, sizeof one);
+	from[0x28 / 4] = 0x40;
+	tx_copy(tx, from);
+}
+
+static void sf_open(void) {
+	pthread_once(&tx_once, tx_init);
+	pthread_mutex_lock(&tx_lock);
+}
+
+static void sf_close(int sync) {
+	tx_apply(tx, sync);
+	pthread_mutex_unlock(&tx_lock);
+}
+
+static int sc_layer(void *sc, int32_t z) { return tx_layer(tx, &sc, z) ? 0 : -1; }
+static int sc_position(void *sc, float x, float y) { return tx_position(tx, &sc, x, y) ? 0 : -1; }
+static int sc_size(void *sc, uint32_t w, uint32_t h) { return tx_size(tx, &sc, w, h) ? 0 : -1; }
+static int sc_alpha(void *sc, float a) { return tx_alpha(tx, &sc, a) ? 0 : -1; }
+static int sc_show(void *sc) { return tx_show(tx, &sc) ? 0 : -1; }
+static int sc_hide(void *sc) { return tx_hide(tx, &sc) ? 0 : -1; }
+static int sc_matrix(void *sc, float dsdx, float dtdx, float dtdy, float dsdy) {
+	return tx_matrix(tx, &sc, dsdx, dtdx, dtdy, dsdy) ? 0 : -1;
+}
+
+static void ss_ctor(void *self) { memset(self, 0, sizeof(shot)); }
+
+static int ss_update(void *self, const void *display, int32_t left, int32_t top, int32_t right, int32_t bottom, int identity) {
+	shot *s = self;
+	int got = ss_capture(display, left, top, right, bottom, 0, 0, INT32_MIN, INT32_MAX, identity, 0, &s->gb);
+	if (got != 0) return got;
+	if (!s->gb) return -1;
+	s->buf = buffer_of(s->gb);
+	if (!s->buf) return -1;
+	return gb_lock(s->gb, SW_READ_OFTEN, &s->bits);
+}
+
+static void ss_dtor(void *self) {
+	shot *s = self;
+	if (!s->gb) return;
+	if (s->bits) gb_unlock(s->gb);
+	if (s->buf) s->buf->dec(s->buf);
+	s->gb = NULL;
+	s->buf = NULL;
+	s->bits = NULL;
+}
+
+static const void *ss_pixels(const void *self) { return ((const shot *)self)->bits; }
+static uint32_t ss_width(const void *self) { return (uint32_t)((const shot *)self)->buf->width; }
+static uint32_t ss_height(const void *self) { return (uint32_t)((const shot *)self)->buf->height; }
+static uint32_t ss_stride(const void *self) { return (uint32_t)((const shot *)self)->buf->stride; }
+static int32_t ss_format(const void *self) { return ((const shot *)self)->buf->format; }
 #elif __ANDROID_API__ >= 26
 extern void sf_create_(void **sret, void *client, const void *name, uint32_t w, uint32_t h, int32_t format,
 	uint32_t flags, void *parent, uint32_t wtype, uint32_t uid)
@@ -59,6 +173,10 @@ extern void sf_create(void **sret, void *client, const void *name, uint32_t w, u
 	uint32_t flags) __asm__("_ZN7android21SurfaceComposerClient13createSurfaceERKNS_7String8Ejjij");
 extern int sc_layer(void *sc, uint32_t z) __asm__("_ZN7android14SurfaceControl8setLayerEj");
 #endif
+extern void sc_clear(void *sc) __asm__("_ZN7android14SurfaceControl5clearEv");
+extern void sc_surface(void **sret, const void *sc) __asm__("_ZNK7android14SurfaceControl10getSurfaceEv");
+extern void sf_display(void **sret, int id) __asm__("_ZN7android21SurfaceComposerClient17getBuiltInDisplayEi");
+#if __ANDROID_API__ < 28
 extern void sf_open(void) __asm__("_ZN7android21SurfaceComposerClient21openGlobalTransactionEv");
 extern void sf_close(int sync) __asm__("_ZN7android21SurfaceComposerClient22closeGlobalTransactionEb");
 extern int sc_position(void *sc, float x, float y) __asm__("_ZN7android14SurfaceControl11setPositionEff");
@@ -66,10 +184,7 @@ extern int sc_size(void *sc, uint32_t w, uint32_t h) __asm__("_ZN7android14Surfa
 extern int sc_alpha(void *sc, float a) __asm__("_ZN7android14SurfaceControl8setAlphaEf");
 extern int sc_show(void *sc) __asm__("_ZN7android14SurfaceControl4showEv");
 extern int sc_hide(void *sc) __asm__("_ZN7android14SurfaceControl4hideEv");
-extern void sc_clear(void *sc) __asm__("_ZN7android14SurfaceControl5clearEv");
-extern void sc_surface(void **sret, const void *sc) __asm__("_ZNK7android14SurfaceControl10getSurfaceEv");
 extern int sc_matrix(void *sc, float dsdx, float dtdx, float dtdy, float dsdy) __asm__("_ZN7android14SurfaceControl9setMatrixEffff");
-extern void sf_display(void **sret, int id) __asm__("_ZN7android21SurfaceComposerClient17getBuiltInDisplayEi");
 extern void ss_ctor(void *self) __asm__("_ZN7android16ScreenshotClientC1Ev");
 extern void ss_dtor(void *self) __asm__("_ZN7android16ScreenshotClientD1Ev");
 extern int ss_update(void *self, const void *display, int32_t left, int32_t top, int32_t right, int32_t bottom, int identity)
@@ -79,6 +194,7 @@ extern uint32_t ss_width(const void *self) __asm__("_ZNK7android16ScreenshotClie
 extern uint32_t ss_height(const void *self) __asm__("_ZNK7android16ScreenshotClient9getHeightEv");
 extern uint32_t ss_stride(const void *self) __asm__("_ZNK7android16ScreenshotClient9getStrideEv");
 extern int32_t ss_format(const void *self) __asm__("_ZNK7android16ScreenshotClient9getFormatEv");
+#endif
 
 #define SLOTS 4
 #define MAX_LAYERS 32
@@ -1025,8 +1141,23 @@ static void *wait_loop(void *arg) {
 	return NULL;
 }
 
+#if __ANDROID_API__ >= 28
+static int logical_size(void) {
+	void *display = NULL;
+	sf_display(&display, 0);
+	uint32_t info[32] = {0};
+	if (!display || sf_info(&display, info) != 0 || !info[0] || !info[1]) return 0;
+	last_w = (int)info[0];
+	last_h = (int)info[1];
+	return 1;
+}
+#endif
+
 static void panel_size(void) {
 	if (last_w && last_h) return;
+#if __ANDROID_API__ >= 28
+	if (logical_size()) return;
+#endif
 	int fd = open("/dev/graphics/fb0", O_RDONLY | O_CLOEXEC);
 	if (fd >= 0) {
 		struct fb_var_screeninfo info;
@@ -1071,6 +1202,20 @@ static void wait_start(void) {
 
 
 
+#if __ANDROID_API__ >= 28
+// No window manager runs to set the primary display's projection.
+static void project_display(void) {
+	panel_size();
+	void *display = NULL;
+	sf_display(&display, 0);
+	if (!display || !last_w || !last_h) return;
+	const int32_t rect[4] = {0, 0, last_w, last_h};
+	sf_open();
+	tx_projection(tx, &display, 0, rect, rect);
+	sf_close(1);
+}
+#endif
+
 static void wait_stop(void) {
 	if (!wait_layer) return;
 	waiting = 0;
@@ -1091,6 +1236,9 @@ int main(void) {
 		logw("composer client: %d", err);
 		return 1;
 	}
+#if __ANDROID_API__ >= 28
+	project_display();
+#endif
 	logi("ready on %s", SOCKET_PATH);
 	for (;;) {
 		int conn = accept(lsock, NULL, NULL);

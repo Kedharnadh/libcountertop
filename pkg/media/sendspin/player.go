@@ -33,7 +33,7 @@ type Player struct {
 	joined *core.Session
 
 	playing track
-	paused  bool
+	group   string
 
 	artwork []byte
 
@@ -123,7 +123,8 @@ func (p *Player) tell(want ...string) {
 func (p *Player) Playing() (playing, paused bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return p.state.Get() == statePlaying && !p.paused, p.paused
+	paused = p.group == "paused" || p.group == "stopped" && p.playing.Title != ""
+	return p.state.Get() == statePlaying && !paused, paused
 }
 
 func (*Player) Kind() nowplaying.Kind { return nowplaying.FromGroup }
@@ -180,7 +181,7 @@ func (p *Player) moved(progress protocol.ProgressState, stamp int64, serverNow f
 func (p *Player) holds(s *core.Session) {
 	p.mu.Lock()
 	p.joined = s
-	p.paused = false
+	p.group = ""
 	p.playing = track{}
 	p.mu.Unlock()
 	p.changed()
@@ -203,7 +204,7 @@ func (p *Player) setState(state string) {
 
 func (p *Player) grouped(state string) {
 	p.mu.Lock()
-	p.paused = state == "paused" || state == "stopped" && p.playing.Title != ""
+	p.group = state
 	p.mu.Unlock()
 	p.changed()
 }

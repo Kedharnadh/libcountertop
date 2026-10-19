@@ -679,7 +679,10 @@ func (c *card) Now() nowplaying.Now {
 	art, mark := c.p.art, c.p.mark
 	c.o.mu.Unlock()
 
-	can := nowplaying.CanPause | nowplaying.CanStop
+	can := nowplaying.CanStop
+	if !s.NoPause {
+		can |= nowplaying.CanPause
+	}
 	if s.HasNext {
 		can |= nowplaying.CanNext
 	}

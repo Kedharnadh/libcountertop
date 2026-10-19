@@ -12,7 +12,8 @@ FLAGS := -O2 -Wall -Werror -I$(NATIVE) -DCOUNTERTOP_PREFIX='"$(PREFIX)"'
 SURFACE := $(NATIVE)/surface
 CAMERA := $(NATIVE)/camera
 CAMERA_LIBS := camera_client gui utils binder $(if $(filter 25,$(API)),stagefright)
-CAMERA_GPU_LIBS := $(if $(filter 27,$(API)),-lEGL -lGLESv2)
+CAMERA_GPU_LIBS := $(if $(filter 27 28,$(API)),-lEGL -lGLESv2)
+SURFACE_LIBS := gui utils binder $(if $(filter 28,$(API)),ui)
 CAMERA_SOURCES := $(CAMERA)/camera.c $(CAMERA)/turn.c $(CAMERA)/cam2.c $(if $(filter 25,$(API)),$(CAMERA)/still.c)
 NDK_BIN := $(NDK)/toolchains/llvm/prebuilt/$(NDK_HOST)/bin
 NDK_CXX := $(NDK_BIN)/armv7a-linux-androideabi$(API)-clang++
@@ -34,17 +35,17 @@ UXPLAY_FLAGS := -O2 -fPIC -w -D_GNU_SOURCE -DPLIST_210 -DPLIST_230 $(UXPLAY_INCL
 .PHONY: all surface camera camshim voice airplay check-ndk test test-voice
 all: surface camera camshim voice airplay
 check-ndk:
-	@test "$(API)" = 25 -o "$(API)" = 27 || { echo "supported native API levels: 25, 27"; exit 1; }
+	@test "$(API)" = 25 -o "$(API)" = 27 -o "$(API)" = 28 || { echo "supported native API levels: 25, 27, 28"; exit 1; }
 	@test -x "$(NDK_CC)" || { echo "no NDK clang at $(NDK_CC); set NDK or ANDROID_NDK_HOME"; exit 1; }
 
 surface: check-ndk
 	@mkdir -p $(dir $(SURFACE_BIN)) $(STUBS)/surface
-	@for lib in gui utils binder; do \
+	@for lib in $(SURFACE_LIBS); do \
 		up=$$(echo $$lib | tr a-z A-Z); \
 		$(NDK_CC) -shared -DLIB$$up -Wl,-soname,lib$$lib.so -o $(STUBS)/surface/lib$$lib.so $(SURFACE)/stubs.c || exit 1; \
 	done
 	$(NDK_CC) $(FLAGS) -o $(SURFACE_BIN) $(SURFACE)/surface.c $(SURFACE)/video.c $(SURFACE)/gl.c $(SURFACE)/ui.c $(SURFACE)/drm.c $(SURFACE)/audio.c $(SURFACE)/wire.c \
-		-L$(STUBS)/surface -lgui -lutils -lbinder -landroid -lmediandk -lEGL -lGLESv2 -llog -lm -Wl,--allow-shlib-undefined
+		-L$(STUBS)/surface $(addprefix -l,$(SURFACE_LIBS)) -landroid -lmediandk -lEGL -lGLESv2 -llog -lm -Wl,--allow-shlib-undefined
 
 camera: check-ndk
 	@mkdir -p $(dir $(CAMERA_BIN)) $(STUBS)/camera

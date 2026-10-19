@@ -88,6 +88,38 @@ void *sensor_listener(void) { return &quiet_listener; }
 
 #endif
 
+#if __ANDROID_API__ >= 28
+// Android 9's CameraService::UidPolicy waits for the activity service, which lives in the stopped framework.
+void am_observe(void *self, const void *observer, int event, int cutpoint, const void *pkg)
+	__asm__("_ZN7android15ActivityManager19registerUidObserverERKNS_2spINS_12IUidObserverEEEiiRKNS_8String16E");
+void am_observe(void *self, const void *observer, int event, int cutpoint, const void *pkg) {}
+
+void am_unobserve(void *self, const void *observer)
+	__asm__("_ZN7android15ActivityManager21unregisterUidObserverERKNS_2spINS_12IUidObserverEEE");
+void am_unobserve(void *self, const void *observer) {}
+
+int am_link(void *self, const void *recipient)
+	__asm__("_ZN7android15ActivityManager11linkToDeathERKNS_2spINS_7IBinder14DeathRecipientEEE");
+int am_link(void *self, const void *recipient) { return -32; }
+
+int am_unlink(void *self, const void *recipient)
+	__asm__("_ZN7android15ActivityManager13unlinkToDeathERKNS_2spINS_7IBinder14DeathRecipientEEE");
+int am_unlink(void *self, const void *recipient) { return 0; }
+
+int am_active(void *self, unsigned uid, const void *pkg) __asm__("_ZN7android15ActivityManager11isUidActiveEjRKNS_8String16E");
+int am_active(void *self, unsigned uid, const void *pkg) { return 1; }
+
+int package_uid(void *self, const void *pkg, int flags) __asm__("_ZN7android20PermissionController13getPackageUidERKNS_8String16Ei");
+int package_uid(void *self, const void *pkg, int flags) { return -1; }
+
+int op_start_quiet(void *self, int op, int uid, const void *pkg, int start_if_default)
+	__asm__("_ZN7android13AppOpsManager14startOpNoThrowEiiRKNS_8String16Eb");
+int op_start_quiet(void *self, int op, int uid, const void *pkg, int start_if_default) { return 0; }
+
+int check_calling_ids(const void *perm, int *pid, int *uid) __asm__("_ZN7android22checkCallingPermissionERKNS_8String16EPiS3_");
+int check_calling_ids(const void *perm, int *pid, int *uid) { return 1; }
+#endif
+
 typedef int (*query_fn)(const void *self, int what, int *value);
 
 int surface_query(const void *self, int what, int *value) __asm__("_ZNK7android7Surface5queryEiPi");

@@ -19,7 +19,7 @@ func Select(targets []Target, board string) (int, error) {
 			}
 			continue
 		}
-		if t.API != 25 && t.API != 27 {
+		if t.API != 25 && t.API != 27 && t.API != 28 {
 			return 0, fmt.Errorf("board %q uses unsupported native API %d", t.Name, t.API)
 		}
 		if api != 0 && api != t.API {
