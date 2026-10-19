@@ -1,6 +1,7 @@
 package live
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -66,6 +67,7 @@ func New(o Options) *Camera {
 		Recover:  c.revive,
 		Wait:     Wait,
 		Settle:   Settle,
+		Keep:     o.Turn != nil,
 	})
 	return c
 }
@@ -117,6 +119,16 @@ func (c *Camera) snapshot() session.Snapshot {
 		s.StillExtra = time.Duration(k.Keyframe) * time.Second
 	}
 	return s
+}
+
+func (c *Camera) Start(context.Context) error {
+	c.hub.Start()
+	return nil
+}
+
+func (c *Camera) Close() error {
+	c.hub.Close()
+	return nil
 }
 
 func (c *Camera) Sessions() *session.Hub { return c.hub }

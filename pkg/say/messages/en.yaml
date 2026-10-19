@@ -244,6 +244,7 @@ camera.setting.sub_on: Sub stream
 camera.setting.sub_size: Sub resolution
 camera.setting.whitebalance: White balance
 camera.starting: Starting the camera
+camera.muted: Microphones are muted
 camera.stream: Camera stream
 cast.apps: Apps
 cast.enable: Enable

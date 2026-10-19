@@ -21,6 +21,9 @@ const (
 	askStill  = 'S'
 	askParams = 'P'
 	askKey    = 'K'
+	askWant   = 'W'
+	wantMain  = 1
+	wantSub   = 2
 	maxParams = 4096
 
 	maxFrame   = 16 << 20
@@ -151,10 +154,12 @@ func turnWord(q int, mirror bool) uint32 {
 }
 
 func (s *Stream) Next(within time.Duration) (Frame, error) {
+	var deadline time.Time
 	if within > 0 {
-		if err := s.c.SetReadDeadline(time.Now().Add(within)); err != nil {
-			return Frame{}, err
-		}
+		deadline = time.Now().Add(within)
+	}
+	if err := s.c.SetReadDeadline(deadline); err != nil {
+		return Frame{}, err
 	}
 	var head [4]uint32
 	if err := binary.Read(s.c, binary.LittleEndian, &head); err != nil {
@@ -202,6 +207,18 @@ func (s *Stream) AskStill() error {
 
 func (s *Stream) AskKey() error {
 	_, err := s.c.Write([]byte{askKey})
+	return err
+}
+
+func (s *Stream) Want(main, sub bool) error {
+	var mask byte
+	if main {
+		mask |= wantMain
+	}
+	if sub {
+		mask |= wantSub
+	}
+	_, err := s.c.Write([]byte{askWant, mask})
 	return err
 }
 

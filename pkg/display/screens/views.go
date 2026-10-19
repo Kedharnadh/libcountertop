@@ -180,8 +180,8 @@ func (a *App) logo() image.Image {
 
 func reach() float32 { return style.Reach() }
 
-func (a *App) livePreview(w *gogui.Window, watch func(ui.Rect) bool) gogui.View {
-	return a.preview.View(w, say.T("camera.starting"), watch)
+func (a *App) livePreview(w *gogui.Window, watch func(ui.Rect) shell.Feed) gogui.View {
+	return a.preview.View(w, watch)
 }
 
 func (a *App) tileView(w *gogui.Window, id, page string, c menu.Cell, tap func(int)) gogui.View {

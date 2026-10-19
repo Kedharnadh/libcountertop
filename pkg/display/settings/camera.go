@@ -22,7 +22,7 @@ type CameraOptions[K any] struct {
 	SetStream func(bool)
 	Push      func(shell.View)
 	Redraw    func()
-	Preview   func(ui.Rect) bool
+	Preview   func(ui.Rect) shell.Feed
 	Wrap      func(*shell.Page) *shell.Page
 }
 type CameraPages[K any] struct {

@@ -19,6 +19,10 @@
 #define ASK_STILL 'S'
 #define ASK_PARAMS 'P'
 #define ASK_KEY 'K'
+#define ASK_WANT 'W'
+#define WANT_MAIN 1
+#define WANT_SUB 2
+#define STALL_MS 3000
 #define MAX_PARAMS 4096
 
 #define OK 0

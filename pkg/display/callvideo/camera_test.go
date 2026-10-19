@@ -33,6 +33,7 @@ func (s *cameraTransport) Next(time.Duration) (camerafeed.Frame, error) {
 }
 func (*cameraTransport) AskStill() error        { return nil }
 func (*cameraTransport) AskKey() error          { return nil }
+func (*cameraTransport) Want(bool, bool) error  { return nil }
 func (*cameraTransport) SetParams(string) error { return nil }
 func (s *cameraTransport) Close() error {
 	s.once.Do(func() { close(s.done) })

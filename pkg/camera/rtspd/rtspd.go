@@ -25,6 +25,7 @@ type Source interface {
 	Join(at int) (*session.Session, <-chan camerafeed.Frame, error)
 	Leave(s *session.Session, frames <-chan camerafeed.Frame)
 	Sizes() []session.Size
+	RequestKey() error
 }
 
 type Options struct {

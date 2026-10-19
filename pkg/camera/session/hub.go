@@ -3,6 +3,7 @@ package session
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"sync"
 	"time"
@@ -28,6 +29,7 @@ type Transport interface {
 	Next(time.Duration) (camerafeed.Frame, error)
 	AskStill() error
 	AskKey() error
+	Want(main, sub bool) error
 	SetParams(string) error
 	Close() error
 }
@@ -45,6 +47,7 @@ type Options struct {
 	RestartError               error
 	Wait, Settle, Linger, Poll time.Duration
 	Depth                      int
+	Keep                       bool
 }
 type Hub struct {
 	mu      sync.Mutex
@@ -59,6 +62,7 @@ type Session struct {
 	out      [2][]chan camerafeed.Frame
 	config   [2][]byte
 	stills   []chan camerafeed.Frame
+	wants    [2]bool
 	users    int
 	err      error
 	done     chan struct{}
@@ -86,6 +90,12 @@ func New(options Options) *Hub {
 		options.RestartError = ErrRestarted
 	}
 	return &Hub{options: options}
+}
+
+func (h *Hub) Start() {
+	if h.options.Keep {
+		go h.keep()
+	}
 }
 func (s *Session) Done() <-chan struct{} { return s.done }
 func (s *Session) Err() error {
@@ -128,10 +138,12 @@ func (h *Hub) acquire() (*Session, error) {
 			snapshot: snapshot,
 			done:     make(chan struct{}),
 			opened:   time.Now(),
+			wants:    [2]bool{true, true},
 		}
 		h.cur = s
 		go h.read(s)
 		go h.follow(s)
+		h.tell(s)
 	}
 	h.cur.users++
 	return h.cur, nil
@@ -146,6 +158,9 @@ func (h *Hub) release(s *Session) {
 	}
 	if h.muted() {
 		h.retire(s, ErrMuted)
+		return
+	}
+	if h.options.Keep {
 		return
 	}
 	s.idle.Schedule(h.options.Linger, &h.mu, func() {
@@ -184,6 +199,7 @@ func (h *Hub) Join(at int) (*Session, <-chan camerafeed.Frame, error) {
 		ch <- camerafeed.Frame{Data: s.config[at], Config: true}
 	}
 	s.out[at] = append(s.out[at], ch)
+	h.tell(s)
 	return s, ch, nil
 }
 
@@ -203,7 +219,44 @@ func (h *Hub) Leave(s *Session, frames <-chan camerafeed.Frame) {
 		found = found || len(s.out[at]) != before
 	}
 	if found {
+		h.tell(s)
 		h.release(s)
+	}
+}
+
+func (h *Hub) tell(s *Session) {
+	if !h.options.Keep || h.cur != s {
+		return
+	}
+	want := [2]bool{len(s.out[0]) > 0, len(s.out[1]) > 0}
+	if want == s.wants {
+		return
+	}
+	s.wants = want
+	if err := s.stream.Want(want[0], want[1]); err != nil {
+		h.retire(s, err)
+	}
+}
+
+func (h *Hub) keep() {
+	ticker := time.NewTicker(h.options.Poll)
+	defer ticker.Stop()
+	for {
+		h.mu.Lock()
+		if h.closed {
+			h.mu.Unlock()
+			return
+		}
+		if h.cur == nil && !h.muted() {
+			s, err := h.acquire()
+			if err != nil {
+				slog.Debug("opening the camera failed", "err", err)
+			} else {
+				h.release(s)
+			}
+		}
+		h.mu.Unlock()
+		<-ticker.C
 	}
 }
 func (h *Hub) RequestKey() error {
@@ -316,8 +369,12 @@ func (h *Hub) follow(s *Session) {
 }
 func (h *Hub) read(s *Session) {
 	defer close(s.done)
+	wait := h.options.Wait
+	if h.options.Keep {
+		wait = 0
+	}
 	for {
-		frame, err := s.stream.Next(h.options.Wait)
+		frame, err := s.stream.Next(wait)
 		if err != nil {
 			if camerafeed.Timeout(err) {
 				err = fmt.Errorf("livecam: no frame from the camera within %s", h.options.Wait)

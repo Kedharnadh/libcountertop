@@ -16,11 +16,17 @@ type Page struct {
 
 	Tiles func() ([]menu.Cell, []func(int))
 
-	Preview func(at ui.Rect) bool
+	Preview func(at ui.Rect) Feed
 
 	Side func(*gogui.Window) gogui.View
 
 	Actions []Action
+}
+
+type Feed struct {
+	Live  bool
+	Glyph string
+	Note  string
 }
 
 type Action struct {

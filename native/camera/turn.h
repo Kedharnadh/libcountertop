@@ -4,5 +4,6 @@ typedef struct turner turner;
 
 turner *turn_open(ANativeWindow *main, int mw, int mh, ANativeWindow *sub, int sw, int sh, int cw, int ch, int quarters,
 	ANativeWindow **camera);
-int turn_frame(turner *t, unsigned char **still);
+int turn_frame(turner *t, unsigned char **still, int want);
+int turn_fd(turner *t);
 void turn_close(turner *t);

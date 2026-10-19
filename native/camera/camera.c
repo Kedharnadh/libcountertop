@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <sys/uio.h>
 #include <sys/un.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <android/log.h>
@@ -74,6 +75,7 @@ typedef struct {
 	int recording;
 	uint32_t w, h;
 	int still;
+	int want;
 	char *extra;
 	char range[32];
 	turner *turn;
@@ -434,6 +436,14 @@ static int gone(int conn, session *s) {
 		free(extra);
 		return 0;
 	}
+	if (c == ASK_WANT) {
+		unsigned char want;
+		if (read_full(conn, &want, 1) < 0) return 1;
+		int gained = want & ~s->want;
+		s->want = want & (WANT_MAIN | WANT_SUB);
+		if (gained) request_key(s);
+		return 0;
+	}
 	if (c == ASK_STILL) s->still = 1;
 	if (c == ASK_KEY) request_key(s);
 	return 0;
@@ -486,21 +496,47 @@ static int drain(int conn, session *s, int at, int64_t wait, uint64_t *frames) {
 	return err;
 }
 
+static int64_t now_ms(void) {
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+static int idle(int conn, session *s, uint64_t *frames) {
+	for (int i = 0; i < 2; i++)
+		if (s->codec[i] && drain(conn, s, i, 0, frames)) return 1;
+	struct pollfd p[2] = {{.fd = conn, .events = POLLIN}, {.fd = turn_fd(s->turn), .events = POLLIN}};
+	int r = poll(p, 2, STALL_MS);
+	if (r == 0) {
+		logw("no camera frame in %d ms", STALL_MS);
+		return 1;
+	}
+	return 0;
+}
+
 static void stream(int conn, session *s) {
 	uint64_t frames[2] = {0, 0};
 	int64_t wait = s->codec[SUB] ? 10000 : 100000;
 	if (s->turn) wait = 5000;
+	int64_t last = now_ms();
 	while (!gone(conn, s)) {
 		if (s->turn) {
+			if (!s->want && idle(conn, s, frames)) break;
 			unsigned char *still = NULL;
-			int drew = turn_frame(s->turn, s->still ? &still : NULL);
-			if (drew && s->still && send_still(conn, s, still)) break;
+			int got = turn_frame(s->turn, s->still ? &still : NULL, s->want);
+			if (got) last = now_ms();
+			else if (now_ms() - last > STALL_MS) {
+				logw("no camera frame in %d ms", STALL_MS);
+				break;
+			}
+			if (got && s->still && send_still(conn, s, still)) break;
+			if (!s->want) continue;
 		}
 #if __ANDROID_API__ >= 26
  else if (s->still && send_still(conn, s, NULL)) { break; }
 #endif
-		if (drain(conn, s, MAIN, wait, frames)) break;
-		if (s->codec[SUB] && drain(conn, s, SUB, wait, frames)) break;
+		if ((s->want & WANT_MAIN) && drain(conn, s, MAIN, wait, frames)) break;
+		if (s->codec[SUB] && (s->want & WANT_SUB) && drain(conn, s, SUB, wait, frames)) break;
 	}
 	logi("client gone after %llu main and %llu sub frames", (unsigned long long)frames[MAIN],
 		(unsigned long long)frames[SUB]);
@@ -513,7 +549,7 @@ static void serve(int conn) {
 	uint32_t w = req[2], h = req[3], fps = req[4], bitrate = req[5], keyframe = req[6];
 	uint32_t sw = req[7], sh = req[8], sbitrate = req[9], quarters = req[10];
 	uint32_t st = OK;
-	session s = {0};
+	session s = {.want = WANT_MAIN | WANT_SUB};
 	uint32_t n = 0;
 	if (req[1] == VERSION) {
 		if (read_full(conn, &n, sizeof n) < 0 || n > MAX_PARAMS) return;

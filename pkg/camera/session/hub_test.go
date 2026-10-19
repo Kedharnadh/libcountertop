@@ -17,6 +17,7 @@ type fakeTransport struct {
 	closed chan struct{}
 	once   sync.Once
 	asks   chan struct{}
+	wants  chan [2]bool
 }
 
 func fakeStream() *fakeTransport {
@@ -24,6 +25,7 @@ func fakeStream() *fakeTransport {
 		frames: make(chan camerafeed.Frame, 128),
 		closed: make(chan struct{}),
 		asks:   make(chan struct{}, 16),
+		wants:  make(chan [2]bool, 16),
 	}
 }
 func (f *fakeTransport) Next(time.Duration) (camerafeed.Frame, error) {
@@ -34,8 +36,12 @@ func (f *fakeTransport) Next(time.Duration) (camerafeed.Frame, error) {
 		return camerafeed.Frame{}, net.ErrClosed
 	}
 }
-func (f *fakeTransport) AskStill() error        { f.asks <- struct{}{}; return nil }
-func (f *fakeTransport) AskKey() error          { return nil }
+func (f *fakeTransport) AskStill() error { f.asks <- struct{}{}; return nil }
+func (f *fakeTransport) AskKey() error   { return nil }
+func (f *fakeTransport) Want(main, sub bool) error {
+	f.wants <- [2]bool{main, sub}
+	return nil
+}
 func (f *fakeTransport) SetParams(string) error { return nil }
 
 func (f *fakeTransport) Close() error { f.once.Do(func() { close(f.closed) }); return nil }
@@ -194,5 +200,94 @@ func TestSubscribersReceiveCachedHeadersAndOneSlowSubscriberDoesNotBlockAnother(
 	h.Leave(s, second)
 	if _, _, err := h.Join(3); err == nil {
 		t.Fatal("invalid stream accepted")
+	}
+}
+
+func TestKeepOpensWithoutUsersAndTellsTheHelperWhatIsWatched(t *testing.T) {
+	opened := make(chan *fakeTransport, 4)
+	h := New(Options{
+		Snapshot: func() Snapshot {
+			return Snapshot{
+				Config: camerafeed.Config{Width: 640, Height: 480, SubWidth: 320},
+				Key:    "one",
+			}
+		},
+		Open: func(camerafeed.Config) (Transport, error) {
+			f := fakeStream()
+			opened <- f
+			return f, nil
+		},
+		Linger: time.Millisecond,
+		Poll:   5 * time.Millisecond,
+		Keep:   true,
+	})
+	t.Cleanup(h.Close)
+	h.Start()
+
+	var f *fakeTransport
+	select {
+	case f = <-opened:
+	case <-time.After(time.Second):
+		t.Fatal("the camera was not opened without a user")
+	}
+	want := func(main, sub bool) {
+		t.Helper()
+		select {
+		case got := <-f.wants:
+			if got != [2]bool{main, sub} {
+				t.Fatalf("told the helper %v, want main %v sub %v", got, main, sub)
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("the helper was not told main %v sub %v", main, sub)
+		}
+	}
+	want(false, false)
+
+	s, main, err := h.Join(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want(true, false)
+	_, sub, err := h.Join(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want(true, true)
+	h.Leave(s, main)
+	want(false, true)
+	h.Leave(s, sub)
+	want(false, false)
+
+	select {
+	case <-f.closed:
+		t.Fatal("the camera closed after its last user left")
+	case <-opened:
+		t.Fatal("the camera was opened twice")
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
+func TestKeepReopensAfterTheHelperGoesAway(t *testing.T) {
+	opened := make(chan *fakeTransport, 4)
+	h := New(Options{
+		Snapshot: func() Snapshot { return Snapshot{Config: camerafeed.Config{Width: 640, Height: 480}, Key: "one"} },
+		Open: func(camerafeed.Config) (Transport, error) {
+			f := fakeStream()
+			opened <- f
+			return f, nil
+		},
+		Poll: 5 * time.Millisecond,
+		Keep: true,
+	})
+	t.Cleanup(h.Close)
+	h.Start()
+	first := <-opened
+	if err := first.Close(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-opened:
+	case <-time.After(time.Second):
+		t.Fatal("the camera was not reopened")
 	}
 }

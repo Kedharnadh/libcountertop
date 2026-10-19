@@ -3,12 +3,13 @@ package widgets
 import (
 	gogui "github.com/go-gui-org/go-gui/gui"
 
+	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
 
-type LivePreview struct{ ready bool }
+type LivePreview struct{ feed shell.Feed }
 
-func (p *LivePreview) View(w *gogui.Window, starting string, watch func(ui.Rect) bool) gogui.View {
+func (p *LivePreview) View(w *gogui.Window, watch func(ui.Rect) shell.Feed) gogui.View {
 	t := gogui.CurrentTheme()
 	vw, vh := w.WindowSize()
 	bw, bh, sizing := float32(vw)*0.45, float32(vh)*0.6, gogui.FixedFixed
@@ -17,8 +18,8 @@ func (p *LivePreview) View(w *gogui.Window, starting string, watch func(ui.Rect)
 	}
 	var content []gogui.View
 	fill := gogui.Color{}
-	if !p.ready {
-		content = append(content, gogui.Label(starting, Secondary()))
+	if !p.feed.Live {
+		content = FeedNote(p.feed)
 		fill = t.Cfg.ColorPanel
 	}
 	return gogui.Column(gogui.ContainerCfg{
@@ -33,9 +34,20 @@ func (p *LivePreview) View(w *gogui.Window, starting string, watch func(ui.Rect)
 		Content: content,
 		AmendLayout: func(e gogui.EventCtx) {
 			s := e.Layout.Shape
-			p.ready = watch(ui.Rect{X: int(s.X), Y: int(s.Y), W: int(s.Width), H: int(s.Height)})
+			p.feed = watch(ui.Rect{X: int(s.X), Y: int(s.Y), W: int(s.Width), H: int(s.Height)})
 		},
 	})
+}
+
+func FeedNote(f shell.Feed) []gogui.View {
+	var out []gogui.View
+	if f.Glyph != "" {
+		out = append(out, icon(f.Glyph, gogui.CurrentTheme().Cfg.TextStyleDef.Color))
+	}
+	if f.Note != "" {
+		out = append(out, gogui.Label(f.Note, Secondary()))
+	}
+	return out
 }
 
 func Divider() gogui.View {

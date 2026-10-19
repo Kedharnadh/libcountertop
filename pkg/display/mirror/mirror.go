@@ -12,13 +12,13 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
-type View struct{ live bool }
+type View struct{ feed shell.Feed }
 
 func (*View) Covers() bool { return true }
 
 type Camera interface {
 	Watch(v shell.View)
-	WantMirror(box ui.Rect) bool
+	WantMirror(box ui.Rect) shell.Feed
 }
 
 type Options struct {
@@ -54,14 +54,14 @@ func (m *Mirror) Screen(v shell.View) *navigation.Screen {
 }
 
 func (m *Mirror) open() {
-	m.view.live = false
+	m.view.feed = shell.Feed{Note: say.T("camera.starting")}
 	m.o.Shell.Push(m.view)
 }
 
 func (m *Mirror) build(*gogui.Window) gogui.View {
 	var content []gogui.View
-	if !m.view.live {
-		content = append(content, gogui.Label(say.T("camera.starting"), widgets.Secondary()))
+	if !m.view.feed.Live {
+		content = widgets.FeedNote(m.view.feed)
 	}
 	return gogui.Column(gogui.ContainerCfg{
 		ID:      "mirror",
@@ -72,7 +72,7 @@ func (m *Mirror) build(*gogui.Window) gogui.View {
 		Content: content,
 		AmendLayout: func(e gogui.EventCtx) {
 			s := e.Layout.Shape
-			m.view.live = m.o.Camera.WantMirror(
+			m.view.feed = m.o.Camera.WantMirror(
 				ui.Rect{X: int(s.X), Y: int(s.Y), W: int(s.Width), H: int(s.Height)},
 			)
 		},

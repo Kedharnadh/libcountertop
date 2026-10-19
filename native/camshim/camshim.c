@@ -118,6 +118,33 @@ int op_start_quiet(void *self, int op, int uid, const void *pkg, int start_if_de
 
 int check_calling_ids(const void *perm, int *pid, int *uid) __asm__("_ZN7android22checkCallingPermissionERKNS_8String16EPiS3_");
 int check_calling_ids(const void *perm, int *pid, int *uid) { return 1; }
+
+#define CONNECT_DEVICE                                                                                                \
+	"_ZN7android13CameraService13connectDeviceERKNS_2spINS_8hardware7camera222ICameraDeviceCallbacksEEERKNS_8String16" \
+	"ESA_iPNS1_INS3_17ICameraDeviceUserEEE"
+
+typedef void (*connect_device_fn)(void *status, void *self, const void *callbacks, const void *id, const void *pkg,
+	int uid, void *device);
+
+void s16_ctor(void *self, const char *s) __asm__("_ZN7android8String16C1EPKc");
+void s16_dtor(void *self) __asm__("_ZN7android8String16D1Ev");
+
+// Android 9's BasicClient waits 5 s for the permission service whenever the package name is empty, as NDK opens send it.
+void connect_device(void *status, void *self, const void *callbacks, const void *id, const void *pkg, int uid,
+	void *device) __asm__(CONNECT_DEVICE);
+void connect_device(void *status, void *self, const void *callbacks, const void *id, const void *pkg, int uid,
+	void *device) {
+	static connect_device_fn real;
+	if (!real) real = (connect_device_fn)dlsym(RTLD_NEXT, CONNECT_DEVICE);
+	if (**(const uint16_t *const *)pkg) {
+		real(status, self, callbacks, id, pkg, uid, device);
+		return;
+	}
+	void *name = NULL;
+	s16_ctor(&name, COUNTERTOP_PREFIX);
+	real(status, self, callbacks, id, &name, uid, device);
+	s16_dtor(&name);
+}
 #endif
 
 typedef int (*query_fn)(const void *self, int what, int *value);

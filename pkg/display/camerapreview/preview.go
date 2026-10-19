@@ -13,11 +13,13 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/surface"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
+	"github.com/ygelfand/libcountertop/pkg/say"
 )
 
 const (
 	camIdle  = 750 * time.Millisecond
 	camHold  = 5 * time.Second
+	muteHold = 500 * time.Millisecond
 	camLayer = 900
 	camZ     = 6
 	mirrorZ  = -2
@@ -42,7 +44,7 @@ type Preview struct {
 	live    bool
 	shown   bool
 	bad     time.Time
-	said    string
+	last    error
 	box     ui.Rect
 }
 
@@ -115,21 +117,31 @@ func (p *Preview) onScreen() bool {
 	return false
 }
 
-func (p *Preview) Want(box ui.Rect) bool { return p.watch(box, Inset) }
+func (p *Preview) Want(box ui.Rect) shell.Feed { return p.watch(box, Inset) }
 
-func (p *Preview) WantMirror(box ui.Rect) bool { return p.watch(box, Mirrored) }
+func (p *Preview) WantMirror(box ui.Rect) shell.Feed { return p.watch(box, Mirrored) }
 
-func (p *Preview) watch(box ui.Rect, framing Framing) bool {
+func (p *Preview) watch(box ui.Rect, framing Framing) shell.Feed {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.want, p.box, p.framing = time.Now(), box, framing
-	if !p.live && time.Since(p.bad) > camHold {
+	hold := camHold
+	if errors.Is(p.last, session.ErrMuted) {
+		hold = muteHold
+	}
+	if !p.live && time.Since(p.bad) > hold {
 		p.live = true
 		ctx, cancel := context.WithCancel(context.Background())
 		p.cancel = cancel
 		go p.run(ctx)
 	}
-	return p.shown
+	switch {
+	case p.shown:
+		return shell.Feed{Live: true}
+	case errors.Is(p.last, session.ErrMuted):
+		return shell.Feed{Glyph: "mdi:microphone-off", Note: say.T("camera.muted")}
+	}
+	return shell.Feed{Note: say.T("camera.starting")}
 }
 
 func (p *Preview) watched() (ui.Rect, Framing, bool) {
@@ -147,11 +159,13 @@ func (p *Preview) run(ctx context.Context) {
 	}
 	if err != nil {
 		p.bad = time.Now()
-		if err.Error() != p.said {
+		quiet := errors.Is(err, session.ErrMuted) ||
+			(p.last != nil && err.Error() == p.last.Error())
+		if !quiet {
 			slog.Warn("the camera preview stopped", "err", err)
 		}
-		p.said = err.Error()
 	}
+	p.last = err
 	p.mu.Unlock()
 	p.options.Shell.Redraw()
 }

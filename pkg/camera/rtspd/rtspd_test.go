@@ -14,6 +14,7 @@ type sizes []session.Size
 func (sizes) Join(int) (*session.Session, <-chan camerafeed.Frame, error) { return nil, nil, nil }
 func (sizes) Leave(*session.Session, <-chan camerafeed.Frame)             {}
 func (s sizes) Sizes() []session.Size                                     { return s }
+func (sizes) RequestKey() error                                           { return nil }
 
 func TestEachServedStreamIsAProfile(t *testing.T) {
 	s := New(Options{

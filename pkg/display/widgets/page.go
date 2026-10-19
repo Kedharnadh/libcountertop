@@ -14,7 +14,7 @@ import (
 type PageRenderer struct {
 	Row     func(string, string, menu.Row, func(int), bool) gogui.View
 	Tile    func(*gogui.Window, string, string, menu.Cell, func(int)) gogui.View
-	Preview func(*gogui.Window, func(ui.Rect) bool) gogui.View
+	Preview func(*gogui.Window, func(ui.Rect) shell.Feed) gogui.View
 	Beside  func(*gogui.Window, gogui.View, gogui.View) gogui.View
 }
 

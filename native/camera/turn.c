@@ -1,7 +1,9 @@
 #include "platform.h"
 #if __ANDROID_API__ >= 26
+#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -46,6 +48,7 @@ struct turner {
 	output out[2];
 	int outs;
 	AImageReader *reader;
+	int wake[2];
 	GLuint prog;
 	GLint pos, uv;
 	cached cache[CACHE];
@@ -115,9 +118,17 @@ static int surface(turner *t, int i, ANativeWindow *win, int w, int h, int quart
 	return 0;
 }
 
+static void arrived(void *ctx, AImageReader *r) {
+	turner *t = ctx;
+	char c = 0;
+	(void)!write(t->wake[1], &c, 1);
+}
+
 turner *turn_open(ANativeWindow *main, int mw, int mh, ANativeWindow *sub, int sw, int sh, int cw, int ch, int quarters,
 	ANativeWindow **camera) {
 	turner *t = calloc(1, sizeof *t);
+	t->wake[0] = t->wake[1] = -1;
+	if (pipe2(t->wake, O_NONBLOCK | O_CLOEXEC) != 0) goto fail;
 	t->dpy = eglGetDisplay(EGL_DEFAULT_DISPLAY);
 	if (t->dpy == EGL_NO_DISPLAY || !eglInitialize(t->dpy, NULL, NULL)) goto fail;
 	EGLint want[] = {EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
@@ -159,6 +170,8 @@ turner *turn_open(ANativeWindow *main, int mw, int mh, ANativeWindow *sub, int s
 		logw("turn: image reader %dx%d", cw, ch);
 		goto fail;
 	}
+	AImageReader_ImageListener listen = {.context = t, .onImageAvailable = arrived};
+	if (AImageReader_setImageListener(t->reader, &listen) != AMEDIA_OK) goto fail;
 	return t;
 fail:
 	logw("turn: setup failed: 0x%x", eglGetError());
@@ -213,16 +226,21 @@ static unsigned char *readback(output *o) {
 	return pix;
 }
 
-int turn_frame(turner *t, unsigned char **still) {
+int turn_fd(turner *t) { return t->wake[0]; }
+
+int turn_frame(turner *t, unsigned char **still, int want) {
+	char drop[64];
+	while (read(t->wake[0], drop, sizeof drop) > 0) {}
 	AImage *img = NULL;
 	if (AImageReader_acquireLatestImage(t->reader, &img) != AMEDIA_OK || !img) return 0;
 	AHardwareBuffer *b = NULL;
 	int64_t ns = 0;
 	AImage_getTimestamp(img, &ns);
-	int drew = 0;
 	if (AImage_getHardwareBuffer(img, &b) == AMEDIA_OK && b) {
 		for (int i = 0; i < t->outs; i++) {
 			output *o = &t->out[i];
+			int shown = want & (1 << i), read = i == 0 && still && !*still;
+			if (!shown && !read) continue;
 			if (!eglMakeCurrent(t->dpy, o->surface, o->surface, t->ctx)) continue;
 			cached *c = texture(t, b);
 			if (!c) break;
@@ -235,14 +253,14 @@ int turn_frame(turner *t, unsigned char **still) {
 			glEnableVertexAttribArray(t->pos);
 			glEnableVertexAttribArray(t->uv);
 			glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-			if (i == 0 && still && !*still) *still = readback(o);
+			if (read) *still = readback(o);
+			if (!shown) continue;
 			t->when(t->dpy, o->surface, ns);
 			eglSwapBuffers(t->dpy, o->surface);
-			drew = 1;
 		}
 	}
 	AImage_delete(img);
-	return drew;
+	return 1;
 }
 
 void turn_close(turner *t) {
@@ -256,6 +274,8 @@ void turn_close(turner *t) {
 		if (t->ctx) eglDestroyContext(t->dpy, t->ctx);
 	}
 	if (t->reader) AImageReader_delete(t->reader);
+	for (int i = 0; i < 2; i++)
+		if (t->wake[i] >= 0) close(t->wake[i]);
 	free(t);
 }
 
@@ -269,7 +289,9 @@ turner *turn_open(ANativeWindow *main, int mw, int mh, ANativeWindow *sub, int s
 	return NULL;
 }
 
-int turn_frame(turner *t, unsigned char **still) { return 0; }
+int turn_frame(turner *t, unsigned char **still, int want) { return 0; }
+
+int turn_fd(turner *t) { return -1; }
 
 void turn_close(turner *t) {}
 

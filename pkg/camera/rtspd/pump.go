@@ -29,7 +29,13 @@ func (p *pump) demand() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.wanted = time.Now()
-	if p.running || !p.allowed() {
+	if p.running {
+		if err := p.source.RequestKey(); err != nil {
+			slog.Debug("asking for a keyframe failed", "stream", StreamName(p.at), "err", err)
+		}
+		return
+	}
+	if !p.allowed() {
 		return
 	}
 	p.running = true
