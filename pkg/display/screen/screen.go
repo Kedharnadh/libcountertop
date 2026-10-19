@@ -90,14 +90,14 @@ func (s *Screen) Theme() theme.Theme {
 
 func (s *Screen) Use(name string) {
 	at := s.options.Settings.Read()
-	t, ok := theme.ByName(style.Theme(at.Style, name))
+	t, ok := theme.Resolve(style.Theme(at.Style, name), at.Custom)
 	if !ok {
 		slog.Warn("no such theme", "theme", name)
 		return
 	}
 
 	s.mu.Lock()
-	changed := s.current.Name != t.Name
+	changed := s.current != t
 	s.current = t
 	s.mu.Unlock()
 

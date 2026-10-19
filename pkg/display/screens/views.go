@@ -192,7 +192,7 @@ func (a *App) tileView(w *gogui.Window, id, page string, c menu.Cell, tap func(i
 	if c.Preview != nil {
 		content = append(content, c.Preview.View(w, float32(tw), float32(th)))
 	}
-	return a.ui.Toolkit.Tile(id, c.Label, c.Chosen, content, tap)
+	return a.ui.Toolkit.Tile(id, c.Label, c.Chosen, content, tap, c.Edit)
 }
 
 func (a *App) painted(key string, w, h int, fill theme.Color, draw widgets.Paint) string {

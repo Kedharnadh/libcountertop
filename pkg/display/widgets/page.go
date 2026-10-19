@@ -61,8 +61,11 @@ func PageBody(w *gogui.Window, p *shell.Page, render PageRenderer) gogui.View {
 			Content: views,
 		},
 	)
-	if p.Preview == nil {
-		return list
+	switch {
+	case p.Side != nil:
+		return render.Beside(w, p.Side(w), list)
+	case p.Preview != nil:
+		return render.Beside(w, render.Preview(w, p.Preview), list)
 	}
-	return render.Beside(w, render.Preview(w, p.Preview), list)
+	return list
 }

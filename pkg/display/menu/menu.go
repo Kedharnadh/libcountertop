@@ -57,4 +57,5 @@ type Cell struct {
 	Label   string
 	Chosen  bool
 	Preview Preview
+	Edit    func()
 }

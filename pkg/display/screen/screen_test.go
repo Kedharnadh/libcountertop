@@ -115,9 +115,9 @@ func TestThemedIsQuietWhenNothingChanged(t *testing.T) {
 func TestEntities(t *testing.T) {
 	s, _ := panel(t)
 
-	if got := len(s.Entities()); got != 13 {
+	if got := len(s.Entities()); got != 19 {
 		t.Errorf(
-			"%d entities, want backlight, mode, theme, style, size, the drawer edge, the dock hide delay, the alert style, the timer style, keyboard, language, marks and the level",
+			"%d entities, want backlight, mode, theme, style, size, the drawer edge, the dock hide delay, the alert style, the timer style, keyboard, language, marks, the six custom theme colors, and the level",
 			got,
 		)
 	}
@@ -364,6 +364,10 @@ func TestEverySettableEntityTakesACommand(t *testing.T) {
 				t.Errorf("%s takes no command", v.ObjectID)
 			}
 		case *esphome.Number:
+			if v.OnCommand == nil {
+				t.Errorf("%s takes no command", v.ObjectID)
+			}
+		case *esphome.Text:
 			if v.OnCommand == nil {
 				t.Errorf("%s takes no command", v.ObjectID)
 			}

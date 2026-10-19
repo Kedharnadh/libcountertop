@@ -616,6 +616,12 @@ screen.setting.size: Size
 screen.setting.style: Style
 screen.setting.theme: Theme
 screen.setting.timer: Timer style
+screen.setting.custom.background: Custom theme background
+screen.setting.custom.surface: Custom theme cards
+screen.setting.custom.text: Custom theme text
+screen.setting.custom.muted: Custom theme secondary text
+screen.setting.custom.accent: Custom theme accent
+screen.setting.custom.accent2: Custom theme second accent
 sendspin.group.sendspin: Sendspin
 sendspin.setting.on: Sendspin
 settings.about: About
@@ -833,6 +839,14 @@ tessera.weather.none: No forecast
 tessera.weather.pressure: "Pressure {{.P}}"
 tessera.weather.visibility: "Visibility {{.V}}"
 tessera.weather.wind: "Wind {{.W}}"
+theme.custom: Custom
+theme.custom.title: Custom theme
+theme.custom.background: Background
+theme.custom.surface: Cards
+theme.custom.text: Text
+theme.custom.muted: Secondary text
+theme.custom.accent: Accent
+theme.custom.accent2: Second accent
 theme.default: Default
 theme.title: Theme
 timer.stop: Stop

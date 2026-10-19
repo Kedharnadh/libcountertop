@@ -32,7 +32,7 @@ func NewTable(uiSize func() string) *Table {
 }
 
 func rows(table func() *Table, uiSize func() string) []Setting {
-	return []Setting{
+	return append([]Setting{
 		{
 			Name:  "backlight",
 			Local: true,
@@ -117,7 +117,7 @@ func rows(table func() *Table, uiSize func() string) []Setting {
 			Kind: setting.Choice, Options: themes(),
 			Read: func(s *schema.Screen) string { return s.Theme },
 			Write: func(s *schema.Screen, v string) error {
-				if _, ok := theme.ByName(v); !ok && v != theme.Follow {
+				if _, ok := theme.ByName(v); !ok && v != theme.Follow && v != theme.CustomName {
 					return table().MustRow("theme").Bad(v, "")
 				}
 				s.Theme = v
@@ -164,7 +164,30 @@ func rows(table func() *Table, uiSize func() string) []Setting {
 		setting.Flag(Setting{
 			Name: "marks", Group: Panel, ID: "privacy_marks", Icon: "mdi:shield-account-outline",
 		}, func(s *schema.Screen) *bool { return &s.Marks }),
+	}, customColors(table)...)
+}
+
+func customColors(table func() *Table) []Setting {
+	out := make([]Setting, 0, len(theme.CustomFields))
+	for _, field := range theme.CustomFields {
+		name := "custom." + field
+		out = append(out, Setting{
+			Name:  name,
+			Group: Panel,
+			ID:    "theme_custom_" + field, Icon: "mdi:eyedropper-variant",
+			Kind: setting.Text,
+			Read: func(s *schema.Screen) string { return s.Custom.Theme().Color(field).String() },
+			Write: func(s *schema.Screen, v string) error {
+				if err := theme.CheckColor(v); err != nil {
+					return table().MustRow(name).Bad(v, err.Error())
+				}
+				at, _ := s.Custom.Field(field)
+				*at = strings.TrimSpace(v)
+				return nil
+			},
+		})
 	}
+	return out
 }
 
 func plain(values []string) []setting.Option {
@@ -180,7 +203,7 @@ func themes() []setting.Option {
 	for _, name := range theme.Names() {
 		out = append(out, setting.Option{Value: name, Label: name})
 	}
-	return out
+	return append(out, setting.Option{Value: theme.CustomName, Label: theme.CustomName})
 }
 
 func edges() []setting.Option {

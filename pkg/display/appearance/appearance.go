@@ -124,9 +124,9 @@ func sizeNamed(name string) Size {
 	return sizes[0]
 }
 
-func Look(name, palette, size string) gogui.Theme {
+func Look(name, palette, size string, custom theme.Custom) gogui.Theme {
 	st := style.ByName(name)
-	p, ok := theme.ByName(style.Theme(name, palette))
+	p, ok := theme.Resolve(style.Theme(name, palette), custom)
 	if !ok {
 		p = theme.Default()
 	}

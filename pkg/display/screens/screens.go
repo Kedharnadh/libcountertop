@@ -267,7 +267,7 @@ func (a *App) sizeSetting() string {
 
 func (a *App) current() gogui.Theme {
 	s := a.o.Settings().Screen
-	return appearance.Look(s.Style, s.Theme, a.sizeSetting())
+	return appearance.Look(s.Style, s.Theme, a.sizeSetting(), s.Custom)
 }
 
 func (a *App) Restyle() {

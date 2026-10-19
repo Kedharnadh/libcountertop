@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
@@ -23,6 +24,9 @@ func TestTheEntityIdentifiersDoNotMove(t *testing.T) {
 		"keyboard":    "screen_keyboard",
 		"language":    "screen_language",
 		"marks":       "privacy_marks",
+	}
+	for _, field := range theme.CustomFields {
+		want["custom."+field] = "theme_custom_" + field
 	}
 
 	tb := table()

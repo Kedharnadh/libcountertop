@@ -135,9 +135,10 @@ func (kit *Toolkit) Tile(
 	selected bool,
 	content []gogui.View,
 	tap func(int),
+	edit func(),
 ) gogui.View {
 	t := gogui.CurrentTheme().Cfg
-	content = append(content, gogui.Label(label, gogui.TextStyle{}))
+	content = append(content, kit.tileLabel(id, label, edit))
 	cfg := gogui.ContainerCfg{
 		ID:         id,
 		HAlign:     gogui.HAlignCenter,
@@ -153,6 +154,28 @@ func (kit *Toolkit) Tile(
 	}
 	kit.controls().Tile(&cfg, Chosen(selected))
 	return kit.Pressable(gogui.Column, cfg, interaction.Tapped(tap, 0))
+}
+
+func (kit *Toolkit) tileLabel(id, label string, edit func()) gogui.View {
+	if edit == nil {
+		return gogui.Label(label, gogui.TextStyle{})
+	}
+	return gogui.Row(gogui.ContainerCfg{
+		Sizing:  gogui.FillFit,
+		Padding: gogui.NoPadding,
+		VAlign:  gogui.VAlignMiddle,
+		Content: []gogui.View{
+			gogui.Label(label, gogui.TextStyle{}),
+			gogui.Row(gogui.ContainerCfg{Sizing: gogui.FillFit, Padding: gogui.NoPadding}),
+			kit.KeyButton(
+				id+"-edit",
+				gogui.IconEdit,
+				gogui.CurrentTheme().Cfg.TextStyleDef,
+				Chosen(false),
+				func(gogui.EventCtx) { edit() },
+			),
+		},
+	})
 }
 
 func (kit *Toolkit) segments(id string, r menu.Row, tap func(int)) gogui.View {

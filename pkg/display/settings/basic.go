@@ -225,14 +225,24 @@ func (p *BasicPages) Theme() *shell.Page {
 				})
 				acts = append(acts, p.useTheme(t.Name))
 			}
+			cells = append(cells, menu.Cell{
+				Label:   say.T("theme.custom"),
+				Chosen:  now == theme.CustomName,
+				Preview: p.options.Previews.Theme(p.state().Screen.Custom.Theme()),
+				Edit:    func() { p.options.Shell.Push(p.CustomTheme()) },
+			})
+			acts = append(acts, p.useTheme(theme.CustomName))
 			return cells, acts
 		},
 	}
 }
 
 func ThemeSays(name string) string {
-	if name == theme.Follow {
+	switch name {
+	case theme.Follow:
 		return say.T("theme.default")
+	case theme.CustomName:
+		return say.T("theme.custom")
 	}
 	return name
 }

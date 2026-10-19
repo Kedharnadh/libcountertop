@@ -28,6 +28,8 @@ type Screen struct {
 	Marks bool `json:"marks"`
 
 	Language string `json:"language"`
+
+	Custom theme.Custom `json:"custom"`
 }
 
 const (

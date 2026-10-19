@@ -40,7 +40,7 @@ func (u *UI) Reset() {
 func (u *UI) Kit() style.Kit { return style.ByName(u.settings.Read().Style).Kit }
 func (u *UI) Palette() theme.Theme {
 	s := u.settings.Read()
-	if p, ok := theme.ByName(style.Theme(s.Style, s.Theme)); ok {
+	if p, ok := theme.Resolve(style.Theme(s.Style, s.Theme), s.Custom); ok {
 		return p
 	}
 	return theme.Default()

@@ -3,6 +3,8 @@ package shell
 import (
 	"time"
 
+	gogui "github.com/go-gui-org/go-gui/gui"
+
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 )
@@ -15,6 +17,8 @@ type Page struct {
 	Tiles func() ([]menu.Cell, []func(int))
 
 	Preview func(at ui.Rect) bool
+
+	Side func(*gogui.Window) gogui.View
 
 	Actions []Action
 }
