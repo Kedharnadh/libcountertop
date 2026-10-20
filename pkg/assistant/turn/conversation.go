@@ -11,6 +11,7 @@ import (
 	"github.com/ygelfand/go-esphome-device/api"
 
 	"github.com/ygelfand/libcountertop/pkg/assistant/activity"
+	"github.com/ygelfand/libcountertop/pkg/hook"
 	"github.com/ygelfand/libcountertop/pkg/inference/wake"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
@@ -65,6 +66,7 @@ type Conversation struct {
 	replyID uint64
 	options Dependencies
 	Word    func(int) (string, bool)
+	Ended   hook.Hook[struct{}]
 	vs      *esphome.VoiceSatellite
 	source  Microphone
 	speaker Speaker
@@ -546,6 +548,7 @@ func (c *Conversation) idle(why string, how activity.Outcome) {
 
 	if was != phaseIdle {
 		slog.Info("turn ended", "was", was, "slot", c.slot+1, "why", why)
+		c.Ended.Emit(struct{}{})
 	}
 }
 

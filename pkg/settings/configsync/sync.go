@@ -77,10 +77,12 @@ type Stage interface {
 }
 
 type Dependencies struct {
-	Store Store
-	Peers Peers
-	Port  int
-	Stage Stage
+	Store  Store
+	Peers  Peers
+	Port   int
+	Secure int
+	Client *http.Client
+	Stage  Stage
 }
 
 type Sync struct {
@@ -109,7 +111,7 @@ func (s *Sync) Now() (Exchange, bool) {
 }
 
 func (s *Sync) Send(p peer.Peer) error {
-	addr, err := p.Addr()
+	addr, err := p.URL()
 	if err != nil {
 		return err
 	}
@@ -132,7 +134,7 @@ func (s *Sync) Send(p peer.Peer) error {
 }
 
 func (s *Sync) Fetch(p peer.Peer) error {
-	addr, err := p.Addr()
+	addr, err := p.URL()
 	if err != nil {
 		return err
 	}

@@ -5,10 +5,9 @@ package dhcp
 import (
 	"context"
 	"errors"
-
-	"github.com/insomniacslk/dhcp/dhcpv4"
+	"net"
 )
 
-func dhcpRequest(context.Context, string, ...dhcpv4.Modifier) (*Lease, error) {
+func dhcpRequest(context.Context, string, string, net.IP) (*Lease, error) {
 	return nil, errors.New("dhcp: only works on the device")
 }

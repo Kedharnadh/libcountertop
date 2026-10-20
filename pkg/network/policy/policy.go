@@ -6,6 +6,7 @@ import (
 	esphome "github.com/ygelfand/go-esphome-device"
 
 	"github.com/ygelfand/libcountertop/pkg/fetch"
+	"github.com/ygelfand/libcountertop/pkg/hook"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -19,17 +20,28 @@ type (
 
 const Group setting.Group = "Network"
 
+const keyMost = 256
+
 func NewTable() *Table {
+	home := setting.Words(
+		Setting{Name: "home_key", Group: Group, Icon: "mdi:home-lock"},
+		keyMost,
+		func(c *schema.Network) *string { return &c.HomeKey },
+	)
+	home.Kind = setting.Secret
 	return setting.NewTable("network", []setting.Group{Group}, []Setting{
 		setting.Flag(Setting{
 			Name: "verify", Group: Group, ID: "verify_certificates", Icon: "mdi:certificate",
 		}, func(c *schema.Network) *bool { return &c.Verify }),
+		home,
 	}, setting.Messages{Text: say.T, Missing: say.Missing})
 }
 
 type Policy struct {
 	settings storage.Section[schema.Network]
 	knobs    *setting.Controls[schema.Network]
+
+	Changed hook.Hook[schema.Network]
 }
 
 func New(settings storage.Section[schema.Network]) *Policy {
@@ -48,6 +60,13 @@ func (p *Policy) Settings() *setting.Controls[schema.Network] { return p.knobs }
 func (p *Policy) Restore(verify bool)                         { p.apply(verify) }
 func (p *Policy) Verifying() bool                             { return !fetch.Skipping() }
 
+func (p *Policy) HomeKey() string  { return p.settings.Read().HomeKey }
+func (p *Policy) HasHomeKey() bool { return p.HomeKey() != "" }
+
+func (p *Policy) SetHomeKey(key string) error {
+	return p.save(p.knobs.Table.MustRow("home_key"), key)
+}
+
 func (p *Policy) SetVerify(verify bool) {
 	if err := p.save(p.knobs.Table.MustRow("verify"), setting.OnOff(verify)); err != nil {
 		slog.Error("saving certificate policy failed", "err", err)
@@ -57,6 +76,7 @@ func (p *Policy) SetVerify(verify bool) {
 func (p *Policy) save(s Setting, v string) error {
 	err := setting.Store(p.settings, s, v)
 	p.apply(p.settings.Read().Verify)
+	p.Changed.Emit(p.settings.Read())
 	return err
 }
 

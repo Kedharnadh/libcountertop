@@ -64,6 +64,40 @@ func TestARememberedAddressIsAskedFor(t *testing.T) {
 	}
 }
 
+func TestTheRequestTakesTheOfferNotTheRememberedAddress(t *testing.T) {
+	remembered := net.IPv4(192, 168, 1, 218)
+	offered := net.IPv4(192, 168, 1, 191)
+	discover, request := selecting("kitchen", remembered)
+
+	asked, err := dhcpv4.New(discover...)
+	if err != nil {
+		t.Fatalf("building the discover: %v", err)
+	}
+	if got := asked.RequestedIPAddress(); !got.Equal(remembered.To4()) {
+		t.Errorf("the discover asked for %v, want %v", got, remembered)
+	}
+
+	offer, err := dhcpv4.New(
+		dhcpv4.WithMessageType(dhcpv4.MessageTypeOffer),
+		dhcpv4.WithYourIP(offered),
+		dhcpv4.WithServerIP(net.IPv4(192, 168, 1, 1)),
+		dhcpv4.WithOption(dhcpv4.OptServerIdentifier(net.IPv4(192, 168, 1, 1))),
+	)
+	if err != nil {
+		t.Fatalf("building the offer: %v", err)
+	}
+	took, err := dhcpv4.NewRequestFromOffer(offer, request...)
+	if err != nil {
+		t.Fatalf("building the request: %v", err)
+	}
+	if got := took.RequestedIPAddress(); !got.Equal(offered.To4()) {
+		t.Errorf("the request asked for %v, want the offered %v", got, offered)
+	}
+	if took.HostName() != "kitchen" {
+		t.Errorf("the request carries hostname %q", took.HostName())
+	}
+}
+
 func TestWhatIsAlwaysAskedFor(t *testing.T) {
 	for _, want := range []net.IP{nil, net.IPv4(192, 168, 1, 40)} {
 		msg := what(t, want)

@@ -13,11 +13,7 @@ import (
 )
 
 func (c *Calls) Action(peers func() []discovery.Peer, video bool) actions.Action {
-	triggers := []actions.Trigger{
-		{Sentence: "call [the] {peer}"},
-		{Sentence: "ring [the] {peer}"},
-		{Sentence: "intercom [the] {peer}"},
-	}
+	triggers := []actions.Trigger{{Sentence: "(call|ring|intercom) [the] {peer}"}}
 	if video {
 		triggers = append(triggers, actions.Trigger{
 			Sentence: "video call [the] {peer}",
@@ -42,6 +38,8 @@ func (c *Calls) Action(peers func() []discovery.Peer, video bool) actions.Action
 			switch {
 			case errors.Is(err, ErrBusy):
 				return say.T("actions.call.busy"), nil
+			case errors.Is(err, ErrForeign):
+				return say.F("actions.call.foreign", map[string]any{"Peer": p.Name}), nil
 			case err != nil:
 				return say.F("actions.call.unreachable", map[string]any{"Peer": p.Name}), nil
 			}

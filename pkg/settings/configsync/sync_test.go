@@ -1,6 +1,7 @@
 package configsync
 
 import (
+	"crypto/tls"
 	"errors"
 	"net"
 	"net/http"
@@ -68,6 +69,11 @@ func pair(t *testing.T) (a, b *device) {
 			Dependencies{
 				Store: d.dev.store,
 				Peers: peers{self: peer.Peer{ID: d.id}, other: d.other},
+				Client: &http.Client{Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{
+						InsecureSkipVerify: true,
+					}, //nolint:gosec // test servers
+				}},
 			},
 		)
 		mux := http.NewServeMux()
@@ -75,11 +81,11 @@ func pair(t *testing.T) (a, b *device) {
 		mux.Handle("POST /config/ask", d.dev.sync.AskHandler())
 		mux.Handle("POST /config/pull", d.dev.sync.PullHandler())
 		mux.Handle("POST /config/cancel", d.dev.sync.CancelHandler())
-		srv := httptest.NewServer(mux)
+		srv := httptest.NewTLSServer(mux)
 		t.Cleanup(srv.Close)
 		host, port, _ := net.SplitHostPort(srv.Listener.Addr().String())
 		n, _ := strconv.Atoi(port)
-		*d.self = peer.Peer{ID: d.id, Name: d.id, Addrs: []net.IP{net.ParseIP(host)}, Port: n}
+		*d.self = peer.Peer{ID: d.id, Name: d.id, Addrs: []net.IP{net.ParseIP(host)}, Secure: n}
 		d.dev.peer = *d.self
 		d.dev.sync.o.Peers = peers{self: *d.self, other: d.other}
 	}

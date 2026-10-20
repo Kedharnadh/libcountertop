@@ -22,9 +22,17 @@ func (cv *View) callsBoard(at ui.Rect, pal theme.Theme) gogui.View {
 }
 
 func (cv *View) actions(p peer.Peer) []peerboard.Action {
+	info := peerboard.Action{
+		Name: "info",
+		Icon: gogui.IconInfo,
+		Do:   func(gogui.EventCtx) { cv.open(p) },
+	}
+	if !p.Standing.Trusted() {
+		return []peerboard.Action{info}
+	}
 	out := []peerboard.Action{
 		{Name: "audio", Icon: gogui.IconPhone, Do: func(gogui.EventCtx) { cv.dial(p, false) }},
-		{Name: "info", Icon: gogui.IconInfo, Do: func(gogui.EventCtx) { cv.open(p) }},
+		info,
 	}
 	if cv.video(p) {
 		out = append(out, peerboard.Action{

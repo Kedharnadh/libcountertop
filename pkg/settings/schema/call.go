@@ -18,6 +18,7 @@ type Call struct {
 	Ring        Chime        `json:"ring"`
 	VideoRing   Chime        `json:"video_ring"`
 	Ringback    Chime        `json:"ringback"`
+	Broadcasts  bool         `json:"broadcasts"`
 }
 
 type CallAudience string
@@ -65,5 +66,6 @@ func DefaultCall() Call {
 		Ring:       ChimeRing,
 		VideoRing:  ChimeRing,
 		Ringback:   ChimeRingback,
+		Broadcasts: true,
 	}
 }

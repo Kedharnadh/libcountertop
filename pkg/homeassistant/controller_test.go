@@ -88,6 +88,88 @@ func TestProbeAllows(t *testing.T) {
 	}
 }
 
+func TestThePingFindsTheIntegration(t *testing.T) {
+	cases := []struct {
+		name   string
+		answer *api.HomeassistantActionResponse
+		want   Integration
+	}{
+		{
+			name: "ready",
+			answer: &api.HomeassistantActionResponse{
+				Success:      true,
+				ResponseData: []byte(`{"response":"{\"supported\": true, \"protocol\": 1}"}`),
+			},
+			want: IntegrationReady,
+		},
+		{
+			name: "outdated",
+			answer: &api.HomeassistantActionResponse{
+				Success:      true,
+				ResponseData: []byte(`{"response":"{\"supported\": false, \"protocol\": 2}"}`),
+			},
+			want: IntegrationOutdated,
+		},
+		{
+			name: "missing",
+			answer: &api.HomeassistantActionResponse{
+				ErrorMessage: "Action echolocal.ping not found",
+			},
+			want: IntegrationMissing,
+		},
+	}
+	for _, c := range cases {
+		var asked *api.HomeassistantActionRequest
+		h, f := connected(
+			func(req *api.HomeassistantActionRequest) *api.HomeassistantActionResponse {
+				asked = req
+				return proto.Clone(c.answer).(*api.HomeassistantActionResponse)
+			},
+		)
+		h.reprobe(f)
+		waitFor(t, h, Allowed)
+		if got := h.Integration(); got != c.want {
+			t.Errorf("%s: integration %s, want %s", c.name, got, c.want)
+		}
+		if asked.GetService() != Ping || len(asked.GetData()) != 1 ||
+			asked.GetData()[0].GetKey() != "protocol" {
+			t.Errorf("%s: probed with %v", c.name, asked)
+		}
+	}
+}
+
+func TestTemplatesRideTheIntegrationWhenItIsThere(t *testing.T) {
+	for _, c := range []struct {
+		integration Integration
+		want        string
+	}{
+		{IntegrationReady, Ping},
+		{IntegrationOutdated, recorder},
+		{IntegrationMissing, recorder},
+	} {
+		var asked string
+		h, f := connected(
+			func(req *api.HomeassistantActionRequest) *api.HomeassistantActionResponse {
+				asked = req.GetService()
+				return &api.HomeassistantActionResponse{
+					Success:      true,
+					ResponseData: []byte(`{"response":"1"}`),
+				}
+			},
+		)
+		set(h, f, Allowed)
+		h.mu.Lock()
+		h.links[f].integration = c.integration
+		h.mu.Unlock()
+		if _, err := h.Template(context.Background(), "{{ 1 }}"); err != nil {
+			t.Fatal(err)
+		}
+		if asked != c.want {
+			t.Errorf("integration %s: the template rode %q, want %q", c.integration, asked, c.want)
+		}
+	}
+}
+
 func TestRefusedFailsFastAndReprobes(t *testing.T) {
 	h, f := connected(answering(`{"response":"ok"}`))
 	set(h, f, Refused)
@@ -311,7 +393,7 @@ func TestEveryAllowedHomeAssistantGetsTheCall(t *testing.T) {
 	set(h, failing, Allowed)
 	set(h, ok, Allowed)
 
-	got, err := h.Ask(context.Background(), carrier, nil, nil, "x")
+	got, err := h.Ask(context.Background(), recorder, nil, nil, "x")
 	if err != nil {
 		t.Fatalf("one failure beat a success: %v", err)
 	}

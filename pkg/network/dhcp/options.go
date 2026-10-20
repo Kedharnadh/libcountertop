@@ -54,3 +54,8 @@ func RequestOptions(hostname string, want net.IP) []dhcpv4.Modifier {
 	}
 	return mods
 }
+
+// RFC 2131 4.3.2: a SELECTING request names the offered address; only the discover may name a remembered one.
+func selecting(hostname string, want net.IP) (discover, request []dhcpv4.Modifier) {
+	return RequestOptions(hostname, want), RequestOptions(hostname, nil)
+}

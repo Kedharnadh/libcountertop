@@ -5,6 +5,7 @@ import "encoding/json"
 type Network struct {
 	Verify  bool   `json:"verify"`
 	Address string `json:"address,omitempty"`
+	HomeKey string `json:"home_key,omitempty"`
 }
 
 func DefaultNetwork() Network { return Network{Verify: true} }

@@ -11,6 +11,7 @@ type Shared struct {
 	Calendar  Calendar  `json:"calendar"`
 	Call      Call      `json:"call"`
 	Camera    Camera    `json:"camera"`
+	Cameras   Cameras   `json:"cameras"`
 	Cast      Cast      `json:"cast"`
 	Clock     Clock     `json:"clock"`
 	Feedback  Feedback  `json:"feedback"`
@@ -44,6 +45,7 @@ func DefaultShared() Shared {
 		Calendar:  DefaultCalendar(),
 		Call:      DefaultCall(),
 		Camera:    DefaultCamera(),
+		Cameras:   DefaultCameras(),
 		Cast:      DefaultCast(),
 		Clock:     DefaultClock(),
 		Feedback:  DefaultFeedback(),
@@ -70,9 +72,11 @@ func (s Shared) Clone() Shared {
 	s.Wake = s.Wake.Clone()
 	s.Cast = s.Cast.Clone()
 	s.Camera = s.Camera.Clone()
+	s.Cameras = s.Cameras.Clone()
 	s.Home = s.Home.Clone()
 	s.Apps = s.Apps.Clone()
 	s.Radio = s.Radio.Clone()
+	s.Voice = s.Voice.Clone()
 	return s
 }
 
@@ -84,6 +88,7 @@ type Sections[C any] struct {
 	Calendar  storage.Binding[C, Calendar]
 	Call      storage.Binding[C, Call]
 	Camera    storage.Binding[C, Camera]
+	Cameras   storage.Binding[C, Cameras]
 	Cast      storage.Binding[C, Cast]
 	Clock     storage.Binding[C, Clock]
 	Feedback  storage.Binding[C, Feedback]
@@ -117,6 +122,7 @@ func NewSections[C any](store func() *storage.Store[C], shared func(*C) *Shared)
 		Calendar:  bind(store, shared, func(s *Shared) *Calendar { return &s.Calendar }),
 		Call:      bind(store, shared, func(s *Shared) *Call { return &s.Call }),
 		Camera:    bind(store, shared, func(s *Shared) *Camera { return &s.Camera }),
+		Cameras:   bind(store, shared, func(s *Shared) *Cameras { return &s.Cameras }),
 		Cast:      bind(store, shared, func(s *Shared) *Cast { return &s.Cast }),
 		Clock:     bind(store, shared, func(s *Shared) *Clock { return &s.Clock }),
 		Feedback:  bind(store, shared, func(s *Shared) *Feedback { return &s.Feedback }),

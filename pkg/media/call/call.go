@@ -55,6 +55,7 @@ const (
 
 var (
 	ErrBusy    = errors.New("already in a call")
+	ErrForeign = errors.New("not in this home")
 	ErrNoRoute = discovery.ErrNoRoute
 )
 
@@ -158,7 +159,10 @@ func (c *Calls) Talking() bool {
 func (c *Calls) PausesWake() bool { return c.Talking() && c.options.Settings.Read().PauseWake }
 
 func (c *Calls) Start(p discovery.Peer, video bool) error {
-	addr, err := p.Addr()
+	if !p.Standing.Trusted() {
+		return ErrForeign
+	}
+	addr, err := p.URL()
 	if err != nil {
 		c.notice(p.Name, ReasonUnreachable)
 		return err
@@ -195,7 +199,7 @@ func (c *Calls) dial(s *session) {
 		return
 	}
 	me := c.options.Peers.Self()
-	status, err := post(
+	status, err := c.post(
 		s.ctx,
 		s.addr,
 		"offer",
@@ -271,7 +275,7 @@ func (c *Calls) answer(s *session) {
 		c.fail(s, "answer", err)
 		return
 	}
-	status, err := post(
+	status, err := c.post(
 		s.ctx,
 		s.addr,
 		"answer",
@@ -508,7 +512,7 @@ func (c *Calls) end(s *session, reason Reason) {
 	safe.Go("call end", func() {
 		ctx, cancel := context.WithTimeout(c.ctx, postWait)
 		defer cancel()
-		if _, err := post(ctx, addr, "end", envelope{Call: id, Reason: reason}); err != nil {
+		if _, err := c.post(ctx, addr, "end", envelope{Call: id, Reason: reason}); err != nil {
 			slog.Debug("call end not acknowledged", "err", err)
 		}
 	})

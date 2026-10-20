@@ -117,7 +117,7 @@ func (c *Client) Run(ctx context.Context) error {
 func (c *Client) obtain(ctx context.Context) (*Lease, error) {
 	held := c.Lease()
 	if held == nil {
-		return dhcpRequest(ctx, c.iface(), RequestOptions(c.hostname(), c.previous())...)
+		return dhcpRequest(ctx, c.iface(), c.hostname(), c.previous())
 	}
 
 	got, err := extend(ctx, c.iface(), held, c.hostname())
@@ -132,7 +132,7 @@ func (c *Client) obtain(ctx context.Context) (*Lease, error) {
 	c.set(nil)
 	release(c.iface())
 
-	return dhcpRequest(ctx, c.iface(), RequestOptions(c.hostname(), c.previous())...)
+	return dhcpRequest(ctx, c.iface(), c.hostname(), c.previous())
 }
 
 func (c *Client) Close() error {

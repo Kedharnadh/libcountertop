@@ -91,6 +91,7 @@ var spoken = regexp.MustCompile(`^(?:(?:open|show)(?: me)? )?(?:the )?(?:weather
 
 func (r *Radar) Command() voice.Hook {
 	return voice.Hook{
+		Name:     "radar",
 		Keywords: []string{"radar"},
 		Match:    spoken,
 		Heard:    func(voice.Heard) { r.Open(nil) },

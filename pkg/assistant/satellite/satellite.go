@@ -3,12 +3,14 @@ package satellite
 import (
 	"context"
 	"log/slog"
+	"sync"
 
 	esphome "github.com/ygelfand/go-esphome-device"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ygelfand/libcountertop/pkg/assistant/turn"
 	"github.com/ygelfand/libcountertop/pkg/inference/wakeslots"
+	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
 
 // Announce and StartConversation both require a media player.
@@ -92,6 +94,28 @@ func (s *Satellite) Ready() bool { return s.vs.Subscribed() }
 func (s *Satellite) Turn() *turn.Conversation { return s.turn }
 
 func (s *Satellite) Start(slot int) { s.turn.Start(slot) }
+
+func (s *Satellite) AfterTurn(fn func()) {
+	var (
+		once sync.Once
+		mu   sync.Mutex
+		stop func()
+	)
+	run := func() {
+		once.Do(func() { safe.Go("after turn", fn) })
+		mu.Lock()
+		defer mu.Unlock()
+		if stop != nil {
+			stop()
+		}
+	}
+	mu.Lock()
+	stop = s.turn.Ended.Listen(func(struct{}) { run() })
+	mu.Unlock()
+	if !s.turn.Busy() {
+		run()
+	}
+}
 
 func (s *Satellite) Action() {
 	if s.Stop() {

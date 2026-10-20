@@ -16,6 +16,7 @@ const (
 	AppRadio    = "radio"
 	AppRadar    = "radar"
 	AppAlarms   = "alarms"
+	AppCameras  = "cameras"
 )
 
 func DefaultApps() Apps { return Apps{Dock: []string{AppPlayer, AppCalls}} }

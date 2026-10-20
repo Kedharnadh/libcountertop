@@ -75,7 +75,12 @@ type BasicDependencies struct {
 	Alerts                AlertSettings
 	Updates               Updates
 	Lock                  PinLock
+	HomeKey               HomeKey
 	Previews              previews.Kit
+}
+type HomeKey interface {
+	HasHomeKey() bool
+	SetHomeKey(string) error
 }
 type PinLock interface {
 	Locked() bool

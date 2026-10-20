@@ -12,6 +12,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/network/peer"
+	"github.com/ygelfand/libcountertop/pkg/say"
 )
 
 //go:embed devices/*.svg
@@ -103,6 +104,10 @@ func (b Board) tile(id string, side float32, p peer.Peer, pal theme.Theme) gogui
 	}
 	tall := min(style.Reach()*1.4, inner*Aspect)
 
+	named := []gogui.View{gogui.Label(p.Name, t.TextStyleDef)}
+	if p.Standing == peer.Foreign {
+		named = append(named, gogui.Label(say.T("peer.foreign"), widgets.Secondary()))
+	}
 	cfg := gogui.ContainerCfg{
 		ID:      id,
 		Width:   side,
@@ -112,7 +117,11 @@ func (b Board) tile(id string, side float32, p peer.Peer, pal theme.Theme) gogui
 		Radius:  gogui.RadiusLarge,
 		Color:   widgets.Color(pal.Surface),
 		Content: []gogui.View{
-			gogui.Label(p.Name, t.TextStyleDef),
+			gogui.Column(gogui.ContainerCfg{
+				Sizing:  gogui.FillFit,
+				Padding: gogui.NoPadding,
+				Content: named,
+			}),
 			gogui.Row(gogui.ContainerCfg{
 				Sizing:  gogui.FillFit,
 				Padding: gogui.NoPadding,

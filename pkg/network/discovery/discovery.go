@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -29,16 +30,22 @@ const (
 
 type Peer = sharedpeer.Peer
 type Identity interface{ Self() Peer }
+type Judge interface {
+	Standing(id string) sharedpeer.Standing
+}
 
 type Discovery struct {
 	identity Identity
+	judge    Judge
 	Changed  hook.Hook[struct{}]
+	Found    hook.Hook[Peer]
+	Lost     hook.Hook[Peer]
 	mu       sync.Mutex
 	peers    map[string]Peer
 }
 
-func New(identity Identity) *Discovery {
-	return &Discovery{identity: identity, peers: map[string]Peer{}}
+func New(identity Identity, judge Judge) *Discovery {
+	return &Discovery{identity: identity, judge: judge, peers: map[string]Peer{}}
 }
 func (d *Discovery) Name() string { return "discovery" }
 
@@ -51,6 +58,9 @@ func (d *Discovery) Peers() []Peer {
 		out = append(out, clonePeer(p))
 	}
 	d.mu.Unlock()
+	for i := range out {
+		out[i].Standing = d.judge.Standing(out[i].ID)
+	}
 	slices.SortFunc(
 		out,
 		func(a, b Peer) int { return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)) },
@@ -69,9 +79,13 @@ func (d *Discovery) Touch(id string) {
 
 func (d *Discovery) Find(id string) (Peer, bool) {
 	d.mu.Lock()
-	defer d.mu.Unlock()
 	p, ok := d.peers[id]
-	return clonePeer(p), ok
+	d.mu.Unlock()
+	p = clonePeer(p)
+	if ok {
+		p.Standing = d.judge.Standing(id)
+	}
+	return p, ok
 }
 
 func (d *Discovery) Run(ctx context.Context) error {
@@ -100,6 +114,7 @@ func record(p Peer) []string {
 		"version=" + p.Version,
 		"proto=" + proto,
 		"caps=" + strings.Join(p.Caps, ","),
+		"secure=" + strconv.Itoa(p.Secure),
 	}
 }
 func (d *Discovery) advertise(ctx context.Context) {
@@ -163,6 +178,7 @@ func (d *Discovery) sweep(ctx context.Context, self string) {
 		d.mu.Unlock()
 		if !known {
 			slog.Info("peer found", "name", p.Name, "model", p.Model, "addrs", p.Addrs)
+			d.Found.Emit(clonePeer(p))
 			d.Changed.Emit(struct{}{})
 		}
 	}
@@ -181,6 +197,7 @@ func (d *Discovery) expire(now time.Time) {
 	d.mu.Unlock()
 	for _, p := range lost {
 		slog.Info("peer lost", "name", p.Name)
+		d.Lost.Emit(p)
 	}
 	if len(lost) > 0 {
 		d.Changed.Emit(struct{}{})
@@ -207,6 +224,9 @@ func parse(e *zeroconf.ServiceEntry, now time.Time) Peer {
 	}
 	if c := txt["caps"]; c != "" {
 		p.Caps = strings.Split(c, ",")
+	}
+	if n, err := strconv.Atoi(txt["secure"]); err == nil {
+		p.Secure = n
 	}
 	if p.Name == "" {
 		p.Name = e.Instance

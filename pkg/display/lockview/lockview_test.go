@@ -155,8 +155,8 @@ func TestThePinTakesFourToEightDigitsOrNothing(t *testing.T) {
 	if !ok {
 		t.Fatal("no pin row")
 	}
-	if row.Portable() {
-		t.Error("the pin syncs to other devices")
+	if !row.Portable() {
+		t.Error("the pin does not sync to other devices")
 	}
 	for _, c := range []struct {
 		in   string

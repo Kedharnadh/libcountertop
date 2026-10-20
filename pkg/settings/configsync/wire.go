@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ygelfand/libcountertop/pkg/fetch"
 	"github.com/ygelfand/libcountertop/pkg/network/peer"
 )
 
@@ -45,7 +44,7 @@ func (s *Sync) offered(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	addr, err := p.Addr()
+	addr, err := p.URL()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -63,7 +62,7 @@ func (s *Sync) asked(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	addr, err := p.Addr()
+	addr, err := p.URL()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -164,16 +163,22 @@ func (s *Sync) caller(w http.ResponseWriter, r *http.Request) (envelope, peer.Pe
 		http.Error(w, "bad address", http.StatusBadRequest)
 		return envelope{}, peer.Peer{}, false
 	}
-	return m, peer.Peer{
-		ID:    m.From,
-		Name:  m.Name,
-		Model: m.Model,
-		Board: m.Board,
-		Caps:  m.Caps,
-		Addrs: []net.IP{net.ParseIP(host)},
-		Port:  s.o.Port,
-		Seen:  time.Now(),
-	}, true
+	p := peer.Peer{
+		ID:     m.From,
+		Name:   m.Name,
+		Model:  m.Model,
+		Board:  m.Board,
+		Caps:   m.Caps,
+		Addrs:  []net.IP{net.ParseIP(host)},
+		Port:   s.o.Port,
+		Secure: s.o.Secure,
+		Seen:   time.Now(),
+	}
+	if r.TLS == nil {
+		// TODO: remove the plain-HTTP peer path once no device predates the secure port.
+		p.Secure = 0
+	}
+	return m, p, true
 }
 
 func (s *Sync) post(addr, what string, m envelope, into *sealed) (int, error) {
@@ -186,14 +191,14 @@ func (s *Sync) post(addr, what string, m envelope, into *sealed) (int, error) {
 	req, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodPost,
-		"http://"+addr+"/config/"+what,
+		addr+"/config/"+what,
 		bytes.NewReader(body),
 	)
 	if err != nil {
 		return 0, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := fetch.Client(postWait).Do(req)
+	resp, err := s.o.Client.Do(req)
 	if err != nil {
 		return 0, err
 	}

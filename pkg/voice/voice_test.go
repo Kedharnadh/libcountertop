@@ -42,7 +42,7 @@ func TestNormalize(t *testing.T) {
 }
 
 func TestKeywordHitSendsTheWholeSegment(t *testing.T) {
-	c := NewCommands(&engine{})
+	c := NewCommands(&engine{}, nil)
 	var got []Heard
 	c.Listen(Hook{Keywords: []string{"radar"}, Heard: func(h Heard) { got = append(got, h) }})
 
@@ -55,7 +55,7 @@ func TestKeywordHitSendsTheWholeSegment(t *testing.T) {
 }
 
 func TestKeywordIsWholeWords(t *testing.T) {
-	c := NewCommands(&engine{})
+	c := NewCommands(&engine{}, nil)
 	called := 0
 	c.Listen(Hook{Keywords: []string{"radio"}, Heard: func(Heard) { called++ }})
 
@@ -67,7 +67,7 @@ func TestKeywordIsWholeWords(t *testing.T) {
 }
 
 func TestMatchFiltersAndReturnsGroups(t *testing.T) {
-	c := NewCommands(&engine{})
+	c := NewCommands(&engine{}, nil)
 	var got []Heard
 	c.Listen(Hook{
 		Keywords: []string{"timer"},
@@ -89,7 +89,7 @@ func TestMatchFiltersAndReturnsGroups(t *testing.T) {
 }
 
 func TestEveryHookOnAKeywordHears(t *testing.T) {
-	c := NewCommands(&engine{})
+	c := NewCommands(&engine{}, nil)
 	var a, b int
 	c.Listen(Hook{Keywords: []string{"stop"}, Heard: func(Heard) { a++ }})
 	c.Listen(Hook{Keywords: []string{"stop"}, Heard: func(Heard) { b++ }})
@@ -103,7 +103,7 @@ func TestEveryHookOnAKeywordHears(t *testing.T) {
 
 func TestKeywordsFollowLiveHooks(t *testing.T) {
 	e := &engine{}
-	c := NewCommands(e)
+	c := NewCommands(e, nil)
 
 	cancelRadar := c.Listen(Hook{Keywords: []string{"radar"}, Heard: func(Heard) {}})
 	cancelStop := c.Listen(Hook{Keywords: []string{"stop", "radar"}, Heard: func(Heard) {}})
@@ -123,7 +123,7 @@ func TestKeywordsFollowLiveHooks(t *testing.T) {
 }
 
 func TestCanceledHookHearsNothing(t *testing.T) {
-	c := NewCommands(&engine{})
+	c := NewCommands(&engine{}, nil)
 	called := 0
 	cancel := c.Listen(Hook{Keywords: []string{"radar"}, Heard: func(Heard) { called++ }})
 	cancel()
@@ -137,7 +137,7 @@ func TestCanceledHookHearsNothing(t *testing.T) {
 
 func TestFailedPushIsRetriedOnTheNextChange(t *testing.T) {
 	e := &engine{fail: errors.New("not running")}
-	c := NewCommands(e)
+	c := NewCommands(e, nil)
 	c.Listen(Hook{Keywords: []string{"radar"}, Heard: func(Heard) {}})
 
 	e.fail = nil
@@ -149,7 +149,7 @@ func TestFailedPushIsRetriedOnTheNextChange(t *testing.T) {
 }
 
 func TestHookMayListenFromItsHandler(t *testing.T) {
-	c := NewCommands(&engine{})
+	c := NewCommands(&engine{}, nil)
 	c.Listen(Hook{Keywords: []string{"radar"}, Heard: func(Heard) {
 		c.Listen(Hook{Keywords: []string{"back"}, Heard: func(Heard) {}})
 	}})

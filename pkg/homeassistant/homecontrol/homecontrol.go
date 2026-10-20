@@ -18,11 +18,25 @@ type Selection struct {
 	Key    string
 	Filter homeassistant.Filter
 	engine *Engine
+	read   func() config.HomePick
+	write  func(config.HomePick) error
+}
+
+func (e *Engine) Choice(
+	key string,
+	f homeassistant.Filter,
+	read func() config.HomePick,
+	write func(config.HomePick) error,
+) Selection {
+	return Selection{Key: key, Filter: f, engine: e, read: read, write: write}
 }
 
 func (s Selection) Name() string { return say.T("home.selection." + s.Key) }
 
 func (s Selection) Pick() config.HomePick {
+	if s.read != nil {
+		return s.read().Clone()
+	}
 	return s.engine.options.Settings.Read().Picked(s.Key).Clone()
 }
 

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"maps"
 	"slices"
+	"strconv"
 	"sync"
 	"time"
 
@@ -37,8 +38,9 @@ type reply struct {
 }
 
 type link struct {
-	access Access
-	stop   context.CancelFunc
+	access      Access
+	integration Integration
+	stop        context.CancelFunc
 }
 
 type pending struct {
@@ -239,16 +241,49 @@ func (h *Controller) reprobe(conn sender) {
 }
 
 func (h *Controller) probe(ctx context.Context, conn sender) {
-	_, err := h.send(ctx, []sender{conn}, request(carrier, carrierData(), nil, "ok"))
+	raw, err := h.send(
+		ctx,
+		[]sender{conn},
+		request(Ping, pingData(), nil, pingReply),
+	)
+	var failed *Failed
 	switch {
 	case err == nil:
-		h.settle(conn, Allowed)
+		h.settle(conn, Allowed, integrationOf(raw))
+	case errors.As(err, &failed):
+		h.settle(conn, Allowed, IntegrationMissing)
 	case errors.Is(err, context.DeadlineExceeded):
 		slog.Warn(
 			"Home Assistant does not answer actions from this device; enable them in the ESPHome integration's options",
 		)
-		h.settle(conn, Refused)
+		h.settle(conn, Refused, IntegrationUnknown)
 	}
+}
+
+func (h *Controller) Integration() Integration {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	best := IntegrationUnknown
+	for _, l := range h.links {
+		best = max(best, l.integration)
+	}
+	return best
+}
+
+func integrationOf(raw []byte) Integration {
+	var out struct {
+		Response json.RawMessage `json:"response"`
+	}
+	var answer struct {
+		Supported bool `json:"supported"`
+	}
+	if json.Unmarshal(raw, &out) != nil || json.Unmarshal(unwrap(out.Response), &answer) != nil {
+		return IntegrationOutdated
+	}
+	if !answer.Supported {
+		return IntegrationOutdated
+	}
+	return IntegrationReady
 }
 
 func (h *Controller) Enable(on bool) {
@@ -271,14 +306,14 @@ func (h *Controller) Enable(on bool) {
 	}
 }
 
-func (h *Controller) settle(conn sender, access Access) {
+func (h *Controller) settle(conn sender, access Access, integration Integration) {
 	h.mu.Lock()
 	l := h.links[conn]
 	if l == nil {
 		h.mu.Unlock()
 		return
 	}
-	l.access = access
+	l.access, l.integration = access, integration
 	overall, moved := h.judge()
 	h.mu.Unlock()
 	if moved {
@@ -344,7 +379,7 @@ func (h *Controller) answer(from sender, m *api.HomeassistantActionResponse) {
 	}
 	r := reply{data: m.GetResponseData()}
 	if !m.GetSuccess() {
-		r = reply{err: fmt.Errorf("homeassistant: %s", m.GetErrorMessage())}
+		r = reply{err: &Failed{Message: m.GetErrorMessage()}}
 		delete(p.to, from)
 		if len(p.to) > 0 {
 			h.mu.Unlock()
@@ -371,8 +406,18 @@ func (h *Controller) Perform(
 }
 
 func (h *Controller) Template(ctx context.Context, tmpl string) (json.RawMessage, error) {
-	return h.Ask(ctx, carrier, carrierData(), nil, tmpl)
+	action, data := h.carrier()
+	return h.Ask(ctx, action, data, nil, tmpl)
 }
+
+func (h *Controller) carrier() (string, map[string]string) {
+	if h.Integration() == IntegrationReady {
+		return Ping, pingData()
+	}
+	return recorder, recorderData()
+}
+
+func pingData() map[string]string { return map[string]string{"protocol": strconv.Itoa(Protocol)} }
 
 func (h *Controller) Ask(
 	ctx context.Context,
@@ -393,9 +438,9 @@ func (h *Controller) Ask(
 	return unwrap(out.Response), nil
 }
 
-const carrier = "recorder.get_statistics"
+const recorder = "recorder.get_statistics"
 
-func carrierData() map[string]string {
+func recorderData() map[string]string {
 	return map[string]string{
 		"statistic_ids": "countertop.none",
 		"start_time":    time.Now().UTC().Format(time.RFC3339),

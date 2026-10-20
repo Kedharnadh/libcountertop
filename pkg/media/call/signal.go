@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ygelfand/libcountertop/pkg/fetch"
 	discovery "github.com/ygelfand/libcountertop/pkg/network/peer"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -51,18 +50,24 @@ func (c *Calls) offered(w http.ResponseWriter, r *http.Request) {
 	p, ok := c.options.Peers.Find(m.From)
 	if !ok {
 		p = discovery.Peer{
-			ID:    m.From,
-			Name:  m.Name,
-			Model: m.Model,
-			Board: m.Board,
-			Caps:  m.Caps,
-			Addrs: []net.IP{net.ParseIP(host)},
-			Port:  c.options.Port,
-			Seen:  time.Now(),
+			ID:     m.From,
+			Name:   m.Name,
+			Model:  m.Model,
+			Board:  m.Board,
+			Caps:   m.Caps,
+			Addrs:  []net.IP{net.ParseIP(host)},
+			Port:   c.options.Port,
+			Secure: c.options.Secure,
+			Seen:   time.Now(),
 		}
 		if p.Name == "" {
 			p.Name = host
 		}
+	}
+	back := "https://" + net.JoinHostPort(host, strconv.Itoa(c.options.Secure))
+	if r.TLS == nil {
+		// TODO: remove the plain-HTTP peer path once no device predates the secure port.
+		back = "http://" + net.JoinHostPort(host, strconv.Itoa(c.options.Port))
 	}
 	auto := cfg.Answers(p.ID)
 	c.mu.Lock()
@@ -80,7 +85,7 @@ func (c *Calls) offered(w http.ResponseWriter, r *http.Request) {
 			Video:     m.Video,
 			CameraOff: m.Video && auto && !cfg.AutoVideo,
 		},
-		net.JoinHostPort(host, strconv.Itoa(c.options.Port)),
+		back,
 	)
 	s.offer = m.SDP
 	s.remote = Size{Width: m.Width, Height: m.Height}
@@ -174,22 +179,24 @@ func (c *Calls) ended(w http.ResponseWriter, r *http.Request) {
 	c.close(s, reason)
 }
 
-func post(ctx context.Context, addr, what string, m envelope) (int, error) {
+func (c *Calls) post(ctx context.Context, base, what string, m envelope) (int, error) {
 	body, err := json.Marshal(m)
 	if err != nil {
 		return 0, err
 	}
+	ctx, cancel := context.WithTimeout(ctx, postWait)
+	defer cancel()
 	req, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodPost,
-		"http://"+addr+"/call/"+what,
+		base+"/call/"+what,
 		bytes.NewReader(body),
 	)
 	if err != nil {
 		return 0, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := fetch.Client(postWait).Do(req)
+	resp, err := c.options.Client.Do(req)
 	if err != nil {
 		return 0, err
 	}

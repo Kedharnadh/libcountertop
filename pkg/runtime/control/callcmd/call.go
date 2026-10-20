@@ -82,8 +82,8 @@ func Peers(peers []peer.Peer) string {
 		for _, a := range p.Addrs {
 			addrs = append(addrs, a.String())
 		}
-		fmt.Fprintf(&out, "%s\t%s\t%s\t%s\t%s:%d\t%s\tv%s\t%s ago\n",
-			p.ID, p.Name, p.Model, p.Board, strings.Join(addrs, ","), p.Port,
+		fmt.Fprintf(&out, "%s\t%s\t%s\t%s\t%s:%d\t%s\t%s\tv%s\t%s ago\n",
+			p.ID, p.Name, p.Model, p.Board, strings.Join(addrs, ","), p.Port, p.Standing,
 			strings.Join(p.Caps, ","), p.Version, time.Since(p.Seen).Round(time.Second))
 	}
 	if out.Len() == 0 {

@@ -23,6 +23,7 @@ type Action struct {
 	Name     string
 	Title    string
 	Args     []esphome.Arg
+	Speech   string
 	Triggers []Trigger
 	Run      func(esphome.Call) (string, error)
 }
@@ -83,6 +84,8 @@ type declaredArg struct {
 	Type string `json:"type"`
 }
 
+const speechType = "speech"
+
 var argTypes = map[esphome.ArgType]string{
 	esphome.ArgString: "string",
 	esphome.ArgInt:    "int",
@@ -90,18 +93,33 @@ var argTypes = map[esphome.ArgType]string{
 	esphome.ArgBool:   "bool",
 }
 
-func (r *Registry) Declaration() map[string]string {
+func (r *Registry) Names() []string {
+	var out []string
+	for _, a := range r.all() {
+		out = append(out, a.Name)
+	}
+	return out
+}
+
+func (r *Registry) Declaration(voiced func(name string) bool) map[string]string {
 	d := declared{Version: Version, Actions: []declaredAction{}}
 	for _, a := range r.all() {
+		triggers := a.Triggers
+		if !voiced(a.Name) {
+			triggers = nil
+		}
 		args := make([]declaredArg, len(a.Args))
 		for i, arg := range a.Args {
 			args[i] = declaredArg{Name: arg.Name, Type: argTypes[arg.Type]}
+			if arg.Name == a.Speech {
+				args[i].Type = speechType
+			}
 		}
 		d.Actions = append(d.Actions, declaredAction{
 			Name:     a.Name,
 			Title:    a.Title,
 			Args:     args,
-			Triggers: a.Triggers,
+			Triggers: triggers,
 		})
 	}
 	data, err := json.Marshal(d)

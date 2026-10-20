@@ -7,17 +7,11 @@ import (
 	"sync"
 	"time"
 
-	esphome "github.com/ygelfand/go-esphome-device"
-
 	"github.com/ygelfand/libcountertop/pkg/inference/whistle"
 	"github.com/ygelfand/libcountertop/pkg/runtime/payload"
-	"github.com/ygelfand/libcountertop/pkg/say"
-	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 	"github.com/ygelfand/libcountertop/pkg/settings/storage"
 )
-
-const Group setting.Group = "Voice"
 
 const depth = 3
 
@@ -29,7 +23,6 @@ type Options struct {
 	Source   whistle.Source
 	Paused   func() bool
 	Settings storage.Section[schema.Voice]
-	Device   uint32
 	Clips    string
 }
 
@@ -38,7 +31,6 @@ type Listener struct {
 
 	opts   Options
 	engine *whistle.Client
-	knobs  *setting.Controls[schema.Voice]
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -57,41 +49,32 @@ func NewListener(o Options) *Listener {
 		Paused: o.Paused,
 		Clips:  o.Clips,
 	})
-	l := &Listener{Commands: NewCommands(engine), opts: o, engine: engine}
+	l := &Listener{opts: o, engine: engine}
+	l.Commands = NewCommands(
+		engine,
+		func(name string) bool { return o.Settings.Read().Command(name) },
+	)
 	engine.Text.Listen(func(t whistle.Transcript) { l.Hear(t.Text) })
-	l.knobs = &setting.Controls[schema.Voice]{
-		Table:  NewTable(),
-		Device: o.Device,
-		Read:   o.Settings.Read,
-		Save:   l.save,
-	}
 	return l
-}
-
-func NewTable() *setting.Table[schema.Voice] {
-	return setting.NewTable("voice", []setting.Group{Group}, []setting.Setting[schema.Voice]{
-		setting.Flag(
-			setting.Setting[schema.Voice]{
-				Name:  "commands",
-				Group: Group,
-				ID:    "voice_commands",
-				Icon:  "mdi:account-voice",
-			},
-			func(c *schema.Voice) *bool { return &c.Commands },
-		),
-	}, setting.Messages{Text: say.T, Missing: say.Missing})
 }
 
 func (l *Listener) Name() string { return "voice" }
 
-func (l *Listener) Entities() []esphome.Entity { return l.knobs.Entities() }
+func (l *Listener) Listen(h Hook) func() {
+	cancel := l.Commands.Listen(h)
+	l.Apply()
+	return func() {
+		cancel()
+		l.Apply()
+	}
+}
 
-func (l *Listener) Settings() *setting.Controls[schema.Voice] { return l.knobs }
-
-func (l *Listener) Restore(c schema.Voice) {
-	l.knobs.PublishFrom(c)
-	if c.Commands {
+func (l *Listener) Apply() {
+	l.Refresh()
+	if l.Live() {
 		l.Start()
+	} else {
+		l.Stop()
 	}
 }
 
@@ -115,18 +98,6 @@ func (l *Listener) Stop() {
 		cancel()
 		l.wg.Wait()
 	}
-}
-
-func (l *Listener) save(s setting.Setting[schema.Voice], v string) error {
-	if err := setting.Store(l.opts.Settings, s, v); err != nil {
-		return err
-	}
-	if l.opts.Settings.Read().Commands {
-		l.Start()
-	} else {
-		l.Stop()
-	}
-	return nil
 }
 
 func (l *Listener) run(ctx context.Context) {

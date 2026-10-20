@@ -23,7 +23,7 @@ func TestTheDeclarationCarriesEveryActionAndItsTriggers(t *testing.T) {
 	r.Add(Action{Name: "ping", Run: func(esphome.Call) (string, error) { return "", nil }})
 
 	var got declared
-	if err := json.Unmarshal([]byte(r.Declaration()["actions"]), &got); err != nil {
+	if err := json.Unmarshal([]byte(r.Declaration(all)["actions"]), &got); err != nil {
 		t.Fatal(err)
 	}
 	if got.Version != Version || len(got.Actions) != 2 {
@@ -40,6 +40,41 @@ func TestTheDeclarationCarriesEveryActionAndItsTriggers(t *testing.T) {
 	}
 	if len(got.Actions[1].Triggers) != 0 {
 		t.Errorf("an action without triggers declared %+v", got.Actions[1].Triggers)
+	}
+}
+
+func TestASpeechArgIsDeclaredAsSpeech(t *testing.T) {
+	var r Registry
+	r.Add(Action{
+		Name:   "broadcast",
+		Args:   []esphome.Arg{{Name: "message", Type: esphome.ArgString}},
+		Speech: "message",
+	})
+	var got declared
+	if err := json.Unmarshal([]byte(r.Declaration(all)["actions"]), &got); err != nil {
+		t.Fatal(err)
+	}
+	if arg := got.Actions[0].Args[0]; arg.Type != speechType {
+		t.Errorf("message declared as %+v, want speech", arg)
+	}
+}
+
+func all(string) bool { return true }
+
+func TestASilencedActionDeclaresNoTriggers(t *testing.T) {
+	var r Registry
+	r.Add(Action{Name: "call", Triggers: []Trigger{{Sentence: "call {peer}"}}})
+	r.Add(Action{Name: "broadcast", Triggers: []Trigger{{Sentence: "broadcast"}}})
+	var got declared
+	raw := r.Declaration(func(name string) bool { return name != "call" })["actions"]
+	if err := json.Unmarshal([]byte(raw), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Actions) != 2 {
+		t.Fatalf("a silenced action left the declaration: %+v", got.Actions)
+	}
+	if len(got.Actions[0].Triggers) != 0 || len(got.Actions[1].Triggers) != 1 {
+		t.Errorf("triggers declared %+v, want none for call and one for broadcast", got.Actions)
 	}
 }
 

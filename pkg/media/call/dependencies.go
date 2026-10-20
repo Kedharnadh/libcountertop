@@ -2,6 +2,7 @@ package call
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/audio/tone"
@@ -89,6 +90,8 @@ type Dependencies struct {
 	Settings Settings
 	Peers    Peers
 	Port     int
+	Secure   int
+	Client   *http.Client
 	Privacy  Privacy
 	Media    Media
 	Sound    Sound

@@ -91,6 +91,8 @@ bluetooth.setting.scan: Bluetooth scanning
 bluetooth.setting.speaker: Bluetooth speaker
 boot.leaving: Restarting
 boot.skip: Skip
+broadcast.from: "From {{.Peer}}"
+broadcast.title: Broadcast
 boot.stranded: Lost contact with the screen
 buttons.dynamic: What's playing
 buttons.static: Main volume
@@ -124,6 +126,20 @@ call.connected: Connected
 call.declined: Declined
 call.dropped: Call dropped
 call.empty: No other devices found
+cameras.app: Cameras
+cameras.failed: Couldn't list the cameras in Home Assistant
+cameras.loading: Loading cameras
+cameras.none: No cameras selected
+cameras.nosite: Home Assistant's address isn't known. Set it in Settings, Cameras.
+cameras.off: "Off"
+cameras.page: "{{.N}} of {{.Of}}"
+cameras.pick: Cameras
+cameras.seconds: "{{.N}} s"
+cameras.setting.refresh: Refresh
+cameras.setting.rotate: Auto paginate
+cameras.setting.scale: Thumbnail size
+cameras.setting.url: Home Assistant URL
+peer.foreign: Not in this home
 call.failed: Call failed
 call.group.calls: Intercom
 call.gone: No longer on the network
@@ -142,6 +158,7 @@ call.setting.answer_from: Auto-answer from
 call.setting.answer_peers: Auto-answer panels
 call.setting.auto_answer: Auto-answer calls
 call.setting.auto_video: Auto-answer with camera on
+call.setting.broadcasts: Receive broadcasts
 call.setting.incoming: Incoming calls
 call.setting.pause_wake: Pause wake word during calls
 call.setting.ring: Ring tone
@@ -397,6 +414,7 @@ home.refused: Actions not allowed
 home.refused.hint: Open ESPHome, press the settings cog on {{.Name}}, and enable “Allow the device to perform Home Assistant actions.”
 home.retry: Try again
 home.search: Search
+home.selection.cameras: Cameras
 home.selection.lights: Lights
 home.selection.switches: Switches
 home.setting.combine: Include switches
@@ -510,6 +528,7 @@ network.lease.minutes: "{{.N}} min"
 network.lease.now: Now
 network.mac: MAC address
 network.router: Router
+network.setting.home_key: Home key
 network.setting.verify: Verify certificates
 network.ssid: Wi-Fi network
 network.title: Network & internet
@@ -612,8 +631,12 @@ rail.sleep: Sleep
 reply.download: Starts later, never gaps
 reply.stream: Starts sooner, can gap
 reply.title: Response playback
+actions.broadcast: Broadcast a message
+actions.broadcast.ask: Go ahead after the tone
+actions.broadcast.text: Broadcasting typed text needs the Home Assistant integration
 actions.call: Call a device
 actions.call.busy: Already in a call
+actions.call.foreign: "{{.Peer}} isn't in this home"
 actions.call.unknown: "There's no device called {{.Peer}}"
 actions.call.unreachable: "{{.Peer}} can't be reached"
 lock.again: Enter it again
@@ -972,8 +995,20 @@ visual.setting.seed: Visual seed
 visual.synthwave: Synthwave
 visual.tesla: Tesla
 visual.thunderstorm: Thunderstorm
-voice.group.voice: Voice commands
-voice.setting.commands: Voice commands
+voice.group.actions: Actions
+voice.group.commands: Commands
+voice.hacs: EchoLocal integration
+voice.hacs.hint: Actions need the EchoLocal integration in Home Assistant. Scan the code to open it in HACS, then install or update it.
+voice.hacs.missing: Not installed
+voice.hacs.outdated: Update needed
+voice.hacs.unknown: Checking
+voice.setting.action.broadcast: Broadcast a message
+voice.setting.action.call: Call a device
+voice.setting.actions: All actions
+voice.setting.command.mirror: Mirror
+voice.setting.command.radar: Radar
+voice.setting.commands: All commands
+voice.title: Voice triggers
 volume.chime: Notification sound
 wake.ember: Ember
 wake.sunrise: Sunrise

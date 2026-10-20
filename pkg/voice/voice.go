@@ -9,6 +9,7 @@ import (
 )
 
 type Hook struct {
+	Name     string
 	Keywords []string
 	Match    *regexp.Regexp
 	Heard    func(Heard)
@@ -25,6 +26,7 @@ type Engine interface {
 
 type Commands struct {
 	engine Engine
+	allow  func(name string) bool
 
 	mu    sync.Mutex
 	next  int
@@ -39,9 +41,25 @@ type listener struct {
 	terms []string
 }
 
-func NewCommands(engine Engine) *Commands {
-	return &Commands{engine: engine, hooks: map[int]listener{}}
+func NewCommands(engine Engine, allow func(name string) bool) *Commands {
+	if allow == nil {
+		allow = func(string) bool { return true }
+	}
+	return &Commands{engine: engine, allow: allow, hooks: map[int]listener{}}
 }
+
+func (c *Commands) Live() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, l := range c.hooks {
+		if c.allow(l.hook.Name) {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Commands) Refresh() { c.publish() }
 
 func (c *Commands) Listen(h Hook) (cancel func()) {
 	terms := make([]string, 0, len(h.Keywords))
@@ -84,7 +102,7 @@ func (c *Commands) Hear(text string) {
 	var due []Hook
 	for _, id := range ids {
 		l := c.hooks[id]
-		if slices.ContainsFunc(
+		if c.allow(l.hook.Name) && slices.ContainsFunc(
 			l.terms,
 			func(t string) bool { return strings.Contains(padded, " "+t+" ") },
 		) {
@@ -111,6 +129,9 @@ func (c *Commands) Keywords() []string {
 	defer c.mu.Unlock()
 	var words []string
 	for _, l := range c.hooks {
+		if !c.allow(l.hook.Name) {
+			continue
+		}
 		for _, k := range l.hook.Keywords {
 			if k = strings.TrimSpace(k); k != "" {
 				words = append(words, k)

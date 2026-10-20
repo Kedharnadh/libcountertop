@@ -47,7 +47,7 @@ func NewTable() *setting.Table[schema.Lock] {
 			*c = schema.Lock{PIN: v}
 			return nil
 		},
-	}}, setting.Messages{Text: say.T, Missing: say.Missing}).Local()
+	}}, setting.Messages{Text: say.T, Missing: say.Missing})
 }
 
 func Controls(

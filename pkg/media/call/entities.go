@@ -37,6 +37,10 @@ func NewTable(more func() []setting.Option) *setting.Table[config.Call] {
 			func(c *config.Call) *bool { return &c.Incoming },
 		),
 		setting.Flag(
+			Setting{Name: "broadcasts", Group: Group, Icon: "mdi:bullhorn"},
+			func(c *config.Call) *bool { return &c.Broadcasts },
+		),
+		setting.Flag(
 			Setting{Name: "auto_answer", Group: Group, Icon: "mdi:phone-in-talk"},
 			func(c *config.Call) *bool { return &c.AutoAnswer },
 		),

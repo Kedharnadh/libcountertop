@@ -3,7 +3,6 @@ package screens
 import (
 	"github.com/go-gui-org/go-glyph"
 	gogui "github.com/go-gui-org/go-gui/gui"
-	"rsc.io/qr"
 
 	"github.com/ygelfand/libcountertop/pkg/runtime/web"
 
@@ -106,43 +105,7 @@ func (a *App) onboard(w *gogui.Window, addr string) gogui.View {
 }
 
 func qrCode(url string, w, h float32, brand theme.Theme) gogui.View {
-	code, err := qr.Encode(url, qr.M)
-	if err != nil {
-		return gogui.Column(gogui.ContainerCfg{Width: w, Height: h, Sizing: gogui.FixedFixed})
-	}
-	side := min(w, h)
-	scale := max(float32(int(side*0.88/float32(code.Size))), 1)
-	quiet := scale * 3
-	drawn := float32(code.Size)*scale + 2*quiet
-	ink := widgets.Color(brand.Text)
-	return gogui.Column(gogui.ContainerCfg{
-		Width:   w,
-		Height:  h,
-		Sizing:  gogui.FixedFixed,
-		Padding: gogui.NoPadding,
-		HAlign:  gogui.HAlignCenter,
-		VAlign:  gogui.VAlignMiddle,
-		Content: []gogui.View{gogui.DrawCanvas(gogui.DrawCanvasCfg{
-			Width: drawn, Height: drawn,
-			Version: uint64(len(url)),
-			OnDraw: func(dc *gogui.DrawContext) {
-				dc.FilledRoundedRect(0, 0, drawn, drawn, quiet, gogui.RGB(0xff, 0xff, 0xff))
-				for y := range code.Size {
-					for x := range code.Size {
-						if code.Black(x, y) {
-							dc.FilledRect(
-								quiet+float32(x)*scale,
-								quiet+float32(y)*scale,
-								scale,
-								scale,
-								ink,
-							)
-						}
-					}
-				}
-			},
-		})},
-	})
+	return widgets.QR(url, w, h, widgets.Color(brand.Text))
 }
 
 func (a *App) onboardHead(w *gogui.Window, wide, short float32, brand theme.Theme) gogui.View {

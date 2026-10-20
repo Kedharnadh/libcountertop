@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"log/slog"
 	"net"
@@ -31,17 +32,23 @@ type Options struct {
 
 type Server struct {
 	opts Options
-	srv  *http.Server
 
 	mu     sync.Mutex
 	shown  string
 	routes map[string]http.Handler
+	peers  map[string]http.Handler
+	secure int
+	tls    func() *tls.Config
 
 	Offered hook.Hook[string]
 }
 
 func New(opts Options) *Server {
-	return &Server{opts: opts, routes: map[string]http.Handler{}}
+	return &Server{
+		opts:   opts,
+		routes: map[string]http.Handler{},
+		peers:  map[string]http.Handler{},
+	}
 }
 
 func (s *Server) Name() string { return "web" }
@@ -58,31 +65,63 @@ func (s *Server) Handle(pattern string, h http.Handler) {
 	s.mu.Unlock()
 }
 
+func (s *Server) HandlePeer(pattern string, h http.Handler) {
+	s.mu.Lock()
+	s.peers[pattern] = h
+	s.mu.Unlock()
+}
+
+func (s *Server) Secure(port int, cfg func() *tls.Config) {
+	s.mu.Lock()
+	s.secure, s.tls = port, cfg
+	s.mu.Unlock()
+}
+
 func (s *Server) Run(ctx context.Context) error {
 	mux := http.NewServeMux()
 	mux.Handle("/", status.Handler(s.opts.Page))
+	peers := http.NewServeMux()
 	s.mu.Lock()
 	for pattern, h := range s.routes {
 		mux.Handle(pattern, h)
 	}
+	for pattern, h := range s.peers {
+		peers.Handle(pattern, h)
+	}
+	secure, cfg := s.secure, s.tls
 	s.mu.Unlock()
 
-	s.srv = &http.Server{
+	servers := []*http.Server{{
 		Addr:              ":" + strconv.Itoa(s.opts.Port),
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
+	}}
+	if secure != 0 && cfg != nil {
+		servers = append(servers, &http.Server{
+			Addr:              ":" + strconv.Itoa(secure),
+			Handler:           peers,
+			TLSConfig:         cfg(),
+			ReadHeaderTimeout: 5 * time.Second,
+		})
 	}
 
-	done := make(chan error, 1)
-	go func() {
-		slog.Info("serving pages", "port", s.opts.Port)
-
-		err := s.srv.ListenAndServe()
-		if errors.Is(err, http.ErrServerClosed) {
-			err = nil
-		}
-		done <- err
-	}()
+	done := make(chan error, len(servers))
+	for _, srv := range servers {
+		go func() {
+			var err error
+			if srv.TLSConfig != nil {
+				slog.Info("serving peers", "port", secure)
+				err = srv.ListenAndServeTLS("", "")
+			} else {
+				slog.Info("serving pages", "port", s.opts.Port)
+				err = srv.ListenAndServe()
+			}
+			if errors.Is(err, http.ErrServerClosed) {
+				err = nil
+			}
+			done <- err
+		}()
+	}
 
 	t := time.NewTicker(watch)
 	defer t.Stop()
@@ -92,15 +131,26 @@ func (s *Server) Run(ctx context.Context) error {
 
 		select {
 		case err := <-done:
+			closeAll(servers)
 			return err
 		case <-ctx.Done():
 			s.hide()
 
 			stop, cancel := context.WithTimeout(context.Background(), shutdown)
 			defer cancel()
-			return s.srv.Shutdown(stop)
+			var errs []error
+			for _, srv := range servers {
+				errs = append(errs, srv.Shutdown(stop))
+			}
+			return errors.Join(errs...)
 		case <-t.C:
 		}
+	}
+}
+
+func closeAll(servers []*http.Server) {
+	for _, srv := range servers {
+		_ = srv.Close()
 	}
 }
 

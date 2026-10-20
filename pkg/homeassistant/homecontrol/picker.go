@@ -34,6 +34,13 @@ type Picker struct {
 func (e *Engine) NewPicker(s Selection) *Picker {
 	p := &Picker{Sel: s, tab: TabManual, open: map[string]bool{}, from: e.cache}
 	p.save = func(pick config.HomePick) {
+		if s.write != nil {
+			if err := s.write(pick.Clone()); err != nil {
+				slog.Error("the selection could not be saved", "selection", s.Key, "err", err)
+			}
+			e.options.Shell.Redraw()
+			return
+		}
 		if err := e.options.Settings.Update(func(c *config.Home) {
 			if c.Picks == nil {
 				c.Picks = map[string]config.HomePick{}

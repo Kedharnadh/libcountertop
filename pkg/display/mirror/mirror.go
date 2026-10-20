@@ -1,6 +1,8 @@
 package mirror
 
 import (
+	"regexp"
+
 	gogui "github.com/go-gui-org/go-gui/gui"
 
 	"github.com/ygelfand/libcountertop/pkg/display/apps"
@@ -10,6 +12,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
+	"github.com/ygelfand/libcountertop/pkg/voice"
 )
 
 type View struct{ feed shell.Feed }
@@ -43,6 +46,17 @@ func (m *Mirror) App() apps.App {
 		Name: func() string { return say.T("mirror.app") },
 		Icon: "mdi:mirror",
 		Open: m.open,
+	}
+}
+
+var spoken = regexp.MustCompile(`^mirror$`)
+
+func (m *Mirror) Command() voice.Hook {
+	return voice.Hook{
+		Name:     "mirror",
+		Keywords: []string{"mirror"},
+		Match:    spoken,
+		Heard:    func(voice.Heard) { m.open() },
 	}
 }
 

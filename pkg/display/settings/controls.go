@@ -1,6 +1,8 @@
 package settings
 
 import (
+	"log/slog"
+
 	gogui "github.com/go-gui-org/go-gui/gui"
 
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
@@ -105,6 +107,23 @@ func (p *BasicPages) System() *shell.Page {
 				Value: value,
 			})
 			acts = append(acts, p.open(func() shell.View { return p.Lock() }))
+		}
+		if k := p.options.HomeKey; k != nil {
+			row := menu.Row{
+				Glyph: gogui.IconHome,
+				Label: say.T("network.setting.home_key"),
+				Kind:  menu.Password,
+				Save: func(v string) {
+					if err := k.SetHomeKey(v); err != nil {
+						slog.Warn("saving the home key failed", "err", err)
+					}
+				},
+			}
+			if k.HasHomeKey() {
+				row.Hint = say.T("settings.secret.set")
+			}
+			rows = append(rows, row)
+			acts = append(acts, nil)
 		}
 		return rows, acts
 	}}
