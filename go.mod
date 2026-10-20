@@ -5,6 +5,7 @@ go 1.26.0
 require (
 	charm.land/huh/v2 v2.0.3
 	charm.land/lipgloss/v2 v2.0.1
+	filippo.io/cpace v0.0.0-20210101143347-24d601e2e469
 	github.com/Sendspin/sendspin-go v1.8.2
 	github.com/antzucaro/matchr v0.0.0-20221106193745-7bed6ef61ef9
 	github.com/asticode/go-astits v1.16.0
@@ -54,6 +55,7 @@ require (
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/google/flatbuffers v25.12.19+incompatible // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/gtank/ristretto255 v0.1.2 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/native v1.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.3.0 // indirect
