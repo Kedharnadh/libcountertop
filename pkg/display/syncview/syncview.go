@@ -54,12 +54,15 @@ type Options struct {
 type View struct {
 	o Options
 
+	pad *widgets.Keypad
+
 	mu    sync.Mutex
-	typed string
 	round string
 }
 
-func New(o Options) *View { return &View{o: o} }
+func New(o Options) *View {
+	return &View{o: o, pad: &widgets.Keypad{ID: "sync", Redraw: o.Shell.Redraw}}
+}
 
 func (v *View) Page() shell.View { return &Directory{} }
 

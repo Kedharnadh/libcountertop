@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ygelfand/libcountertop/pkg/network/releases"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
@@ -145,6 +146,159 @@ func TestAPendingRebootIsShownOnce(t *testing.T) {
 	u.RebootPending(true)
 	u.Announce()
 	if got := u.status.Get(); got != "installed 1.0, reboot to finish" {
+		t.Errorf("status = %q", got)
+	}
+}
+
+type buildSource struct {
+	*source
+	builds []releases.Release
+	listed error
+}
+
+func (b buildSource) Builds(
+	context.Context,
+) ([]releases.Release, error) {
+	return b.builds, b.listed
+}
+
+func (b buildSource) FetchBuild(_ context.Context, version string) (manifest, error) {
+	return manifest{version: version}, b.fetched
+}
+
+func TestOnlyASourceWithBuildsOffersAVersionPicker(t *testing.T) {
+	plain := build(&source{}, &settings{})
+	if plain.versions != nil || len(plain.Entities()) != 5 {
+		t.Error("a source without builds offers a version picker")
+	}
+	plain.List(context.Background())
+	if got := plain.Catalog().Finding; got != Unchecked {
+		t.Errorf("finding = %d, want unchecked", got)
+	}
+
+	u := build(buildSource{source: &source{}}, &settings{})
+	if u.versions == nil || len(u.Entities()) != 7 {
+		t.Fatal("a source with builds offers no version picker")
+	}
+	if got := u.versions.Get(); got != unpicked {
+		t.Errorf("picker starts at %q, want %q", got, unpicked)
+	}
+}
+
+func TestPickingAVersionInstallsNothingUntilTheButton(t *testing.T) {
+	src := &source{}
+	builds := []releases.Release{{Tag: "1.0"}, {Tag: "0.9"}}
+	u := build(buildSource{source: src, builds: builds}, &settings{})
+	_ = u.List(context.Background())
+
+	u.pick("0.8")
+	if got := u.versions.Get(); got != unpicked {
+		t.Errorf("picked %q, a version that is not offered", got)
+	}
+	u.pick("0.9")
+	if got := u.versions.Get(); got != "0.9" {
+		t.Fatalf("picker shows %q, want 0.9", got)
+	}
+	if src.restarted != "" {
+		t.Fatal("picking a version installed it")
+	}
+
+	version := u.versions.Get()
+	u.installPicked()
+	if got := u.versions.Get(); got != unpicked {
+		t.Errorf("picker shows %q after the button, want %q", got, unpicked)
+	}
+	u.InstallBuild(context.Background(), version)
+	if src.restarted != "update to 0.9" {
+		t.Errorf("restart reason = %q", src.restarted)
+	}
+}
+
+func TestTheButtonWithNothingPickedInstallsNothing(t *testing.T) {
+	src := &source{}
+	u := build(buildSource{source: src}, &settings{})
+	u.installPicked()
+	u.pick("1.0")
+	u.installPicked()
+	if src.restarted != "" {
+		t.Error("the button installed with nothing to install")
+	}
+}
+
+func TestTheListOffersEveryVersionButTheRunningOne(t *testing.T) {
+	builds := []releases.Release{{Tag: "1.1-dev.2", Prerelease: true}, {Tag: "1.0"}, {Tag: "0.9"}}
+	u := build(buildSource{source: &source{}, builds: builds}, &settings{})
+	var seen []Finding
+	u.Listed.Listen(func(c Catalog) { seen = append(seen, c.Finding) })
+
+	u.List(context.Background())
+
+	if want := []Finding{Checking, Current}; !slices.Equal(seen, want) {
+		t.Errorf("listed %v, want %v", seen, want)
+	}
+	if got := u.Catalog().Builds; !slices.Equal(got, builds) {
+		t.Errorf("builds = %v, want %v", got, builds)
+	}
+	if want := []string{unpicked, "1.1-dev.2", "0.9"}; !slices.Equal(u.versions.Options, want) {
+		t.Errorf("options = %v, want %v", u.versions.Options, want)
+	}
+}
+
+func TestHomeAssistantReconnectsOnlyWhenTheOptionsChange(t *testing.T) {
+	reconnects := 0
+	src := buildSource{source: &source{}, builds: []releases.Release{{Tag: "0.9"}}}
+	u := New(Dependencies[manifest]{
+		Source:    src,
+		Settings:  &settings{},
+		Version:   "1.0",
+		Channels:  []string{"stable"},
+		Reconnect: func() { reconnects++ },
+	})
+	_ = u.List(context.Background())
+	_ = u.List(context.Background())
+	if reconnects != 1 {
+		t.Errorf("reconnected %d times, want 1", reconnects)
+	}
+}
+
+func TestAFailedListKeepsWhatWasListed(t *testing.T) {
+	u := build(buildSource{source: &source{}, listed: errors.New("rate limited")}, &settings{})
+	u.listed(Catalog{Finding: Current, Builds: []releases.Release{{Tag: "0.9"}}})
+
+	u.List(context.Background())
+
+	got := u.Catalog()
+	if got.Finding != Unreachable || len(got.Builds) != 1 {
+		t.Errorf("catalog = %+v, want unreachable with the earlier build", got)
+	}
+}
+
+func TestInstallingABuildInstallsThatVersionEvenWhenOlder(t *testing.T) {
+	src := &source{}
+	u := build(buildSource{source: src}, &settings{})
+	u.InstallBuild(context.Background(), "0.9")
+	if src.restarted != "update to 0.9" {
+		t.Errorf("restart reason = %q", src.restarted)
+	}
+}
+
+func TestInstallingTheRunningBuildDoesNothing(t *testing.T) {
+	src := &source{}
+	u := build(buildSource{source: src}, &settings{})
+	u.InstallBuild(context.Background(), "1.0")
+	if src.restarted != "" {
+		t.Error("reinstalled the running version")
+	}
+}
+
+func TestABuildThatCannotBeFetchedIsReported(t *testing.T) {
+	src := &source{fetched: errors.New("404 Not Found")}
+	u := build(buildSource{source: src}, &settings{})
+	u.InstallBuild(context.Background(), "0.9")
+	if src.restarted != "" {
+		t.Error("restarted without a build")
+	}
+	if got := u.status.Get(); !strings.Contains(got, "404") {
 		t.Errorf("status = %q", got)
 	}
 }

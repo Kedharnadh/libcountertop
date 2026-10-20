@@ -38,6 +38,7 @@ func TestSharedFlattensIntoTheEmbeddingStruct(t *testing.T) {
 		"feedback",
 		"home",
 		"idle",
+		"lock",
 		"media",
 		"network",
 		"own",

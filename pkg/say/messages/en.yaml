@@ -612,6 +612,23 @@ rail.sleep: Sleep
 reply.download: Starts later, never gaps
 reply.stream: Starts sooner, can gap
 reply.title: Response playback
+lock.again: Enter it again
+lock.change: Change PIN
+lock.clear: Remove PIN
+lock.clear.what: Are you sure? This will unlock settings.
+lock.enter: Enter the PIN
+lock.mismatch: The PINs didn't match. Enter a new PIN
+lock.new: Enter a new PIN, 4 to 8 digits
+lock.next: Next
+lock.off: "Off"
+lock.on: "On"
+lock.set: Set PIN
+lock.entity.pin: Settings Lock
+lock.group.lock: Lock
+lock.setting.pin: Settings Lock
+lock.title: Settings
+lock.wait: "Try again in {{.Seconds}} s"
+lock.wrong: Wrong PIN
 rtsp.entity.password: RTSP password
 rtsp.entity.username: RTSP username
 rtsp.group.rtsp: RTSP
@@ -905,6 +922,11 @@ update.ready: Update available
 update.running: Current version
 update.title: Software update
 update.unreachable: Couldn't reach the update server
+update.versions: Other versions
+update.versions.confirm: "Install {{.Version}}"
+update.versions.installed: Installed
+update.versions.what: "{{.Running}} is replaced by {{.Version}} and the app restarts."
+update.versions.none: No other versions
 upgrade.installing: Installing…
 upgrade.line: Updating to {{.Version}} · {{.Status}}
 upgrade.percent: "{{.N}}%"

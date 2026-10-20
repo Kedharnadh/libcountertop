@@ -74,7 +74,13 @@ type BasicDependencies struct {
 	Marks                 ModeMarks
 	Alerts                AlertSettings
 	Updates               Updates
+	Lock                  PinLock
 	Previews              previews.Kit
+}
+type PinLock interface {
+	Locked() bool
+	Change()
+	Clear()
 }
 type AlertSettings interface {
 	Current() config.Alerts

@@ -93,7 +93,41 @@ func (p *BasicPages) System() *shell.Page {
 			})
 			acts = append(acts, p.open(func() shell.View { return p.Update() }))
 		}
+		if p.options.Lock != nil {
+			value := say.T("lock.off")
+			if p.options.Lock.Locked() {
+				value = say.T("lock.on")
+			}
+			rows = append(rows, menu.Row{
+				Glyph: gogui.IconLock,
+				Label: say.T("lock.setting.pin"),
+				Kind:  menu.Chevron,
+				Value: value,
+			})
+			acts = append(acts, p.open(func() shell.View { return p.Lock() }))
+		}
 		return rows, acts
+	}}
+}
+
+func (p *BasicPages) Lock() *shell.Page {
+	l := p.options.Lock
+	return &shell.Page{Title: say.T("lock.setting.pin"), Build: func() ([]menu.Row, []func(int)) {
+		if !l.Locked() {
+			return []menu.Row{{Label: say.T("lock.set")}}, []func(int){func(int) { l.Change() }}
+		}
+		return []menu.Row{
+				{Label: say.T("lock.change")},
+				{Label: say.T("lock.clear"), Kind: menu.Chevron},
+			}, []func(int){
+				func(int) { l.Change() },
+				p.open(func() shell.View {
+					return ConfirmPage(say.T("lock.clear"), say.T("lock.clear.what"), func() {
+						l.Clear()
+						p.options.Shell.Pop()
+					})
+				}),
+			}
 	}}
 }
 func (p *BasicPages) DateTime() *shell.Page {

@@ -16,6 +16,7 @@ type Shared struct {
 	Feedback  Feedback  `json:"feedback"`
 	Home      Home      `json:"home"`
 	Idle      Idle      `json:"idle"`
+	Lock      Lock      `json:"lock"`
 	Media     Media     `json:"media"`
 	Network   Network   `json:"network"`
 	Photos    Photos    `json:"photos"`
@@ -88,6 +89,7 @@ type Sections[C any] struct {
 	Feedback  storage.Binding[C, Feedback]
 	Home      storage.Binding[C, Home]
 	Idle      storage.Binding[C, Idle]
+	Lock      storage.Binding[C, Lock]
 	Media     storage.Binding[C, Media]
 	Network   storage.Binding[C, Network]
 	Photos    storage.Binding[C, Photos]
@@ -120,6 +122,7 @@ func NewSections[C any](store func() *storage.Store[C], shared func(*C) *Shared)
 		Feedback:  bind(store, shared, func(s *Shared) *Feedback { return &s.Feedback }),
 		Home:      bind(store, shared, func(s *Shared) *Home { return &s.Home }),
 		Idle:      bind(store, shared, func(s *Shared) *Idle { return &s.Idle }),
+		Lock:      bind(store, shared, func(s *Shared) *Lock { return &s.Lock }),
 		Media:     bind(store, shared, func(s *Shared) *Media { return &s.Media }),
 		Network:   bind(store, shared, func(s *Shared) *Network { return &s.Network }),
 		Photos:    bind(store, shared, func(s *Shared) *Photos { return &s.Photos }),
@@ -161,6 +164,7 @@ func (w SharedWriter[C]) Clock() ClockWriter         { return NewClockWriter(w.s
 func (w SharedWriter[C]) Feedback() FeedbackWriter   { return NewFeedbackWriter(w.s.Feedback) }
 func (w SharedWriter[C]) Home() HomeWriter           { return NewHomeWriter(w.s.Home) }
 func (w SharedWriter[C]) Idle() IdleWriter           { return NewIdleWriter(w.s.Idle) }
+func (w SharedWriter[C]) Lock() LockWriter           { return NewLockWriter(w.s.Lock) }
 func (w SharedWriter[C]) Media() MediaWriter         { return NewMediaWriter(w.s.Media) }
 func (w SharedWriter[C]) Network() NetworkWriter     { return NewNetworkWriter(w.s.Network) }
 func (w SharedWriter[C]) Poster() PosterWriter       { return NewPosterWriter(w.s.Poster) }

@@ -20,6 +20,9 @@ type Updates interface {
 	CheckLater()
 	InstallLater()
 	Offer() firmware.Offer
+	Catalog() firmware.Catalog
+	ListLater()
+	InstallBuildLater(version string)
 }
 
 func (p *BasicPages) Update() *shell.Page {
@@ -64,6 +67,58 @@ func (p *BasicPages) Update() *shell.Page {
 				Hint:  headline(offer.Release.Notes),
 			})
 			acts = append(acts, func(int) { u.InstallLater() })
+		}
+		rows = append(rows, menu.Row{Glyph: gogui.IconTimeline, Label: say.T("update.versions")})
+		acts = append(acts, func(int) {
+			u.ListLater()
+			p.options.Shell.Push(p.Versions())
+		})
+		return rows, acts
+	}}
+}
+
+func (p *BasicPages) Versions() *shell.Page {
+	u := p.options.Updates
+	return &shell.Page{Title: say.T("update.versions"), Build: func() ([]menu.Row, []func(int)) {
+		catalog := u.Catalog()
+		if len(catalog.Builds) == 0 {
+			says := say.T("update.checking")
+			switch catalog.Finding {
+			case firmware.Unreachable:
+				says = say.T("update.unreachable")
+			case firmware.Current:
+				says = say.T("update.versions.none")
+			}
+			return []menu.Row{{Label: says, Kind: menu.Plain}}, []func(int){nil}
+		}
+
+		running := u.Version()
+		rows := make([]menu.Row, 0, len(catalog.Builds))
+		acts := make([]func(int), 0, len(catalog.Builds))
+		for _, b := range catalog.Builds {
+			channel := say.T("update.channel.stable")
+			if b.Prerelease {
+				channel = say.T("update.channel.dev")
+			}
+			if b.Tag == running {
+				rows = append(rows, menu.Row{
+					Label: b.Tag,
+					Hint:  channel,
+					Value: say.T("update.versions.installed"),
+					Kind:  menu.Plain,
+				})
+				acts = append(acts, nil)
+				continue
+			}
+			rows = append(rows, menu.Row{Glyph: gogui.IconDownload, Label: b.Tag, Hint: channel})
+			tag := map[string]any{"Version": b.Tag, "Running": running}
+			acts = append(acts, func(int) {
+				p.options.Shell.Push(ConfirmPage(
+					say.F("update.versions.confirm", tag),
+					say.F("update.versions.what", tag),
+					func() { u.InstallBuildLater(b.Tag) },
+				))
+			})
 		}
 		return rows, acts
 	}}

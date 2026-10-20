@@ -9,6 +9,7 @@ import (
 	esphome "github.com/ygelfand/go-esphome-device"
 
 	"github.com/ygelfand/libcountertop/pkg/hook"
+	"github.com/ygelfand/libcountertop/pkg/network/releases"
 	"github.com/ygelfand/libcountertop/pkg/runtime/component"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -38,6 +39,18 @@ type Trial interface {
 	Commit()
 }
 
+const unpicked = "Select for rollback"
+
+type Catalog struct {
+	Finding Finding
+	Builds  []releases.Release
+}
+
+type Builds[M any] interface {
+	Builds(ctx context.Context) ([]releases.Release, error)
+	FetchBuild(ctx context.Context, version string) (M, error)
+}
+
 type Settings interface {
 	Read() schema.Update
 	Channel(label string) error
@@ -59,6 +72,7 @@ type Dependencies[M any] struct {
 	Channels  []string
 	Busy      Indicator
 	OnFailure func()
+	Reconnect func()
 }
 
 type Upgrade struct {
@@ -86,18 +100,22 @@ type Offer struct {
 type Firmware[M any] struct {
 	Upgrading hook.Hook[Upgrade]
 	Offered   hook.Hook[Offer]
+	Listed    hook.Hook[Catalog]
 
 	deps Dependencies[M]
 
-	entity  *esphome.Update
-	channel *esphome.Select
-	look    *esphome.Button
-	status  *esphome.TextSensor
-	events  *esphome.Event
+	entity   *esphome.Update
+	channel  *esphome.Select
+	look     *esphome.Button
+	status   *esphome.TextSensor
+	events   *esphome.Event
+	versions *esphome.Select
+	apply    *esphome.Button
 
 	mu      sync.Mutex
 	found   M
 	offer   Offer
+	catalog Catalog
 	upgrade Upgrade
 
 	announced     sync.Once
@@ -164,13 +182,57 @@ func New[M any](deps Dependencies[M]) *Firmware[M] {
 		},
 		Types: types,
 	}
+
+	if _, ok := deps.Source.(Builds[M]); ok {
+		u.versions = &esphome.Select{
+			Base: esphome.Base{
+				ObjectID: "install_version",
+				Name:     "Install version",
+				Icon:     "mdi:history",
+				Category: esphome.CategoryConfig,
+			},
+			Options:   []string{unpicked},
+			OnCommand: u.pick,
+		}
+		u.versions.Set(unpicked)
+		u.apply = &esphome.Button{
+			Base: esphome.Base{
+				ObjectID: "install_selected_version",
+				Name:     "Install selected version",
+				Icon:     "mdi:package-down",
+				Category: esphome.CategoryConfig,
+			},
+			OnPress: u.installPicked,
+		}
+	}
 	return u
+}
+
+func (u *Firmware[M]) pick(version string) {
+	if !slices.Contains(u.options(u.Catalog().Builds), version) {
+		slog.Warn("unknown option", "setting", u.versions.ObjectID, "value", version)
+		return
+	}
+	u.versions.Set(version)
+}
+
+func (u *Firmware[M]) installPicked() {
+	version := u.versions.Get()
+	u.versions.Set(unpicked)
+	if version == unpicked || version == u.deps.Version {
+		return
+	}
+	u.InstallBuildLater(version)
 }
 
 func (u *Firmware[M]) Name() string { return "firmware" }
 
 func (u *Firmware[M]) Entities() []esphome.Entity {
-	return []esphome.Entity{u.entity, u.channel, u.look, u.status, u.events}
+	entities := []esphome.Entity{u.entity, u.channel, u.look, u.status, u.events}
+	if u.versions != nil {
+		entities = append(entities, u.versions, u.apply)
+	}
+	return entities
 }
 
 func (u *Firmware[M]) Restore() { u.channel.Set(u.Channel()) }
@@ -314,7 +376,82 @@ func (u *Firmware[M]) Install(ctx context.Context) {
 		u.found = found
 	}
 	u.mu.Unlock()
+	u.install(ctx, found)
+}
 
+func (u *Firmware[M]) Catalog() Catalog {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.catalog
+}
+
+func (u *Firmware[M]) ListLater() {
+	safe.Go("update list", func() { _ = u.List(context.Background()) })
+}
+
+func (u *Firmware[M]) List(ctx context.Context) error {
+	b, ok := u.deps.Source.(Builds[M])
+	if !ok {
+		return nil
+	}
+	before := u.Catalog().Builds
+	u.listed(Catalog{Finding: Checking, Builds: before})
+
+	builds, err := b.Builds(ctx)
+	if err != nil {
+		slog.Error("listing releases failed", "err", err)
+		u.listed(Catalog{Finding: Unreachable, Builds: before})
+		return err
+	}
+	options := u.options(builds)
+	changed := !slices.Equal(options, u.options(before))
+	u.versions.SetOptions(options)
+	u.listed(Catalog{Finding: Current, Builds: builds})
+	if changed && u.deps.Reconnect != nil {
+		u.deps.Reconnect()
+	}
+	return nil
+}
+
+func (u *Firmware[M]) options(builds []releases.Release) []string {
+	options := []string{unpicked}
+	for _, r := range builds {
+		if r.Tag != u.deps.Version {
+			options = append(options, r.Tag)
+		}
+	}
+	return options
+}
+
+func (u *Firmware[M]) listed(c Catalog) {
+	u.mu.Lock()
+	u.catalog = c
+	u.mu.Unlock()
+	u.Listed.Emit(c)
+}
+
+func (u *Firmware[M]) InstallBuildLater(version string) {
+	safe.Go("update install build", func() { u.InstallBuild(context.Background(), version) })
+}
+
+func (u *Firmware[M]) InstallBuild(ctx context.Context, version string) {
+	b, ok := u.deps.Source.(Builds[M])
+	if !ok {
+		return
+	}
+	if version == u.deps.Version {
+		return
+	}
+	found, err := b.FetchBuild(ctx, version)
+	if err != nil {
+		slog.Error("fetching a release failed", "version", version, "err", err)
+		u.Settled(EventFailed, "installing "+version+" failed: "+err.Error())
+		return
+	}
+	u.install(ctx, found)
+}
+
+func (u *Firmware[M]) install(ctx context.Context, found M) {
 	release := u.deps.Source.Describe(found)
 	if release.Version == "" || release.Version == u.deps.Version {
 		slog.Warn("an install was asked for with nothing to install", "running", u.deps.Version)
@@ -329,7 +466,7 @@ func (u *Firmware[M]) Install(ctx context.Context) {
 	}
 
 	u.progress(release, 0)
-	err = u.deps.Source.Install(ctx, found, func(at float32) {
+	err := u.deps.Source.Install(ctx, found, func(at float32) {
 		refresh()
 		u.progress(release, at)
 	})

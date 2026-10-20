@@ -274,6 +274,14 @@ func (w PosterWriter) Last(v string) error {
 	return w.s.Update(func(c *Poster) { c.Last = v })
 }
 
+type LockWriter struct{ s storage.Section[Lock] }
+
+func NewLockWriter(s storage.Section[Lock]) LockWriter { return LockWriter{s: s} }
+
+func (w LockWriter) All(v Lock) error {
+	return w.s.Update(func(c *Lock) { *c = v })
+}
+
 type RTSPWriter struct{ s storage.Section[RTSP] }
 
 func NewRTSPWriter(s storage.Section[RTSP]) RTSPWriter { return RTSPWriter{s: s} }

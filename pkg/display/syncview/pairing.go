@@ -96,63 +96,15 @@ func code(digits string) gogui.View {
 }
 
 func (v *View) entry(x configsync.Exchange, wide, vh float32) gogui.View {
-	typed := v.typedFor(x.ID)
+	v.mu.Lock()
+	if v.round != x.ID {
+		v.round = x.ID
+		v.pad.Reset()
+	}
+	v.mu.Unlock()
+	typed := v.pad.Typed()
 	shown := typed + strings.Repeat("·", codeLength-len(typed))
-	key := min(style.Reach()*1.2, vh*0.07)
-	glyph := gogui.CurrentTheme().Cfg.TextStyleDef
-	glyph.Size = key * 0.5
-	digit := func(d string) gogui.View {
-		return v.o.UI.Toolkit.WideKey(
-			"sync-key-"+d,
-			d,
-			glyph,
-			key,
-			style.Partial,
-			func(gogui.EventCtx) { v.press(x.ID, d) },
-		)
-	}
-	icon := gogui.CurrentTheme().TextStyleIconMedium
-	icon.Size = key * 0.45
-	row := func(keys ...gogui.View) gogui.View {
-		return gogui.Row(
-			gogui.ContainerCfg{
-				Sizing:  gogui.FillFit,
-				Padding: gogui.NoPadding,
-				Spacing: gogui.SpacingSmall,
-				Content: keys,
-			},
-		)
-	}
-	pad := gogui.Column(gogui.ContainerCfg{
-		Width:   min(wide, key*6),
-		Sizing:  gogui.FixedFit,
-		Padding: gogui.NoPadding,
-		Spacing: gogui.SpacingSmall,
-		Content: []gogui.View{
-			row(digit("1"), digit("2"), digit("3")),
-			row(digit("4"), digit("5"), digit("6")),
-			row(digit("7"), digit("8"), digit("9")),
-			row(
-				v.o.UI.Toolkit.WideKey(
-					"sync-key-clear",
-					gogui.IconClose,
-					icon,
-					key,
-					style.Partial,
-					func(gogui.EventCtx) { v.clear(x.ID) },
-				),
-				digit("0"),
-				v.o.UI.Toolkit.WideKey(
-					"sync-key-back",
-					gogui.IconArrowLeft,
-					icon,
-					key,
-					style.Partial,
-					func(gogui.EventCtx) { v.back(x.ID) },
-				),
-			),
-		},
-	})
+	pad := v.pad.View(&v.o.UI.Toolkit, wide, vh, codeLength, v.o.Sync.Enter)
 	return gogui.Column(gogui.ContainerCfg{
 		Sizing:  gogui.FitFit,
 		Padding: gogui.NoPadding,
@@ -184,50 +136,6 @@ func (v *View) keys(x configsync.Exchange, wide float32) gogui.View {
 			),
 		},
 	})
-}
-
-func (v *View) typedFor(id string) string {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	if v.round != id {
-		v.round, v.typed = id, ""
-	}
-	return v.typed
-}
-
-func (v *View) press(id, d string) {
-	v.mu.Lock()
-	if v.round != id {
-		v.round, v.typed = id, ""
-	}
-	v.typed += d
-	full := ""
-	if len(v.typed) == codeLength {
-		full, v.typed = v.typed, ""
-	}
-	v.mu.Unlock()
-	if full != "" {
-		v.o.Sync.Enter(full)
-	}
-	v.o.Shell.Redraw()
-}
-
-func (v *View) back(id string) {
-	v.mu.Lock()
-	if v.round == id && v.typed != "" {
-		v.typed = v.typed[:len(v.typed)-1]
-	}
-	v.mu.Unlock()
-	v.o.Shell.Redraw()
-}
-
-func (v *View) clear(id string) {
-	v.mu.Lock()
-	if v.round == id {
-		v.typed = ""
-	}
-	v.mu.Unlock()
-	v.o.Shell.Redraw()
 }
 
 func message(x configsync.Exchange) string {
