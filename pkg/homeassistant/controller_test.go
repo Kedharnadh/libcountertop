@@ -34,7 +34,7 @@ func (f *fake) Send(m proto.Message) error {
 	}
 	if resp := answer(req); resp != nil {
 		resp.CallId = req.GetCallId()
-		go func() { _ = f.h.Handle(context.Background(), nil, resp) }()
+		go f.h.answer(f, resp)
 	}
 	return nil
 }
@@ -50,8 +50,15 @@ func connected(
 ) (*Controller, *fake) {
 	h := New(Settings{Home: testHomeSettings{}, API: testAPISettings{}})
 	f := &fake{h: h, answer: answer}
-	h.to = f
+	h.links[f] = &link{}
 	return h, f
+}
+
+func set(h *Controller, f *fake, access Access) {
+	h.mu.Lock()
+	h.links[f].access = access
+	h.judge()
+	h.mu.Unlock()
 }
 
 func waitFor(t *testing.T, h *Controller, want Access) {
@@ -76,14 +83,14 @@ func TestProbeAllows(t *testing.T) {
 
 	mu.Lock()
 	defer mu.Unlock()
-	if len(heard) != 2 || heard[0] != Unknown || heard[1] != Allowed {
-		t.Errorf("heard %v, want [unknown allowed]", heard)
+	if len(heard) != 1 || heard[0] != Allowed {
+		t.Errorf("heard %v, want [allowed]", heard)
 	}
 }
 
 func TestRefusedFailsFastAndReprobes(t *testing.T) {
 	h, f := connected(answering(`{"response":"ok"}`))
-	h.access = Refused
+	set(h, f, Refused)
 
 	if err := h.Call(context.Background(), "light.turn_on", nil); !errors.Is(err, ErrNotAllowed) {
 		t.Fatalf("a call while refused said %v, want ErrNotAllowed", err)
@@ -91,11 +98,11 @@ func TestRefusedFailsFastAndReprobes(t *testing.T) {
 
 	h.Probe()
 	waitFor(t, h, Allowed)
-	_ = f
 }
 
 func TestSendFailureDisconnects(t *testing.T) {
 	h, f := connected(nil)
+	set(h, f, Allowed)
 	f.fail = errors.New("closed")
 	heard := Allowed
 	h.Changed.Listen(func(a Access) { heard = a })
@@ -123,7 +130,7 @@ func TestSendFailureDisconnects(t *testing.T) {
 
 func TestAReconnectWithinTheHoldKeepsAccess(t *testing.T) {
 	h, f := connected(answering(`{"response":"ok"}`))
-	h.access = Allowed
+	set(h, f, Allowed)
 	var heard []Access
 	var mu sync.Mutex
 	h.Changed.Listen(func(a Access) { mu.Lock(); heard = append(heard, a); mu.Unlock() })
@@ -144,7 +151,7 @@ func TestAReconnectWithinTheHoldKeepsAccess(t *testing.T) {
 
 func TestEntitiesSendsTheFilter(t *testing.T) {
 	var sent string
-	h, _ := connected(func(req *api.HomeassistantActionRequest) *api.HomeassistantActionResponse {
+	h, f := connected(func(req *api.HomeassistantActionRequest) *api.HomeassistantActionResponse {
 		sent = req.GetResponseTemplate()
 		return &api.HomeassistantActionResponse{
 			Success: true,
@@ -153,7 +160,7 @@ func TestEntitiesSendsTheFilter(t *testing.T) {
 			),
 		}
 	})
-	h.access = Allowed
+	set(h, f, Allowed)
 
 	got, err := h.Entities(
 		context.Background(),
@@ -203,7 +210,7 @@ func TestStartup(t *testing.T) {
 		h := New(Settings{Home: testHomeSettings{}, API: testAPISettings{}})
 		h.born, h.access = born, c.access
 		if c.to {
-			h.to = &fake{h: h}
+			h.links[&fake{h: h}] = &link{access: c.access}
 		}
 		p := h.startup(c.adopted, c.at)
 		if p.Done != c.done || p.Failed != c.failed {
@@ -229,20 +236,91 @@ type testAPISettings struct{}
 func (testAPISettings) Read() schema.API               { return schema.API{} }
 func (testAPISettings) Update(func(*schema.API)) error { return nil }
 
-func TestAReplacedConnectionKeepsAccess(t *testing.T) {
+func TestASecondHomeAssistantKeepsAccess(t *testing.T) {
 	h, f := connected(answering(`{"response":"ok"}`))
-	h.access = Allowed
+	set(h, f, Allowed)
 	var heard []Access
 	var mu sync.Mutex
 	h.Changed.Listen(func(a Access) { mu.Lock(); heard = append(heard, a); mu.Unlock() })
 
-	h.attach(&fake{h: h, answer: answering(`{"response":"ok"}`)})
+	h.attach(&fake{h: h})
 	waitFor(t, h, Allowed)
-	_ = f
 
 	mu.Lock()
 	defer mu.Unlock()
 	if len(heard) != 0 {
-		t.Errorf("a replaced connection announced %v, want nothing", heard)
+		t.Errorf("a second connection announced %v, want nothing", heard)
+	}
+}
+
+func TestOneAllowingHomeAssistantOpensTheGate(t *testing.T) {
+	h, refusing := connected(nil)
+	allowing := &fake{h: h, answer: answering(`{"response":"ok"}`)}
+	h.links[allowing] = &link{access: Refused}
+	set(h, refusing, Refused)
+	if h.Access() != Refused {
+		t.Fatalf("access is %s with every link refusing, want refused", h.Access())
+	}
+
+	var sent []*fake
+	var mu sync.Mutex
+	for _, f := range []*fake{refusing, allowing} {
+		answer := f.answer
+		f.answer = func(req *api.HomeassistantActionRequest) *api.HomeassistantActionResponse {
+			mu.Lock()
+			sent = append(sent, f)
+			mu.Unlock()
+			if answer == nil {
+				return nil
+			}
+			return answer(req)
+		}
+	}
+	set(h, allowing, Allowed)
+	if h.Access() != Allowed {
+		t.Fatalf("access is %s with one link allowing, want allowed", h.Access())
+	}
+	if err := h.Call(context.Background(), "light.turn_on", nil); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	if len(sent) != 1 || sent[0] != allowing {
+		t.Errorf("the call went to %d links, want only the allowing one", len(sent))
+	}
+	mu.Unlock()
+
+	h.lost(allowing)
+	if h.Access() != Allowed {
+		t.Errorf("access is %s inside the hold, want allowed", h.Access())
+	}
+	h.mu.Lock()
+	at := h.dropped
+	h.mu.Unlock()
+	h.expire(at)
+	if h.Access() != Refused {
+		t.Errorf("access is %s once only the refusing link is left, want refused", h.Access())
+	}
+}
+
+func TestEveryAllowedHomeAssistantGetsTheCall(t *testing.T) {
+	h, failing := connected(func(*api.HomeassistantActionRequest) *api.HomeassistantActionResponse {
+		return &api.HomeassistantActionResponse{ErrorMessage: "no such entity"}
+	})
+	ok := &fake{h: h, answer: answering(`{"response":"on"}`)}
+	h.links[ok] = &link{}
+	set(h, failing, Allowed)
+	set(h, ok, Allowed)
+
+	got, err := h.Ask(context.Background(), carrier, nil, nil, "x")
+	if err != nil {
+		t.Fatalf("one failure beat a success: %v", err)
+	}
+	if string(got) != "on" {
+		t.Errorf("got %s, want on", got)
+	}
+
+	h.lost(ok)
+	if err := h.Call(context.Background(), "light.turn_on", nil); err == nil {
+		t.Error("the only failure left reported success")
 	}
 }

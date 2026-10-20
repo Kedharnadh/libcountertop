@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
+	"slices"
 	"sync"
 	"time"
 
@@ -34,26 +36,36 @@ type reply struct {
 	err  error
 }
 
+type link struct {
+	access Access
+	stop   context.CancelFunc
+}
+
+type pending struct {
+	ch chan reply
+	to map[sender]struct{}
+}
+
 type Settings struct {
 	Home storage.Section[schema.Home]
 	API  storage.Section[schema.API]
 }
 type Controller struct {
-	settings  Settings
-	ctx       context.Context
-	stop      context.CancelFunc
-	workers   sync.WaitGroup
-	closed    bool
-	probeStop context.CancelFunc
+	settings Settings
+	ctx      context.Context
+	stop     context.CancelFunc
+	workers  sync.WaitGroup
+	closed   bool
 
 	Changed hook.Hook[Access]
 
 	mu      sync.Mutex
-	to      sender
+	links   map[sender]*link
 	dropped time.Time
+	held    Access
 	access  Access
 	next    uint32
-	waiting map[uint32]chan reply
+	waiting map[uint32]*pending
 	born    time.Time
 }
 
@@ -63,7 +75,8 @@ func New(settings Settings) *Controller {
 		settings: settings,
 		ctx:      ctx,
 		stop:     stop,
-		waiting:  map[uint32]chan reply{},
+		links:    map[sender]*link{},
+		waiting:  map[uint32]*pending{},
 		born:     time.Now(),
 	}
 }
@@ -72,22 +85,18 @@ func (h *Controller) Close() {
 	h.mu.Lock()
 	h.closed = true
 	h.stop()
-	if h.probeStop != nil {
-		h.probeStop()
-	}
-	h.to = nil
-	h.failPending()
-	h.mu.Unlock()
-	h.workers.Wait()
-}
-func (h *Controller) failPending() {
-	for id, ch := range h.waiting {
-		select {
-		case ch <- reply{err: ErrNotConnected}:
-		default:
+	for conn, l := range h.links {
+		if l.stop != nil {
+			l.stop()
 		}
+		delete(h.links, conn)
+	}
+	for id, p := range h.waiting {
+		p.ch <- reply{err: ErrNotConnected}
 		delete(h.waiting, id)
 	}
+	h.mu.Unlock()
+	h.workers.Wait()
 }
 
 func (h *Controller) Name() string { return "homeassistant" }
@@ -97,21 +106,12 @@ func (h *Controller) Handle(_ context.Context, conn *esphome.Conn, msg proto.Mes
 	case *api.SubscribeHomeassistantServicesRequest:
 		h.attach(conn)
 	case *api.HomeassistantActionResponse:
-		h.mu.Lock()
-		ch := h.waiting[m.GetCallId()]
-		delete(h.waiting, m.GetCallId())
-		h.mu.Unlock()
-		if ch == nil {
-			return nil
-		}
-		if !m.GetSuccess() {
-			ch <- reply{err: fmt.Errorf("homeassistant: %s", m.GetErrorMessage())}
-			return nil
-		}
-		ch <- reply{data: m.GetResponseData()}
+		h.answer(conn, m)
 	}
 	return nil
 }
+
+func (h *Controller) ConnClosed(conn *esphome.Conn) { h.lost(conn) }
 
 func (h *Controller) Startup() startup.Progress {
 	return h.startup(h.settings.API.Read().Adopted, time.Now())
@@ -148,18 +148,46 @@ func (h *Controller) Access() Access {
 func (h *Controller) Connected() bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	return h.to != nil || h.holding(time.Now())
+	return len(h.links) > 0 || h.holding(time.Now())
 }
 
 func (h *Controller) holding(now time.Time) bool {
 	return !h.dropped.IsZero() && now.Sub(h.dropped) < dropHold
 }
 
+func (h *Controller) overall() Access {
+	unknown := len(h.links) == 0
+	for _, l := range h.links {
+		switch l.access {
+		case Allowed:
+			return Allowed
+		case Unknown:
+			unknown = true
+		}
+	}
+	if h.holding(time.Now()) {
+		return h.held
+	}
+	if unknown {
+		return Unknown
+	}
+	return Refused
+}
+
+func (h *Controller) judge() (Access, bool) {
+	access := h.overall()
+	if access == h.access {
+		return access, false
+	}
+	h.access = access
+	return access, true
+}
+
 func (h *Controller) Probe() {
 	h.mu.Lock()
-	conn := h.to
+	conns := slices.Collect(maps.Keys(h.links))
 	h.mu.Unlock()
-	if conn != nil {
+	for _, conn := range conns {
 		h.reprobe(conn)
 	}
 }
@@ -170,13 +198,9 @@ func (h *Controller) attach(conn sender) {
 		h.mu.Unlock()
 		return
 	}
-	if h.to != conn {
-		h.failPending()
-		if h.to != nil {
-			h.dropped = time.Now()
-		}
+	if h.links[conn] == nil {
+		h.links[conn] = &link{}
 	}
-	h.to = conn
 	h.mu.Unlock()
 	h.reprobe(conn)
 }
@@ -187,41 +211,35 @@ func (h *Controller) reprobe(conn sender) {
 	}
 	ready := make(chan struct{})
 	h.mu.Lock()
-	current := !h.closed && h.to == conn
-	reset := false
-	if current {
-		if !h.holding(time.Now()) {
-			h.access, reset = Unknown, true
-		}
-		h.dropped = time.Time{}
-		if h.probeStop != nil {
-			h.probeStop()
-		}
-		ctx, stop := context.WithTimeout(h.ctx, probeWait)
-		h.probeStop = stop
-		h.workers.Add(1)
-		go func() {
-			defer h.workers.Done()
-			defer stop()
-			select {
-			case <-ready:
-				h.probe(ctx, conn)
-			case <-ctx.Done():
-			}
-		}()
-	}
-	h.mu.Unlock()
-	if !current {
+	l := h.links[conn]
+	if h.closed || l == nil {
+		h.mu.Unlock()
 		return
 	}
-	if reset {
-		h.Changed.Emit(Unknown)
+	l.access = Unknown
+	if l.stop != nil {
+		l.stop()
+	}
+	ctx, stop := context.WithTimeout(h.ctx, probeWait)
+	l.stop = stop
+	h.workers.Go(func() {
+		defer stop()
+		select {
+		case <-ready:
+			h.probe(ctx, conn)
+		case <-ctx.Done():
+		}
+	})
+	access, moved := h.judge()
+	h.mu.Unlock()
+	if moved {
+		h.Changed.Emit(access)
 	}
 	close(ready)
 }
 
 func (h *Controller) probe(ctx context.Context, conn sender) {
-	_, err := h.call(ctx, carrier, carrierData(), nil, "ok")
+	_, err := h.send(ctx, []sender{conn}, request(carrier, carrierData(), nil, "ok"))
 	switch {
 	case err == nil:
 		h.settle(conn, Allowed)
@@ -239,59 +257,107 @@ func (h *Controller) Enable(on bool) {
 		return
 	}
 	h.mu.Lock()
-	moved := h.access != Unknown
-	h.access = Unknown
-	h.mu.Unlock()
-	if moved {
-		h.Changed.Emit(Unknown)
+	for _, l := range h.links {
+		l.access = Unknown
+		if l.stop != nil {
+			l.stop()
+		}
 	}
-}
-
-func (h *Controller) settle(conn sender, access Access) {
-	h.mu.Lock()
-	moved := h.to == conn && h.access != access
-	if moved {
-		h.access = access
-	}
+	h.dropped, h.held = time.Time{}, Unknown
+	access, moved := h.judge()
 	h.mu.Unlock()
 	if moved {
 		h.Changed.Emit(access)
 	}
 }
 
+func (h *Controller) settle(conn sender, access Access) {
+	h.mu.Lock()
+	l := h.links[conn]
+	if l == nil {
+		h.mu.Unlock()
+		return
+	}
+	l.access = access
+	overall, moved := h.judge()
+	h.mu.Unlock()
+	if moved {
+		h.Changed.Emit(overall)
+	}
+}
+
 func (h *Controller) lost(conn sender) {
 	h.mu.Lock()
-	gone := h.to == conn
-	var at time.Time
-	if gone {
-		h.to = nil
-		at = time.Now()
-		h.dropped = at
-		if h.probeStop != nil {
-			h.probeStop()
-		}
-		h.failPending()
+	l := h.links[conn]
+	if l == nil {
+		h.mu.Unlock()
+		return
 	}
+	delete(h.links, conn)
+	if l.stop != nil {
+		l.stop()
+	}
+	at := time.Now()
+	h.held, h.dropped = h.access, at
+	h.abandon(conn)
+	access, moved := h.judge()
 	h.mu.Unlock()
-	if gone {
-		time.AfterFunc(dropHold, func() { h.expire(at) })
+	if moved {
+		h.Changed.Emit(access)
+	}
+	time.AfterFunc(dropHold, func() { h.expire(at) })
+}
+
+func (h *Controller) abandon(conn sender) {
+	for id, p := range h.waiting {
+		if _, ok := p.to[conn]; !ok {
+			continue
+		}
+		delete(p.to, conn)
+		if len(p.to) == 0 {
+			p.ch <- reply{err: ErrNotConnected}
+			delete(h.waiting, id)
+		}
 	}
 }
 
 func (h *Controller) expire(at time.Time) {
 	h.mu.Lock()
-	stale := h.to == nil && h.dropped.Equal(at)
-	if stale {
-		h.dropped, h.access = time.Time{}, Unknown
+	if !h.dropped.Equal(at) {
+		h.mu.Unlock()
+		return
 	}
+	h.dropped, h.held = time.Time{}, Unknown
+	access, moved := h.judge()
 	h.mu.Unlock()
-	if stale {
-		h.Changed.Emit(Unknown)
+	if moved {
+		h.Changed.Emit(access)
 	}
 }
 
+func (h *Controller) answer(from sender, m *api.HomeassistantActionResponse) {
+	h.mu.Lock()
+	p := h.waiting[m.GetCallId()]
+	if p == nil {
+		h.mu.Unlock()
+		return
+	}
+	r := reply{data: m.GetResponseData()}
+	if !m.GetSuccess() {
+		r = reply{err: fmt.Errorf("homeassistant: %s", m.GetErrorMessage())}
+		delete(p.to, from)
+		if len(p.to) > 0 {
+			h.mu.Unlock()
+			return
+		}
+	}
+	delete(h.waiting, m.GetCallId())
+	h.mu.Unlock()
+	p.ch <- r
+}
+
 func (h *Controller) Call(ctx context.Context, action string, data map[string]string) error {
-	_, err := h.call(ctx, action, data, nil, "")
+	_, err := h.call(ctx, request(action, data, nil, ""))
 	return err
 }
 
@@ -300,7 +366,7 @@ func (h *Controller) Perform(
 	action string,
 	data, templates map[string]string,
 ) error {
-	_, err := h.call(ctx, action, data, templates, "")
+	_, err := h.call(ctx, request(action, data, templates, ""))
 	return err
 }
 
@@ -314,7 +380,7 @@ func (h *Controller) Ask(
 	data, templates map[string]string,
 	tmpl string,
 ) (json.RawMessage, error) {
-	raw, err := h.call(ctx, action, data, templates, tmpl)
+	raw, err := h.call(ctx, request(action, data, templates, tmpl))
 	if err != nil {
 		return nil, err
 	}
@@ -340,66 +406,97 @@ func carrierData() map[string]string {
 
 func (h *Controller) call(
 	ctx context.Context,
-	action string,
-	data, templates map[string]string,
-	tmpl string,
+	req *api.HomeassistantActionRequest,
 ) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	ch := make(chan reply, 1)
 	h.mu.Lock()
-	to, access := h.to, h.access
-	h.next++
-	id := h.next
-	if to != nil {
-		h.waiting[id] = ch
-	}
+	targets, err := h.targets()
 	h.mu.Unlock()
-	if to == nil {
+	if err != nil {
+		return nil, err
+	}
+	return h.send(ctx, targets, req)
+}
+
+func (h *Controller) targets() ([]sender, error) {
+	if len(h.links) == 0 {
 		return nil, ErrNotConnected
 	}
-	if access == Refused {
-		h.mu.Lock()
-		delete(h.waiting, id)
-		h.mu.Unlock()
+	var out []sender
+	for conn, l := range h.links {
+		if l.access != Refused {
+			out = append(out, conn)
+		}
+	}
+	if h.access == Refused || len(out) == 0 {
 		return nil, ErrNotAllowed
 	}
+	return out, nil
+}
+
+func (h *Controller) send(
+	ctx context.Context,
+	targets []sender,
+	req *api.HomeassistantActionRequest,
+) ([]byte, error) {
+	p := &pending{ch: make(chan reply, 1), to: make(map[sender]struct{}, len(targets))}
+	for _, t := range targets {
+		p.to[t] = struct{}{}
+	}
+	h.mu.Lock()
+	if h.closed {
+		h.mu.Unlock()
+		return nil, ErrNotConnected
+	}
+	h.next++
+	id := h.next
+	h.waiting[id] = p
+	h.mu.Unlock()
 	defer func() {
 		h.mu.Lock()
 		delete(h.waiting, id)
 		h.mu.Unlock()
 	}()
 
-	fields := make([]*api.HomeassistantServiceMap, 0, len(data))
-	for k, v := range data {
-		fields = append(fields, &api.HomeassistantServiceMap{Key: k, Value: v})
-	}
-	shaped := make([]*api.HomeassistantServiceMap, 0, len(templates))
-	for k, v := range templates {
-		shaped = append(shaped, &api.HomeassistantServiceMap{Key: k, Value: v})
-	}
-	req := &api.HomeassistantActionRequest{
-		Service:          action,
-		Data:             fields,
-		DataTemplate:     shaped,
-		CallId:           id,
-		WantsResponse:    tmpl != "",
-		ResponseTemplate: tmpl,
-	}
-	if err := to.Send(req); err != nil {
-		h.lost(to)
-		return nil, err
+	req.CallId = id
+	for _, t := range targets {
+		if err := t.Send(req); err != nil {
+			h.lost(t)
+		}
 	}
 
 	select {
-	case r := <-ch:
+	case r := <-p.ch:
 		return r.data, r.err
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case <-h.ctx.Done():
 		return nil, ErrNotConnected
 	}
+}
+
+func request(
+	action string,
+	data, templates map[string]string,
+	tmpl string,
+) *api.HomeassistantActionRequest {
+	return &api.HomeassistantActionRequest{
+		Service:          action,
+		Data:             pairs(data),
+		DataTemplate:     pairs(templates),
+		WantsResponse:    tmpl != "",
+		ResponseTemplate: tmpl,
+	}
+}
+
+func pairs(m map[string]string) []*api.HomeassistantServiceMap {
+	out := make([]*api.HomeassistantServiceMap, 0, len(m))
+	for k, v := range m {
+		out = append(out, &api.HomeassistantServiceMap{Key: k, Value: v})
+	}
+	return out
 }
 
 func (h *Controller) Watch(changed func(Access)) func() { return h.Changed.Listen(changed) }

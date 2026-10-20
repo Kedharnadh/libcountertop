@@ -1,0 +1,44 @@
+package match
+
+import "testing"
+
+var devices = []Candidate{
+	{Key: "bb", Name: "Kitchen Blueberry"},
+	{Key: "at", Name: "Athena"},
+	{Key: "cr", Name: "Crown"},
+	{Key: "oe", Name: "Office Echo"},
+	{Key: "os", Name: "Office Show"},
+	{Key: "lr", Name: "Living Room"},
+}
+
+func TestSpokenNamesFindTheirDevice(t *testing.T) {
+	for _, c := range []struct {
+		said, want string
+	}{
+		{"blueberry", "bb"},
+		{"blue berry", "bb"},
+		{"Blue-Berry", "bb"},
+		{"kitchen blueberry", "bb"},
+		{"the athena", "at"},
+		{"athena", "at"},
+		{"athina", "at"},
+		{"crown", "cr"},
+		{"living room", "lr"},
+		{"livingroom", "lr"},
+		{"office echo", "oe"},
+		{"at", "at"},
+	} {
+		got, ok := Best(c.said, devices)
+		if !ok || got != c.want {
+			t.Errorf("Best(%q) = %q, %v; want %q", c.said, got, ok, c.want)
+		}
+	}
+}
+
+func TestUnknownOrAmbiguousNamesFindNothing(t *testing.T) {
+	for _, said := range []string{"mom", "garage", "office", "", "the"} {
+		if got, ok := Best(said, devices); ok {
+			t.Errorf("Best(%q) = %q, want no match", said, got)
+		}
+	}
+}

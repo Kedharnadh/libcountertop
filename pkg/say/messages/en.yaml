@@ -612,6 +612,10 @@ rail.sleep: Sleep
 reply.download: Starts later, never gaps
 reply.stream: Starts sooner, can gap
 reply.title: Response playback
+actions.call: Call a device
+actions.call.busy: Already in a call
+actions.call.unknown: "There's no device called {{.Peer}}"
+actions.call.unreachable: "{{.Peer}} can't be reached"
 lock.again: Enter it again
 lock.change: Change PIN
 lock.clear: Remove PIN
