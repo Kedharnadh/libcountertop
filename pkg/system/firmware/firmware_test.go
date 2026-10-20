@@ -171,7 +171,7 @@ func TestOnlyASourceWithBuildsOffersAVersionPicker(t *testing.T) {
 	if plain.versions != nil || len(plain.Entities()) != 5 {
 		t.Error("a source without builds offers a version picker")
 	}
-	plain.List(context.Background())
+	_ = plain.List(context.Background())
 	if got := plain.Catalog().Finding; got != Unchecked {
 		t.Errorf("finding = %d, want unchecked", got)
 	}
@@ -231,7 +231,9 @@ func TestTheListOffersEveryVersionButTheRunningOne(t *testing.T) {
 	var seen []Finding
 	u.Listed.Listen(func(c Catalog) { seen = append(seen, c.Finding) })
 
-	u.List(context.Background())
+	if err := u.List(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
 	if want := []Finding{Checking, Current}; !slices.Equal(seen, want) {
 		t.Errorf("listed %v, want %v", seen, want)
@@ -265,7 +267,9 @@ func TestAFailedListKeepsWhatWasListed(t *testing.T) {
 	u := build(buildSource{source: &source{}, listed: errors.New("rate limited")}, &settings{})
 	u.listed(Catalog{Finding: Current, Builds: []releases.Release{{Tag: "0.9"}}})
 
-	u.List(context.Background())
+	if err := u.List(context.Background()); err == nil {
+		t.Error("a failed list returned no error")
+	}
 
 	got := u.Catalog()
 	if got.Finding != Unreachable || len(got.Builds) != 1 {
