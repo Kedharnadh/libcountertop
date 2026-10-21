@@ -7,7 +7,9 @@
   border-radius: var(--mantine-radius-md);
   border: 1px solid var(--mantine-color-default-border);
   color: var(--mantine-color-dimmed);
-  transition: border-color 200ms ease, color 200ms ease;
+  transition:
+    border-color 200ms ease,
+    color 200ms ease;
 }
 
 .ct-heart[data-live] {
@@ -82,14 +84,19 @@
   }
 }
 
+.ct-page {
+  container-type: inline-size;
+}
+
 .ct-overview {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--mantine-spacing-xl);
   max-width: 1180px;
   align-items: start;
 }
 
-@media (min-width: 62em) {
+@container (min-width: 1080px) {
   .ct-overview[data-screen] {
     grid-template-columns: auto minmax(260px, 1fr);
   }
@@ -98,6 +105,8 @@
 .ct-bezel {
   position: relative;
   justify-self: start;
+  box-sizing: border-box;
+  width: calc(min(760px, (100dvh - 160px) * var(--aspect)) + 20px);
   max-width: 100%;
   padding: 10px;
   border-radius: 18px;
@@ -109,16 +118,11 @@
 
 .ct-screen {
   display: block;
-  width: auto;
-  max-width: min(100%, 760px);
-  max-height: calc(100dvh - 160px);
+  width: 100%;
+  height: auto;
+  aspect-ratio: var(--aspect);
   border-radius: 9px;
   background: #000;
-}
-
-.ct-screen-empty {
-  width: 360px;
-  aspect-ratio: 10 / 16;
 }
 
 .ct-screen-live {
@@ -221,7 +225,10 @@
   background: var(--mantine-color-default);
   border: 1px solid var(--mantine-color-default-border);
   color: var(--mantine-color-text);
-  transition: transform 120ms ease, background 120ms ease, box-shadow 120ms ease;
+  transition:
+    transform 120ms ease,
+    background 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .ct-round:hover {
@@ -262,7 +269,11 @@
   width: 88px;
   height: 88px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--mantine-color-teal-6), var(--mantine-color-blue-7));
+  background: linear-gradient(
+    135deg,
+    var(--mantine-color-teal-6),
+    var(--mantine-color-blue-7)
+  );
   color: #fff;
   font-size: 30px;
   font-weight: 600;
@@ -383,7 +394,11 @@
   overflow: hidden;
   color: #fff;
   background:
-    radial-gradient(120% 80% at 50% 0%, rgba(32, 201, 151, 0.25), transparent 60%),
+    radial-gradient(
+      120% 80% at 50% 0%,
+      rgba(32, 201, 151, 0.25),
+      transparent 60%
+    ),
     linear-gradient(180deg, #16181d, #0b0c0f);
   box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.7);
 }
@@ -482,7 +497,11 @@
   height: 148px;
   border-radius: 50%;
   color: #fff;
-  background: linear-gradient(135deg, var(--mantine-color-teal-6), var(--mantine-color-blue-7));
+  background: linear-gradient(
+    135deg,
+    var(--mantine-color-teal-6),
+    var(--mantine-color-blue-7)
+  );
   box-shadow: 0 18px 40px -16px var(--mantine-color-teal-6);
   transition: transform 120ms ease;
   touch-action: none;
@@ -490,7 +509,11 @@
 }
 
 .ct-mic[data-live] {
-  background: linear-gradient(135deg, var(--mantine-color-red-6), var(--mantine-color-orange-6));
+  background: linear-gradient(
+    135deg,
+    var(--mantine-color-red-6),
+    var(--mantine-color-orange-6)
+  );
   box-shadow: 0 18px 40px -16px var(--mantine-color-red-6);
 }
 
@@ -510,7 +533,9 @@
 }
 
 .ct-shortcut .mantine-Paper-root {
-  transition: border-color 120ms ease, transform 120ms ease;
+  transition:
+    border-color 120ms ease,
+    transform 120ms ease;
 }
 
 .ct-shortcut:hover .mantine-Paper-root {

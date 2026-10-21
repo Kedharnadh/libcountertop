@@ -110,6 +110,10 @@ export function Shell({ device, onOut }: { device: Device; onOut: () => void }) 
     for (const d of domains) for (const f of d.fields) m.set(f.id, { domain: d.domain, name: f.name });
     return m;
   }, [domains]);
+  const adopted = useMemo(() => {
+    const f = domains.find((d) => d.domain === "api")?.fields.find((x) => x.name === "adopted");
+    return f ? f.value === "on" : undefined;
+  }, [domains]);
   const byIDRef = useRef(byID);
   byIDRef.current = byID;
 
@@ -283,7 +287,7 @@ export function Shell({ device, onOut }: { device: Device; onOut: () => void }) 
         ) : open === developer ? (
           <Developer entities={entities} states={states} focus={focus} onSignedOut={signedOut} />
         ) : (
-          <Overview device={device} entities={entities} states={states} go={go} />
+          <Overview device={device} entities={entities} states={states} adopted={adopted} go={go} />
         )}
         {error && (
           <Notification

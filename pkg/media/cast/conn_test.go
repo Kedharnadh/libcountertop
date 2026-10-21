@@ -76,6 +76,43 @@ func dial(t *testing.T, s *Service) *sender {
 	return &sender{t: t, conn: ours}
 }
 
+func TestClosingTheServiceEndsEveryConnection(t *testing.T) {
+	s := NewService(NewReceiver("Kitchen"))
+	spoken, quiet := dial(t, s), dial(t, s)
+	spoken.send(Message{
+		Source:      "sender-0",
+		Destination: "receiver-0",
+		Namespace:   NSConnection,
+		Payload:     `{"type":"CONNECT"}`,
+	})
+	waitFor(t, s, 1)
+
+	s.Close()
+
+	for name, c := range map[string]*sender{"a sender that spoke": spoken, "a quiet sender": quiet} {
+		if _, err := c.next(); !hungUp(err) {
+			t.Errorf("%s was not disconnected: %v", name, err)
+		}
+	}
+	waitFor(t, s, 0)
+}
+
+func hungUp(err error) bool { return errors.Is(err, io.EOF) || errors.Is(err, io.ErrClosedPipe) }
+
+func TestASenderArrivingAfterCloseIsTurnedAway(t *testing.T) {
+	s := NewService(NewReceiver("Kitchen"))
+	s.Close()
+
+	ours, theirs := net.Pipe()
+	t.Cleanup(func() { ours.Close() })
+	if err := s.Serve(NewConn(theirs)); !errors.Is(err, ErrGone) {
+		t.Errorf("serving after close answered %v, want ErrGone", err)
+	}
+	if _, err := (&sender{t: t, conn: ours}).next(); !hungUp(err) {
+		t.Errorf("a late sender was kept: %v", err)
+	}
+}
+
 func TestAConversationOverAConnection(t *testing.T) {
 	s := NewService(NewReceiver("Kitchen"))
 	s.Receiver.Player = &player{}

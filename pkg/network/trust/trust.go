@@ -141,12 +141,15 @@ func (t *Trust) Lost(p peer.Peer) {
 func (t *Trust) Rekey() {
 	key := t.o.Key()
 	t.mu.Lock()
-	if key == t.key {
-		t.mu.Unlock()
+	forgot := t.rekey(key)
+	t.mu.Unlock()
+	t.reconfirm(forgot)
+}
+
+func (t *Trust) reconfirm(forgot bool) {
+	if !forgot {
 		return
 	}
-	t.forget(key)
-	t.mu.Unlock()
 	for _, p := range t.o.Peers() {
 		t.Found(p)
 	}
@@ -184,9 +187,10 @@ func (t *Trust) changed() {
 func (t *Trust) Standing(id string) peer.Standing {
 	key := t.o.Key()
 	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.rekey(key)
+	forgot := t.rekey(key)
 	s, ok := t.byID[id]
+	t.mu.Unlock()
+	t.reconfirm(forgot)
 	if !ok {
 		return peer.Checking
 	}
@@ -236,9 +240,11 @@ func (t *Trust) Legacy(h http.Handler) http.Handler {
 func (t *Trust) homeCert(fp string) bool {
 	key := t.o.Key()
 	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.rekey(key)
-	return t.byCert[fp] == peer.Home
+	forgot := t.rekey(key)
+	home := t.byCert[fp] == peer.Home
+	t.mu.Unlock()
+	t.reconfirm(forgot)
+	return home
 }
 
 func (t *Trust) transport(check func(fp string) error) *http.Transport {
@@ -256,10 +262,12 @@ func (t *Trust) transport(check func(fp string) error) *http.Transport {
 	return &http.Transport{TLSClientConfig: cfg, ForceAttemptHTTP2: true}
 }
 
-func (t *Trust) rekey(key string) {
-	if key != t.key {
-		t.forget(key)
+func (t *Trust) rekey(key string) bool {
+	if key == t.key {
+		return false
 	}
+	t.forget(key)
+	return true
 }
 
 func (t *Trust) forget(key string) {
@@ -274,14 +282,15 @@ func (t *Trust) judge(key, id, fp string, v peer.Standing) {
 		return
 	}
 	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.rekey(key)
+	forgot := t.rekey(key)
 	if id != "" {
 		t.byID[id] = v
 	}
 	if fp != "" {
 		t.byCert[fp] = v
 	}
+	t.mu.Unlock()
+	t.reconfirm(forgot)
 }
 
 func caller(r *http.Request) (string, bool) {

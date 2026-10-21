@@ -16,7 +16,6 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/hook"
 	netaddress "github.com/ygelfand/libcountertop/pkg/network/address"
-	"github.com/ygelfand/libcountertop/pkg/runtime/status"
 )
 
 const (
@@ -30,7 +29,6 @@ type Options struct {
 	Port    int
 	APIPort int
 	Adopted func() bool
-	Page    func() status.Page
 }
 
 type side struct {
@@ -43,13 +41,12 @@ type side struct {
 type Server struct {
 	opts Options
 
-	mu      sync.Mutex
-	shown   string
-	pages   side
-	peers   side
-	public  side
-	trusted func() bool
-	root    http.Handler
+	mu     sync.Mutex
+	shown  string
+	pages  side
+	peers  side
+	public side
+	root   http.Handler
 
 	Offered hook.Hook[string]
 }
@@ -95,9 +92,9 @@ func (s *Server) PublicRoot(h http.Handler) {
 	s.mu.Unlock()
 }
 
-func (s *Server) Public(port int, cfg func() *tls.Config, trusted func() bool) {
+func (s *Server) Public(port int, cfg func() *tls.Config) {
 	s.mu.Lock()
-	s.public.port, s.public.tls, s.trusted = port, cfg, trusted
+	s.public.port, s.public.tls = port, cfg
 	s.mu.Unlock()
 }
 
@@ -106,7 +103,6 @@ func (s *Server) Run(ctx context.Context) error {
 	pages, peers, public, root := s.pages, s.peers, s.public, s.root
 	s.mu.Unlock()
 
-	page := status.Handler(s.opts.Page)
 	var servers []*http.Server
 	var names []side
 	for _, sd := range []side{pages, peers, public} {
@@ -116,12 +112,12 @@ func (s *Server) Run(ctx context.Context) error {
 		r := chi.NewRouter()
 		switch sd.name {
 		case pages.name:
-			r.Get("/", s.front(page, public.port))
+			if public.port != 0 && public.tls != nil {
+				r.Get("/", front(public.port))
+			}
 		case public.name:
 			if root != nil {
 				r.Handle("/*", root)
-			} else {
-				r.Get("/", page)
 			}
 		}
 		for pattern, h := range sd.routes {
@@ -189,12 +185,8 @@ func route(r chi.Router, pattern string, h http.Handler) {
 	r.Handle(pattern, h)
 }
 
-func (s *Server) front(page http.Handler, port int) http.HandlerFunc {
+func front(port int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if s.trusted == nil || port == 0 || !s.trusted() {
-			page.ServeHTTP(w, r)
-			return
-		}
 		host := r.Host
 		if h, _, err := net.SplitHostPort(r.Host); err == nil {
 			host = h

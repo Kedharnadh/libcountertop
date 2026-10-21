@@ -119,17 +119,23 @@ type Service struct {
 
 	mu    sync.Mutex
 	conns map[string]*Conn
+	open  map[*Conn]struct{}
 }
 
 func NewService(r *Receiver) *Service {
-	return &Service{Receiver: r, conns: map[string]*Conn{}}
+	return &Service{Receiver: r, conns: map[string]*Conn{}, open: map[*Conn]struct{}{}}
 }
 
 func (s *Service) Serve(c *Conn) error {
+	if !s.admit(c) {
+		_ = c.Close()
+		return ErrGone
+	}
 	var known string
 
 	defer func() {
 		_ = c.Close()
+		s.release(c)
 		if known != "" {
 			s.forget(known)
 		}
@@ -247,6 +253,35 @@ func (s *Service) forget(id string) {
 
 	delete(s.conns, id)
 	delete(s.Receiver.senders, id)
+}
+
+func (s *Service) Close() {
+	s.mu.Lock()
+	open := s.open
+	s.open = nil
+	s.mu.Unlock()
+
+	for c := range open {
+		_ = c.Close()
+	}
+}
+
+func (s *Service) admit(c *Conn) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.open == nil {
+		return false
+	}
+	s.open[c] = struct{}{}
+	return true
+}
+
+func (s *Service) release(c *Conn) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.open, c)
 }
 
 func (s *Service) Senders() int {

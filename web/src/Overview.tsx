@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { Group, Stack, Text, Title } from "@mantine/core";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { Button, Group, Paper, Stack, Text, Title } from "@mantine/core";
 import {
   IconBulb,
+  IconHome,
   IconCamera,
   IconCameraOff,
   IconClockHour4,
@@ -18,12 +19,21 @@ type Props = {
   device: Device;
   entities: Description[];
   states: Map<string, State["state"]>;
+  adopted?: boolean;
   go: (slug: string, focus?: string) => void;
 };
 
 const screenEvery = 3000;
+const adoptURL =
+  "https://my.home-assistant.io/redirect/config_flow_start/?domain=esphome";
 
-type Line = { key: string; icon: Icon; label: string; value: string; tone?: "alert" | "live" | "quiet" };
+type Line = {
+  key: string;
+  icon: Icon;
+  label: string;
+  value: string;
+  tone?: "alert" | "live" | "quiet";
+};
 
 function value(states: Map<string, State["state"]>, id: string): unknown {
   const s = states.get(id);
@@ -40,7 +50,10 @@ function since(seconds: number): string {
   return `${m}m`;
 }
 
-function lines(entities: Description[], states: Map<string, State["state"]>): Line[] {
+function lines(
+  entities: Description[],
+  states: Map<string, State["state"]>,
+): Line[] {
   const byID = new Map(entities.map((e) => [e.id, e]));
   const name = (id: string) => byID.get(id)?.info.name || id;
   const unit = (id: string) => byID.get(id)?.info.unit_of_measurement ?? "";
@@ -50,11 +63,23 @@ function lines(entities: Description[], states: Map<string, State["state"]>): Li
   if (typeof call === "string" && call && call !== "idle") {
     const peer = value(states, "call_peer");
     const who = typeof peer === "string" && peer ? ` · ${peer}` : "";
-    out.push({ key: "call", icon: IconPhone, label: name("call_state"), value: call + who, tone: "live" });
+    out.push({
+      key: "call",
+      icon: IconPhone,
+      label: name("call_state"),
+      value: call + who,
+      tone: "live",
+    });
   }
   const playing = value(states, "now_playing");
   if (typeof playing === "string" && playing) {
-    out.push({ key: "playing", icon: IconMusic, label: name("now_playing"), value: playing, tone: "live" });
+    out.push({
+      key: "playing",
+      icon: IconMusic,
+      label: name("now_playing"),
+      value: playing,
+      tone: "live",
+    });
   }
   const muted = value(states, "microphone_muted");
   if (typeof muted === "boolean") {
@@ -78,7 +103,12 @@ function lines(entities: Description[], states: Map<string, State["state"]>): Li
   }
   const light = value(states, "ambient_light");
   if (typeof light === "number") {
-    out.push({ key: "light", icon: IconBulb, label: name("ambient_light"), value: `${Math.round(light)} ${unit("ambient_light")}`.trim() });
+    out.push({
+      key: "light",
+      icon: IconBulb,
+      label: name("ambient_light"),
+      value: `${Math.round(light)} ${unit("ambient_light")}`.trim(),
+    });
   }
   const temp = value(states, "cpu_temperature");
   if (typeof temp === "number") {
@@ -92,7 +122,13 @@ function lines(entities: Description[], states: Map<string, State["state"]>): Li
   }
   const up = value(states, "uptime");
   if (typeof up === "number") {
-    out.push({ key: "uptime", icon: IconClockHour4, label: name("uptime"), value: since(up), tone: "quiet" });
+    out.push({
+      key: "uptime",
+      icon: IconClockHour4,
+      label: name("uptime"),
+      value: since(up),
+      tone: "quiet",
+    });
   }
   return out;
 }
@@ -100,6 +136,7 @@ function lines(entities: Description[], states: Map<string, State["state"]>): Li
 function Screen() {
   const [src, setSrc] = useState<string>();
   const [taken, setTaken] = useState<number>();
+  const [aspect, setAspect] = useState(10 / 16);
   const timer = useRef<number | undefined>(undefined);
 
   useEffect(() => {
@@ -111,6 +148,8 @@ function Screen() {
       const url = `/api/v1/screen?t=${Date.now()}`;
       next.onload = () => {
         if (stopped) return;
+        if (next.naturalWidth && next.naturalHeight)
+          setAspect(next.naturalWidth / next.naturalHeight);
         setSrc(url);
         setTaken(Date.now());
         timer.current = window.setTimeout(take, screenEvery);
@@ -131,41 +170,74 @@ function Screen() {
   }, []);
 
   return (
-    <div className="ct-bezel">
-      {src ? <img src={src} alt="The panel right now" className="ct-screen" /> : <div className="ct-screen ct-screen-empty" />}
-      {taken && <span className="ct-screen-live" title={new Date(taken).toLocaleTimeString()} />}
+    <div className="ct-bezel" style={{ "--aspect": aspect } as CSSProperties}>
+      {src ? (
+        <img src={src} alt="The panel right now" className="ct-screen" />
+      ) : (
+        <div className="ct-screen" />
+      )}
+      {taken && (
+        <span
+          className="ct-screen-live"
+          title={new Date(taken).toLocaleTimeString()}
+        />
+      )}
     </div>
   );
 }
 
-export function Overview({ device, entities, states }: Props) {
+export function Overview({ device, entities, states, adopted }: Props) {
   const list = lines(entities, states);
   return (
-    <div className="ct-overview" data-screen={device.screen || undefined}>
-      {device.screen && <Screen />}
-      <Stack gap="lg" className="ct-status">
-        <Stack gap={2}>
-          <Title order={2} fw={600}>
-            {device.name}
-          </Title>
-          <Text c="dimmed" size="sm">
-            {device.model}
-          </Text>
+    <div className="ct-page">
+      <div className="ct-overview" data-screen={device.screen || undefined}>
+        {device.screen && <Screen />}
+        <Stack gap="lg" className="ct-status">
+          <Stack gap={2}>
+            <Title order={2} fw={600}>
+              {device.name}
+            </Title>
+            <Text c="dimmed" size="sm">
+              {device.model}
+            </Text>
+          </Stack>
+          {adopted === false && (
+            <Paper withBorder p="md" radius="md">
+              <Group justify="space-between" wrap="wrap" gap="sm">
+                <Text fw={600}>Not in Home Assistant yet</Text>
+                <Button
+                  component="a"
+                  href={adoptURL}
+                  target="_blank"
+                  rel="noreferrer"
+                  leftSection={<IconHome size={16} />}
+                >
+                  Add to Home Assistant
+                </Button>
+              </Group>
+            </Paper>
+          )}
+          <Stack gap={0}>
+            {list.map((l) => (
+              <Group
+                key={l.key}
+                className="ct-line"
+                data-tone={l.tone}
+                wrap="nowrap"
+                gap="sm"
+              >
+                <l.icon size={18} stroke={1.6} className="ct-line-icon" />
+                <Text size="sm" className="ct-line-label">
+                  {l.label}
+                </Text>
+                <Text size="sm" fw={500} className="ct-line-value" truncate>
+                  {l.value}
+                </Text>
+              </Group>
+            ))}
+          </Stack>
         </Stack>
-        <Stack gap={0}>
-          {list.map((l) => (
-            <Group key={l.key} className="ct-line" data-tone={l.tone} wrap="nowrap" gap="sm">
-              <l.icon size={18} stroke={1.6} className="ct-line-icon" />
-              <Text size="sm" className="ct-line-label">
-                {l.label}
-              </Text>
-              <Text size="sm" fw={500} className="ct-line-value" truncate>
-                {l.value}
-              </Text>
-            </Group>
-          ))}
-        </Stack>
-      </Stack>
+      </div>
     </div>
   );
 }

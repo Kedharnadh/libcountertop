@@ -288,6 +288,75 @@ func TestANewKeyReconfirmsEveryKnownPeer(t *testing.T) {
 	eventually(t, "a reconfirming b", func() bool { return a.t.Standing("b") == peer.Home })
 }
 
+func (d *device) tries() int {
+	d.t.mu.Lock()
+	defer d.t.mu.Unlock()
+	n := 0
+	for _, times := range d.t.asked {
+		n += len(times)
+	}
+	return n
+}
+
+func settled(t *testing.T, a, b *device) {
+	t.Helper()
+	before := a.tries() + b.tries()
+	time.Sleep(300 * time.Millisecond)
+	if after := a.tries() + b.tries(); after != before {
+		t.Errorf("confirmations kept going after both sides agreed: %d more", after-before)
+	}
+	if a.tries()+b.tries() >= burst {
+		t.Errorf("%d confirmations used up the tries", a.tries()+b.tries())
+	}
+}
+
+func TestJoiningAHomeIsSeenOnBothSides(t *testing.T) {
+	a, b := newDevice(t, "a", "pancake tuesday"), newDevice(t, "b", "waffle wednesday")
+	a.know(b.peer("b"))
+	b.know(a.peer("a"))
+	a.t.Found(b.peer("b"))
+	b.t.Found(a.peer("a"))
+	eventually(t, "a seeing b as foreign", func() bool { return a.t.Standing("b") == peer.Foreign })
+	eventually(t, "b seeing a as foreign", func() bool { return b.t.Standing("a") == peer.Foreign })
+
+	b.setKey("pancake tuesday")
+	b.t.Rekey()
+	eventually(t, "b seeing a as home", func() bool { return b.t.Standing("a") == peer.Home })
+	eventually(t, "a seeing b as home", func() bool { return a.t.Standing("b") == peer.Home })
+	settled(t, a, b)
+}
+
+func TestLeavingAHomeIsSeenOnBothSides(t *testing.T) {
+	a, b := newDevice(t, "a", "pancake tuesday"), newDevice(t, "b", "pancake tuesday")
+	a.know(b.peer("b"))
+	b.know(a.peer("a"))
+	b.t.Found(a.peer("a"))
+	eventually(t, "b seeing a as home", func() bool { return b.t.Standing("a") == peer.Home })
+	eventually(t, "a seeing b as home", func() bool { return a.t.Standing("b") == peer.Home })
+
+	b.setKey("waffle wednesday")
+	b.t.Rekey()
+	eventually(t, "b seeing a as foreign", func() bool { return b.t.Standing("a") == peer.Foreign })
+	eventually(t, "a seeing b as foreign", func() bool { return a.t.Standing("b") == peer.Foreign })
+	if got := ping(t, b, a); got == http.StatusOK {
+		t.Error("b got through a's guard after leaving")
+	}
+	settled(t, a, b)
+}
+
+func TestAKeyChangeReadFirstStillReconfirms(t *testing.T) {
+	a, b := newDevice(t, "a", "pancake tuesday"), newDevice(t, "b", "waffle wednesday")
+	a.know(b.peer("b"))
+	a.t.confirm(context.Background(), b.peer("b"), "pancake tuesday")
+
+	a.setKey("waffle wednesday")
+	if got := a.t.Standing("b"); got == peer.Foreign {
+		t.Fatalf("b is still %s right after the key change", got)
+	}
+	a.t.Rekey()
+	eventually(t, "a reconfirming b", func() bool { return a.t.Standing("b") == peer.Home })
+}
+
 func TestAnUnreachablePeerIsRetriedUntilLost(t *testing.T) {
 	a := newDevice(t, "a", "")
 	gone := peer.Peer{ID: "gone", Addrs: []net.IP{net.ParseIP("127.0.0.1")}, Secure: 1}

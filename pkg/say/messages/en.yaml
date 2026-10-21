@@ -1148,6 +1148,6 @@ feedback.setting.mute: Mute sound
 feedback.setting.unmute: Unmute sound
 feedback.setting.hold: Mute hold sound
 frontend.entity.password: Admin password
-frontend.group.frontend: Frontend
+frontend.group.frontend: Web access
 frontend.setting.password: Admin password
 microphone.setting.mute_sound: Mute sound

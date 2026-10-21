@@ -27,11 +27,7 @@ func Handler() http.Handler {
 			r.URL.Path = "/"
 			name = "index.html"
 		}
-		if strings.HasPrefix(name, "assets/") {
-			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-		} else {
-			w.Header().Set("Cache-Control", "no-cache")
-		}
+		w.Header().Set("Cache-Control", "no-cache")
 		static.ServeHTTP(w, r)
 	})
 }

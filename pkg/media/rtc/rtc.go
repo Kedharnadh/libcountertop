@@ -376,6 +376,7 @@ func (l *Link) send() {
 	frames, done := l.media.Audio.Frames()
 	defer done()
 	silence := make([]int16, FrameSamples)
+	pending := make([]int16, 0, 2*FrameSamples)
 	out := make([]byte, 1275)
 	for {
 		select {
@@ -385,24 +386,33 @@ func (l *Link) send() {
 			if !ok {
 				return
 			}
-			if l.muted.Load() || len(pcm) != FrameSamples {
-				pcm = silence
-			}
-			began := time.Now()
-			n, err := enc.EncodeSILK(pcm, opus.BandwidthWideband, out)
-			l.count.encode.Add(int64(time.Since(began)))
-			l.count.audioSent.Add(1)
-			if err != nil {
-				slog.Warn("call encode", "err", err)
-				continue
-			}
-			if err := l.track.WriteSample(
-				media.Sample{Data: append([]byte(nil), out[:n]...), Duration: frame},
-			); err != nil &&
-				!errors.Is(err, context.Canceled) {
-				slog.Debug("call send", "err", err)
+			pending = append(pending, pcm...)
+			for len(pending) >= FrameSamples {
+				chunk := pending[:FrameSamples]
+				if l.muted.Load() {
+					chunk = silence
+				}
+				l.transmit(enc, chunk, out)
+				pending = append(pending[:0], pending[FrameSamples:]...)
 			}
 		}
+	}
+}
+
+func (l *Link) transmit(enc *opus.Encoder, pcm []int16, out []byte) {
+	began := time.Now()
+	n, err := enc.EncodeSILK(pcm, opus.BandwidthWideband, out)
+	l.count.encode.Add(int64(time.Since(began)))
+	l.count.audioSent.Add(1)
+	if err != nil {
+		slog.Warn("call encode", "err", err)
+		return
+	}
+	if err := l.track.WriteSample(
+		media.Sample{Data: append([]byte(nil), out[:n]...), Duration: frame},
+	); err != nil &&
+		!errors.Is(err, context.Canceled) {
+		slog.Debug("call send", "err", err)
 	}
 }
 

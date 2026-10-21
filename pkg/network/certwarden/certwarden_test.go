@@ -84,8 +84,8 @@ func TestAPulledCertificateIsServedAndKept(t *testing.T) {
 	settings := configured(srv.URL)
 
 	w := New(Options{Settings: settings, Path: path})
-	if w.Trusted() {
-		t.Fatal("trusted before fetching anything")
+	if _, ok := w.Certificate(); ok {
+		t.Fatal("a certificate before fetching anything")
 	}
 	if err := w.fetch(context.Background()); err != nil {
 		t.Fatal(err)
@@ -96,12 +96,12 @@ func TestAPulledCertificateIsServedAndKept(t *testing.T) {
 	}
 
 	again := New(Options{Settings: settings, Path: path})
-	if !again.Trusted() {
+	if _, ok := again.Certificate(); !ok {
 		t.Error("a restart lost the kept certificate")
 	}
 	settings.v.Server = ""
-	if again.Trusted() {
-		t.Error("still trusted after Cert Warden was unset")
+	if _, ok := again.Certificate(); ok {
+		t.Error("still serving it after Cert Warden was unset")
 	}
 }
 

@@ -9,6 +9,13 @@ export default defineConfig({
     outDir: "../pkg/runtime/webui/dist",
     emptyOutDir: true,
     chunkSizeWarningLimit: 1024,
+    rollupOptions: {
+      output: {
+        entryFileNames: "assets/[name].js",
+        chunkFileNames: "assets/[name].js",
+        assetFileNames: "assets/[name][extname]",
+      },
+    },
   },
   server: {
     proxy: {

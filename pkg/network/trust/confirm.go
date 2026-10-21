@@ -64,9 +64,10 @@ func (t *Trust) ConfirmHandler() http.Handler {
 			return
 		}
 		t.mu.Lock()
-		t.rekey(key)
+		forgot := t.rekey(key)
 		t.pending[fp] = pending{secret: secret, from: h.From, at: t.o.Now()}
 		t.mu.Unlock()
+		t.reconfirm(forgot)
 		writeJSON(w, answer{Msg: msg, Proof: mac(secret, "b")})
 	})
 }
@@ -85,25 +86,35 @@ func (t *Trust) ProveHandler() http.Handler {
 		}
 		key := t.o.Key()
 		t.mu.Lock()
-		t.rekey(key)
+		forgot := t.rekey(key)
 		half, ok := t.pending[fp]
 		delete(t.pending, fp)
 		t.mu.Unlock()
+		t.reconfirm(forgot)
 		if !ok || t.o.Now().Sub(half.at) > pendingLife {
 			http.Error(w, "no confirmation under way", http.StatusConflict)
 			return
 		}
+		verdict := peer.Home
 		if !hmac.Equal(mac(half.secret, "a"), p.Proof) {
-			t.judge(key, "", fp, peer.Foreign)
+			verdict = peer.Foreign
+		}
+		t.judge(key, "", fp, verdict)
+		if verdict == peer.Home {
+			w.WriteHeader(http.StatusNoContent)
+		} else {
 			http.Error(w, "not in this home", http.StatusForbidden)
-			return
 		}
-		t.judge(key, "", fp, peer.Home)
-		w.WriteHeader(http.StatusNoContent)
-		if p, ok := t.known(half.from); ok {
-			t.Found(p)
-		}
+		t.recheck(half.from, verdict)
 	})
+}
+
+func (t *Trust) recheck(id string, verdict peer.Standing) {
+	p, ok := t.known(id)
+	if !ok || t.Standing(id) == verdict {
+		return
+	}
+	t.Found(p)
 }
 
 func (t *Trust) confirm(ctx context.Context, p peer.Peer, key string) bool {

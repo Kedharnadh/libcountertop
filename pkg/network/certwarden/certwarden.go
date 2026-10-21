@@ -125,11 +125,6 @@ func (w *Warden) Certificate() (*tls.Certificate, bool) {
 	return w.cert, true
 }
 
-func (w *Warden) Trusted() bool {
-	_, ok := w.Certificate()
-	return ok
-}
-
 func (w *Warden) Says() string {
 	cfg := w.o.Settings.Read()
 	w.mu.Lock()

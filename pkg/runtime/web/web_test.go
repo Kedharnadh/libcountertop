@@ -8,8 +8,6 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-
-	"github.com/ygelfand/libcountertop/pkg/runtime/status"
 )
 
 func TestAdoptionHidesTheOffer(t *testing.T) {
@@ -18,7 +16,6 @@ func TestAdoptionHidesTheOffer(t *testing.T) {
 		Port:    80,
 		APIPort: 6053,
 		Adopted: adopted.Load,
-		Page:    func() status.Page { return status.Page{} },
 	})
 
 	var heard []string
@@ -69,35 +66,24 @@ func TestAMethodPatternOnlyAnswersThatMethod(t *testing.T) {
 	}
 }
 
-func TestThePlainPageMovesToHTTPSOnlyWhenTrusted(t *testing.T) {
-	var trusted atomic.Bool
-	s := New(Options{})
-	s.Public(443, nil, trusted.Load)
-	page := http.HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusTeapot) },
-	)
-
+func TestThePlainPageMovesToHTTPS(t *testing.T) {
 	for _, c := range []struct {
-		trusted bool
-		port    int
-		host    string
-		code    int
-		to      string
+		port int
+		host string
+		to   string
 	}{
-		{false, 443, "kitchen.home:80", http.StatusTeapot, ""},
-		{true, 443, "kitchen.home:80", http.StatusFound, "https://kitchen.home/"},
-		{true, 443, "kitchen.home", http.StatusFound, "https://kitchen.home/"},
-		{true, 8444, "10.0.0.5", http.StatusFound, "https://10.0.0.5:8444/"},
+		{443, "kitchen.home:80", "https://kitchen.home/"},
+		{443, "kitchen.home", "https://kitchen.home/"},
+		{8444, "10.0.0.5", "https://10.0.0.5:8444/"},
 	} {
-		trusted.Store(c.trusted)
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.Host = c.host
-		s.front(page, c.port).ServeHTTP(w, req)
-		if w.Code != c.code || w.Header().Get("Location") != c.to {
+		front(c.port).ServeHTTP(w, req)
+		if w.Code != http.StatusFound || w.Header().Get("Location") != c.to {
 			t.Errorf(
-				"trusted %v, %s: got %d %q, want %d %q",
-				c.trusted, c.host, w.Code, w.Header().Get("Location"), c.code, c.to,
+				"%s: got %d %q, want %d %q",
+				c.host, w.Code, w.Header().Get("Location"), http.StatusFound, c.to,
 			)
 		}
 	}

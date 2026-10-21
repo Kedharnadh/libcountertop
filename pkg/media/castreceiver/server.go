@@ -401,6 +401,7 @@ func (s *Server) Down() {
 	}
 	if s.service != nil {
 		s.service.Receiver.Forget()
+		s.service.Close()
 		s.service = nil
 	}
 }
