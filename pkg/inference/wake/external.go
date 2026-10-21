@@ -16,6 +16,7 @@ import (
 	esphome "github.com/ygelfand/go-esphome-device"
 
 	"github.com/ygelfand/libcountertop/pkg/fetch"
+	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
 
 // Home Assistant serves custom_wake_words statically; an offer's hash and size are the model's.
@@ -98,24 +99,7 @@ func write(dir, id string, model []byte, m manifest) error {
 		{modelPath(dir, id), model},
 		{filepath.Join(dir, id+".json"), config},
 	} {
-		tmp, err := os.CreateTemp(dir, ".wake-*")
-		if err != nil {
-			return err
-		}
-		name := tmp.Name()
-		defer os.Remove(name)
-		if err := tmp.Chmod(0o644); err != nil {
-			_ = tmp.Close()
-			return err
-		}
-		if _, err := tmp.Write(f.data); err != nil {
-			_ = tmp.Close()
-			return err
-		}
-		if err := tmp.Close(); err != nil {
-			return err
-		}
-		if err := os.Rename(name, f.path); err != nil {
+		if err := safe.WriteFile(f.path, f.data, 0o644); err != nil {
 			return err
 		}
 	}

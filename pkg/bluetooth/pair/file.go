@@ -11,6 +11,8 @@ import (
 	"slices"
 	"strings"
 	"sync"
+
+	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
 
 type File struct {
@@ -153,46 +155,11 @@ func (f *File) write() error {
 		fmt.Fprintf(&b, "%s %s\n", a, hex.EncodeToString(key[:]))
 	}
 
-	dir := filepath.Dir(f.path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(f.path), 0o755); err != nil {
 		return fmt.Errorf("pair: %w", err)
 	}
-
-	tmp, err := os.CreateTemp(dir, filepath.Base(f.path)+".*")
-	if err != nil {
+	if err := safe.WriteFile(f.path, b.Bytes(), 0o600); err != nil {
 		return fmt.Errorf("pair: %s: %w", f.path, err)
-	}
-	name := tmp.Name()
-
-	if err := writeThrough(tmp, b.Bytes()); err != nil {
-		_ = os.Remove(name)
-		return fmt.Errorf("pair: %s: %w", name, err)
-	}
-
-	if err := os.Rename(name, f.path); err != nil {
-		_ = os.Remove(name)
-		return fmt.Errorf("pair: %s: %w", f.path, err)
-	}
-
-	if d, err := os.Open(dir); err == nil {
-		_ = d.Sync()
-		d.Close()
 	}
 	return nil
-}
-
-func writeThrough(f *os.File, data []byte) error {
-	if err := f.Chmod(0o600); err != nil {
-		f.Close()
-		return err
-	}
-	if _, err := f.Write(data); err != nil {
-		f.Close()
-		return err
-	}
-	if err := f.Sync(); err != nil {
-		f.Close()
-		return err
-	}
-	return f.Close()
 }

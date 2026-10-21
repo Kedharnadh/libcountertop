@@ -49,7 +49,7 @@ func (t *Trust) ConfirmHandler() http.Handler {
 			return
 		}
 		key := t.o.Key()
-		if !t.admit() {
+		if !t.admit(source(r)) {
 			http.Error(w, "too many tries", http.StatusTooManyRequests)
 			return
 		}
@@ -93,16 +93,15 @@ func (t *Trust) ProveHandler() http.Handler {
 			http.Error(w, "no confirmation under way", http.StatusConflict)
 			return
 		}
-		before := t.Standing(half.from)
 		if !hmac.Equal(mac(half.secret, "a"), p.Proof) {
-			t.judge(key, half.from, fp, peer.Foreign)
+			t.judge(key, "", fp, peer.Foreign)
 			http.Error(w, "not in this home", http.StatusForbidden)
-		} else {
-			t.judge(key, half.from, fp, peer.Home)
-			w.WriteHeader(http.StatusNoContent)
+			return
 		}
-		if t.Standing(half.from) != before {
-			t.changed()
+		t.judge(key, "", fp, peer.Home)
+		w.WriteHeader(http.StatusNoContent)
+		if p, ok := t.known(half.from); ok {
+			t.Found(p)
 		}
 	})
 }
@@ -210,22 +209,38 @@ func legacy(key string) peer.Standing {
 	return peer.Foreign
 }
 
-func (t *Trust) admit() bool {
+func (t *Trust) admit(from string) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	now := t.o.Now()
-	kept := t.asked[:0]
-	for _, at := range t.asked {
-		if now.Sub(at) < window {
-			kept = append(kept, at)
+	total := 0
+	for ip, times := range t.asked {
+		kept := times[:0]
+		for _, at := range times {
+			if now.Sub(at) < window {
+				kept = append(kept, at)
+			}
 		}
+		if len(kept) == 0 {
+			delete(t.asked, ip)
+			continue
+		}
+		t.asked[ip] = kept
+		total += len(kept)
 	}
-	t.asked = kept
-	if len(t.asked) >= burst {
+	if len(t.asked[from]) >= burst || total >= ceiling {
 		return false
 	}
-	t.asked = append(t.asked, now)
+	t.asked[from] = append(t.asked[from], now)
 	return true
+}
+
+func source(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 func mac(secret []byte, side string) []byte {

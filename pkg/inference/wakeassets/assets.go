@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
 
 // The stop word, from kahrendt/microWakeWord.
@@ -34,25 +36,8 @@ func Stop(dir string) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("assets: %w", err)
 	}
-	f, err := os.CreateTemp(dir, ".stop-*")
-	if err != nil {
-		return "", fmt.Errorf("assets: creating the stop model: %w", err)
-	}
-	tmp := f.Name()
-	defer os.Remove(tmp)
-	if err := f.Chmod(0o644); err != nil {
-		_ = f.Close()
-		return "", err
-	}
-	if _, err := f.Write(want); err != nil {
-		_ = f.Close()
+	if err := safe.WriteFile(path, want, 0o644); err != nil {
 		return "", fmt.Errorf("assets: writing the stop model: %w", err)
-	}
-	if err := f.Close(); err != nil {
-		return "", err
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		return "", fmt.Errorf("assets: replacing the stop model: %w", err)
 	}
 	return path, nil
 }

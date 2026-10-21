@@ -19,6 +19,7 @@ const (
 	pendingLife = 30 * time.Second
 	window      = 5 * time.Minute
 	burst       = 20
+	ceiling     = 200
 )
 
 var (
@@ -56,7 +57,7 @@ type Trust struct {
 	byCert  map[string]peer.Standing
 	pending map[string]pending
 	chasing map[string]context.CancelFunc
-	asked   []time.Time
+	asked   map[string][]time.Time
 }
 
 func New(o Options) (*Trust, error) {
@@ -73,6 +74,7 @@ func New(o Options) (*Trust, error) {
 		ctx:     ctx,
 		stop:    stop,
 		chasing: map[string]context.CancelFunc{},
+		asked:   map[string][]time.Time{},
 	}
 	t.forget(o.Key())
 	t.home = t.transport(func(fp string) error {
@@ -98,6 +100,18 @@ func (t *Trust) Run(ctx context.Context) error {
 	t.stop()
 	t.workers.Wait()
 	return nil
+}
+
+func (t *Trust) known(id string) (peer.Peer, bool) {
+	if id == "" || t.o.Peers == nil {
+		return peer.Peer{}, false
+	}
+	for _, p := range t.o.Peers() {
+		if p.ID == id {
+			return p, true
+		}
+	}
+	return peer.Peer{}, false
 }
 
 func (t *Trust) Found(p peer.Peer) {

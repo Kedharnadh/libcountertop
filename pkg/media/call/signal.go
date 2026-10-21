@@ -29,17 +29,13 @@ type envelope struct {
 	Model  string   `json:"model,omitempty"`
 	Board  string   `json:"board,omitempty"`
 	Caps   []string `json:"caps,omitempty"`
+	User   string   `json:"-"`
 }
 
 func (c *Calls) offered(w http.ResponseWriter, r *http.Request) {
 	var m envelope
 	if err := json.NewDecoder(r.Body).Decode(&m); err != nil || m.Call == "" || m.SDP == "" {
 		http.Error(w, "bad offer", http.StatusBadRequest)
-		return
-	}
-	cfg := c.options.Settings.Read()
-	if !cfg.Incoming {
-		http.Error(w, "not taking calls", http.StatusForbidden)
 		return
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
@@ -69,12 +65,26 @@ func (c *Calls) offered(w http.ResponseWriter, r *http.Request) {
 		// TODO: remove the plain-HTTP peer path once no device predates the secure port.
 		back = "http://" + net.JoinHostPort(host, strconv.Itoa(c.options.Port))
 	}
-	auto := cfg.Answers(p.ID)
+	switch status := c.incoming(m, p, peerLine{c: c, base: back}); status {
+	case http.StatusAccepted:
+		w.WriteHeader(status)
+	case http.StatusConflict:
+		http.Error(w, "busy", status)
+	default:
+		http.Error(w, "not taking calls", status)
+	}
+}
+
+func (c *Calls) incoming(m envelope, p discovery.Peer, l line) int {
+	cfg := c.options.Settings.Read()
+	if !cfg.Incoming {
+		return http.StatusForbidden
+	}
+	auto := cfg.Answers(p.ID) || (m.User != "" && cfg.AnswersUser(m.User))
 	c.mu.Lock()
 	if c.now != nil {
 		c.mu.Unlock()
-		http.Error(w, "busy", http.StatusConflict)
-		return
+		return http.StatusConflict
 	}
 	s := c.open(
 		Call{
@@ -85,7 +95,7 @@ func (c *Calls) offered(w http.ResponseWriter, r *http.Request) {
 			Video:     m.Video,
 			CameraOff: m.Video && auto && !cfg.AutoVideo,
 		},
-		back,
+		l,
 	)
 	s.offer = m.SDP
 	s.remote = Size{Width: m.Width, Height: m.Height}
@@ -104,7 +114,6 @@ func (c *Calls) offered(w http.ResponseWriter, r *http.Request) {
 		auto,
 	)
 	c.changed(s)
-	w.WriteHeader(http.StatusAccepted)
 	if auto {
 		c.options.Sound.Tone(
 			schema.StreamAlerts,
@@ -115,7 +124,7 @@ func (c *Calls) offered(w http.ResponseWriter, r *http.Request) {
 			c.options.Messages.Info(p.Name, say.T("call.connected"), noticeFor)
 		}
 		c.Answer()
-		return
+		return http.StatusAccepted
 	}
 	chime, fallback := cfg.Ring, schema.ChimeRing
 	if m.Video {
@@ -128,6 +137,7 @@ func (c *Calls) offered(w http.ResponseWriter, r *http.Request) {
 			c.requestClose(s, ReasonUnanswered)
 		}
 	})
+	return http.StatusAccepted
 }
 
 func (c *Calls) answered(w http.ResponseWriter, r *http.Request) {
@@ -162,20 +172,24 @@ func (c *Calls) ended(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad end", http.StatusBadRequest)
 		return
 	}
+	c.peerEnded(m.Call, m.Reason)
+}
+
+func (c *Calls) peerEnded(id string, reason Reason) {
 	c.mu.Lock()
 	s := c.now
 	c.mu.Unlock()
-	if s == nil || s.ID != m.Call {
+	if s == nil || s.ID != id {
 		return
 	}
-	reason := m.Reason
+	given := reason
 	switch reason {
 	case ReasonCancelled, ReasonUnanswered:
 		reason = ReasonHangup
 	case "":
 		reason = ReasonHangup
 	}
-	slog.Info("call ended by peer", "peer", s.Peer.Name, "reason", m.Reason)
+	slog.Info("call ended by peer", "peer", s.Peer.Name, "reason", given)
 	c.close(s, reason)
 }
 

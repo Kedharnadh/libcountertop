@@ -16,6 +16,7 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/hook"
 	"github.com/ygelfand/libcountertop/pkg/runtime/component"
+	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
@@ -245,10 +246,7 @@ func (s *Screen) keep(l Layout) {
 	}
 	b, err := json.Marshal(l)
 	if err == nil {
-		tmp := s.options.Keep + ".tmp"
-		if err = os.WriteFile(tmp, b, 0o600); err == nil {
-			err = os.Rename(tmp, s.options.Keep)
-		}
+		err = safe.WriteFile(s.options.Keep, b, 0o600)
 	}
 	if err != nil {
 		slog.Warn("tessera: the layout could not be kept", "err", err)

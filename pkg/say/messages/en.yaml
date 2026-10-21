@@ -115,6 +115,7 @@ call.answer.count: "{{.N}} selected"
 call.answer.everyone: Everyone
 call.answer.from: Answer from
 call.answer.peers: Panels
+call.answer.users: Users
 call.answer.selected: Selected
 call.auto: Auto-answer
 call.auto.hint: Answers at once
@@ -127,6 +128,7 @@ call.connected: Connected
 call.declined: Declined
 call.dropped: Call dropped
 call.empty: No other devices found
+call.users.empty: No Home Assistant users found
 cameras.app: Cameras
 cameras.failed: Couldn't list the cameras in Home Assistant
 cameras.loading: Loading cameras
@@ -163,6 +165,7 @@ call.ringback: Ringback
 call.seen: Last seen
 call.setting.answer_from: Auto-answer from
 call.setting.answer_peers: Auto-answer panels
+call.setting.answer_users: Auto-answer users
 call.setting.auto_answer: Auto-answer calls
 call.setting.auto_video: Auto-answer with camera on
 call.setting.broadcasts: Receive broadcasts

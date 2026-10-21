@@ -10,6 +10,7 @@ const (
 	checkEvery  = 24 * time.Hour
 	checkSettle = 5 * time.Minute
 	listRetry   = 30 * time.Second
+	listMost    = time.Hour
 )
 
 func (u *Firmware[M]) Run(ctx context.Context) error {
@@ -19,6 +20,7 @@ func (u *Firmware[M]) Run(ctx context.Context) error {
 	defer first.Stop()
 	daily := time.NewTicker(checkEvery)
 	defer daily.Stop()
+	retry := listRetry
 
 	for {
 		select {
@@ -26,7 +28,8 @@ func (u *Firmware[M]) Run(ctx context.Context) error {
 			return nil
 		case <-list.C:
 			if u.List(ctx) != nil {
-				list.Reset(listRetry)
+				list.Reset(retry)
+				retry = min(2*retry, listMost)
 			}
 		case <-first.C:
 			if t, ok := u.deps.Source.(Trial); ok {

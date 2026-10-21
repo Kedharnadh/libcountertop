@@ -15,6 +15,8 @@ type Entity struct {
 	AreaID string   `json:"area_id"`
 	Area   string   `json:"area"`
 	Labels []string `json:"labels"`
+
+	Attributes map[string]string `json:"attributes,omitempty"`
 }
 
 func (e Entity) Domain() string {
@@ -25,15 +27,20 @@ func (e Entity) Domain() string {
 func (e Entity) Available() bool { return e.State != "unavailable" }
 
 type Filter struct {
-	Domains []string
-	Classes []string
-	Labels  []string
+	Domains    []string
+	Classes    []string
+	Labels     []string
+	Attributes []string
 }
 
 const entitiesTemplate = `{%- set ns = namespace(out=[]) -%}
 {%- for s in SOURCE -%}
 {%- if (CLASSES | length == 0 or s.attributes.device_class in CLASSES) and (LABELS | length == 0 or labels(s.entity_id) | select('in', LABELS) | list | length > 0) -%}
-{%- set ns.out = ns.out + [{'id': s.entity_id, 'name': s.name, 'state': s.state, 'area_id': area_id(s.entity_id) or '', 'area': area_name(s.entity_id) or '', 'labels': labels(s.entity_id)}] -%}
+{%- set at = namespace(d={}) -%}
+{%- for k in ATTRIBUTES if k in s.attributes -%}
+{%- set at.d = dict(at.d, **{k: s.attributes[k] | string}) -%}
+{%- endfor -%}
+{%- set ns.out = ns.out + [{'id': s.entity_id, 'name': s.name, 'state': s.state, 'area_id': area_id(s.entity_id) or '', 'area': area_name(s.entity_id) or '', 'labels': labels(s.entity_id), 'attributes': at.d}] -%}
 {%- endif -%}
 {%- endfor -%}
 {{ ns.out | tojson }}`
@@ -47,6 +54,7 @@ func (f Filter) Template() string {
 		"SOURCE", source,
 		"CLASSES", list(f.Classes),
 		"LABELS", list(f.Labels),
+		"ATTRIBUTES", list(f.Attributes),
 	).Replace(entitiesTemplate)
 }
 

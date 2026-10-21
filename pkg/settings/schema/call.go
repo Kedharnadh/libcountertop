@@ -13,6 +13,7 @@ type Call struct {
 	AutoVideo   bool         `json:"auto_video"`
 	AnswerFrom  CallAudience `json:"answer_from"`
 	AnswerPeers string       `json:"answer_peers"`
+	AnswerUsers string       `json:"answer_users"`
 	PauseWake   bool         `json:"pause_wake"`
 	Stream      CallStream   `json:"stream"`
 	Ring        Chime        `json:"ring"`
@@ -34,11 +35,20 @@ func (a CallAudience) Label() string { return say.T("call.answer." + string(a)) 
 
 func (c Call) Peers() []string { return strings.Fields(c.AnswerPeers) }
 
+func (c Call) Users() []string { return strings.Fields(c.AnswerUsers) }
+
 func (c Call) Answers(peer string) bool {
 	if !c.AutoAnswer {
 		return false
 	}
 	return c.AnswerFrom != AnswerSelected || slices.Contains(c.Peers(), peer)
+}
+
+func (c Call) AnswersUser(user string) bool {
+	if !c.AutoAnswer {
+		return false
+	}
+	return c.AnswerFrom != AnswerSelected || slices.Contains(c.Users(), user)
 }
 
 type CallStream string

@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strconv"
 	"sync"
@@ -95,8 +96,8 @@ func TestMatchingKeysMakeAHome(t *testing.T) {
 	if got := a.t.Standing("b"); got != peer.Home {
 		t.Errorf("a sees b as %s, want home", got)
 	}
-	if got := b.t.Standing("a"); got != peer.Home {
-		t.Errorf("b sees a as %s after one confirmation, want home", got)
+	if got := b.t.Standing("a"); got != peer.Checking {
+		t.Errorf("b sees a as %s before checking a itself, want checking", got)
 	}
 	if got := ping(t, a, b); got != http.StatusOK {
 		t.Errorf("a home request to b answered %d", got)
@@ -128,14 +129,70 @@ func TestNoKeyOnTheFarSideIsForeign(t *testing.T) {
 	if got := a.t.Standing("b"); got != peer.Foreign {
 		t.Errorf("a sees a keyless b as %s, want foreign", got)
 	}
-	if got := b.t.Standing("a"); got != peer.Foreign {
-		t.Errorf("keyless b sees a as %s, want foreign", got)
+	if got := b.t.Standing("a"); got != peer.Checking {
+		t.Errorf("keyless b sees a as %s before checking a itself, want checking", got)
 	}
 	if got := ping(t, a, b); got != 0 {
 		t.Errorf("a reached a keyless b: %d", got)
 	}
 	if got := ping(t, b, a); got == http.StatusOK {
 		t.Error("a keyless b got through a's guard")
+	}
+}
+
+func TestAFailedProofCannotNameAnotherDevice(t *testing.T) {
+	a, b := newDevice(t, "a", "pancake tuesday"), newDevice(t, "b", "pancake tuesday")
+	b.t.confirm(context.Background(), a.peer("a"), "pancake tuesday")
+	if got := b.t.Standing("a"); got != peer.Home {
+		t.Fatalf("b sees a as %s, want home", got)
+	}
+
+	stranger := newDevice(t, "a", "waffle wednesday")
+	stranger.t.confirm(context.Background(), b.peer("b"), "waffle wednesday")
+
+	if got := b.t.Standing("a"); got != peer.Home {
+		t.Errorf("a stranger claiming a's id left b seeing a as %s, want home", got)
+	}
+	if got := ping(t, stranger, b); got == http.StatusOK {
+		t.Error("the stranger got through b's guard")
+	}
+}
+
+func TestEachAddressHasItsOwnTries(t *testing.T) {
+	d := newDevice(t, "a", "pancake tuesday")
+	now := time.Unix(1_800_000_000, 0)
+	d.t.o.Now = func() time.Time { return now }
+
+	for range burst {
+		if !d.t.admit("10.0.0.66") {
+			t.Fatal("an address was refused inside its tries")
+		}
+	}
+	if d.t.admit("10.0.0.66") {
+		t.Error("an address went past its tries")
+	}
+	if !d.t.admit("10.0.0.7") {
+		t.Error("another address was refused because the first used up its tries")
+	}
+
+	now = now.Add(window)
+	if !d.t.admit("10.0.0.66") {
+		t.Error("an address was still refused after the window passed")
+	}
+}
+
+func TestAllAddressesTogetherStopAtTheCeiling(t *testing.T) {
+	d := newDevice(t, "a", "pancake tuesday")
+	now := time.Unix(1_800_000_000, 0)
+	d.t.o.Now = func() time.Time { return now }
+
+	for i := range ceiling {
+		if !d.t.admit("10.0.0." + strconv.Itoa(i/burst)) {
+			t.Fatalf("try %d was refused below the ceiling", i)
+		}
+	}
+	if d.t.admit("10.0.1.1") {
+		t.Error("a fresh address went past the ceiling")
 	}
 }
 
@@ -203,9 +260,11 @@ func TestChangingTheKeyForgetsTheHome(t *testing.T) {
 
 func TestAFoundPeerIsConfirmedInTheBackground(t *testing.T) {
 	a, b := newDevice(t, "a", "pancake tuesday"), newDevice(t, "b", "pancake tuesday")
+	b.know(a.peer("a"))
 	a.t.Found(b.peer("b"))
 	eventually(t, "a confirming b", func() bool { return a.t.Standing("b") == peer.Home })
 	eventually(t, "a announcing the change", func() bool { return a.changed() > 0 })
+	eventually(t, "b checking a in turn", func() bool { return b.t.Standing("a") == peer.Home })
 	eventually(t, "b hearing about a", func() bool { return b.changed() > 0 })
 }
 
@@ -260,5 +319,31 @@ func TestTheIdentityIsKept(t *testing.T) {
 	}
 	if Fingerprint(first.Certificate[0]) != Fingerprint(again.Certificate[0]) {
 		t.Error("a second load made a new certificate")
+	}
+}
+
+func TestADamagedIdentityIsReplaced(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "peer.pem")
+	if err := os.WriteFile(
+		path,
+		[]byte("-----BEGIN CERTIFICATE-----\ntruncat"),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	cert, err := LoadIdentity(path)
+	if err != nil {
+		t.Fatalf("LoadIdentity: %v", err)
+	}
+	if len(cert.Certificate) == 0 {
+		t.Fatal("no certificate came back")
+	}
+	again, err := LoadIdentity(path)
+	if err != nil {
+		t.Fatalf("loading the replacement: %v", err)
+	}
+	if Fingerprint(cert.Certificate[0]) != Fingerprint(again.Certificate[0]) {
+		t.Error("the replacement was not kept")
 	}
 }

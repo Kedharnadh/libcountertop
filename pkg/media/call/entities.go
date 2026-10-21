@@ -67,6 +67,11 @@ func NewTable(more func() []setting.Option) *setting.Table[config.Call] {
 			255,
 			func(c *config.Call) *string { return &c.AnswerPeers },
 		),
+		setting.Words(
+			Setting{Name: "answer_users", Group: Group, Icon: "mdi:account-group", Local: true},
+			255,
+			func(c *config.Call) *string { return &c.AnswerUsers },
+		),
 		chime("ring", "mdi:bell-ring", func(c *config.Call) *config.Chime { return &c.Ring }),
 		chime("video_ring", "mdi:bell-ring-outline",
 			func(c *config.Call) *config.Chime { return &c.VideoRing }),
@@ -148,6 +153,16 @@ func (c *Calls) ToggleAnswerPeer(id string) {
 		peers = append(peers, id)
 	}
 	c.set("answer_peers", strings.Join(peers, " "))
+}
+
+func (c *Calls) ToggleAnswerUser(id string) {
+	users := c.options.Settings.Read().Users()
+	if i := slices.Index(users, id); i >= 0 {
+		users = slices.Delete(users, i, i+1)
+	} else {
+		users = append(users, id)
+	}
+	c.set("answer_users", strings.Join(users, " "))
 }
 
 func (c *Calls) SetRing(v config.Chime) { c.set("ring", string(v)) }

@@ -78,7 +78,7 @@ type session struct {
 	workers  sync.WaitGroup
 	stopped  bool
 	Call
-	addr    string
+	line    line
 	offer   string
 	link    *rtc.Link
 	remote  Size
@@ -175,7 +175,10 @@ func (c *Calls) Start(p discovery.Peer, video bool) error {
 		c.inform(p.Name, say.T("actions.call.busy"))
 		return ErrBusy
 	}
-	s := c.open(Call{ID: newID(), Peer: p, State: Calling, Since: time.Now(), Video: video}, addr)
+	s := c.open(
+		Call{ID: newID(), Peer: p, State: Calling, Since: time.Now(), Video: video},
+		peerLine{c: c, base: addr},
+	)
 	c.mu.Unlock()
 	slog.Info("calling", "to", p.Name, "call", s.ID, "video", video)
 	c.changed(s)
@@ -202,9 +205,8 @@ func (c *Calls) dial(s *session) {
 		return
 	}
 	me := c.options.Peers.Self()
-	status, err := c.post(
+	status, err := s.line.send(
 		s.ctx,
-		s.addr,
 		"offer",
 		envelope{
 			Call:   s.ID,
@@ -278,9 +280,8 @@ func (c *Calls) answer(s *session) {
 		c.fail(s, "answer", err)
 		return
 	}
-	status, err := c.post(
+	status, err := s.line.send(
 		s.ctx,
-		s.addr,
 		"answer",
 		envelope{Call: s.ID, SDP: sdp, Width: own.Width, Height: own.Height},
 	)
@@ -425,9 +426,9 @@ func (c *Calls) redraw() {
 	}
 }
 
-func (c *Calls) open(call Call, addr string) *session {
+func (c *Calls) open(call Call, l line) *session {
 	ctx, stop := context.WithCancel(c.ctx)
-	s := &session{Call: call, addr: addr, ctx: ctx, stop: stop, quiet: func() {}}
+	s := &session{Call: call, line: l, ctx: ctx, stop: stop, quiet: func() {}}
 	s.unhook = c.options.Privacy.Watch(func() {
 		c.apply(s)
 		c.changed(s)
@@ -508,14 +509,14 @@ func (c *Calls) fail(s *session, step string, err error) {
 }
 
 func (c *Calls) end(s *session, reason Reason) {
-	addr, id := s.addr, s.ID
+	l, id := s.line, s.ID
 	if !c.finish(s, reason) {
 		return
 	}
 	safe.Go("call end", func() {
 		ctx, cancel := context.WithTimeout(c.ctx, postWait)
 		defer cancel()
-		if _, err := c.post(ctx, addr, "end", envelope{Call: id, Reason: reason}); err != nil {
+		if _, err := l.send(ctx, "end", envelope{Call: id, Reason: reason}); err != nil {
 			slog.Debug("call end not acknowledged", "err", err)
 		}
 	})

@@ -13,10 +13,13 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"math/big"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
 
 const lifetime = 50 * 365 * 24 * time.Hour
@@ -25,7 +28,11 @@ func LoadIdentity(path string) (tls.Certificate, error) {
 	raw, err := os.ReadFile(path)
 	switch {
 	case err == nil:
-		return tls.X509KeyPair(raw, raw)
+		cert, err := tls.X509KeyPair(raw, raw)
+		if err == nil {
+			return cert, nil
+		}
+		slog.Warn("the peer certificate is unreadable, making a new one", "path", path, "err", err)
 	case !errors.Is(err, fs.ErrNotExist):
 		return tls.Certificate{}, err
 	}
@@ -40,7 +47,7 @@ func LoadIdentity(path string) (tls.Certificate, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return cert, fmt.Errorf("trust: keeping the certificate: %w", err)
 	}
-	if err := os.WriteFile(path, raw, 0o600); err != nil {
+	if err := safe.WriteFile(path, raw, 0o600); err != nil {
 		return cert, fmt.Errorf("trust: keeping the certificate: %w", err)
 	}
 	return cert, nil

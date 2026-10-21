@@ -5,7 +5,9 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/network/releases"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -18,6 +20,10 @@ type source struct {
 	fetched   error
 	installed error
 	restarted string
+
+	hold     chan struct{}
+	installs atomic.Int32
+	restarts chan string
 }
 
 func (s *source) Fetch(context.Context, string) (manifest, error) {
@@ -27,11 +33,31 @@ func (s *source) Fetch(context.Context, string) (manifest, error) {
 func (s *source) Describe(m manifest) Release { return Release{Version: m.version} }
 
 func (s *source) Install(_ context.Context, _ manifest, progress func(float32)) error {
+	s.installs.Add(1)
 	progress(0.5)
+	if s.hold != nil {
+		<-s.hold
+	}
 	return s.installed
 }
 
-func (s *source) Restart(why string) { s.restarted = why }
+func (s *source) Restart(why string) {
+	s.restarted = why
+	if s.restarts != nil {
+		s.restarts <- why
+	}
+}
+
+func restarted(t *testing.T, s *source) string {
+	t.Helper()
+	select {
+	case why := <-s.restarts:
+		return why
+	case <-time.After(5 * time.Second):
+		t.Fatal("the install never finished")
+		return ""
+	}
+}
 
 type trialSource struct {
 	*source
@@ -186,7 +212,7 @@ func TestOnlyASourceWithBuildsOffersAVersionPicker(t *testing.T) {
 }
 
 func TestPickingAVersionInstallsNothingUntilTheButton(t *testing.T) {
-	src := &source{}
+	src := &source{restarts: make(chan string, 1)}
 	builds := []releases.Release{{Tag: "1.0"}, {Tag: "0.9"}}
 	u := build(buildSource{source: src, builds: builds}, &settings{})
 	_ = u.List(context.Background())
@@ -199,18 +225,45 @@ func TestPickingAVersionInstallsNothingUntilTheButton(t *testing.T) {
 	if got := u.versions.Get(); got != "0.9" {
 		t.Fatalf("picker shows %q, want 0.9", got)
 	}
-	if src.restarted != "" {
+	if src.installs.Load() != 0 {
 		t.Fatal("picking a version installed it")
 	}
 
-	version := u.versions.Get()
 	u.installPicked()
 	if got := u.versions.Get(); got != unpicked {
 		t.Errorf("picker shows %q after the button, want %q", got, unpicked)
 	}
-	u.InstallBuild(context.Background(), version)
-	if src.restarted != "update to 0.9" {
-		t.Errorf("restart reason = %q", src.restarted)
+	if why := restarted(t, src); why != "update to 0.9" {
+		t.Errorf("restart reason = %q", why)
+	}
+}
+
+func TestASecondInstallIsRefusedWhileOneRuns(t *testing.T) {
+	src := &source{hold: make(chan struct{}), restarts: make(chan string, 1)}
+	u := build(
+		buildSource{source: src, builds: []releases.Release{{Tag: "0.9"}, {Tag: "0.8"}}},
+		&settings{},
+	)
+
+	u.InstallBuildLater("0.9")
+	for deadline := time.Now().Add(5 * time.Second); u.Upgrade().Version == ""; {
+		if time.Now().After(deadline) {
+			t.Fatal("the first install never started")
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	u.InstallBuild(context.Background(), "0.8")
+	if n := src.installs.Load(); n != 1 {
+		t.Errorf("%d installs ran, want only the first", n)
+	}
+	if got := u.Upgrade().Version; got != "0.9" {
+		t.Errorf("installing %q, want the first install's 0.9", got)
+	}
+
+	close(src.hold)
+	if why := restarted(t, src); why != "update to 0.9" {
+		t.Errorf("restart reason = %q", why)
 	}
 }
 

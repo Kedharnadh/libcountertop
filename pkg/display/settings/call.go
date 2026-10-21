@@ -1,11 +1,17 @@
 package settings
 
 import (
+	"context"
+	"log/slog"
 	"slices"
+	"sync"
+	"time"
 
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
+	ha "github.com/ygelfand/libcountertop/pkg/homeassistant"
 	"github.com/ygelfand/libcountertop/pkg/network/peer"
+	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	config "github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -20,19 +26,37 @@ type CallController interface {
 	SetPauseWake(bool)
 	SetAnswerFrom(config.CallAudience)
 	ToggleAnswerPeer(string)
+	ToggleAnswerUser(string)
 	SetRing(config.Chime)
 	SetVideoRing(config.Chime)
 	SetRingback(config.Chime)
 	Tones() []setting.Option
 	Preview(config.Chime)
 }
+
+const (
+	personUser = "user_id"
+	peopleWait = 10 * time.Second
+)
+
+type Directory interface {
+	Entities(ctx context.Context, f ha.Filter) ([]ha.Entity, error)
+}
+
 type CallDependencies struct {
 	Settings   storage.Section[config.Call]
 	Shell      *shell.Shell
 	Controller CallController
 	Peers      func() []peer.Peer
+	Home       Directory
 }
-type CallPages struct{ options CallDependencies }
+
+type CallPages struct {
+	options CallDependencies
+
+	mu     sync.Mutex
+	people []ha.Entity
+}
 
 func NewCallPages(o CallDependencies) *CallPages { return &CallPages{options: o} }
 func (p *CallPages) open(makePage func() shell.View) func(int) {
@@ -72,6 +96,14 @@ func (p *CallPages) Calls() *shell.Page {
 						Value: say.F("call.answer.count", map[string]any{"N": len(c.Peers())}),
 					})
 					acts = append(acts, p.open(func() shell.View { return p.AnswerPeers() }))
+					if p.options.Home != nil {
+						rows = append(rows, menu.Row{
+							Label: say.T("call.answer.users"),
+							Kind:  menu.Chevron,
+							Value: say.F("call.answer.count", map[string]any{"N": len(c.Users())}),
+						})
+						acts = append(acts, p.open(func() shell.View { return p.AnswerUsers() }))
+					}
 				}
 				rows = append(
 					rows,
@@ -153,6 +185,57 @@ func (p *CallPages) AnswerPeers() *shell.Page {
 			return rows, acts
 		},
 	}
+}
+
+func (p *CallPages) AnswerUsers() *shell.Page {
+	p.findPeople()
+	return &shell.Page{
+		Title: say.T("call.answer.users"),
+		Build: func() ([]menu.Row, []func(int)) {
+			p.mu.Lock()
+			people := p.people
+			p.mu.Unlock()
+			if len(people) == 0 {
+				return []menu.Row{{Label: say.T("call.users.empty")}}, []func(int){nil}
+			}
+			chosen := p.options.Settings.Read().Users()
+			rows := make([]menu.Row, 0, len(people))
+			acts := make([]func(int), 0, len(people))
+			for _, person := range people {
+				user := person.Attributes[personUser]
+				rows = append(rows, menu.Row{
+					Label: person.Name,
+					Kind:  menu.Toggle,
+					On:    slices.Contains(chosen, user),
+				})
+				acts = append(acts, func(int) { p.options.Controller.ToggleAnswerUser(user) })
+			}
+			return rows, acts
+		},
+	}
+}
+
+func (p *CallPages) findPeople() {
+	safe.Go("call people", func() {
+		ctx, cancel := context.WithTimeout(context.Background(), peopleWait)
+		defer cancel()
+		found, err := p.options.Home.Entities(
+			ctx,
+			ha.Filter{Domains: []string{"person"}, Attributes: []string{personUser}},
+		)
+		if err != nil {
+			slog.Warn("listing Home Assistant people failed", "err", err)
+			return
+		}
+		people := slices.DeleteFunc(
+			found,
+			func(e ha.Entity) bool { return e.Attributes[personUser] == "" },
+		)
+		p.mu.Lock()
+		p.people = people
+		p.mu.Unlock()
+		p.options.Shell.Redraw()
+	})
 }
 
 func audience(c config.Call) config.CallAudience {

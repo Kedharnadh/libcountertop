@@ -457,6 +457,10 @@ func (u *Firmware[M]) install(ctx context.Context, found M) {
 		slog.Warn("an install was asked for with nothing to install", "running", u.deps.Version)
 		return
 	}
+	if busy := u.claim(release); busy != "" {
+		slog.Warn("an install is already under way", "installing", busy, "asked", release.Version)
+		return
+	}
 
 	refresh := func() {}
 	if u.deps.Busy != nil {
@@ -483,6 +487,16 @@ func (u *Firmware[M]) install(ctx context.Context, found M) {
 		return
 	}
 	u.deps.Source.Restart("update to " + release.Version)
+}
+
+func (u *Firmware[M]) claim(release Release) (busy string) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	if u.upgrade.Version != "" {
+		return u.upgrade.Version
+	}
+	u.upgrade = Upgrade{Version: release.Version}
+	return ""
 }
 
 func (u *Firmware[M]) progress(release Release, at float32) {

@@ -2,9 +2,10 @@ package payload
 
 import (
 	"bytes"
-	"errors"
 	"os"
 	"path/filepath"
+
+	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
 
 func Install(path string, binary []byte) error {
@@ -17,15 +18,5 @@ func Install(path string, binary []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".voice-*")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(tmp.Name())
-	_, err = tmp.Write(binary)
-	err = errors.Join(err, tmp.Chmod(0o755), tmp.Close())
-	if err != nil {
-		return err
-	}
-	return os.Rename(tmp.Name(), path)
+	return safe.WriteFile(path, binary, 0o755)
 }

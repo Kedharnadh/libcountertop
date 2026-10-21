@@ -15,6 +15,7 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/fetch"
 	"github.com/ygelfand/libcountertop/pkg/media/cast"
+	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
 )
 
 const retry = 30 * time.Second
@@ -106,13 +107,7 @@ func authority(name, path string) (*cast.Authority, error) {
 	return a, nil
 }
 
-func writeKept(path string, data []byte) error {
-	tmp := path + ".new"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
-}
+func writeKept(path string, data []byte) error { return safe.WriteFile(path, data, 0o600) }
 
 func (k *keys) Current() *cast.Credentials {
 	if h := k.held.Load(); h != nil {

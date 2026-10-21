@@ -33,6 +33,10 @@ type Privacy interface {
 
 type Media interface{ Pause() }
 
+type Home interface {
+	Call(ctx context.Context, action string, data map[string]string) error
+}
+
 type Messages interface {
 	Info(title, body string, hold time.Duration)
 }
@@ -100,4 +104,5 @@ type Dependencies struct {
 	Stage    Stage
 	Video    Video
 	Messages Messages
+	Home     Home
 }
