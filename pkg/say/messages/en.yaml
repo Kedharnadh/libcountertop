@@ -47,6 +47,7 @@ alarm.volume.silent: Silent
 alarm.volume.static: Steady
 alarm.weekdays: Weekdays
 alarm.weekends: Weekends
+alerts.group.alerts: Alerts & Alarms
 alerts.page: Alerts & Alarms
 alerts.setting.alert: Alert chime
 alerts.setting.info: Info chime
@@ -65,6 +66,7 @@ align.random: Random
 align.right: Right
 api.group.api: Home Assistant
 api.setting.adopted: Adopted by Home Assistant
+apps.group.apps: Apps
 apps.empty: No apps
 apps.hint: Tap the star to keep an app in the dock. Drag a tile to move it.
 apps.setting.dock: Apps in the dock
@@ -105,6 +107,7 @@ calendar.group.calendar: Calendar
 calendar.none: No calendars in Home Assistant
 calendar.off: "Off"
 calendar.pick: Pick calendars under Settings → Home Assistant
+calendar.example.entities: calendar.family, calendar.work
 calendar.setting.entities: Calendars
 calendar.setting.span: Days to show
 calendar.today: Today
@@ -130,6 +133,7 @@ call.dropped: Call dropped
 call.empty: No other devices found
 call.users.empty: No Home Assistant users found
 cameras.app: Cameras
+cameras.group.cameras: Cameras
 cameras.failed: Couldn't list the cameras in Home Assistant
 cameras.loading: Loading cameras
 cameras.none: No cameras selected
@@ -140,6 +144,25 @@ cameras.seconds: "{{.N}} s"
 cameras.setting.refresh: Refresh
 cameras.setting.rotate: Auto paginate
 cameras.setting.scale: Thumbnail size
+cameras.setting.tab: Dashboard tab
+certs.entity.cert: Cert Warden certificate name
+certs.entity.cert_api_key: Cert Warden certificate API key
+certs.entity.key_api_key: Cert Warden key API key
+certs.entity.server: Cert Warden server
+certs.example.cert: kitchen-display
+certs.example.server: https://certs.example.com
+certs.group.certificate: Certificate
+certs.setting.cert: Certificate name
+certs.setting.cert_api_key: Certificate API key
+certs.setting.key_api_key: Key API key
+certs.setting.server: Cert Warden server
+certs.status.expired: Expired
+certs.status.fetching: Fetching
+certs.status.refused: Wrong API key
+certs.status.unreachable: Can't reach Cert Warden
+certs.status.unset: Self-signed
+certs.status.valid: "{{.Name}}, valid until {{.Date}}"
+cameras.example.url: http://homeassistant.local:8123
 cameras.setting.url: Home Assistant URL
 peer.cap.audio: Calls
 peer.cap.broadcast: Broadcasts
@@ -163,6 +186,7 @@ call.reconnecting: Reconnecting…
 call.ring: Ring
 call.ringback: Ringback
 call.seen: Last seen
+call.setting.answer_api: Auto-answer API calls
 call.setting.answer_from: Auto-answer from
 call.setting.answer_peers: Auto-answer panels
 call.setting.answer_users: Auto-answer users
@@ -278,6 +302,7 @@ camera.setting.whitebalance: White balance
 camera.starting: Starting the camera
 camera.muted: Microphones are muted
 camera.shutter: Camera shutter is closed
+cast.group.primevideo: Prime Video
 cast.apps: Apps
 cast.enable: Enable
 cast.entity.receiver: Cast receiver
@@ -300,6 +325,7 @@ cast.setting.prime.skipintro: Prime Video skip intro
 cast.setting.receiver: Receiver
 cast.setting.youtube.livedelay: YouTube live delay
 cast.setting.youtube.lounge: YouTube lounge
+cast.example.youtube.skip: sponsor, selfpromo, intro
 cast.setting.youtube.skip: SponsorBlock categories
 chime.chirp: Chirp
 chime.ding: Ding
@@ -309,6 +335,7 @@ chime.ringback: Ringback
 chime.rise: Rise
 chime.timer: Timer
 chime.trouble: Trouble
+clock.group.clock: Clock
 clock.color: Color
 clock.color.title: Clock color
 clock.date: Show date
@@ -458,6 +485,7 @@ home.unconnected: Not connected
 home.unconnected.hint: Add {{.Name}} to Home Assistant
 hours.12: 12 hour
 hours.24: 24 hour
+idle.group.idle: Screen saver
 idle.after: Start after
 idle.after.title: Start after
 idle.face: Clock face
@@ -530,6 +558,7 @@ microphone.setting.sensitivity: Room sensitivity
 mirror.app: Mirror
 mode.auto: Automatic
 mode.manual: Manual
+network.group.network: Network & internet
 network.address: IP address
 network.address.none: None
 network.lease: Lease renews
@@ -562,6 +591,10 @@ photos.entity.people: Photo people
 photos.entity.server: Immich server
 photos.entity.tags: Photo tags
 photos.group.photos: Photos
+photos.example.albums: Family, Summer 2026
+photos.example.people: Alex, Sam
+photos.example.server: https://photos.example.com
+photos.example.tags: kitchen, favorites
 photos.setting.albums: Albums
 photos.setting.favorites: Favorites only
 photos.setting.interval: Next photo every
@@ -669,9 +702,11 @@ lock.wrong: Wrong PIN
 rtsp.entity.password: RTSP password
 rtsp.entity.username: RTSP username
 rtsp.group.rtsp: RTSP
+rtsp.example.username: viewer
 rtsp.setting.enabled: RTSP server
 rtsp.setting.password: Password
 rtsp.setting.username: Username
+screen.group.panel: Display
 screen.setting.alert: Alert style
 screen.setting.auto: Auto brightness
 screen.setting.backlight: Brightness
@@ -934,6 +969,7 @@ todo.none: No to-do lists in Home Assistant
 todo.off: "Off"
 todo.pick: Pick a list under Settings → Home Assistant
 todo.setting.completed: Show completed items
+todo.example.entity: todo.shopping_list
 todo.setting.entity: To-do list
 todo.title: Shopping list
 tone.alert: Alert
@@ -966,6 +1002,7 @@ update.versions.none: No other versions
 upgrade.installing: Installing…
 upgrade.line: Updating to {{.Version}} · {{.Status}}
 upgrade.percent: "{{.N}}%"
+visual.group.visual: Visuals
 visual.aurora: Aurora
 visual.classic-vu: Classic VU
 visual.cymatics: Cymatics
@@ -998,6 +1035,7 @@ visual.rain-on-glass: Rain on Glass
 visual.ribbons: Ribbons
 visual.setting.fps: Visual frame cap
 visual.setting.kind: Visual
+visual.example.label: Kitchen
 visual.setting.label: Visual label
 visual.setting.lift: Visualizer lift
 visual.setting.seed: Visual seed
@@ -1022,6 +1060,7 @@ volume.chime: Notification sound
 wake.ember: Ember
 wake.sunrise: Sunrise
 wake.white: White
+weather.group.weather: Weather
 weather.alert.until: "Until {{.T}}"
 weather.alert.dismiss: Dismiss
 weather.alerts.hint: Severe US weather warnings for your home, from the National Weather Service
@@ -1059,6 +1098,7 @@ weather.setting.alerts: Weather alerts
 weather.setting.align: Dashboard weather horizontal position
 weather.setting.animate: Animate dashboard weather
 weather.setting.dashboard: Weather on dashboard
+weather.example.entity: weather.home
 weather.setting.entity: Weather entity
 weather.setting.idle: Weather on screen saver
 weather.setting.look: Dashboard weather look
@@ -1078,6 +1118,8 @@ weather.themed.hint: "Off uses natural colors: a yellow sun, gray clouds, blue r
 weather.title: Weather
 weather.uv: "UV {{.N}}"
 weather.wind: "Wind {{.N}} {{.Unit}}"
+webaccess.address: Address
+webaccess.title: Web access
 youtube.category.filler: Filler
 youtube.category.hook: Hook
 youtube.category.interaction: Interaction reminder
@@ -1098,10 +1140,14 @@ youtube.skip.some: "{{.N}} kinds"
 youtube.title: YouTube
 zone.title: Time zone
 
+feedback.group.feedback: Feedback sounds
 feedback.setting.chime: Device chime
 feedback.setting.failure: Failure sound
 feedback.setting.cancel: Cancellation sound
 feedback.setting.mute: Mute sound
 feedback.setting.unmute: Unmute sound
 feedback.setting.hold: Mute hold sound
+frontend.entity.password: Admin password
+frontend.group.frontend: Frontend
+frontend.setting.password: Admin password
 microphone.setting.mute_sound: Mute sound

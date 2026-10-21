@@ -122,7 +122,7 @@ type Marks struct {
 
 type Board struct {
 	Glyph func(dashboard.Tab) string
-	Draw  func(ui.Rect, dashboard.Tab, theme.Theme) gogui.View
+	Draw  func(*gogui.Window, ui.Rect, dashboard.Tab, theme.Theme) gogui.View
 }
 
 type Options struct {

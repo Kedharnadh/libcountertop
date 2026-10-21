@@ -12,9 +12,11 @@ type Shared struct {
 	Call      Call      `json:"call"`
 	Camera    Camera    `json:"camera"`
 	Cameras   Cameras   `json:"cameras"`
+	Certs     Certs     `json:"certs"`
 	Cast      Cast      `json:"cast"`
 	Clock     Clock     `json:"clock"`
 	Feedback  Feedback  `json:"feedback"`
+	Frontend  Frontend  `json:"frontend"`
 	Home      Home      `json:"home"`
 	Idle      Idle      `json:"idle"`
 	Lock      Lock      `json:"lock"`
@@ -89,9 +91,11 @@ type Sections[C any] struct {
 	Call      storage.Binding[C, Call]
 	Camera    storage.Binding[C, Camera]
 	Cameras   storage.Binding[C, Cameras]
+	Certs     storage.Binding[C, Certs]
 	Cast      storage.Binding[C, Cast]
 	Clock     storage.Binding[C, Clock]
 	Feedback  storage.Binding[C, Feedback]
+	Frontend  storage.Binding[C, Frontend]
 	Home      storage.Binding[C, Home]
 	Idle      storage.Binding[C, Idle]
 	Lock      storage.Binding[C, Lock]
@@ -123,9 +127,11 @@ func NewSections[C any](store func() *storage.Store[C], shared func(*C) *Shared)
 		Call:      bind(store, shared, func(s *Shared) *Call { return &s.Call }),
 		Camera:    bind(store, shared, func(s *Shared) *Camera { return &s.Camera }),
 		Cameras:   bind(store, shared, func(s *Shared) *Cameras { return &s.Cameras }),
+		Certs:     bind(store, shared, func(s *Shared) *Certs { return &s.Certs }),
 		Cast:      bind(store, shared, func(s *Shared) *Cast { return &s.Cast }),
 		Clock:     bind(store, shared, func(s *Shared) *Clock { return &s.Clock }),
 		Feedback:  bind(store, shared, func(s *Shared) *Feedback { return &s.Feedback }),
+		Frontend:  bind(store, shared, func(s *Shared) *Frontend { return &s.Frontend }),
 		Home:      bind(store, shared, func(s *Shared) *Home { return &s.Home }),
 		Idle:      bind(store, shared, func(s *Shared) *Idle { return &s.Idle }),
 		Lock:      bind(store, shared, func(s *Shared) *Lock { return &s.Lock }),

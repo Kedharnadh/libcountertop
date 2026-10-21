@@ -16,10 +16,14 @@ import (
 )
 
 func (app *App) tileBoard(at ui.Rect, s homecontrol.Selection, pal theme.Theme) gogui.View {
+	return widgets.Placed(at, app.tileList(float32(at.W), s, pal))
+}
+
+func (app *App) tileList(width float32, s homecontrol.Selection, pal theme.Theme) gogui.View {
 	areas, loading := app.o.Home.Dash().Tiles(s)
 	gap := reach() * 0.25
-	cols := max(2, int(float32(at.W)/(reach()*6)))
-	side := cell(float32(at.W)-gap, gap, cols)
+	cols := max(2, int(width/(reach()*6)))
+	side := cell(width-gap, gap, cols)
 
 	var views []gogui.View
 	switch {
@@ -64,7 +68,7 @@ func (app *App) tileBoard(at ui.Rect, s homecontrol.Selection, pal theme.Theme) 
 		)
 	}
 
-	return widgets.Placed(at, gogui.Column(gogui.ContainerCfg{
+	return gogui.Column(gogui.ContainerCfg{
 		ID:         "tiles",
 		Sizing:     gogui.FillFill,
 		Padding:    gogui.NoPadding,
@@ -72,7 +76,23 @@ func (app *App) tileBoard(at ui.Rect, s homecontrol.Selection, pal theme.Theme) 
 		Scrollable: true,
 		OnGesture:  app.ui.HoldStill,
 		Content:    views,
-	}))
+	})
+}
+
+func (app *App) fullScreen(f *homecontrol.Full) *Screen {
+	return &Screen{
+		Title: f.Sel.Name(),
+		View:  f,
+		Fixed: true,
+		Build: func(w *gogui.Window) gogui.View {
+			vw, _ := w.WindowSize()
+			s, ok := app.o.Home.Dash().Find(f.Sel.Key)
+			if !ok {
+				return gogui.Label(say.T("home.empty"), widgets.Secondary())
+			}
+			return app.tileList(float32(vw)-2*gogui.PadLarge, s, app.ui.Palette())
+		},
+	}
 }
 
 func areaName(a homecontrol.AreaTiles) string {

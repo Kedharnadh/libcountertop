@@ -6,9 +6,9 @@ import (
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 
-	"github.com/ygelfand/libcountertop/pkg/display/peerboard"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
+	"github.com/ygelfand/libcountertop/pkg/network/peer/pictures"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	"github.com/ygelfand/libcountertop/pkg/settings/configsync"
 )
@@ -63,7 +63,7 @@ func (v *View) logo(tall float32) gogui.View {
 }
 
 func (v *View) who(x configsync.Exchange, tall float32) gogui.View {
-	key, svg := peerboard.Picture(x.Peer.Board)
+	key, svg := pictures.For(x.Peer.Board)
 	name := gogui.CurrentTheme().Cfg.TextStyleDef
 	name.Size *= 1.6
 	return gogui.Row(gogui.ContainerCfg{
@@ -76,7 +76,7 @@ func (v *View) who(x configsync.Exchange, tall float32) gogui.View {
 				gogui.SvgCfg{
 					ID:      "sync-" + key,
 					SvgData: svg,
-					Width:   tall / peerboard.Aspect,
+					Width:   tall / pictures.Aspect,
 					Height:  tall,
 				},
 			),

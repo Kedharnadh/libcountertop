@@ -48,6 +48,8 @@ const (
 	Text
 
 	Secret
+
+	Credential
 )
 
 func (k Kind) String() string {
@@ -68,6 +70,8 @@ func (k Kind) String() string {
 		return "text"
 	case Secret:
 		return "secret"
+	case Credential:
+		return "credential"
 	}
 	return "unknown"
 }
@@ -304,6 +308,14 @@ func (s Setting[T]) Object(domain string) string {
 }
 
 func (s Setting[T]) Title() string { return s.messages.text(s.domain + ".setting." + s.Name) }
+
+func (s Setting[T]) Example() string {
+	key := s.domain + ".example." + s.Name
+	if s.messages.missing(key) {
+		return ""
+	}
+	return s.messages.text(key)
+}
 
 func (s Setting[T]) Named() string {
 	if at := s.domain + ".entity." + s.Name; !s.messages.missing(at) {

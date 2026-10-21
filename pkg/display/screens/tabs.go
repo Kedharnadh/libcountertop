@@ -14,7 +14,7 @@ func homeGlyph(t dashboard.Tab) string {
 	return glyphFor(homecontrol.Selection{Key: t.Key})
 }
 
-func (a *App) homeBoard(at ui.Rect, t dashboard.Tab, pal theme.Theme) gogui.View {
+func (a *App) homeBoard(_ *gogui.Window, at ui.Rect, t dashboard.Tab, pal theme.Theme) gogui.View {
 	s, ok := a.o.Home.Dash().Find(t.Key)
 	if !ok {
 		return nil

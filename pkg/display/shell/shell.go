@@ -97,6 +97,12 @@ func (s *Shell) Visible(v View) bool {
 	return slices.Contains(Showing(s.stack), v)
 }
 
+func (s *Shell) Covered() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.ContainsFunc(s.stack, View.Covers)
+}
+
 func Showing(stack []View) []View {
 	for i := len(stack) - 1; i >= 0; i-- {
 		if stack[i].Covers() {

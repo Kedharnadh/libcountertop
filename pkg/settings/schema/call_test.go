@@ -25,6 +25,30 @@ func TestCallAnswers(t *testing.T) {
 			false,
 		},
 		{"selected with nobody", Call{AutoAnswer: true, AnswerFrom: AnswerSelected}, "a", false},
+		{
+			"everyone includes the API",
+			Call{AutoAnswer: true, AnswerFrom: AnswerEveryone},
+			APICaller,
+			true,
+		},
+		{
+			"selected, API allowed",
+			Call{AutoAnswer: true, AnswerFrom: AnswerSelected, AnswerAPI: true},
+			APICaller,
+			true,
+		},
+		{
+			"selected, API not allowed",
+			Call{AutoAnswer: true, AnswerFrom: AnswerSelected, AnswerPeers: APICaller},
+			APICaller,
+			false,
+		},
+		{
+			"API allowed but auto-answer off",
+			Call{AnswerFrom: AnswerSelected, AnswerAPI: true},
+			APICaller,
+			false,
+		},
 	}
 	for _, c := range cases {
 		if got := c.call.Answers(c.peer); got != c.want {

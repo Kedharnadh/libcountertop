@@ -8,6 +8,7 @@ const (
 )
 
 type Cameras struct {
+	Tab     bool     `json:"tab"`
 	Pick    HomePick `json:"pick"`
 	Scale   int      `json:"scale"`
 	Refresh int      `json:"refresh"`

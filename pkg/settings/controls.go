@@ -124,7 +124,7 @@ func (c *Controls[T]) entity(s Setting[T], at *T) esphome.Entity {
 		e.OnCommand = func(v float32) { c.put(s, strconv.Itoa(int(v))) }
 		return e
 
-	case Text, Secret:
+	case Text, Secret, Credential:
 		e := &esphome.Text{
 			Base: esphome.Base{
 				ObjectID: id, DeviceID: device, Name: name, Icon: icon,
@@ -132,7 +132,7 @@ func (c *Controls[T]) entity(s Setting[T], at *T) esphome.Entity {
 			},
 			MaxLength: textMost,
 		}
-		if s.Kind == Secret {
+		if s.Kind == Secret || s.Kind == Credential {
 			e.Mode = api.TextMode_TEXT_MODE_PASSWORD
 		}
 		e.Set(s.Visible(at))

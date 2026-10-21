@@ -35,7 +35,7 @@ func ServicePage[T any](title string, c *setting.Controls[T]) *shell.Page {
 				tap = func(int) { save(setting.OnOff(!row.On)) }
 			case setting.Text:
 				row.Kind, row.Value, row.Save = menu.Field, s.Read(&at), save
-			case setting.Secret:
+			case setting.Secret, setting.Credential:
 				row.Kind, row.Value, row.Save = menu.Password, s.Read(&at), save
 			default:
 				continue

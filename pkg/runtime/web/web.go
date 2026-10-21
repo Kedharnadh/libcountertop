@@ -8,8 +8,11 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/go-chi/chi/v5"
 
 	"github.com/ygelfand/libcountertop/pkg/hook"
 	netaddress "github.com/ygelfand/libcountertop/pkg/network/address"
@@ -30,15 +33,23 @@ type Options struct {
 	Page    func() status.Page
 }
 
+type side struct {
+	name   string
+	port   int
+	tls    func() *tls.Config
+	routes map[string]http.Handler
+}
+
 type Server struct {
 	opts Options
 
-	mu     sync.Mutex
-	shown  string
-	routes map[string]http.Handler
-	peers  map[string]http.Handler
-	secure int
-	tls    func() *tls.Config
+	mu      sync.Mutex
+	shown   string
+	pages   side
+	peers   side
+	public  side
+	trusted func() bool
+	root    http.Handler
 
 	Offered hook.Hook[string]
 }
@@ -46,8 +57,9 @@ type Server struct {
 func New(opts Options) *Server {
 	return &Server{
 		opts:   opts,
-		routes: map[string]http.Handler{},
-		peers:  map[string]http.Handler{},
+		pages:  side{name: "pages", port: opts.Port, routes: map[string]http.Handler{}},
+		peers:  side{name: "peers", routes: map[string]http.Handler{}},
+		public: side{name: "secure pages", routes: map[string]http.Handler{}},
 	}
 }
 
@@ -59,61 +71,82 @@ func (s *Server) Offering() string {
 	return s.shown
 }
 
-func (s *Server) Handle(pattern string, h http.Handler) {
-	s.mu.Lock()
-	s.routes[pattern] = h
-	s.mu.Unlock()
-}
+func (s *Server) Handle(pattern string, h http.Handler) { s.add(&s.pages, pattern, h) }
 
-func (s *Server) HandlePeer(pattern string, h http.Handler) {
+func (s *Server) HandlePeer(pattern string, h http.Handler) { s.add(&s.peers, pattern, h) }
+
+func (s *Server) HandlePublic(pattern string, h http.Handler) { s.add(&s.public, pattern, h) }
+
+func (s *Server) add(to *side, pattern string, h http.Handler) {
 	s.mu.Lock()
-	s.peers[pattern] = h
+	to.routes[pattern] = h
 	s.mu.Unlock()
 }
 
 func (s *Server) Secure(port int, cfg func() *tls.Config) {
 	s.mu.Lock()
-	s.secure, s.tls = port, cfg
+	s.peers.port, s.peers.tls = port, cfg
+	s.mu.Unlock()
+}
+
+func (s *Server) PublicRoot(h http.Handler) {
+	s.mu.Lock()
+	s.root = h
+	s.mu.Unlock()
+}
+
+func (s *Server) Public(port int, cfg func() *tls.Config, trusted func() bool) {
+	s.mu.Lock()
+	s.public.port, s.public.tls, s.trusted = port, cfg, trusted
 	s.mu.Unlock()
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	mux := http.NewServeMux()
-	mux.Handle("/", status.Handler(s.opts.Page))
-	peers := http.NewServeMux()
 	s.mu.Lock()
-	for pattern, h := range s.routes {
-		mux.Handle(pattern, h)
-	}
-	for pattern, h := range s.peers {
-		peers.Handle(pattern, h)
-	}
-	secure, cfg := s.secure, s.tls
+	pages, peers, public, root := s.pages, s.peers, s.public, s.root
 	s.mu.Unlock()
 
-	servers := []*http.Server{{
-		Addr:              ":" + strconv.Itoa(s.opts.Port),
-		Handler:           mux,
-		ReadHeaderTimeout: 5 * time.Second,
-	}}
-	if secure != 0 && cfg != nil {
-		servers = append(servers, &http.Server{
-			Addr:              ":" + strconv.Itoa(secure),
-			Handler:           peers,
-			TLSConfig:         cfg(),
+	page := status.Handler(s.opts.Page)
+	var servers []*http.Server
+	var names []side
+	for _, sd := range []side{pages, peers, public} {
+		if sd.port == 0 || (sd.name != pages.name && sd.tls == nil) {
+			continue
+		}
+		r := chi.NewRouter()
+		switch sd.name {
+		case pages.name:
+			r.Get("/", s.front(page, public.port))
+		case public.name:
+			if root != nil {
+				r.Handle("/*", root)
+			} else {
+				r.Get("/", page)
+			}
+		}
+		for pattern, h := range sd.routes {
+			route(r, pattern, h)
+		}
+		srv := &http.Server{
+			Addr:              ":" + strconv.Itoa(sd.port),
+			Handler:           r,
 			ReadHeaderTimeout: 5 * time.Second,
-		})
+		}
+		if sd.tls != nil {
+			srv.TLSConfig = sd.tls()
+		}
+		servers = append(servers, srv)
+		names = append(names, sd)
 	}
 
 	done := make(chan error, len(servers))
-	for _, srv := range servers {
+	for i, srv := range servers {
 		go func() {
+			slog.Info("serving "+names[i].name, "port", names[i].port)
 			var err error
 			if srv.TLSConfig != nil {
-				slog.Info("serving peers", "port", secure)
 				err = srv.ListenAndServeTLS("", "")
 			} else {
-				slog.Info("serving pages", "port", s.opts.Port)
 				err = srv.ListenAndServe()
 			}
 			if errors.Is(err, http.ErrServerClosed) {
@@ -145,6 +178,31 @@ func (s *Server) Run(ctx context.Context) error {
 			return errors.Join(errs...)
 		case <-t.C:
 		}
+	}
+}
+
+func route(r chi.Router, pattern string, h http.Handler) {
+	if method, path, ok := strings.Cut(pattern, " "); ok {
+		r.Method(method, path, h)
+		return
+	}
+	r.Handle(pattern, h)
+}
+
+func (s *Server) front(page http.Handler, port int) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if s.trusted == nil || port == 0 || !s.trusted() {
+			page.ServeHTTP(w, r)
+			return
+		}
+		host := r.Host
+		if h, _, err := net.SplitHostPort(r.Host); err == nil {
+			host = h
+		}
+		if port != 443 {
+			host = net.JoinHostPort(host, strconv.Itoa(port))
+		}
+		http.Redirect(w, r, "https://"+host+"/", http.StatusFound)
 	}
 }
 

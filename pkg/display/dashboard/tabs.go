@@ -4,6 +4,8 @@ import (
 	"cmp"
 	"slices"
 	"sync"
+
+	"github.com/ygelfand/libcountertop/pkg/hook"
 )
 
 type Tab struct {
@@ -18,6 +20,8 @@ type source struct {
 }
 
 type Tabs struct {
+	Changed hook.Hook[struct{}]
+
 	mu      sync.Mutex
 	sources []source
 	showing string
@@ -66,9 +70,7 @@ func (t *Tabs) Show(key string) {
 	}
 	t.showing = key
 	t.mu.Unlock()
-	if t.redraw != nil {
-		t.redraw()
-	}
+	t.changed()
 }
 
 func (t *Tabs) Clock() {
@@ -77,8 +79,13 @@ func (t *Tabs) Clock() {
 	t.showing = ""
 	t.mu.Unlock()
 	if changed {
-		if t.redraw != nil {
-			t.redraw()
-		}
+		t.changed()
+	}
+}
+
+func (t *Tabs) changed() {
+	t.Changed.Emit(struct{}{})
+	if t.redraw != nil {
+		t.redraw()
 	}
 }

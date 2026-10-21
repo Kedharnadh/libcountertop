@@ -192,6 +192,7 @@ func (a *App) nativeDash(w *gogui.Window, vw, vh, top, margin int, pal theme.The
 	if kind, drawn := a.boards[showing.Kind]; tabbed && drawn {
 		below := top + margin
 		return append(layers, kind.Draw(
+			w,
 			ui.Rect{X: margin, Y: below, W: vw - 2*margin, H: vh - below - margin},
 			showing,
 			pal,

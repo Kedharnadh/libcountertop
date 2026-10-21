@@ -27,6 +27,7 @@ type CallController interface {
 	SetAnswerFrom(config.CallAudience)
 	ToggleAnswerPeer(string)
 	ToggleAnswerUser(string)
+	SetAnswerAPI(bool)
 	SetRing(config.Chime)
 	SetVideoRing(config.Chime)
 	SetRingback(config.Chime)
@@ -104,6 +105,15 @@ func (p *CallPages) Calls() *shell.Page {
 						})
 						acts = append(acts, p.open(func() shell.View { return p.AnswerUsers() }))
 					}
+					rows = append(rows, menu.Row{
+						Label: say.T("call.setting.answer_api"),
+						Kind:  menu.Toggle,
+						On:    c.AnswerAPI,
+					})
+					acts = append(
+						acts,
+						func(int) { p.options.Controller.SetAnswerAPI(!c.AnswerAPI) },
+					)
 				}
 				rows = append(
 					rows,

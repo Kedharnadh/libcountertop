@@ -82,6 +82,10 @@ type HomeKey interface {
 	HomeKey() string
 	SetHomeKey(string) error
 }
+type AdminPassword interface {
+	Password() string
+	SetPassword(string) error
+}
 type PinLock interface {
 	Locked() bool
 	Change()

@@ -19,12 +19,14 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/display/apps"
 	"github.com/ygelfand/libcountertop/pkg/display/callvideo"
+	"github.com/ygelfand/libcountertop/pkg/display/dashboard"
 	"github.com/ygelfand/libcountertop/pkg/display/icons"
 	"github.com/ygelfand/libcountertop/pkg/display/interaction"
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/navigation"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
+	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant"
@@ -44,6 +46,7 @@ const (
 	linger      = 3 * time.Minute
 	fetchAtMost = 8
 	gapShare    = 0.05
+	TabKind     = "cameras"
 )
 
 var scaleShare = map[int]float64{1: 0.2, 2: 0.25, 3: 1.0 / 3, 4: 0.5, 5: 1}
@@ -64,6 +67,7 @@ type Options struct {
 	Settings storage.Section[schema.Cameras]
 	Client   *http.Client
 	Picker   func() shell.View
+	Tabs     *dashboard.Tabs
 }
 
 type Grid struct{}
@@ -132,9 +136,16 @@ func New(o Options) *Cameras {
 	c.knobs = &setting.Controls[schema.Cameras]{
 		Table: NewTable(),
 		Read:  o.Settings.Read,
-		Save:  func(s Setting, v string) error { return setting.Store(o.Settings, s, v) },
+		Save: func(s Setting, v string) error {
+			err := setting.Store(o.Settings, s, v)
+			c.follow()
+			return err
+		},
 	}
 	o.Shell.Changed.Listen(func(shell.Change) { c.follow() })
+	if o.Tabs != nil {
+		o.Tabs.Changed.Listen(func(struct{}) { c.follow() })
+	}
 	return c
 }
 
@@ -160,7 +171,7 @@ func (c *Cameras) Screen(v shell.View) *navigation.Screen {
 }
 
 func (c *Cameras) follow() {
-	grid := c.o.Shell.Visible(c.grid)
+	grid := c.o.Shell.Visible(c.grid) || c.tabbed()
 	live := c.o.Shell.Visible(c.live)
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -357,6 +368,32 @@ func RowHeight(scale int, w float64) float64 {
 
 func (c *Cameras) buildGrid(w *gogui.Window) gogui.View {
 	vw, vh := w.WindowSize()
+	return c.collage(w, ui.Rect{W: vw, H: vh}, true)
+}
+
+func (c *Cameras) Board(w *gogui.Window, at ui.Rect, _ dashboard.Tab, _ theme.Theme) gogui.View {
+	return widgets.Placed(at, c.collage(w, ui.Rect{W: at.W, H: at.H}, false))
+}
+
+func (*Cameras) Glyph(dashboard.Tab) string { return gogui.IconVideo }
+
+func (c *Cameras) DashboardTabs() []dashboard.Tab {
+	if cfg := c.o.Settings.Read(); !cfg.Tab || cfg.Pick.Empty() {
+		return nil
+	}
+	return []dashboard.Tab{{Kind: TabKind, Key: TabKind, Name: say.T("cameras.app")}}
+}
+
+func (c *Cameras) tabbed() bool {
+	if c.o.Tabs == nil || c.o.Shell.Covered() {
+		return false
+	}
+	t, ok := c.o.Tabs.Showing()
+	return ok && t.Kind == TabKind
+}
+
+func (c *Cameras) collage(w *gogui.Window, at ui.Rect, full bool) gogui.View {
+	vw, vh := at.W, at.H
 	cams := c.picked()
 	if len(cams) == 0 {
 		return c.note(c.emptyNote())
@@ -419,16 +456,19 @@ func (c *Cameras) buildGrid(w *gogui.Window) gogui.View {
 			page,
 		))
 	}
-	views = append(views, c.closer("cameras-close", func() { c.o.Shell.Remove(c.grid) }))
-	return gogui.Column(gogui.ContainerCfg{
+	cfg := gogui.ContainerCfg{
 		ID:        "cameras",
 		Sizing:    gogui.FillFill,
 		Padding:   gogui.NoPadding,
-		Color:     gogui.RGB(0, 0, 0),
 		Clip:      true,
-		Content:   views,
 		OnGesture: c.swipe,
-	})
+	}
+	if full {
+		views = append(views, c.closer("cameras-close", func() { c.o.Shell.Remove(c.grid) }))
+		cfg.Color = gogui.RGB(0, 0, 0)
+	}
+	cfg.Content = views
+	return gogui.Column(cfg)
 }
 
 func onPage(
@@ -812,6 +852,7 @@ func (c *Cameras) Page() *shell.Page {
 		scale := menu.Steps(schema.CameraScaleMost - schema.CameraScaleLeast + 1)
 		refresh, rotate := menu.Steps(len(refreshSteps)), menu.Steps(len(rotateSteps))
 		rows := []menu.Row{
+			{Label: say.T("cameras.setting.tab"), Kind: menu.Toggle, On: cfg.Tab},
 			{
 				Label: say.T("cameras.pick"),
 				Kind:  menu.Chevron,
@@ -849,6 +890,7 @@ func (c *Cameras) Page() *shell.Page {
 			},
 		}
 		taps := []func(int){
+			func(int) { c.change("tab", setting.OnOff(!cfg.Tab)) },
 			func(int) { c.o.Shell.Push(c.o.Picker()) },
 			func(level int) {
 				c.change("scale", strconv.Itoa(scale.Index(level)+schema.CameraScaleLeast))

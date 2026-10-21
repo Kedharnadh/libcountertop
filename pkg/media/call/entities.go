@@ -72,6 +72,10 @@ func NewTable(more func() []setting.Option) *setting.Table[config.Call] {
 			255,
 			func(c *config.Call) *string { return &c.AnswerUsers },
 		),
+		setting.Flag(
+			Setting{Name: "answer_api", Group: Group, Icon: "mdi:api"},
+			func(c *config.Call) *bool { return &c.AnswerAPI },
+		),
 		chime("ring", "mdi:bell-ring", func(c *config.Call) *config.Chime { return &c.Ring }),
 		chime("video_ring", "mdi:bell-ring-outline",
 			func(c *config.Call) *config.Chime { return &c.VideoRing }),
@@ -144,6 +148,8 @@ func (c *Calls) SetAutoVideo(on bool) { c.set("auto_video", setting.OnOff(on)) }
 func (c *Calls) SetStream(v config.CallStream) { c.set("stream", string(v)) }
 
 func (c *Calls) SetAnswerFrom(v config.CallAudience) { c.set("answer_from", string(v)) }
+
+func (c *Calls) SetAnswerAPI(on bool) { c.set("answer_api", setting.OnOff(on)) }
 
 func (c *Calls) ToggleAnswerPeer(id string) {
 	peers := c.options.Settings.Read().Peers()

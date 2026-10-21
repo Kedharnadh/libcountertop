@@ -2,6 +2,7 @@ package nativeapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -51,8 +52,9 @@ type Dependencies struct {
 type Server struct {
 	deps Dependencies
 
-	srv *esphome.Server
-	id  Identity
+	srv  *esphome.Server
+	id   Identity
+	ents atomic.Pointer[esphome.Entities]
 
 	reconnect chan struct{}
 	announced sync.Once
@@ -68,6 +70,50 @@ func New(deps Dependencies) *Server {
 }
 
 func (a *Server) Name() string { return "api" }
+
+func (a *Server) Listen(fn func(esphome.State)) (cancel func()) {
+	if ents := a.ents.Load(); ents != nil {
+		return ents.Listen(fn)
+	}
+	return func() {}
+}
+
+func (a *Server) States() []esphome.State {
+	if ents := a.ents.Load(); ents != nil {
+		return ents.States()
+	}
+	return nil
+}
+
+func (a *Server) Actions() []esphome.Action {
+	if ents := a.ents.Load(); ents != nil {
+		return ents.Actions()
+	}
+	return nil
+}
+
+func (a *Server) RunAction(name string, c esphome.Call) (any, error) {
+	ents := a.ents.Load()
+	if ents == nil {
+		return nil, errors.New("nativeapi: not serving yet")
+	}
+	return ents.Run(name, c)
+}
+
+func (a *Server) Press(object string) error {
+	ents := a.ents.Load()
+	if ents == nil {
+		return errors.New("nativeapi: not serving yet")
+	}
+	return ents.Press(object)
+}
+
+func (a *Server) Descriptions() []esphome.Description {
+	if ents := a.ents.Load(); ents != nil {
+		return ents.Descriptions()
+	}
+	return nil
+}
 
 func (a *Server) Startup() component.Progress {
 	port := a.port.Load()
@@ -107,6 +153,7 @@ func (a *Server) register() error {
 	if err := ents.AddActions(a.deps.Registry.Actions()...); err != nil {
 		return err
 	}
+	a.ents.Store(ents)
 	info := a.id.Info
 	info.Devices = SubDevices(info.Devices, registered)
 	if a.deps.Bluetooth != nil {

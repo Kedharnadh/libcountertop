@@ -14,6 +14,7 @@ type Call struct {
 	AnswerFrom  CallAudience `json:"answer_from"`
 	AnswerPeers string       `json:"answer_peers"`
 	AnswerUsers string       `json:"answer_users"`
+	AnswerAPI   bool         `json:"answer_api"`
 	PauseWake   bool         `json:"pause_wake"`
 	Stream      CallStream   `json:"stream"`
 	Ring        Chime        `json:"ring"`
@@ -37,11 +38,19 @@ func (c Call) Peers() []string { return strings.Fields(c.AnswerPeers) }
 
 func (c Call) Users() []string { return strings.Fields(c.AnswerUsers) }
 
+const APICaller = "api"
+
 func (c Call) Answers(peer string) bool {
 	if !c.AutoAnswer {
 		return false
 	}
-	return c.AnswerFrom != AnswerSelected || slices.Contains(c.Peers(), peer)
+	if c.AnswerFrom != AnswerSelected {
+		return true
+	}
+	if peer == APICaller {
+		return c.AnswerAPI
+	}
+	return slices.Contains(c.Peers(), peer)
 }
 
 func (c Call) AnswersUser(user string) bool {

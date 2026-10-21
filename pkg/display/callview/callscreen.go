@@ -12,11 +12,11 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/homeview"
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/navigation"
-	"github.com/ygelfand/libcountertop/pkg/display/peerboard"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/media/call"
+	"github.com/ygelfand/libcountertop/pkg/network/peer/pictures"
 	"github.com/ygelfand/libcountertop/pkg/say"
 )
 
@@ -191,8 +191,8 @@ func (cv *View) callBody(w *gogui.Window) gogui.View {
 			gogui.ContainerCfg{Sizing: gogui.FillFill, Padding: gogui.NoPadding, Content: layers},
 		)
 	}
-	tall := min(float32(vh)*0.3, float32(vw)*0.5*peerboard.Aspect)
-	key, svg := peerboard.Picture(c.Peer.Board)
+	tall := min(float32(vh)*0.3, float32(vw)*0.5*pictures.Aspect)
+	key, svg := pictures.For(c.Peer.Board)
 	return gogui.Column(gogui.ContainerCfg{
 		Sizing:  gogui.FillFill,
 		Padding: pad,
@@ -205,7 +205,7 @@ func (cv *View) callBody(w *gogui.Window) gogui.View {
 				gogui.SvgCfg{
 					ID:      "call-" + key,
 					SvgData: svg,
-					Width:   tall / peerboard.Aspect,
+					Width:   tall / pictures.Aspect,
 					Height:  tall,
 				},
 			),
@@ -370,8 +370,8 @@ func (cv *View) profileBody(w *gogui.Window, prof *Profile) gogui.View {
 	}
 	t := gogui.CurrentTheme().Cfg
 	vw, vh := w.WindowSize()
-	tall := min(float32(vh)*0.18, float32(vw)*0.6*peerboard.Aspect)
-	key, svg := peerboard.Picture(p.Board)
+	tall := min(float32(vh)*0.18, float32(vw)*0.6*pictures.Aspect)
+	key, svg := pictures.For(p.Board)
 
 	addrs := make([]string, 0, len(p.Addrs))
 	for _, a := range p.Addrs {
@@ -416,7 +416,7 @@ func (cv *View) profileBody(w *gogui.Window, prof *Profile) gogui.View {
 						gogui.SvgCfg{
 							ID:      "profile-" + key,
 							SvgData: svg,
-							Width:   tall / peerboard.Aspect,
+							Width:   tall / pictures.Aspect,
 							Height:  tall,
 						},
 					),

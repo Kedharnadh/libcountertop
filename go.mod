@@ -12,6 +12,7 @@ require (
 	github.com/bluenviron/gohlslib/v2 v2.4.5
 	github.com/bluenviron/mediacommon/v2 v2.9.5
 	github.com/charmbracelet/x/term v0.2.2
+	github.com/go-chi/chi/v5 v5.5.0
 	github.com/go-gui-org/go-glyph v1.26.4
 	github.com/go-gui-org/go-gui v0.91.0
 	github.com/gorilla/websocket v1.5.3
@@ -29,7 +30,7 @@ require (
 	github.com/pion/rtp v1.10.5
 	github.com/pion/webrtc/v4 v4.2.22
 	github.com/tphakala/go-aac v0.7.0
-	github.com/ygelfand/go-esphome-device v0.0.16
+	github.com/ygelfand/go-esphome-device v0.0.17
 	github.com/zserge/microwakeword v0.0.0-20260330234603-bfaf3840114e
 	golang.org/x/image v0.47.0
 	golang.org/x/sys v0.49.0

@@ -1,7 +1,6 @@
 package peerboard
 
 import (
-	"embed"
 	"fmt"
 	"math"
 
@@ -12,21 +11,9 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/network/peer"
+	"github.com/ygelfand/libcountertop/pkg/network/peer/pictures"
 	"github.com/ygelfand/libcountertop/pkg/say"
 )
-
-//go:embed devices/*.svg
-var devices embed.FS
-
-const Aspect = 190.0 / 320.0
-
-func Picture(codename string) (key, svg string) {
-	if b, err := devices.ReadFile("devices/" + codename + ".svg"); err == nil {
-		return "device-" + codename, string(b)
-	}
-	b, _ := devices.ReadFile("devices/default.svg")
-	return "device-default", string(b)
-}
 
 type Action struct {
 	Name string
@@ -86,7 +73,7 @@ func (b Board) View(at ui.Rect, peers []peer.Peer, pal theme.Theme) gogui.View {
 func (b Board) tile(id string, side float32, p peer.Peer, pal theme.Theme) gogui.View {
 	t := gogui.CurrentTheme().Cfg
 	inner := side - 2*t.PaddingMedium.Left
-	key, svg := Picture(p.Board)
+	key, svg := pictures.For(p.Board)
 
 	glyph := gogui.CurrentTheme().TextStyleIconMedium
 	glyph.Color = t.TextStyleDef.Color
@@ -102,7 +89,7 @@ func (b Board) tile(id string, side float32, p peer.Peer, pal theme.Theme) gogui
 			a.Do,
 		))
 	}
-	tall := min(style.Reach()*1.4, inner*Aspect)
+	tall := min(style.Reach()*1.4, inner*pictures.Aspect)
 
 	standing := " "
 	if p.Standing == peer.Foreign {
@@ -134,7 +121,7 @@ func (b Board) tile(id string, side float32, p peer.Peer, pal theme.Theme) gogui
 					gogui.Svg(gogui.SvgCfg{
 						ID:      id + "-" + key,
 						SvgData: svg,
-						Width:   tall / Aspect,
+						Width:   tall / pictures.Aspect,
 						Height:  tall,
 					}),
 				},

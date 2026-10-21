@@ -35,6 +35,8 @@ func (a *App) screenFor(v shell.View) *Screen {
 		return a.homeScreen(t)
 	case *homecontrol.Picker:
 		return a.pickerScreen(t)
+	case *homecontrol.Full:
+		return a.fullScreen(t)
 	}
 	for _, f := range a.o.Views {
 		if s := f(v); s != nil {

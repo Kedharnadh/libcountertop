@@ -125,8 +125,8 @@ func TestABroadcastReachesAHomePeer(t *testing.T) {
 	_, snd, msgs, kitchen := receiver(t, true, false)
 	clip := []int16{1, -2, 3, -4, 32767, -32768}
 
-	if err := sender(kitchen).send(clip); err != nil {
-		t.Fatal(err)
+	if sent, err := sender(kitchen).send(clip); err != nil || sent != 1 {
+		t.Fatalf("sent to %d, %v; want 1", sent, err)
 	}
 	snd.mu.Lock()
 	defer snd.mu.Unlock()
@@ -148,7 +148,7 @@ func TestABroadcastReachesAHomePeer(t *testing.T) {
 
 func TestATurnedOffReceiverRefuses(t *testing.T) {
 	_, snd, _, kitchen := receiver(t, false, false)
-	if err := sender(kitchen).send([]int16{1, 2}); !errors.Is(err, ErrNobody) {
+	if _, err := sender(kitchen).send([]int16{1, 2}); !errors.Is(err, ErrNobody) {
 		t.Errorf("sending to a device that refuses said %v, want ErrNobody", err)
 	}
 	if len(snd.played) != 0 {
@@ -158,7 +158,7 @@ func TestATurnedOffReceiverRefuses(t *testing.T) {
 
 func TestABusyReceiverDropsIt(t *testing.T) {
 	_, snd, _, kitchen := receiver(t, true, true)
-	if err := sender(kitchen).send([]int16{1, 2}); !errors.Is(err, ErrNobody) {
+	if _, err := sender(kitchen).send([]int16{1, 2}); !errors.Is(err, ErrNobody) {
 		t.Errorf("sending to a busy device said %v, want ErrNobody", err)
 	}
 	if len(snd.played) != 0 {
@@ -184,7 +184,7 @@ func TestOnlyHomePeersThatTakeBroadcastsAreTargets(t *testing.T) {
 }
 
 func TestNoTargetsIsAnError(t *testing.T) {
-	if err := sender().send([]int16{1}); !errors.Is(err, ErrNobody) {
+	if _, err := sender().send([]int16{1}); !errors.Is(err, ErrNobody) {
 		t.Errorf("sending to nobody said %v, want ErrNobody", err)
 	}
 }

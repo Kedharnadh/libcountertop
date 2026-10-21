@@ -193,6 +193,8 @@ func (t *Trust) Standing(id string) peer.Standing {
 	return s
 }
 
+func (t *Trust) Identity() *tls.Certificate { return &t.o.Identity }
+
 func (t *Trust) ServerConfig() *tls.Config {
 	return &tls.Config{
 		Certificates: []tls.Certificate{t.o.Identity},

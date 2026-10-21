@@ -19,6 +19,10 @@ var (
 
 func NewTable() *setting.Table[schema.Cameras] {
 	return setting.NewTable("cameras", []setting.Group{Group}, []Setting{
+		setting.Flag(
+			Setting{Name: "tab", Group: Group, Icon: "mdi:tab"},
+			func(c *schema.Cameras) *bool { return &c.Tab },
+		),
 		setting.Count(Setting{
 			Name: "scale", Group: Group, Icon: "mdi:magnify-plus-outline",
 			Min: schema.CameraScaleLeast, Max: schema.CameraScaleMost, Slider: true,

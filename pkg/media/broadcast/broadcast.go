@@ -147,7 +147,8 @@ func (b *Broadcaster) speak() {
 		b.outcome(err)
 		return
 	}
-	b.outcome(b.send(samples))
+	_, err = b.send(samples)
+	b.outcome(err)
 }
 
 func (b *Broadcaster) relay(url string) {
@@ -159,7 +160,8 @@ func (b *Broadcaster) relay(url string) {
 		b.outcome(err)
 		return
 	}
-	b.outcome(b.send(samples))
+	_, err = b.send(samples)
+	b.outcome(err)
 }
 
 func (b *Broadcaster) outcome(err error) {
@@ -272,10 +274,10 @@ func (b *Broadcaster) Targets() []peer.Peer {
 	return out
 }
 
-func (b *Broadcaster) send(samples []int16) error {
+func (b *Broadcaster) send(samples []int16) (int, error) {
 	targets := b.Targets()
 	if len(targets) == 0 {
-		return ErrNobody
+		return 0, ErrNobody
 	}
 	body := encode(samples)
 	from := b.o.Peers.Self().ID
@@ -298,9 +300,9 @@ func (b *Broadcaster) send(samples []int16) error {
 	wg.Wait()
 	slog.Info("broadcast sent", "to", sent, "of", len(targets), "seconds", len(samples)/Rate)
 	if sent == 0 {
-		return ErrNobody
+		return 0, ErrNobody
 	}
-	return nil
+	return sent, nil
 }
 
 func (b *Broadcaster) post(p peer.Peer, from string, body []byte) error {

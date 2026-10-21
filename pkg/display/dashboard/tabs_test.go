@@ -40,3 +40,25 @@ func TestTabs(t *testing.T) {
 		t.Error("Clock redrew with nothing open")
 	}
 }
+
+func TestTabsSayWhenTheOpenTabChanges(t *testing.T) {
+	strip := NewTabs(nil)
+	strip.Add(10, func() []Tab { return []Tab{{Kind: "a", Key: "one"}} })
+	heard := 0
+	strip.Changed.Listen(func(struct{}) { heard++ })
+
+	strip.Show("one")
+	strip.Show("one")
+	if heard != 2 {
+		t.Errorf("heard %d changes from opening and closing a tab, want 2", heard)
+	}
+	strip.Clock()
+	if heard != 2 {
+		t.Error("Clock with nothing open reported a change")
+	}
+	strip.Show("one")
+	strip.Clock()
+	if heard != 4 {
+		t.Errorf("heard %d changes, want 4 after Clock closed the tab", heard)
+	}
+}

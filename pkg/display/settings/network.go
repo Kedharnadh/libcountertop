@@ -17,7 +17,12 @@ type NetworkState struct {
 	Verify                     bool
 }
 
-func NetworkPage(read func() NetworkState, setVerify func(bool)) *shell.Page {
+func NetworkPage(
+	read func() NetworkState,
+	setVerify func(bool),
+	web *WebAccess,
+	stack *shell.Shell,
+) *shell.Page {
 	return &shell.Page{Title: say.T("network.title"), Build: func() ([]menu.Row, []func(int)) {
 		c := read()
 		rows := []menu.Row{
@@ -49,6 +54,17 @@ func NetworkPage(read func() NetworkState, setVerify func(bool)) *shell.Page {
 			},
 		)
 		acts = append(acts, func(int) { setVerify(!c.Verify) })
+		if web != nil {
+			rows = append(rows, menu.Row{
+				Glyph: gogui.IconGlobe,
+				Label: say.T("webaccess.title"),
+				Kind:  menu.Chevron,
+				Value: "https://" + c.Address + "/",
+			})
+			acts = append(acts, func(int) {
+				stack.Push(web.Page(func() string { return read().Address }))
+			})
+		}
 		return rows, acts
 	}}
 }
