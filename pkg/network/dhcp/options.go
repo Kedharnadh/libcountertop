@@ -10,6 +10,7 @@ type Options struct {
 	Interface string
 	Hostname  func() string
 	Store     Store
+	Network   func() string
 }
 
 type Store interface {
@@ -31,6 +32,12 @@ func (c *Client) hostname() string {
 		}
 	}
 	return "countertop"
+}
+func (c *Client) network() string {
+	if c.options.Network == nil {
+		return ""
+	}
+	return c.options.Network()
 }
 func (c *Client) previous() net.IP {
 	if c.options.Store == nil {

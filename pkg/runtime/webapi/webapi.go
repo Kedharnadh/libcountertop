@@ -215,10 +215,7 @@ func (a *API) list(w http.ResponseWriter, _ *http.Request) {
 		if !ok {
 			continue
 		}
-		order, key, ok := placed(b.Domain())
-		if !ok {
-			order, key = len(sections), systemSection
-		}
+		order, key := sectionOf(b.Domain())
 		out = append(out, domainFields{
 			Domain:     b.Domain(),
 			SectionKey: key,

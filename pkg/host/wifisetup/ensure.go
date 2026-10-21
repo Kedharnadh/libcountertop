@@ -26,50 +26,35 @@ type Request struct {
 	SSID     string
 	Password string
 	WPS      bool
+	Force    bool
 }
 
 func Ensure(ctx context.Context, out io.Writer, s Supplicant, r Request) error {
 	ssid, password, wps := r.SSID, r.Password, r.WPS
 	given := ssid != ""
 
-	if ssid == "" && !wps {
+	if ssid == "" && !wps && !r.Force {
 		done, err := check(ctx, out, s)
 		if err != nil || done {
 			return err
 		}
 	}
 
-	var err error
 	for {
-		if wps {
-			fmt.Fprintf(out, "%s\n", styleDetail.Render("Press the WPS button on the router now."))
-			if err := wpa.WPS(s); err != nil {
-				return err
-			}
-		} else {
-			if ssid == "" {
-				if ssid, password, err = askNetwork(ctx, out, s); err != nil {
-					return err
-				}
-			}
-			if err := s.Join(ssid, password); err != nil {
+		if !wps && ssid == "" {
+			var err error
+			if ssid, password, err = askNetwork(ctx, out, s); err != nil {
 				return err
 			}
 		}
 
-		state, err := attempt(ctx, s, ssid)
+		state, err := join(ctx, out, s, ssid, password, wps)
 		if err == nil {
 			fmt.Fprintf(out, "%s %s\n", styleDone.Render("✓ connected:"), state)
 			return nil
 		}
 
 		fmt.Fprintf(out, "%s %v\n", styleFail.Render("✗"), err)
-
-		if ssid != "" && !state.Associated() {
-			if err := wpa.Remove(s, ssid); err != nil {
-				return err
-			}
-		}
 
 		again, err := prompt.Confirm(ctx, out, "Try again?")
 		if err != nil || !again {
@@ -81,6 +66,38 @@ func Ensure(ctx context.Context, out io.Writer, s Supplicant, r Request) error {
 		}
 		wps = false
 	}
+}
+
+func join(
+	ctx context.Context,
+	out io.Writer,
+	s Supplicant,
+	ssid, password string,
+	wps bool,
+) (wpa.State, error) {
+	if wps {
+		fmt.Fprintf(out, "%s\n", styleDetail.Render("Press the WPS button on the router now."))
+		if err := wpa.WPS(s); err != nil {
+			return wpa.State{}, err
+		}
+		state, err := attempt(ctx, s, "")
+		if err != nil {
+			return state, err
+		}
+		return state, wpa.Only(s, state.ID)
+	}
+
+	now, err := wpa.Status(s)
+	if err != nil {
+		return now, err
+	}
+	if now.Joined(ssid) {
+		return now, wpa.Only(s, now.ID)
+	}
+	if err := s.Join(ctx, ssid, password); err != nil {
+		return now, err
+	}
+	return wpa.Status(s)
 }
 
 func askNetwork(ctx context.Context, out io.Writer, s Supplicant) (string, string, error) {

@@ -13,6 +13,7 @@ import (
 type Options struct {
 	Slots    int
 	DeviceID func(slot int) uint32
+	Read     func() schema.Wake
 	Write    func(slot int) schema.WakeWriter
 	Wake     func(slot int)
 	Extras   func(slot int) []esphome.Entity

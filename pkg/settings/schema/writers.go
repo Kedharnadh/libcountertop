@@ -486,6 +486,8 @@ func (w WakeWriter) Visual(s Stage, kind string) error {
 	})
 }
 
+func (w WakeWriter) Apply(f func(*WakeWord)) error { return w.word(f) }
+
 func (w WakeWriter) word(f func(*WakeWord)) error {
 	if w.slot < 0 {
 		return fmt.Errorf("config: wake slot %d", w.slot)

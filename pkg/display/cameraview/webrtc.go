@@ -3,6 +3,7 @@ package cameraview
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"sync"
@@ -28,6 +29,7 @@ const (
 var (
 	errNoPicture   = errors.New("cameras: the stream sent no picture")
 	errUndecodable = errors.New("cameras: the decoder refused the stream")
+	errLost        = errors.New("cameras: the stream connection was lost")
 )
 
 type Speaker interface {
@@ -39,11 +41,6 @@ type Streams interface {
 	Speaks(protocol int) bool
 	OpenWebRTC(ctx context.Context, entity, offer string) (homeassistant.WebRTC, error)
 	CloseWebRTC(ctx context.Context, w homeassistant.WebRTC) error
-}
-
-func (c *Cameras) streams(cam homeassistant.Camera) bool {
-	return c.o.Streams != nil && c.o.Display != nil && cam.Streams() &&
-		c.o.Streams.Speaks(homeassistant.WebRTCProtocol)
 }
 
 func (c *Cameras) stream(ctx context.Context, cam homeassistant.Camera, live func()) error {
@@ -78,7 +75,7 @@ func (c *Cameras) stream(ctx context.Context, cam homeassistant.Camera, live fun
 		func(s webrtc.PeerConnectionState) {
 			if s == webrtc.PeerConnectionStateFailed ||
 				s == webrtc.PeerConnectionStateDisconnected {
-				cancel(errors.New("cameras: the stream connection " + s.String()))
+				cancel(fmt.Errorf("%w: %s", errLost, s))
 			}
 		},
 	)

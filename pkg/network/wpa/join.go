@@ -110,19 +110,21 @@ func Add(c Conn, ssid, passphrase string) (string, error) {
 	return id, nil
 }
 
-func Join(c Conn, ssid, passphrase string) error {
-	if err := Remove(c, ssid); err != nil {
-		return err
+func Only(c Conn, id string) error {
+	if id == "" {
+		return fmt.Errorf("wpa: no network to keep")
 	}
-
-	id, err := Add(c, ssid, passphrase)
+	out, err := c.Cmd("list_networks")
 	if err != nil {
 		return err
 	}
 
-	for _, cmd := range []string{"enable_network", "select_network"} {
-		if _, err := c.Cmd(cmd, id); err != nil {
-			_, _ = c.Cmd("remove_network", id)
+	for line := range strings.SplitSeq(out, "\n") {
+		other, _, _ := strings.Cut(strings.TrimRight(line, "\r"), "\t")
+		if _, err := strconv.Atoi(other); err != nil || other == id {
+			continue
+		}
+		if _, err := c.Cmd("remove_network", other); err != nil {
 			return err
 		}
 	}

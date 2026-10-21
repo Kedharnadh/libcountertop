@@ -26,6 +26,7 @@ var sections = []section{
 	{"alerts.page", []string{"alerts"}},
 	{"settings.camera", []string{"camera"}},
 	{"voice.title", []string{"voice"}},
+	{"settings.assistants", []string{"assistants", "ring"}},
 }
 
 const systemSection = "settings.system"
@@ -37,6 +38,13 @@ func placed(domain string) (int, string, bool) {
 		}
 	}
 	return 0, "", false
+}
+
+func sectionOf(domain string) (int, string) {
+	if order, key, ok := placed(domain); ok {
+		return order, key
+	}
+	return len(sections), systemSection
 }
 
 func Unplaced(r *setting.Registry) []string {

@@ -105,7 +105,7 @@ func (c *Client) Run(ctx context.Context) error {
 			}
 		})
 
-		err = c.hold(ctx, lease, taken)
+		err = c.hold(ctx, lease, c.network(), taken)
 		stop()
 
 		if err != nil {
@@ -208,7 +208,7 @@ func (c *Client) contested(ctx context.Context, lease *Lease) (bool, error) {
 	return true, sleep(ctx, backoff)
 }
 
-func (c *Client) hold(ctx context.Context, lease *Lease, taken <-chan struct{}) error {
+func (c *Client) hold(ctx context.Context, lease *Lease, on string, taken <-chan struct{}) error {
 	renew := time.NewTimer(time.Until(lease.Renew))
 	defer renew.Stop()
 
@@ -237,6 +237,16 @@ func (c *Client) hold(ctx context.Context, lease *Lease, taken <-chan struct{}) 
 			if !linkUp(c.iface()) {
 				slog.Warn("link went away, asking again")
 				c.set(nil)
+				return nil
+			}
+			now := c.network()
+			if on == "" {
+				on = now
+			} else if now != "" && now != on {
+				slog.Warn("network changed, asking again", "was", on, "now", now)
+				c.set(nil)
+				release(c.iface())
+				c.remember(nil)
 				return nil
 			}
 		}

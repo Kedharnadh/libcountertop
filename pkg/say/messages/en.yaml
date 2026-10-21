@@ -76,6 +76,14 @@ assistants.off: "Off"
 assistants.pipeline: Pipeline
 assistants.pipeline.preferred: Preferred
 assistants.reply: Response playback
+assistants.setting.buffer: Reply buffer
+assistants.setting.delivery: Response playback
+assistants.setting.follow_up: Follow-up time
+assistants.setting.max_listen: Max listening time
+assistants.setting.max_think: Max thinking time
+assistants.setting.recordings: Recordings kept
+assistants.setting.threshold: Wake word sensitivity
+assistants.setting.tone: Wake sound
 assistants.slot: Assistant {{.N}}
 assistants.talk: Talk now
 assistants.talk.hint: Without the wake word
@@ -88,6 +96,9 @@ assistants.waiting: Waiting for the model
 assistants.word: Wake word
 assistants.word.ha: Enable actions or pick in Home Assistant
 bluetooth.group.bluetooth: Bluetooth
+ring.setting.effect: Wake light
+ring.setting.replying_effect: Replying light
+ring.setting.thinking_effect: Thinking light
 bluetooth.setting.proxy: Bluetooth proxy
 bluetooth.setting.scan: Bluetooth scanning
 bluetooth.setting.speaker: Bluetooth speaker
@@ -141,6 +152,15 @@ cameras.nosite: Home Assistant's address isn't known. Set it in Settings, Camera
 cameras.off: "Off"
 cameras.pick: Select
 cameras.seconds: "{{.N}} s"
+cameras.why.display: Live video isn't supported on this display
+cameras.why.failed: Live video unavailable
+cameras.why.format: Video format not supported
+cameras.why.lost: Connection lost
+cameras.why.nopicture: No video from the camera
+cameras.why.pictures: No live stream in Home Assistant
+cameras.why.refused: "Home Assistant: {{.Message}}"
+cameras.why.slow: Home Assistant timed out
+cameras.why.webrtc: Install the EchoLocal integration for live video
 cameras.setting.refresh: Refresh
 cameras.setting.rotate: Auto paginate
 cameras.setting.scale: Thumbnail size

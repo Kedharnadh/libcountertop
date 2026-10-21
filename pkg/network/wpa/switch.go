@@ -17,12 +17,8 @@ func Switch(ctx context.Context, c Conn, ssid, passphrase string) error {
 	if err != nil {
 		return err
 	}
-	if was.SSID == ssid {
+	if was.Joined(ssid) {
 		return fmt.Errorf("wpa: already on %q", ssid)
-	}
-
-	if err := Remove(c, ssid); err != nil {
-		return err
 	}
 
 	id, err := Add(c, ssid, passphrase)
@@ -47,8 +43,7 @@ func Switch(ctx context.Context, c Conn, ssid, passphrase string) error {
 		return back(c, id, was, err)
 	}
 
-	_, err = c.Cmd("save_config")
-	return err
+	return Only(c, id)
 }
 
 func back(c Conn, id string, was State, why error) error {

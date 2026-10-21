@@ -120,6 +120,7 @@ func IDs(out, ssid string) []string {
 }
 
 type State struct {
+	ID      string
 	SSID    string
 	State   string
 	Address string
@@ -150,6 +151,8 @@ func ParseStatus(out string) State {
 			continue
 		}
 		switch key {
+		case "id":
+			s.ID = value
 		case "ssid":
 			s.SSID = value
 		case "wpa_state":

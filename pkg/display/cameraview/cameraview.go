@@ -111,6 +111,7 @@ type Cameras struct {
 	presses   *interaction.Presses
 	win       *gogui.Window
 	watching  string
+	why       string
 	liveBegan time.Time
 	spinning  atomic.Bool
 	liveShot  frame
@@ -559,7 +560,7 @@ func (c *Cameras) watch(id string) {
 		c.stopLive()
 	}
 	ctx, stop := context.WithCancel(context.Background())
-	c.stopLive, c.watching, c.liveBegan = stop, id, time.Now()
+	c.stopLive, c.watching, c.why, c.liveBegan = stop, id, "", time.Now()
 	if c.liveShot.key != "" {
 		gogui.DropImage(c.liveShot.key)
 	}
@@ -573,7 +574,12 @@ func (c *Cameras) runLive(ctx context.Context, id string) {
 	pics, stopPics := c.startPictures(ctx, id)
 	defer func() { stopPics() }()
 	cam, ok := c.camera(id)
-	if !ok || !c.streams(cam) || c.undecodable(id) {
+	if !ok {
+		<-ctx.Done()
+		return
+	}
+	if why := c.unstreamable(cam); why != "" {
+		c.explain(id, why, nil)
 		<-ctx.Done()
 		return
 	}
@@ -581,7 +587,7 @@ func (c *Cameras) runLive(ctx context.Context, id string) {
 	if ctx.Err() != nil {
 		return
 	}
-	slog.Warn("camera stream failed, showing pictures instead", "camera", id, "err", err)
+	c.explain(id, reason(err), err)
 	if errors.Is(err, errUndecodable) {
 		c.mu.Lock()
 		c.refused[id] = struct{}{}
@@ -591,6 +597,49 @@ func (c *Cameras) runLive(ctx context.Context, id string) {
 		_, stopPics = c.startPictures(ctx, id)
 	}
 	<-ctx.Done()
+}
+
+func (c *Cameras) unstreamable(cam homeassistant.Camera) string {
+	switch {
+	case c.o.Display == nil:
+		return say.T("cameras.why.display")
+	case c.o.Streams == nil || !c.o.Streams.Speaks(homeassistant.WebRTCProtocol):
+		return say.T("cameras.why.webrtc")
+	case !cam.Streams():
+		return say.T("cameras.why.pictures")
+	case c.undecodable(cam.ID):
+		return say.T("cameras.why.format")
+	}
+	return ""
+}
+
+func (c *Cameras) explain(id, why string, err error) {
+	slog.Warn("camera showing pictures", "camera", id, "why", why, "err", err)
+	c.mu.Lock()
+	if c.watching == id {
+		c.why = why
+	}
+	c.mu.Unlock()
+	c.o.Shell.Redraw()
+}
+
+func reason(err error) string {
+	var refused *homeassistant.Failed
+	switch {
+	case errors.Is(err, errUndecodable):
+		return say.T("cameras.why.format")
+	case errors.Is(err, errNoPicture):
+		return say.T("cameras.why.nopicture")
+	case errors.Is(err, errLost):
+		return say.T("cameras.why.lost")
+	case errors.Is(err, homeassistant.ErrNoWebRTC):
+		return say.T("cameras.why.webrtc")
+	case errors.As(err, &refused):
+		return say.F("cameras.why.refused", map[string]any{"Message": refused.Message})
+	case errors.Is(err, context.DeadlineExceeded):
+		return say.T("cameras.why.slow")
+	}
+	return say.T("cameras.why.failed")
 }
 
 func (c *Cameras) startPictures(
@@ -673,7 +722,7 @@ func (c *Cameras) showLive(id string, img *image.RGBA) {
 func (c *Cameras) buildLive(w *gogui.Window) gogui.View {
 	vw, vh := w.WindowSize()
 	c.mu.Lock()
-	f, id, began, video, audible := c.liveShot, c.watching, c.liveBegan, c.video, c.audible
+	f, id, began, video, audible, why := c.liveShot, c.watching, c.liveBegan, c.video, c.audible, c.why
 	thumb := c.frames[id]
 	c.mu.Unlock()
 	var content []gogui.View
@@ -705,6 +754,9 @@ func (c *Cameras) buildLive(w *gogui.Window) gogui.View {
 	content = append(content, c.closer("camera-live-close", c.closeLive))
 	if video != nil || f.src != "" {
 		content = append(content, mode(vw, video != nil))
+	}
+	if video == nil && why != "" {
+		content = append(content, caption(vw, why))
 	}
 	if video != nil && c.o.Speaker != nil {
 		content = append(content, c.sounder(vw, vh, audible))
@@ -774,6 +826,34 @@ func mode(vw int, live bool) gogui.View {
 			VAlign:  gogui.VAlignMiddle,
 			Padding: gogui.NoPadding,
 			Content: []gogui.View{gogui.Label(glyph, st)},
+		}),
+	)
+}
+
+func caption(vw int, text string) gogui.View {
+	st := gogui.CurrentTheme().Cfg.TextStyleDef
+	st.Color = gogui.RGB(0xff, 0xff, 0xff)
+	badge := int(style.Reach()*0.5) * 2
+	top := int(gogui.PadLarge)*2 + badge
+	return widgets.Placed(
+		ui.Rect{X: 0, Y: top, W: vw, H: int(st.Size * 2.4)},
+		gogui.Row(gogui.ContainerCfg{
+			Sizing:  gogui.FillFill,
+			HAlign:  gogui.HAlignCenter,
+			VAlign:  gogui.VAlignMiddle,
+			Padding: gogui.NoPadding,
+			Content: []gogui.View{gogui.Row(gogui.ContainerCfg{
+				Sizing: gogui.FitFit,
+				Radius: gogui.RadiusLarge,
+				Color:  gogui.RGBA(0, 0, 0, 0x99),
+				Padding: gogui.NewPadding(
+					gogui.PadSmall,
+					gogui.PadLarge,
+					gogui.PadSmall,
+					gogui.PadLarge,
+				),
+				Content: []gogui.View{gogui.Label(text, st)},
+			})},
 		}),
 	)
 }

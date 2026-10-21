@@ -112,6 +112,50 @@ func TestSwitchingToAWorkingNetworkTakes(t *testing.T) {
 	}
 }
 
+func TestASwitchForgetsTheOldNetwork(t *testing.T) {
+	f := newFake("old")
+	f.configured["0"], f.next = "old", 1
+	f.joins["new"] = true
+
+	if err := Switch(context.Background(), f, "new", "a good passphrase"); err != nil {
+		t.Fatalf("switching to a network that associates: %v", err)
+	}
+	for id, name := range f.configured {
+		if name != "new" {
+			t.Errorf("network %s (%q) is still configured after the switch", id, name)
+		}
+	}
+	if len(f.configured) != 1 {
+		t.Errorf("%d networks configured after the switch, want 1", len(f.configured))
+	}
+}
+
+func TestAFailedSwitchKeepsTheOldNetwork(t *testing.T) {
+	f := newFake("old")
+	f.configured["0"], f.next = "old", 1
+	f.joins["new"] = false
+
+	within, stop := context.WithTimeout(context.Background(), 2*time.Second)
+	defer stop()
+	_ = Switch(within, f, "new", "the wrong passphrase")
+
+	if f.configured["0"] != "old" {
+		t.Errorf("the old network is gone after a failed switch: %v", f.configured)
+	}
+}
+
+func TestOnlyNeedsANetworkToKeep(t *testing.T) {
+	f := newFake("old")
+	f.configured["0"] = "old"
+
+	if err := Only(f, ""); err == nil {
+		t.Error("keeping no network was accepted")
+	}
+	if len(f.configured) != 1 {
+		t.Errorf("%d networks configured, want the one there was", len(f.configured))
+	}
+}
+
 func TestAFailedSwitchGoesBack(t *testing.T) {
 	f := newFake("old")
 	f.joins["new"] = false

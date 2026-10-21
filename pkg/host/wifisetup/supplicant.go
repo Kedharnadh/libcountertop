@@ -1,6 +1,7 @@
 package wifisetup
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -42,8 +43,8 @@ func (s Supplicant) Answering() bool {
 	return err == nil && strings.Contains(out, "PONG")
 }
 
-func (s Supplicant) Join(ssid, passphrase string) error {
-	if err := wpa.Join(s, ssid, passphrase); err != nil {
+func (s Supplicant) Join(ctx context.Context, ssid, passphrase string) error {
+	if err := wpa.Switch(ctx, s, ssid, passphrase); err != nil {
 		return err
 	}
 	if s.DHCP != "" {
