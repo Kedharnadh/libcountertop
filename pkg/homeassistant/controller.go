@@ -40,6 +40,7 @@ type reply struct {
 type link struct {
 	access      Access
 	integration Integration
+	protocol    int
 	stop        context.CancelFunc
 }
 
@@ -83,6 +84,10 @@ func New(settings Settings) *Controller {
 	}
 }
 func (h *Controller) Run(ctx context.Context) error { <-ctx.Done(); h.Close(); return nil }
+
+func (h *Controller) FollowIntegration(f Follower) {
+	f.Follow(VersionEntity, "").Reported.Listen(func(string) { h.Probe() })
+}
 func (h *Controller) Close() {
 	h.mu.Lock()
 	h.closed = true
@@ -249,14 +254,15 @@ func (h *Controller) probe(ctx context.Context, conn sender) {
 	var failed *Failed
 	switch {
 	case err == nil:
-		h.settle(conn, Allowed, integrationOf(raw))
+		integration, protocol := integrationOf(raw)
+		h.settle(conn, Allowed, integration, protocol)
 	case errors.As(err, &failed):
-		h.settle(conn, Allowed, IntegrationMissing)
+		h.settle(conn, Allowed, IntegrationMissing, 0)
 	case errors.Is(err, context.DeadlineExceeded):
 		slog.Warn(
 			"Home Assistant does not answer actions from this device; enable them in the ESPHome integration's options",
 		)
-		h.settle(conn, Refused, IntegrationUnknown)
+		h.settle(conn, Refused, IntegrationUnknown, 0)
 	}
 }
 
@@ -270,20 +276,37 @@ func (h *Controller) Integration() Integration {
 	return best
 }
 
-func integrationOf(raw []byte) Integration {
+func integrationOf(raw []byte) (Integration, int) {
 	var out struct {
 		Response json.RawMessage `json:"response"`
 	}
 	var answer struct {
 		Supported bool `json:"supported"`
+		Protocol  int  `json:"protocol"`
 	}
 	if json.Unmarshal(raw, &out) != nil || json.Unmarshal(unwrap(out.Response), &answer) != nil {
-		return IntegrationOutdated
+		return IntegrationOutdated, 0
 	}
 	if !answer.Supported {
-		return IntegrationOutdated
+		return IntegrationOutdated, answer.Protocol
 	}
-	return IntegrationReady
+	return IntegrationReady, answer.Protocol
+}
+
+func (h *Controller) speaker(protocol int) (sender, bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for conn, l := range h.links {
+		if l.access == Allowed && l.integration == IntegrationReady && l.protocol >= protocol {
+			return conn, true
+		}
+	}
+	return nil, false
+}
+
+func (h *Controller) Speaks(protocol int) bool {
+	_, ok := h.speaker(protocol)
+	return ok
 }
 
 func (h *Controller) Enable(on bool) {
@@ -306,14 +329,14 @@ func (h *Controller) Enable(on bool) {
 	}
 }
 
-func (h *Controller) settle(conn sender, access Access, integration Integration) {
+func (h *Controller) settle(conn sender, access Access, integration Integration, protocol int) {
 	h.mu.Lock()
 	l := h.links[conn]
 	if l == nil {
 		h.mu.Unlock()
 		return
 	}
-	l.access, l.integration = access, integration
+	l.access, l.integration, l.protocol = access, integration, protocol
 	overall, moved := h.judge()
 	h.mu.Unlock()
 	if moved {

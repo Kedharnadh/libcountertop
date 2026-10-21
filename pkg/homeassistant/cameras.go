@@ -11,12 +11,17 @@ import (
 
 type Camera struct {
 	Entity
-	Picture string `json:"picture"`
+	Picture  string `json:"picture"`
+	Features int    `json:"features"`
 }
+
+const cameraStream = 2
+
+func (c Camera) Streams() bool { return c.Features&cameraStream != 0 }
 
 const camerasTemplate = `{%- set ns = namespace(out=[]) -%}
 {%- for s in states.camera -%}
-{%- set ns.out = ns.out + [{'id': s.entity_id, 'name': s.name, 'state': s.state, 'area_id': area_id(s.entity_id) or '', 'area': area_name(s.entity_id) or '', 'labels': labels(s.entity_id), 'picture': s.attributes.entity_picture or ''}] -%}
+{%- set ns.out = ns.out + [{'id': s.entity_id, 'name': s.name, 'state': s.state, 'area_id': area_id(s.entity_id) or '', 'area': area_name(s.entity_id) or '', 'labels': labels(s.entity_id), 'picture': s.attributes.entity_picture or '', 'features': s.attributes.supported_features or 0}] -%}
 {%- endfor -%}
 {{ ns.out | tojson }}`
 

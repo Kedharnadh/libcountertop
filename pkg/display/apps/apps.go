@@ -10,6 +10,7 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/display/drawer"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
+	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/say"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
@@ -48,6 +49,7 @@ type Apps struct {
 	mu   sync.Mutex
 	list []App
 	drag drag
+	held widgets.Drag
 }
 
 type drag struct {

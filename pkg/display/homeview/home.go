@@ -72,6 +72,11 @@ func (view *Renderer) Body(w *gogui.Window) gogui.View {
 			menu.Row{Label: say.T("calendar.app"), Kind: menu.Chevron, Value: chosen},
 			func(int) { view.options.Shell.Push(view.CalendarPage()) }, false))
 	}
+	if page := view.options.Cameras; page != nil {
+		views = append(views, view.options.UI.Row("cameras", "home",
+			menu.Row{Label: say.T("cameras.app"), Kind: menu.Chevron},
+			func(int) { view.options.Shell.Push(page()) }, false))
+	}
 	return Column(views)
 }
 
@@ -474,6 +479,7 @@ type Dependencies struct {
 	WeatherEntities func() shell.View
 	Todo            *todo.Todo
 	Calendar        *calendar.Calendar
+	Cameras         func() shell.View
 	Shell           *shell.Shell
 	Logo            string
 	Marks           settings.ModeMarks

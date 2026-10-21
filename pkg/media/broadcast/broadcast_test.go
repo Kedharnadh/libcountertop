@@ -66,6 +66,8 @@ type turns struct{ after int }
 
 func (t *turns) AfterTurn(func()) { t.after++ }
 
+func (t *turns) Listen() func() { return func() {} }
+
 type messages struct{ titles []string }
 
 func (m *messages) Info(title, _ string, _ time.Duration) { m.titles = append(m.titles, title) }

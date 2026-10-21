@@ -51,9 +51,34 @@ func TestTheCameraIsOneEntityAndItTakesPictures(t *testing.T) {
 	}
 }
 
-func TestACoveredCameraTakesNoPicture(t *testing.T) {
-	if _, err := newVision(true).Still(); !errors.Is(err, ErrCovered) {
-		t.Errorf("err = %v, want %v", err, ErrCovered)
+func TestABlockedCameraAnswersWithTheCard(t *testing.T) {
+	muted := New(Options{
+		Covered: func() bool { return false },
+		Picture: func(time.Duration) (session.Picture, error) {
+			return session.Picture{}, session.ErrMuted
+		},
+	})
+	for name, v := range map[string]*Vision{"covered": newVision(true), "muted": muted} {
+		out, err := v.Still()
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		img, err := jpeg.Decode(bytes.NewReader(out))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if b := img.Bounds(); b.Dx() != cardWidth || b.Dy() != cardHeight {
+			t.Errorf("%s card is %v, want %dx%d", name, b, cardWidth, cardHeight)
+		}
+	}
+	failing := New(Options{
+		Covered: func() bool { return false },
+		Picture: func(time.Duration) (session.Picture, error) {
+			return session.Picture{}, errors.New("no frame")
+		},
+	})
+	if _, err := failing.Still(); err == nil {
+		t.Error("a failed picture came back as a card")
 	}
 }
 

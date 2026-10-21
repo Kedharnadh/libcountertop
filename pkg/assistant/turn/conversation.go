@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"math"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -48,6 +49,8 @@ const (
 	evContinue
 	evSpeaking
 	evAccepted
+	evListen
+	evRelease
 )
 
 type event struct {
@@ -378,6 +381,17 @@ func (c *Conversation) handle(e event) {
 		c.idle("cancelled", activity.Cancelled)
 		c.options.Cancelled()
 
+	case evListen:
+		if c.phase == phaseIdle {
+			c.options.Presentation.Show(Showing{Phase: phaseListening, Slot: c.slot})
+			c.options.Presentation.Phase(c.slot, phaseListening)
+		}
+
+	case evRelease:
+		if c.phase == phaseIdle {
+			c.present()
+		}
+
 	case evTimeout:
 		c.clearPending()
 
@@ -683,6 +697,12 @@ func (c *Conversation) tts(data []byte, end bool) {
 func (c *Conversation) Start(slot int) { c.post(event{kind: evStart, slot: slot}) }
 
 func (c *Conversation) Cancel() { c.post(event{kind: evCancel}) }
+
+func (c *Conversation) Listen() (release func()) {
+	c.post(event{kind: evListen})
+	var once sync.Once
+	return func() { once.Do(func() { c.post(event{kind: evRelease}) }) }
+}
 
 func (c *Conversation) Busy() bool { return c.Phase() != phaseIdle }
 

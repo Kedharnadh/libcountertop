@@ -80,9 +80,13 @@ func New(vs *esphome.VoiceSatellite, deps turn.Dependencies, options Options) *S
 
 func (s *Satellite) Name() string { return "conversation" }
 
+var _ esphome.ConnCloser = (*Satellite)(nil)
+
 func (s *Satellite) Handle(ctx context.Context, c *esphome.Conn, msg proto.Message) error {
 	return s.vs.Handle(ctx, c, msg)
 }
+
+func (s *Satellite) ConnClosed(c *esphome.Conn) { s.vs.ConnClosed(c) }
 
 func (s *Satellite) Run(ctx context.Context) error {
 	s.turn.Run(ctx)
@@ -116,6 +120,8 @@ func (s *Satellite) AfterTurn(fn func()) {
 		run()
 	}
 }
+
+func (s *Satellite) Listen() (release func()) { return s.turn.Listen() }
 
 func (s *Satellite) Action() {
 	if s.Stop() {

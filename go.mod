@@ -12,8 +12,8 @@ require (
 	github.com/bluenviron/gohlslib/v2 v2.4.5
 	github.com/bluenviron/mediacommon/v2 v2.9.5
 	github.com/charmbracelet/x/term v0.2.2
-	github.com/go-gui-org/go-glyph v1.26.1
-	github.com/go-gui-org/go-gui v0.84.0
+	github.com/go-gui-org/go-glyph v1.26.4
+	github.com/go-gui-org/go-gui v0.91.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/kkdai/youtube/v2 v2.10.6
@@ -29,10 +29,10 @@ require (
 	github.com/pion/rtp v1.10.5
 	github.com/pion/webrtc/v4 v4.2.22
 	github.com/tphakala/go-aac v0.7.0
-	github.com/ygelfand/go-esphome-device v0.0.15
+	github.com/ygelfand/go-esphome-device v0.0.16
 	github.com/zserge/microwakeword v0.0.0-20260330234603-bfaf3840114e
-	golang.org/x/image v0.46.0
-	golang.org/x/sys v0.48.0
+	golang.org/x/image v0.47.0
+	golang.org/x/sys v0.49.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -110,13 +110,13 @@ require (
 	github.com/wlynxg/anet v0.0.5 // indirect
 	github.com/yuin/goldmark v1.8.5 // indirect
 	github.com/yuin/goldmark-emoji v1.0.6 // indirect
-	golang.org/x/crypto v0.55.0
+	golang.org/x/crypto v0.57.0
 	golang.org/x/exp/shiny v0.0.0-20260908205506-85c1c2202aba
 	golang.org/x/mod v0.41.0 // indirect
-	golang.org/x/net v0.58.0 // indirect
-	golang.org/x/sync v0.23.0
-	golang.org/x/text v0.42.0
+	golang.org/x/net v0.59.0 // indirect
+	golang.org/x/sync v0.24.0
+	golang.org/x/text v0.43.0
 	golang.org/x/time v0.14.0 // indirect
-	golang.org/x/tools v0.49.0 // indirect
+	golang.org/x/tools v0.51.0 // indirect
 	rsc.io/qr v0.2.0
 )

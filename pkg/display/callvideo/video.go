@@ -114,13 +114,14 @@ type layer struct {
 	box     func(vw, vh int) display.Rect
 	broken  func()
 
-	mu     sync.Mutex
-	open   bool
-	shown  bool
-	hidden bool
-	closed bool
-	frames uint64
-	failed error
+	mu      sync.Mutex
+	open    bool
+	shown   bool
+	hidden  bool
+	closed  bool
+	frames  uint64
+	decoded uint64
+	failed  error
 }
 
 func (l *layer) stats() call.LayerStats {
@@ -134,6 +135,7 @@ func (l *layer) stats() call.LayerStats {
 		Width:  l.size.Width,
 		Height: l.size.Height,
 		Frames: l.frames,
+		Shown:  l.decoded,
 		Failed: l.failed,
 	}
 }
@@ -187,7 +189,8 @@ func (l *layer) Show(f rtc.Frame) {
 		)
 		l.open, l.failed = true, nil
 	}
-	if err := feed(c, l.id, f); err != nil {
+	played, err := feed(c, l.id, f)
+	if err != nil {
 		l.failed = err
 		if errors.Is(err, surface.Broken) {
 			slog.Warn("call video decoder broke, reopening", "layer", l.id)
@@ -202,6 +205,7 @@ func (l *layer) Show(f rtc.Frame) {
 		return
 	}
 	l.frames++
+	l.decoded = uint64(played.Shown)
 	if err := c.VideoClock(l.id, f.PTS-videoLag, true); err != nil {
 		slog.Debug("call video clock", "layer", l.id, "err", err)
 	}
@@ -268,16 +272,16 @@ func (l *layer) close() {
 	l.open, l.shown = false, false
 }
 
-func feed(c *surface.Client, id uint32, f rtc.Frame) error {
+func feed(c *surface.Client, id uint32, f rtc.Frame) (surface.Played, error) {
 	var flags uint32
 	if f.Key {
 		flags = surface.SampleKey
 	}
 	give := time.Now().Add(feedGiveUp)
 	for {
-		_, err := c.VideoSample(id, f.PTS, flags, f.Data)
+		played, err := c.VideoSample(id, f.PTS, flags, f.Data)
 		if !errors.Is(err, surface.Full) || time.Now().After(give) {
-			return err
+			return played, err
 		}
 		time.Sleep(feedRetry)
 	}

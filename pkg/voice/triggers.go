@@ -46,6 +46,8 @@ func NewTable(actions, commands []string) *setting.Table[schema.Voice] {
 	)
 }
 
+func ActionSwitch(name string) string { return say.T("voice.setting." + schema.ActionKey(name)) }
+
 func item(key string, group setting.Group, icon string) Setting {
 	return Setting{
 		Name:  key,

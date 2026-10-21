@@ -60,8 +60,7 @@ func (p *Policy) Settings() *setting.Controls[schema.Network] { return p.knobs }
 func (p *Policy) Restore(verify bool)                         { p.apply(verify) }
 func (p *Policy) Verifying() bool                             { return !fetch.Skipping() }
 
-func (p *Policy) HomeKey() string  { return p.settings.Read().HomeKey }
-func (p *Policy) HasHomeKey() bool { return p.HomeKey() != "" }
+func (p *Policy) HomeKey() string { return p.settings.Read().HomeKey }
 
 func (p *Policy) SetHomeKey(key string) error {
 	return p.save(p.knobs.Table.MustRow("home_key"), key)

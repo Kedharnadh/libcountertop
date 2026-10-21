@@ -67,6 +67,7 @@ type Radar struct {
 	back   backdrop
 	pan    *[2]float64
 	drag   [2]float32
+	held   widgets.Drag
 	placed placement
 }
 
@@ -251,26 +252,33 @@ func (r *Radar) panner(box ui.Rect) gogui.View {
 			if kind != gogui.GesturePan && kind != gogui.GestureSwipe {
 				return
 			}
-			r.mu.Lock()
-			switch {
-			case kind == gogui.GesturePan && (e.Event.GesturePhase == gogui.GesturePhaseBegan ||
-				e.Event.GesturePhase == gogui.GesturePhaseChanged):
+			if kind == gogui.GesturePan && (e.Event.GesturePhase == gogui.GesturePhaseBegan ||
+				e.Event.GesturePhase == gogui.GesturePhaseChanged) {
+				if !r.held.Active() {
+					r.held.Begin(e.Window, r.drop)
+				}
+				r.mu.Lock()
 				r.drag[0] += e.Event.GestureDX
 				r.drag[1] += e.Event.GestureDY
-			case e.Event.GesturePhase == gogui.GesturePhaseEnded:
-				if r.drag != [2]float32{} {
-					at := r.placed.moved(r.drag)
-					r.pan = &at
-				}
-				r.drag = [2]float32{}
-			case e.Event.GesturePhase == gogui.GesturePhaseCancelled:
-				r.drag = [2]float32{}
+				r.mu.Unlock()
+			} else {
+				r.held.End(e.Window, 0)
 			}
-			r.mu.Unlock()
 			e.Consume()
 			e.Window.InvalidateLayout()
 		},
 	}))
+}
+
+func (r *Radar) drop(w *gogui.Window, _ float32) {
+	r.mu.Lock()
+	if r.drag != [2]float32{} {
+		at := r.placed.moved(r.drag)
+		r.pan = &at
+	}
+	r.drag = [2]float32{}
+	r.mu.Unlock()
+	w.InvalidateLayout()
 }
 
 func swallow(e gogui.EventCtx) {

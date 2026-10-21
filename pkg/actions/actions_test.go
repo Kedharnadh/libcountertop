@@ -23,7 +23,8 @@ func TestTheDeclarationCarriesEveryActionAndItsTriggers(t *testing.T) {
 	r.Add(Action{Name: "ping", Run: func(esphome.Call) (string, error) { return "", nil }})
 
 	var got declared
-	if err := json.Unmarshal([]byte(r.Declaration(all)["actions"]), &got); err != nil {
+	switched := func(name string) string { return "Switch " + name }
+	if err := json.Unmarshal([]byte(r.Declaration(all, switched)["actions"]), &got); err != nil {
 		t.Fatal(err)
 	}
 	if got.Version != Version || len(got.Actions) != 2 {
@@ -32,7 +33,7 @@ func TestTheDeclarationCarriesEveryActionAndItsTriggers(t *testing.T) {
 	call := got.Actions[0]
 	if call.Name != "call" || len(call.Args) != 1 ||
 		call.Args[0] != (declaredArg{Name: "peer", Type: "string"}) ||
-		len(call.Triggers) != 2 {
+		len(call.Triggers) != 2 || call.Switch != "Switch call" {
 		t.Errorf("call declared as %+v", call)
 	}
 	if call.Triggers[1].Args["video"] != "true" {
@@ -51,7 +52,7 @@ func TestASpeechArgIsDeclaredAsSpeech(t *testing.T) {
 		Speech: "message",
 	})
 	var got declared
-	if err := json.Unmarshal([]byte(r.Declaration(all)["actions"]), &got); err != nil {
+	if err := json.Unmarshal([]byte(r.Declaration(all, nil)["actions"]), &got); err != nil {
 		t.Fatal(err)
 	}
 	if arg := got.Actions[0].Args[0]; arg.Type != speechType {
@@ -66,7 +67,7 @@ func TestASilencedActionDeclaresNoTriggers(t *testing.T) {
 	r.Add(Action{Name: "call", Triggers: []Trigger{{Sentence: "call {peer}"}}})
 	r.Add(Action{Name: "broadcast", Triggers: []Trigger{{Sentence: "broadcast"}}})
 	var got declared
-	raw := r.Declaration(func(name string) bool { return name != "call" })["actions"]
+	raw := r.Declaration(func(name string) bool { return name != "call" }, nil)["actions"]
 	if err := json.Unmarshal([]byte(raw), &got); err != nil {
 		t.Fatal(err)
 	}

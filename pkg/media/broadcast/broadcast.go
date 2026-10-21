@@ -36,7 +36,7 @@ const (
 
 	longest     = 30 * time.Second
 	firstWords  = 8 * time.Second
-	quietAfter  = 1200 * time.Millisecond
+	quietAfter  = 2 * time.Second
 	leadChunks  = 6
 	startChunks = 3
 	speechAbove = 0.5
@@ -71,7 +71,10 @@ type Tones interface {
 	Sound(c, fallback schema.Chime) tone.Sound
 }
 
-type Turns interface{ AfterTurn(func()) }
+type Turns interface {
+	AfterTurn(func())
+	Listen() (release func())
+}
 
 type Messages interface {
 	Info(title, body string, hold time.Duration)
@@ -133,10 +136,12 @@ func (b *Broadcaster) speak() {
 		return
 	}
 	defer b.recording.Unlock()
+	release := b.o.Turns.Listen()
 	start := b.o.Tones.Sound(schema.ChimeChirp, schema.ChimeChirp)
 	b.o.Sound.Tone(schema.StreamFeedback, toneLevel, start)
 	time.Sleep(start.Length())
 	samples, err := b.record(context.Background())
+	release()
 	if err != nil {
 		slog.Info("broadcast not sent", "err", err)
 		b.outcome(err)

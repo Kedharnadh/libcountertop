@@ -1,13 +1,8 @@
 package widgets
 
 import (
-	"fmt"
-
 	gogui "github.com/go-gui-org/go-gui/gui"
 
-	"github.com/ygelfand/libcountertop/pkg/display/style"
-	"github.com/ygelfand/libcountertop/pkg/display/ui"
-	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/tessera"
 )
 
@@ -24,16 +19,17 @@ func (v *View) gesture(l tessera.Layout) func(gogui.EventCtx) {
 			switch ev.GesturePhase {
 			case gogui.GesturePhaseBegan, gogui.GesturePhaseChanged:
 				if abs(ev.GestureDX) >= abs(ev.GestureDY) {
-					v.drag(l, ev.GestureDX, width)
+					v.drag(e.Window, l, ev.GestureDX, width)
 				}
 			default:
-				v.release(e.Window, l, width, 0)
+				v.pager.Lift(e.Window, 0)
 			}
 		case gogui.GestureSwipe:
 			if -ev.VelocityY > swipeSpeed && -ev.VelocityY > abs(ev.VelocityX) {
+				v.pager.Lift(e.Window, 0)
 				v.move(e.Window, func() { v.home(l) })
 			} else {
-				v.release(e.Window, l, width, ev.VelocityX)
+				v.pager.Lift(e.Window, ev.VelocityX)
 			}
 		default:
 			return
@@ -48,35 +44,4 @@ func abs(f float32) float32 {
 		return -f
 	}
 	return f
-}
-
-func (v *View) dots(at ui.Rect, shown []int, page int) gogui.View {
-	t := gogui.CurrentTheme().Cfg
-	side := style.Reach() * 0.3
-	var dots []gogui.View
-	for i, p := range shown {
-		fill := t.ColorTextSecondary.WithOpacity(0.4)
-		if p == page {
-			fill = t.ColorAccent
-		}
-		dots = append(dots, gogui.Row(gogui.ContainerCfg{
-			ID:      fmt.Sprintf("tessera-dot-%d", i),
-			Width:   side,
-			Height:  side,
-			Sizing:  gogui.FixedFixed,
-			Radius:  gogui.RadiusLarge,
-			Color:   fill,
-			Padding: gogui.NoPadding,
-		}))
-	}
-	return widgets.Placed(at, gogui.Row(gogui.ContainerCfg{
-		Width:   float32(at.W),
-		Height:  float32(at.H),
-		Sizing:  gogui.FixedFixed,
-		HAlign:  gogui.HAlignCenter,
-		VAlign:  gogui.VAlignMiddle,
-		Spacing: gogui.SpacingMedium,
-		Padding: gogui.NoPadding,
-		Content: dots,
-	}))
 }

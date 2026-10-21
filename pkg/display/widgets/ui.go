@@ -34,6 +34,7 @@ func NewUI(settings storage.Section[schema.Screen]) *UI {
 func (u *UI) Reset() {
 	u.Presses = interaction.New()
 	u.Editor = NewEditor()
+	u.Editor.Presses = u.Presses
 	u.Gestures = &Gestures{Release: func(e gogui.EventCtx) { u.Presses.Release(e) }}
 }
 

@@ -377,15 +377,28 @@ func (cv *View) profileBody(w *gogui.Window, prof *Profile) gogui.View {
 	for _, a := range p.Addrs {
 		addrs = append(addrs, a.String())
 	}
+	can := make([]string, 0, len(p.Caps))
+	for _, c := range p.Caps {
+		if say.Missing("peer.cap." + c) {
+			can = append(can, c)
+			continue
+		}
+		can = append(can, say.T("peer.cap."+c))
+	}
 	capable := say.T("call.no")
-	if p.Video() {
-		capable = say.T("call.yes")
+	if len(can) > 0 {
+		capable = strings.Join(can, ", ")
 	}
 	details := []menu.Row{
 		{Label: say.T("call.model"), Kind: menu.Plain, Value: p.Model},
+		{
+			Label: say.T("call.standing"),
+			Kind:  menu.Plain,
+			Value: say.T("peer." + p.Standing.String()),
+		},
 		{Label: say.T("call.address"), Kind: menu.Plain, Value: strings.Join(addrs, ", ")},
 		{Label: say.T("call.version"), Kind: menu.Plain, Value: p.Version},
-		{Label: say.T("call.video"), Kind: menu.Plain, Value: capable},
+		{Label: say.T("call.caps"), Kind: menu.Plain, Value: capable},
 		{
 			Label: say.T("call.seen"),
 			Kind:  menu.Plain,
@@ -418,6 +431,9 @@ func (cv *View) profileBody(w *gogui.Window, prof *Profile) gogui.View {
 		)
 	}
 
+	if !p.Standing.Trusted() {
+		return homeview.Column(rows)
+	}
 	glyph := iconStyle(t.TextStyleDef.Color)
 	glyph.Size = reach() * 0.7
 	height := reach() * 1.8

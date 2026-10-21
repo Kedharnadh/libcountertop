@@ -10,15 +10,16 @@ import (
 
 	esphome "github.com/ygelfand/go-esphome-device"
 
+	"github.com/ygelfand/libcountertop/pkg/camera/card"
 	"github.com/ygelfand/libcountertop/pkg/camera/session"
 )
 
 const (
-	Wait    = 5 * time.Second
-	Quality = 85
+	Wait       = 5 * time.Second
+	Quality    = 85
+	cardWidth  = 640
+	cardHeight = 360
 )
-
-var ErrCovered = errors.New("vision: the camera is covered")
 
 type Options struct {
 	DeviceID uint32
@@ -54,14 +55,19 @@ func (v *Vision) Entities() []esphome.Entity { return []esphome.Entity{v.entity}
 
 func (v *Vision) Still() ([]byte, error) {
 	if v.covered() {
-		return nil, ErrCovered
+		return card.JPEG(cardWidth, cardHeight, session.Shuttered, Quality)
 	}
 
 	v.mu.Lock()
 	defer v.mu.Unlock()
 
 	pic, err := v.picture(Wait)
-	if err != nil {
+	switch {
+	case errors.Is(err, session.ErrMuted):
+		return card.JPEG(cardWidth, cardHeight, session.Muted, Quality)
+	case errors.Is(err, session.ErrShutter):
+		return card.JPEG(cardWidth, cardHeight, session.Shuttered, Quality)
+	case err != nil:
 		return nil, err
 	}
 	return encode(pic)

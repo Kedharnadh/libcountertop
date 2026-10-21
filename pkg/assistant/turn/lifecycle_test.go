@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/ygelfand/libcountertop/pkg/hook"
 )
 
 func TestOldReplyCannotEndOrDisarmNewReply(t *testing.T) {
@@ -17,6 +19,28 @@ func TestOldReplyCannotEndOrDisarmNewReply(t *testing.T) {
 	c.handle(event{kind: evPlaying, replyID: 2})
 	if c.deadline != nil {
 		t.Fatal("current audio did not disarm its deadline")
+	}
+}
+
+func TestListeningHoldShowsTheMicStageOnlyWhileIdle(t *testing.T) {
+	var shown []Showing
+	h := &hook.Hook[Showing]{}
+	h.Listen(func(s Showing) { shown = append(shown, s) })
+	c := &Conversation{slot: 1, options: Dependencies{Presentation: &Presentation{Shown: h}}}
+
+	c.handle(event{kind: evListen})
+	c.handle(event{kind: evRelease})
+	if len(shown) != 2 || shown[0].Phase != Listening || shown[0].Slot != 1 ||
+		shown[1].Phase != Idle {
+		t.Fatalf("idle hold showed %+v, want listening on slot 1 then idle", shown)
+	}
+
+	shown = nil
+	c.phase = phaseThinking
+	c.handle(event{kind: evListen})
+	c.handle(event{kind: evRelease})
+	if len(shown) != 0 {
+		t.Fatalf("a hold during a turn showed %+v, want nothing", shown)
 	}
 }
 

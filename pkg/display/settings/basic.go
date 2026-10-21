@@ -79,7 +79,7 @@ type BasicDependencies struct {
 	Previews              previews.Kit
 }
 type HomeKey interface {
-	HasHomeKey() bool
+	HomeKey() string
 	SetHomeKey(string) error
 }
 type PinLock interface {

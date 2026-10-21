@@ -162,6 +162,21 @@ func TestChangedOnlyFiresOnNews(t *testing.T) {
 	}
 }
 
+func TestReportedFiresOnEveryReport(t *testing.T) {
+	s := &States{}
+	v := s.Follow("sensor.echolocal_protocol_version", "")
+
+	reported := 0
+	v.Reported.Listen(func(string) { reported++ })
+
+	report(t, s, "sensor.echolocal_protocol_version", "", "2")
+	report(t, s, "sensor.echolocal_protocol_version", "", "2")
+
+	if reported != 2 {
+		t.Errorf("reported %d times for two reports of the same state, want 2", reported)
+	}
+}
+
 func TestOnlyANumberReadsAsANumber(t *testing.T) {
 	tests := []struct {
 		state string

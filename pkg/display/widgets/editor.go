@@ -3,6 +3,7 @@ package widgets
 import (
 	gui "github.com/go-gui-org/go-gui/gui"
 
+	"github.com/ygelfand/libcountertop/pkg/display/interaction"
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/style"
 )
@@ -12,15 +13,19 @@ type FieldStyle interface {
 }
 
 type Editor struct {
-	drafts  map[string]string
-	leaf    string
-	save    func()
-	Top     float32
-	Shift   bool
-	Symbols bool
+	drafts   map[string]string
+	revealed map[string]struct{}
+	Presses  *interaction.Presses
+	leaf     string
+	save     func()
+	Top      float32
+	Shift    bool
+	Symbols  bool
 }
 
-func NewEditor() *Editor { return &Editor{drafts: make(map[string]string)} }
+func NewEditor() *Editor {
+	return &Editor{drafts: make(map[string]string), revealed: make(map[string]struct{})}
+}
 
 func focused(w *gui.Window, leaf string) bool {
 	for _, id := range w.ResolveID(leaf) {
@@ -78,10 +83,11 @@ func (e *Editor) Row(kit FieldStyle, id string, r menu.Row) gui.View {
 	if !ok {
 		text = r.Value
 	}
-	return e.Field(kit, gui.InputCfg{
+	_, shown := e.revealed[fid]
+	field := e.Field(kit, gui.InputCfg{
 		ID:            fid,
 		Text:          text,
-		IsPassword:    r.Kind == menu.Password,
+		IsPassword:    r.Kind == menu.Password && !shown,
 		Sizing:        gui.FillFit,
 		OnTextChanged: func(s string, ev gui.EventCtx) { e.drafts[fid] = s; ev.Window.InvalidateLayout() },
 		OnTextCommit: func(_ string, _ gui.InputCommitReason, ev gui.EventCtx) {
@@ -92,5 +98,39 @@ func (e *Editor) Row(kit FieldStyle, id string, r menu.Row) gui.View {
 		if s, ok := e.drafts[fid]; ok && r.Save != nil {
 			r.Save(s)
 		}
+	})
+	if r.Kind != menu.Password {
+		return field
+	}
+	return gui.Row(gui.ContainerCfg{
+		Sizing:  gui.FillFit,
+		VAlign:  gui.VAlignMiddle,
+		Padding: gui.NoPadding,
+		Spacing: gui.SpacingSmall,
+		Content: []gui.View{field, e.eye(fid, shown)},
+	})
+}
+
+func (e *Editor) eye(fid string, shown bool) gui.View {
+	glyph := "mdi:eye"
+	if shown {
+		glyph = "mdi:eye-off"
+	}
+	return e.Presses.Pressable(gui.Row, gui.ContainerCfg{
+		ID:      fid + "-eye",
+		Width:   style.Reach(),
+		Height:  style.Reach(),
+		Sizing:  gui.FixedFixed,
+		HAlign:  gui.HAlignCenter,
+		VAlign:  gui.VAlignMiddle,
+		Padding: gui.NoPadding,
+		Content: []gui.View{icon(glyph, gui.CurrentTheme().Cfg.ColorTextSecondary)},
+	}, func(ev gui.EventCtx) {
+		if shown {
+			delete(e.revealed, fid)
+		} else {
+			e.revealed[fid] = struct{}{}
+		}
+		ev.Window.InvalidateLayout()
 	})
 }

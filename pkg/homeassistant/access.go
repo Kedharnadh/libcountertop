@@ -2,6 +2,8 @@ package homeassistant
 
 import (
 	"errors"
+
+	"github.com/ygelfand/libcountertop/pkg/homeassistant/states"
 )
 
 var (
@@ -19,10 +21,15 @@ const (
 	Refused
 )
 
+type Follower interface {
+	Follow(entity, attribute string) *states.Value
+}
+
 const (
-	Ping      = "echolocal.ping"
-	Protocol  = 1
-	pingReply = "{{ response | tojson }}"
+	VersionEntity = "sensor.echolocal_protocol_version"
+	Ping          = "echolocal.ping"
+	Protocol      = 1
+	pingReply     = "{{ response | tojson }}"
 )
 
 type Failed struct{ Message string }

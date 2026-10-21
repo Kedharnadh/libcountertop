@@ -70,6 +70,7 @@ type LayerStats struct {
 	Width  int
 	Height int
 	Frames uint64
+	Shown  uint64
 	Failed error
 }
 

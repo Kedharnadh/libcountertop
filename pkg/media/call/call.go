@@ -16,6 +16,7 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/media/rtc"
 	discovery "github.com/ygelfand/libcountertop/pkg/network/peer"
 	"github.com/ygelfand/libcountertop/pkg/runtime/safe"
+	"github.com/ygelfand/libcountertop/pkg/say"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
 
@@ -160,6 +161,7 @@ func (c *Calls) PausesWake() bool { return c.Talking() && c.options.Settings.Rea
 
 func (c *Calls) Start(p discovery.Peer, video bool) error {
 	if !p.Standing.Trusted() {
+		c.inform(p.Name, say.T("peer.foreign"))
 		return ErrForeign
 	}
 	addr, err := p.URL()
@@ -170,6 +172,7 @@ func (c *Calls) Start(p discovery.Peer, video bool) error {
 	c.mu.Lock()
 	if c.now != nil {
 		c.mu.Unlock()
+		c.inform(p.Name, say.T("actions.call.busy"))
 		return ErrBusy
 	}
 	s := c.open(Call{ID: newID(), Peer: p, State: Calling, Since: time.Now(), Video: video}, addr)

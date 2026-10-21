@@ -1,15 +1,19 @@
 package card
 
 import (
+	"bytes"
 	"image"
+	"image/jpeg"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
 
+	"github.com/ygelfand/libcountertop/pkg/camera/session"
 	"github.com/ygelfand/libcountertop/pkg/display/icons"
 	"github.com/ygelfand/libcountertop/pkg/display/theme"
 	"github.com/ygelfand/libcountertop/pkg/display/ui"
+	"github.com/ygelfand/libcountertop/pkg/say"
 )
 
 var (
@@ -17,7 +21,29 @@ var (
 	ink        = theme.Color{R: 0xf0, G: 0xf0, B: 0xf0}
 )
 
-func Draw(w, h int, icon, text string) []byte {
+func Draw(w, h int, b session.Block) []byte { return luma(render(w, h, b)) }
+
+func JPEG(w, h int, b session.Block, quality int) ([]byte, error) {
+	img := render(w, h, b)
+	gray := image.NewGray(image.Rect(0, 0, w, h))
+	for y := range h {
+		for x := range w {
+			c := img.At(x, y)
+			gray.Pix[y*gray.Stride+x] = byte((299*int(c.R) + 587*int(c.G) + 114*int(c.B)) / 1000)
+		}
+	}
+	var out bytes.Buffer
+	if err := jpeg.Encode(&out, gray, &jpeg.Options{Quality: quality}); err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
+}
+
+func render(w, h int, b session.Block) *ui.Image {
+	icon, text := "microphone-off", say.T("camera.muted")
+	if b == session.Shuttered {
+		icon, text = "camera-off", say.T("camera.shutter")
+	}
 	img := ui.NewImage(w, h, background)
 	short := min(w, h)
 	side := short / 4
@@ -26,7 +52,7 @@ func Draw(w, h int, icon, text string) []byte {
 	if err == nil {
 		ui.DrawTextIn(img, f, ui.Rect{Y: h/2 + short/24, W: w, H: short / 8}, ink, background, text)
 	}
-	return luma(img)
+	return img
 }
 
 func glyph(img *ui.Image, r rune, x, y, side int) {

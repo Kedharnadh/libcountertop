@@ -179,18 +179,14 @@ func (t *Tuner) dial(favorites []schema.Station, tuned schema.Station, width flo
 		if i == at {
 			text.Color = needle
 		}
-		labels = append(labels, gogui.Column(gogui.ContainerCfg{
+		labels = append(labels, t.o.UI.Toolkit.Pressable(gogui.Column, gogui.ContainerCfg{
 			ID:      "radio-preset-" + strconv.Itoa(i),
 			Width:   cell,
 			Sizing:  gogui.FixedFit,
 			Padding: gogui.NoPadding,
 			HAlign:  gogui.HAlignCenter,
 			Content: []gogui.View{gogui.Label(s.Title, text)},
-			OnClick: func(e gogui.EventCtx) {
-				t.tune(s)
-				e.Consume()
-			},
-		}))
+		}, func(gogui.EventCtx) { t.tune(s) }))
 	}
 	return gogui.Column(gogui.ContainerCfg{
 		Width:   width,

@@ -153,13 +153,11 @@ func (s *Scene) view(w *gui.Window) gui.View {
 				}
 			}
 		}
-		if !startup.Settled(s.progress) {
-			at := Skip(s.width, s.height)
-			items = append(
-				items,
-				centeredBox(at, p.Surface, text(s.skip, float32(at.H)*0.4, p.Text)),
-			)
-		}
+		at := Skip(s.width, s.height)
+		items = append(
+			items,
+			centeredBox(at, p.Surface, text(s.skip, float32(at.H)*0.4, p.Text)),
+		)
 	}
 	size := max(float32(short)*0.024, 1)
 	items = append(

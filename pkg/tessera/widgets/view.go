@@ -37,7 +37,7 @@ type View struct {
 	shown     string
 	rested    bool
 	due       time.Time
-	slide     slide
+	pager     *kit.Pager
 	width     float32
 	screen    *tessera.Screen
 	last      ui.Rect
@@ -64,7 +64,7 @@ type View struct {
 func New(o Dependencies) *View {
 	return &View{
 		o:       o,
-		slide:   slide{other: -1},
+		pager:   kit.NewPager("tessera-slide"),
 		watches: map[string]*watch{},
 		armed:   map[string]time.Time{},
 		grips:   map[string]*grip{},
@@ -164,15 +164,12 @@ func (v *View) pageArea(
 	v.width = float32(area.W)
 	v.area = area
 	v.mu.Unlock()
-	s := v.sliding()
+	s := v.pager.Now()
 	inner := ui.Rect{W: area.W, H: area.H}
-	tiles := v.tiles(w, l, g, inner, gap, page, int(s.offset), f)
-	if s.offset != 0 && s.other >= 0 {
-		shift := int(s.offset) - area.W
-		if s.offset < 0 {
-			shift = int(s.offset) + area.W
-		}
-		tiles = append(tiles, v.tiles(w, l, g, inner, gap, s.other, shift, f)...)
+	tiles := v.tiles(w, l, g, inner, gap, page, int(s.Offset), f)
+	if s.Moving() {
+		shift := int(s.OtherShift(float32(area.W)))
+		tiles = append(tiles, v.tiles(w, l, g, inner, gap, s.Other, shift, f)...)
 	}
 	return kit.Placed(area, gogui.Column(gogui.ContainerCfg{
 		ID:        "tessera-page",

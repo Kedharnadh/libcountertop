@@ -150,19 +150,17 @@ func (v *View) alert(
 		gogui.Column(gogui.ContainerCfg{Padding: gogui.NoPadding, Content: words}),
 		v.dismiss(w, a, ink),
 	)
-	return gogui.Row(v.UI.Toolkit.Panel(gogui.ContainerCfg{
+	cfg := v.UI.Toolkit.Panel(gogui.ContainerCfg{
 		ID:      "weather-alert",
 		Padding: gogui.PaddingMedium,
 		Spacing: gogui.SpacingMedium,
 		VAlign:  gogui.VAlignMiddle,
 		Content: content,
-		OnClick: func(e gogui.EventCtx) {
-			if v.Radar != nil {
-				v.Radar(&a)
-				e.Consume()
-			}
-		},
-	}))
+	})
+	if v.Radar == nil {
+		return gogui.Row(cfg)
+	}
+	return v.UI.Toolkit.Pressable(gogui.Row, cfg, func(gogui.EventCtx) { v.Radar(&a) })
 }
 
 func (v *View) dismiss(w *gogui.Window, a nws.Alert, ink theme.Theme) gogui.View {

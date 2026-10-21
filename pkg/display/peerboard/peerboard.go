@@ -104,9 +104,13 @@ func (b Board) tile(id string, side float32, p peer.Peer, pal theme.Theme) gogui
 	}
 	tall := min(style.Reach()*1.4, inner*Aspect)
 
-	named := []gogui.View{gogui.Label(p.Name, t.TextStyleDef)}
+	standing := " "
 	if p.Standing == peer.Foreign {
-		named = append(named, gogui.Label(say.T("peer.foreign"), widgets.Secondary()))
+		standing = say.T("peer.foreign")
+	}
+	named := []gogui.View{
+		gogui.Label(p.Name, t.TextStyleDef),
+		gogui.Label(standing, widgets.Secondary()),
 	}
 	cfg := gogui.ContainerCfg{
 		ID:      id,

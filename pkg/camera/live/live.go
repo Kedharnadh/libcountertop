@@ -13,7 +13,6 @@ import (
 	"github.com/ygelfand/libcountertop/pkg/camera/card"
 	"github.com/ygelfand/libcountertop/pkg/camera/session"
 	"github.com/ygelfand/libcountertop/pkg/hook"
-	"github.com/ygelfand/libcountertop/pkg/say"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
 	"github.com/ygelfand/libcountertop/pkg/settings/schema"
 )
@@ -67,7 +66,7 @@ func New(o Options) *Camera {
 		Snapshot: c.snapshot,
 		Open:     o.Open,
 		Blocked:  c.blocked,
-		Card:     drawCard,
+		Card:     card.Draw,
 		Recover:  c.revive,
 		Wait:     Wait,
 		Settle:   Settle,
@@ -84,13 +83,6 @@ func (c *Camera) blocked() session.Block {
 		return session.Shuttered
 	}
 	return session.Open
-}
-
-func drawCard(w, h int, b session.Block) []byte {
-	if b == session.Shuttered {
-		return card.Draw(w, h, "camera-off", say.T("camera.shutter"))
-	}
-	return card.Draw(w, h, "microphone-off", say.T("camera.muted"))
 }
 
 func (c *Camera) turn() int {

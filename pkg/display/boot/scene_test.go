@@ -83,10 +83,14 @@ func TestProgressFramesContainRowsVersionAndSkip(t *testing.T) {
 		if err := s.Draw([]startup.Progress{{Name: "Wi-Fi", Done: true}}, true); err != nil {
 			t.Fatal(err)
 		}
+		kept := false
 		for _, cmd := range s.w.Renderers() {
 			if cmd.Kind == gui.RenderText && cmd.Text == "Skip" {
-				t.Errorf("%v settled frame retained skip", size)
+				kept = true
 			}
+		}
+		if !kept {
+			t.Errorf("%v settled frame dropped skip", size)
 		}
 	}
 }

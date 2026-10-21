@@ -5,18 +5,15 @@ import (
 	"time"
 )
 
-func TestSkipDoesNotBypassReadiness(t *testing.T) {
+func TestSkipEndsWhileStillWaiting(t *testing.T) {
 	var c Controller
 	p := []Progress{{Name: "network"}}
-	for at := Frame; at < 20*time.Second; at += Frame {
-		c.Tick(at, p, false, true)
+	for at := Frame; at < 4*time.Second; at += Frame {
+		c.Tick(at, p, false, false)
 	}
-	if c.Ready != 0 {
-		t.Fatalf("skipping without readiness gave finish=%v", c.Ready)
-	}
-	c.Tick(20*time.Second, p, true, true)
+	c.Tick(4*time.Second, p, false, true)
 	if c.Ready != 1 {
-		t.Fatalf("ready after skip gave finish=%v, want 1", c.Ready)
+		t.Fatalf("skip while waiting gave finish=%v, want 1", c.Ready)
 	}
 }
 

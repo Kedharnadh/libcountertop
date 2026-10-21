@@ -9,10 +9,12 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
+	"log/slog"
 	"mime"
 	"mime/multipart"
 	"net/http"
 	"strings"
+	"time"
 
 	xdraw "golang.org/x/image/draw"
 )
@@ -50,7 +52,7 @@ func snapshot(
 	c *http.Client,
 	base, picture string,
 	w, h int,
-) (*image.NRGBA, error) {
+) (*image.RGBA, error) {
 	if base == "" {
 		return nil, ErrNoSite
 	}
@@ -71,7 +73,7 @@ func stream(
 	c *http.Client,
 	base, picture string,
 	w, h int,
-	frame func(*image.NRGBA),
+	frame func(*image.RGBA),
 ) error {
 	if base == "" {
 		return ErrNoSite
@@ -85,12 +87,18 @@ func stream(
 	if err != nil || params["boundary"] == "" {
 		return fmt.Errorf("cameras: the live stream is not multipart: %v", err)
 	}
-	parts := multipart.NewReader(bufio.NewReader(resp.Body), params["boundary"])
+	// Home Assistant declares boundary=--frameboundary and delimits parts with --frameboundary.
+	parts := multipart.NewReader(
+		bufio.NewReader(resp.Body),
+		strings.TrimPrefix(params["boundary"], "--"),
+	)
 	for ctx.Err() == nil {
+		waited := time.Now()
 		part, err := parts.NextPart()
 		if err != nil {
 			return err
 		}
+		decoding := time.Now()
 		img, _, err := image.Decode(io.LimitReader(part, frameMost))
 		if cerr := part.Close(); cerr != nil {
 			return cerr
@@ -98,15 +106,23 @@ func stream(
 		if err != nil {
 			continue
 		}
-		frame(fit(img, w, h))
+		fitting := time.Now()
+		fitted := fit(img, w, h)
+		slog.Debug("camera live frame",
+			"size", img.Bounds().Size(),
+			"wait", decoding.Sub(waited),
+			"decode", fitting.Sub(decoding),
+			"fit", time.Since(fitting),
+		)
+		frame(fitted)
 	}
 	return ctx.Err()
 }
 
-func fit(img image.Image, w, h int) *image.NRGBA {
+func fit(img image.Image, w, h int) *image.RGBA {
 	b := img.Bounds()
 	if w <= 0 || h <= 0 || b.Dx() == 0 || b.Dy() == 0 {
-		out := image.NewNRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
+		out := image.NewRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
 		xdraw.Draw(out, out.Bounds(), img, b.Min, xdraw.Src)
 		return out
 	}
@@ -114,7 +130,7 @@ func fit(img image.Image, w, h int) *image.NRGBA {
 	if sh > h {
 		sw, sh = b.Dx()*h/b.Dy(), h
 	}
-	out := image.NewNRGBA(image.Rect(0, 0, max(sw, 1), max(sh, 1)))
+	out := image.NewRGBA(image.Rect(0, 0, max(sw, 1), max(sh, 1)))
 	xdraw.ApproxBiLinear.Scale(out, out.Bounds(), img, b, xdraw.Src, nil)
 	return out
 }

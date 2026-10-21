@@ -5,7 +5,6 @@ import (
 
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
-	"github.com/ygelfand/libcountertop/pkg/say"
 	setting "github.com/ygelfand/libcountertop/pkg/settings"
 )
 
@@ -37,10 +36,7 @@ func ServicePage[T any](title string, c *setting.Controls[T]) *shell.Page {
 			case setting.Text:
 				row.Kind, row.Value, row.Save = menu.Field, s.Read(&at), save
 			case setting.Secret:
-				row.Kind, row.Save = menu.Password, save
-				if s.Read(&at) != "" {
-					row.Hint = say.T("settings.secret.set")
-				}
+				row.Kind, row.Value, row.Save = menu.Password, s.Read(&at), save
 			default:
 				continue
 			}

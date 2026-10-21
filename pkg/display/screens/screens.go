@@ -162,6 +162,7 @@ type Options struct {
 	WeatherEntities func() shell.View
 	Todo            *todo.Todo
 	Calendar        *calendar.Calendar
+	CamerasPage     func() shell.View
 	Player          playerview.Player
 	PlayerPage      func() shell.View
 	MediaVolume     volume.Channel
@@ -239,6 +240,7 @@ func New(o Options) *App {
 		WeatherEntities: o.WeatherEntities,
 		Todo:            o.Todo,
 		Calendar:        o.Calendar,
+		Cameras:         o.CamerasPage,
 		Shell:           o.Shell,
 		Logo:            esphomeLogo,
 		Marks:           settings.ModeMarks{Tessera: tesseraview.Mark, Native: a.logo},

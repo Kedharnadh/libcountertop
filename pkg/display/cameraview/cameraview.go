@@ -2,6 +2,7 @@ package cameraview
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"image"
 	"log/slog"
@@ -10,15 +11,21 @@ import (
 	"slices"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	gogui "github.com/go-gui-org/go-gui/gui"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ygelfand/libcountertop/pkg/display/apps"
+	"github.com/ygelfand/libcountertop/pkg/display/callvideo"
+	"github.com/ygelfand/libcountertop/pkg/display/icons"
+	"github.com/ygelfand/libcountertop/pkg/display/interaction"
 	"github.com/ygelfand/libcountertop/pkg/display/menu"
 	"github.com/ygelfand/libcountertop/pkg/display/navigation"
 	"github.com/ygelfand/libcountertop/pkg/display/shell"
+	"github.com/ygelfand/libcountertop/pkg/display/style"
+	"github.com/ygelfand/libcountertop/pkg/display/ui"
 	"github.com/ygelfand/libcountertop/pkg/display/widgets"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant"
 	"github.com/ygelfand/libcountertop/pkg/homeassistant/homecontrol"
@@ -32,10 +39,11 @@ import (
 const (
 	listEvery   = 4 * time.Minute
 	fetchWait   = 10 * time.Second
+	failedRetry = time.Minute
 	liveRetry   = time.Second
-	swipeFar    = 80
-	aspect      = 9.0 / 16.0
-	fetchAtMost = 3
+	linger      = 3 * time.Minute
+	fetchAtMost = 8
+	gapShare    = 0.05
 )
 
 var scaleShare = map[int]float64{1: 0.2, 2: 0.25, 3: 1.0 / 3, 4: 0.5, 5: 1}
@@ -49,6 +57,9 @@ type Site interface{ URL() string }
 type Options struct {
 	Shell    *shell.Shell
 	Source   Source
+	Streams  Streams
+	Speaker  Speaker
+	Display  callvideo.Display
 	Site     Site
 	Settings storage.Section[schema.Cameras]
 	Client   *http.Client
@@ -59,9 +70,13 @@ type Grid struct{}
 
 func (*Grid) Covers() bool { return true }
 
+func (*Grid) Timeout() time.Duration { return linger }
+
 type Live struct{}
 
 func (*Live) Covers() bool { return true }
+
+func (*Live) Timeout() time.Duration { return linger }
 
 type frame struct {
 	key string
@@ -76,25 +91,44 @@ type Cameras struct {
 	live  *Live
 	knobs *setting.Controls[schema.Cameras]
 
-	mu       sync.Mutex
-	list     []homeassistant.Camera
-	listErr  error
-	frames   map[string]frame
-	gen      uint64
-	page     int
-	pages    int
-	shown    []string
-	tile     image.Point
-	screen   image.Point
-	panned   float32
-	watching string
-	liveShot frame
-	stopGrid context.CancelFunc
-	stopLive context.CancelFunc
+	mu        sync.Mutex
+	list      []homeassistant.Camera
+	listErr   error
+	frames    map[string]frame
+	failing   map[string]time.Time
+	fetching  map[string]struct{}
+	gen       uint64
+	page      int
+	pages     int
+	shown     []string
+	tile      image.Point
+	screen    image.Point
+	pager     *widgets.Pager
+	presses   *interaction.Presses
+	win       *gogui.Window
+	watching  string
+	liveBegan time.Time
+	spinning  atomic.Bool
+	liveShot  frame
+	video     *callvideo.Stream
+	refused   map[string]struct{}
+	audible   bool
+	stopGrid  context.CancelFunc
+	stopLive  context.CancelFunc
 }
 
 func New(o Options) *Cameras {
-	c := &Cameras{o: o, grid: &Grid{}, live: &Live{}, frames: map[string]frame{}}
+	c := &Cameras{
+		o:        o,
+		grid:     &Grid{},
+		live:     &Live{},
+		frames:   map[string]frame{},
+		failing:  map[string]time.Time{},
+		fetching: map[string]struct{}{},
+		refused:  map[string]struct{}{},
+		pager:    widgets.NewPager("cameras-slide"),
+		presses:  interaction.New(),
+	}
 	c.knobs = &setting.Controls[schema.Cameras]{
 		Table: NewTable(),
 		Read:  o.Settings.Read,
@@ -219,35 +253,60 @@ func (c *Cameras) camera(id string) (homeassistant.Camera, bool) {
 
 func (c *Cameras) fetchShown(ctx context.Context) {
 	c.mu.Lock()
-	ids, size := slices.Clone(c.shown), c.tile
+	shown := slices.Clone(c.shown)
+	c.mu.Unlock()
+	c.fetch(ctx, shown)
+}
+
+func (c *Cameras) fetch(ctx context.Context, wanted []string) {
+	c.mu.Lock()
+	size, now := c.tile, time.Now()
+	var ids []string
+	for _, id := range wanted {
+		if _, busy := c.fetching[id]; busy || now.Before(c.failing[id]) {
+			continue
+		}
+		c.fetching[id] = struct{}{}
+		ids = append(ids, id)
+	}
 	c.mu.Unlock()
 	base := c.o.Site.URL()
 	var g errgroup.Group
 	g.SetLimit(fetchAtMost)
 	for _, id := range ids {
-		cam, ok := c.camera(id)
-		if !ok || cam.Picture == "" {
-			continue
-		}
 		g.Go(func() error {
+			defer func() {
+				c.mu.Lock()
+				delete(c.fetching, id)
+				c.mu.Unlock()
+			}()
+			cam, ok := c.camera(id)
+			if !ok || cam.Picture == "" {
+				return nil
+			}
 			ctx, cancel := context.WithTimeout(ctx, fetchWait)
 			defer cancel()
+			began := time.Now()
 			img, err := snapshot(ctx, c.o.Client, base, cam.Picture, size.X, size.Y)
+			slog.Debug("camera snapshot", "camera", id, "took", time.Since(began), "err", err)
 			if err != nil {
-				slog.Debug("camera snapshot failed", "camera", id, "err", err)
+				c.mu.Lock()
+				c.failing[id] = time.Now().Add(failedRetry)
+				c.mu.Unlock()
 				return nil
 			}
 			c.keep(id, img)
+			c.o.Shell.Redraw()
 			return nil
 		})
 	}
 	_ = g.Wait()
-	c.o.Shell.Redraw()
 }
 
-func (c *Cameras) keep(id string, img *image.NRGBA) {
+func (c *Cameras) keep(id string, img *image.RGBA) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	delete(c.failing, id)
 	c.gen++
 	key := fmt.Sprintf("camera/%s/%d", id, c.gen)
 	src := gogui.UseImage(key, img.Rect.Dx(), img.Rect.Dy(), img.Pix)
@@ -259,28 +318,41 @@ func (c *Cameras) keep(id string, img *image.NRGBA) {
 
 func (c *Cameras) turn(by int) {
 	c.mu.Lock()
+	from, win, width := c.page, c.win, float32(c.screen.X)
 	if c.pages > 1 {
 		c.page = ((c.page+by)%c.pages + c.pages) % c.pages
 	}
+	to := c.page
 	c.mu.Unlock()
+	if win != nil && from != to {
+		win.QueueCommand(func(w *gogui.Window) { c.pager.Slid(w, from, to, by > 0, width) })
+	}
 	c.o.Shell.Redraw()
 }
 
-func Layout(n, scale int, w, h float64) (cols, rows int) {
-	if n <= 0 || w <= 0 || h <= 0 {
-		return 1, 1
+func (c *Cameras) neighbour(by int) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.pages <= 1 {
+		return -1
 	}
+	return ((c.page+by)%c.pages + c.pages) % c.pages
+}
+
+func (c *Cameras) turnTo(to int) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	from := c.page
+	c.page = to
+	return from
+}
+
+func RowHeight(scale int, w float64) float64 {
 	share, ok := scaleShare[scale]
 	if !ok {
 		share = scaleShare[3]
 	}
-	cols = max(1, int(math.Floor(1/share+1e-9)))
-	rows = max(1, int(math.Floor(h/(w/float64(cols)*aspect)+1e-9)))
-	if n < cols*rows {
-		cols = min(cols, n)
-		rows = int(math.Ceil(float64(n) / float64(cols)))
-	}
-	return cols, rows
+	return w * share / unknownShape
 }
 
 func (c *Cameras) buildGrid(w *gogui.Window) gogui.View {
@@ -289,88 +361,133 @@ func (c *Cameras) buildGrid(w *gogui.Window) gogui.View {
 	if len(cams) == 0 {
 		return c.note(c.emptyNote())
 	}
-	cols, rows := Layout(len(cams), c.o.Settings.Read().Scale, float64(vw), float64(vh))
-	per := cols * rows
-	tw, th := float32(vw)/float32(cols), float32(vh)/float32(rows)
+	target := RowHeight(c.o.Settings.Read().Scale, float64(vw))
 
 	c.mu.Lock()
-	c.pages = (len(cams) + per - 1) / per
+	shapes := make([]float64, len(cams))
+	for i, cam := range cams {
+		shapes[i] = unknownShape
+		if f, ok := c.frames[cam.ID]; ok && f.w > 0 && f.h > 0 {
+			shapes[i] = float64(f.w) / float64(f.h)
+		}
+	}
+	c.mu.Unlock()
+	layout := Collage(shapes, float64(vw), float64(vh), target, float64(style.Reach()*gapShare))
+
+	c.mu.Lock()
+	c.win = w
+	c.pages = len(layout)
 	c.page = min(c.page, c.pages-1)
-	from := c.page * per
-	shown := cams[from:min(from+per, len(cams))]
+	shown, _ := onPage(cams, layout, c.page)
 	ids := make([]string, len(shown))
 	for i, cam := range shown {
 		ids[i] = cam.ID
 	}
-	moved := !slices.Equal(ids, c.shown)
-	c.shown, c.tile, c.screen = ids, image.Point{X: int(tw), Y: int(th)}, image.Point{X: vw, Y: vh}
-	frames := make([]frame, len(shown))
-	for i, cam := range shown {
-		frames[i] = c.frames[cam.ID]
+	var added []string
+	for _, id := range ids {
+		if !slices.Contains(c.shown, id) {
+			added = append(added, id)
+		}
 	}
+	c.shown, c.screen = ids, image.Point{X: vw, Y: vh}
+	c.tile = image.Point{X: vw, Y: int(math.Ceil(min(float64(vh), target)))}
 	page, pages := c.page, c.pages
 	c.mu.Unlock()
-	if moved {
-		safe.Go("cameras page", func() { c.fetchShown(context.Background()) })
+	if len(added) > 0 {
+		safe.Go("cameras page", func() { c.fetch(context.Background(), added) })
 	}
 
-	var lines []gogui.View
-	for r := range rows {
-		var row []gogui.View
-		for k := range cols {
-			i := r*cols + k
-			if i >= len(shown) {
-				break
-			}
-			row = append(row, c.tileView(shown[i], frames[i], tw, th))
-		}
-		lines = append(lines, gogui.Row(gogui.ContainerCfg{
-			Sizing:  gogui.FillFit,
-			Padding: gogui.NoPadding,
-			Content: row,
-		}))
+	s := c.pager.Now()
+	views := []gogui.View{
+		widgets.Placed(
+			ui.Rect{X: int(s.Offset), W: vw, H: vh},
+			c.pageView(onPage(cams, layout, page)),
+		),
 	}
-	if pages > 1 {
-		lines = append(lines, gogui.Label(
-			say.F("cameras.page", map[string]any{"N": page + 1, "Of": pages}),
-			widgets.Secondary(),
+	if s.Moving() && s.Other < pages {
+		views = append(views, widgets.Placed(
+			ui.Rect{X: int(s.OtherShift(float32(vw))), W: vw, H: vh},
+			c.pageView(onPage(cams, layout, s.Other)),
 		))
 	}
+	if pages > 1 {
+		dots := int(style.Reach() * 0.8)
+		views = append(views, widgets.PageDots(
+			"cameras-dot",
+			ui.Rect{Y: vh - dots, W: vw, H: dots},
+			pages,
+			page,
+		))
+	}
+	views = append(views, c.closer("cameras-close", func() { c.o.Shell.Remove(c.grid) }))
 	return gogui.Column(gogui.ContainerCfg{
 		ID:        "cameras",
 		Sizing:    gogui.FillFill,
 		Padding:   gogui.NoPadding,
 		Color:     gogui.RGB(0, 0, 0),
-		Content:   lines,
+		Clip:      true,
+		Content:   views,
 		OnGesture: c.swipe,
 	})
 }
 
-func (c *Cameras) swipe(e gogui.EventCtx) {
-	if e.Event.GestureType != gogui.GesturePan && e.Event.GestureType != gogui.GestureSwipe {
-		return
+func onPage(
+	cams []homeassistant.Camera,
+	layout [][]ui.Rect,
+	page int,
+) ([]homeassistant.Camera, []ui.Rect) {
+	if page < 0 || page >= len(layout) {
+		return nil, nil
 	}
+	from := 0
+	for _, p := range layout[:page] {
+		from += len(p)
+	}
+	return cams[from : from+len(layout[page])], layout[page]
+}
+
+func (c *Cameras) pageView(shown []homeassistant.Camera, rects []ui.Rect) gogui.View {
 	c.mu.Lock()
-	switch e.Event.GesturePhase {
-	case gogui.GesturePhaseBegan:
-		c.panned = e.Event.GestureDX
-	case gogui.GesturePhaseChanged:
-		c.panned += e.Event.GestureDX
-	case gogui.GesturePhaseEnded:
-		far := c.panned
-		c.panned = 0
-		c.mu.Unlock()
-		switch {
-		case far <= -swipeFar:
-			c.turn(1)
-		case far >= swipeFar:
-			c.turn(-1)
-		}
-		e.Consume()
-		return
+	frames := make([]frame, len(shown))
+	for i, cam := range shown {
+		frames[i] = c.frames[cam.ID]
 	}
 	c.mu.Unlock()
+
+	tiles := make([]gogui.View, len(shown))
+	for i, cam := range shown {
+		r := rects[i]
+		tiles[i] = widgets.Placed(r, c.tileView(cam, frames[i], float32(r.W), float32(r.H)))
+	}
+	return gogui.Column(gogui.ContainerCfg{
+		Sizing:  gogui.FillFill,
+		Padding: gogui.NoPadding,
+		Content: tiles,
+	})
+}
+
+func (c *Cameras) swipe(e gogui.EventCtx) {
+	c.mu.Lock()
+	width := float32(c.screen.X)
+	c.mu.Unlock()
+	ev := e.Event
+	switch ev.GestureType {
+	case gogui.GesturePan:
+		switch ev.GesturePhase {
+		case gogui.GesturePhaseBegan, gogui.GesturePhaseChanged:
+			if math.Abs(float64(ev.GestureDX)) >= math.Abs(float64(ev.GestureDY)) {
+				c.pager.Drag(e.Window, ev.GestureDX, width, c.neighbour, c.turnTo)
+			}
+		default:
+			c.pager.Lift(e.Window, 0)
+		}
+	case gogui.GestureSwipe:
+		c.pager.Lift(e.Window, ev.VelocityX)
+	default:
+		return
+	}
 	e.Consume()
+	e.Window.InvalidateLayout()
 }
 
 func (c *Cameras) tileView(cam homeassistant.Camera, f frame, tw, th float32) gogui.View {
@@ -378,13 +495,13 @@ func (c *Cameras) tileView(cam homeassistant.Camera, f frame, tw, th float32) go
 	if f.src != "" {
 		content = append(content, gogui.Image(gogui.ImageCfg{
 			Src:    f.src,
-			Width:  float32(f.w),
-			Height: float32(f.h),
+			Width:  tw,
+			Height: th,
 		}))
 	} else {
 		content = append(content, gogui.Label(cam.Name, widgets.Secondary()))
 	}
-	return gogui.Column(gogui.ContainerCfg{
+	return c.presses.Pressable(gogui.Column, gogui.ContainerCfg{
 		ID:      "camera-" + cam.ID,
 		Width:   tw,
 		Height:  th,
@@ -393,11 +510,7 @@ func (c *Cameras) tileView(cam homeassistant.Camera, f frame, tw, th float32) go
 		HAlign:  gogui.HAlignCenter,
 		VAlign:  gogui.VAlignMiddle,
 		Content: content,
-		OnClick: func(e gogui.EventCtx) {
-			c.watch(cam.ID)
-			e.Consume()
-		},
-	})
+	}, func(gogui.EventCtx) { c.watch(cam.ID) })
 }
 
 func (c *Cameras) watch(id string) {
@@ -406,13 +519,57 @@ func (c *Cameras) watch(id string) {
 		c.stopLive()
 	}
 	ctx, stop := context.WithCancel(context.Background())
-	c.stopLive, c.watching = stop, id
+	c.stopLive, c.watching, c.liveBegan = stop, id, time.Now()
+	if c.liveShot.key != "" {
+		gogui.DropImage(c.liveShot.key)
+	}
+	c.liveShot = frame{}
 	c.mu.Unlock()
 	c.o.Shell.Push(c.live)
 	safe.Go("camera live", func() { c.runLive(ctx, id) })
 }
 
 func (c *Cameras) runLive(ctx context.Context, id string) {
+	pics, stopPics := c.startPictures(ctx, id)
+	defer func() { stopPics() }()
+	cam, ok := c.camera(id)
+	if !ok || !c.streams(cam) || c.undecodable(id) {
+		<-ctx.Done()
+		return
+	}
+	err := c.stream(ctx, cam, stopPics)
+	if ctx.Err() != nil {
+		return
+	}
+	slog.Warn("camera stream failed, showing pictures instead", "camera", id, "err", err)
+	if errors.Is(err, errUndecodable) {
+		c.mu.Lock()
+		c.refused[id] = struct{}{}
+		c.mu.Unlock()
+	}
+	if pics.Err() != nil {
+		_, stopPics = c.startPictures(ctx, id)
+	}
+	<-ctx.Done()
+}
+
+func (c *Cameras) startPictures(
+	ctx context.Context,
+	id string,
+) (context.Context, context.CancelFunc) {
+	pics, stop := context.WithCancel(ctx)
+	safe.Go("camera pictures", func() { c.pictures(pics, id) })
+	return pics, stop
+}
+
+func (c *Cameras) undecodable(id string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	_, ok := c.refused[id]
+	return ok
+}
+
+func (c *Cameras) pictures(ctx context.Context, id string) {
 	for ctx.Err() == nil {
 		cam, ok := c.camera(id)
 		if !ok {
@@ -428,8 +585,8 @@ func (c *Cameras) runLive(ctx context.Context, id string) {
 			cam.Picture,
 			size.X,
 			size.Y,
-			func(img *image.NRGBA) {
-				c.showLive(img)
+			func(img *image.RGBA) {
+				c.showLive(id, img)
 			},
 		)
 		if ctx.Err() != nil {
@@ -445,7 +602,7 @@ func (c *Cameras) runLive(ctx context.Context, id string) {
 			size.X,
 			size.Y,
 		); err == nil {
-			c.showLive(img)
+			c.showLive(id, img)
 		}
 		sctx()
 		select {
@@ -456,8 +613,12 @@ func (c *Cameras) runLive(ctx context.Context, id string) {
 	}
 }
 
-func (c *Cameras) showLive(img *image.NRGBA) {
+func (c *Cameras) showLive(id string, img *image.RGBA) {
 	c.mu.Lock()
+	if c.watching != id {
+		c.mu.Unlock()
+		return
+	}
 	c.gen++
 	key := fmt.Sprintf("camera/live/%d", c.gen)
 	src := gogui.UseImage(key, img.Rect.Dx(), img.Rect.Dy(), img.Pix)
@@ -469,19 +630,44 @@ func (c *Cameras) showLive(img *image.NRGBA) {
 	c.o.Shell.Redraw()
 }
 
-func (c *Cameras) buildLive(*gogui.Window) gogui.View {
+func (c *Cameras) buildLive(w *gogui.Window) gogui.View {
+	vw, vh := w.WindowSize()
 	c.mu.Lock()
-	f, id := c.liveShot, c.watching
+	f, id, began, video, audible := c.liveShot, c.watching, c.liveBegan, c.video, c.audible
+	thumb := c.frames[id]
 	c.mu.Unlock()
 	var content []gogui.View
-	if f.src != "" {
+	back := gogui.RGB(0, 0, 0)
+	switch {
+	case video != nil:
+		back = gogui.ColorTransparent
+	case f.src != "":
 		content = append(content, gogui.Image(gogui.ImageCfg{
 			Src:    f.src,
 			Width:  float32(f.w),
 			Height: float32(f.h),
 		}))
-	} else if cam, ok := c.camera(id); ok {
-		content = append(content, gogui.Label(cam.Name, widgets.Secondary()))
+	case thumb.src != "":
+		sw, sh := enlarge(thumb.w, thumb.h, vw, vh)
+		content = append(content,
+			gogui.Image(gogui.ImageCfg{Src: thumb.src, Width: sw, Height: sh}),
+			widgets.Placed(ui.Rect{W: vw, H: vh}, widgets.Spinner(vw, vh, time.Since(began))),
+		)
+		c.spinAgain(w)
+	default:
+		if cam, ok := c.camera(id); ok {
+			content = append(content, gogui.Label(cam.Name, widgets.Secondary()))
+		}
+		content = append(content,
+			widgets.Placed(ui.Rect{W: vw, H: vh}, widgets.Spinner(vw, vh, time.Since(began))))
+		c.spinAgain(w)
+	}
+	content = append(content, c.closer("camera-live-close", c.closeLive))
+	if video != nil || f.src != "" {
+		content = append(content, mode(vw, video != nil))
+	}
+	if video != nil && c.o.Speaker != nil {
+		content = append(content, c.sounder(vw, vh, audible))
 	}
 	return gogui.Column(gogui.ContainerCfg{
 		ID:      "camera-live",
@@ -489,19 +675,111 @@ func (c *Cameras) buildLive(*gogui.Window) gogui.View {
 		Padding: gogui.NoPadding,
 		HAlign:  gogui.HAlignCenter,
 		VAlign:  gogui.VAlignMiddle,
-		Color:   gogui.RGB(0, 0, 0),
+		Color:   back,
 		Content: content,
 		OnClick: func(e gogui.EventCtx) {
-			c.o.Shell.Remove(c.live)
-			c.mu.Lock()
-			if c.liveShot.key != "" {
-				gogui.DropImage(c.liveShot.key)
-			}
-			c.liveShot = frame{}
-			c.mu.Unlock()
+			c.closeLive()
 			e.Consume()
 		},
 	})
+}
+
+func (c *Cameras) closeLive() {
+	c.o.Shell.Remove(c.live)
+	c.mu.Lock()
+	if c.liveShot.key != "" {
+		gogui.DropImage(c.liveShot.key)
+	}
+	c.liveShot = frame{}
+	c.mu.Unlock()
+}
+
+func (c *Cameras) closer(id string, close func()) gogui.View {
+	st := gogui.CurrentTheme().TextStyleIconMedium
+	st.Size = style.Reach() * 0.6
+	st.Color = gogui.RGB(0xff, 0xff, 0xff)
+	side := int(st.Size * 2)
+	pad := int(gogui.PadLarge)
+	return widgets.Placed(
+		ui.Rect{X: pad, Y: pad, W: side, H: side},
+		c.presses.Button(
+			id,
+			gogui.IconClose,
+			st,
+			gogui.RGBA(0, 0, 0, 0x99),
+			func(gogui.EventCtx) { close() },
+		),
+	)
+}
+
+func mode(vw int, live bool) gogui.View {
+	st := gogui.CurrentTheme().TextStyleIconMedium
+	st.Family = icons.Family
+	st.Size = style.Reach() * 0.5
+	st.Color = gogui.RGB(0xff, 0xff, 0xff)
+	glyph := icons.Glyph(icons.Named("mdi:image"))
+	if live {
+		glyph = icons.Glyph(icons.Named("mdi:video"))
+	}
+	side := int(st.Size * 2)
+	return widgets.Placed(
+		ui.Rect{X: (vw - side) / 2, Y: int(gogui.PadLarge), W: side, H: side},
+		gogui.Row(gogui.ContainerCfg{
+			Width:   float32(side),
+			Height:  float32(side),
+			Sizing:  gogui.FixedFixed,
+			Radius:  gogui.RadiusLarge,
+			Color:   gogui.RGBA(0, 0, 0, 0x99),
+			HAlign:  gogui.HAlignCenter,
+			VAlign:  gogui.VAlignMiddle,
+			Padding: gogui.NoPadding,
+			Content: []gogui.View{gogui.Label(glyph, st)},
+		}),
+	)
+}
+
+func (c *Cameras) sounder(vw, vh int, audible bool) gogui.View {
+	st := gogui.CurrentTheme().TextStyleIconMedium
+	st.Family = icons.Family
+	st.Size = style.Reach() * 1.4
+	st.Color = gogui.RGB(0xff, 0xff, 0xff)
+	glyph := icons.Glyph(icons.Named("mdi:volume-off"))
+	if audible {
+		glyph = icons.Glyph(icons.Named("mdi:volume-high"))
+	}
+	side := int(st.Size * 2)
+	pad := int(gogui.PadLarge)
+	return widgets.Placed(
+		ui.Rect{X: (vw - side) / 2, Y: vh - pad - side, W: side, H: side},
+		c.presses.Button(
+			"camera-live-sound",
+			glyph,
+			st,
+			gogui.RGBA(0, 0, 0, 0x99),
+			func(gogui.EventCtx) { c.toggleSound() },
+		),
+	)
+}
+
+func (c *Cameras) spinAgain(w *gogui.Window) {
+	if c.spinning.Swap(true) {
+		return
+	}
+	time.AfterFunc(widgets.SpinStep, func() {
+		c.spinning.Store(false)
+		w.QueueCommand(func(w *gogui.Window) { w.InvalidateLayout() })
+	})
+}
+
+func enlarge(w, h, vw, vh int) (float32, float32) {
+	if w <= 0 || h <= 0 {
+		return float32(vw), float32(vh)
+	}
+	sw, sh := float32(vw), float32(h)*float32(vw)/float32(w)
+	if sh > float32(vh) {
+		sw, sh = float32(w)*float32(vh)/float32(h), float32(vh)
+	}
+	return sw, sh
 }
 
 func (c *Cameras) emptyNote() string {

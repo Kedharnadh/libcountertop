@@ -146,7 +146,6 @@ func Look(name, palette, size string, custom theme.Custom) gogui.Theme {
 	cfg.ColorTextSecondary = widgets.Color(p.Muted)
 	cfg.TextStyleDef.Color = widgets.Color(p.Text)
 	cfg.TextStyleDef.Family = st.Family
-	cfg.ScrollMultiplier = 1
 	ink, surface := widgets.Color(p.Text), widgets.Color(p.Surface)
 	cfg.ColorHover = ink.WithOpacity(0.06).Over(surface)
 	cfg.ColorActive = ink.WithOpacity(0.12).Over(surface)

@@ -67,7 +67,7 @@ func TestAServicePageEditsItsTable(t *testing.T) {
 	}
 
 	rows, _ = page.Build()
-	if !rows[0].On || rows[2].Value != "" || rows[2].Hint == "" {
+	if !rows[0].On || rows[2].Value != "pw" {
 		t.Errorf("after saving: on %+v, password %+v", rows[0], rows[2])
 	}
 }

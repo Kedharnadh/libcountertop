@@ -144,15 +144,19 @@ func api() (*webrtc.API, error) {
 	if err := webrtc.RegisterDefaultInterceptors(m, reg); err != nil {
 		return nil, err
 	}
+	return webrtc.NewAPI(
+		webrtc.WithMediaEngine(m),
+		webrtc.WithInterceptorRegistry(reg),
+		webrtc.WithSettingEngine(settings()),
+	), nil
+}
+
+func settings() webrtc.SettingEngine {
 	se := webrtc.SettingEngine{}
 	se.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)
 	se.SetNetworkTypes([]webrtc.NetworkType{webrtc.NetworkTypeUDP4})
 	se.SetICETimeouts(disconnectedAfter, failedAfter, keepalive)
-	return webrtc.NewAPI(
-		webrtc.WithMediaEngine(m),
-		webrtc.WithInterceptorRegistry(reg),
-		webrtc.WithSettingEngine(se),
-	), nil
+	return se
 }
 
 func New(m Media, report func(webrtc.PeerConnectionState)) (*Link, error) {
@@ -410,6 +414,21 @@ func (l *Link) receive(t *webrtc.TrackRemote, _ *webrtc.RTPReceiver) {
 	case t.Kind() != webrtc.RTPCodecTypeAudio:
 		return
 	}
+	hear(t, &l.count, l.media.Audio.Play)
+}
+
+func hear(t *webrtc.TrackRemote, count *counters, play func([]int16)) {
+	switch t.Codec().MimeType {
+	case webrtc.MimeTypePCMU:
+		hearG711(t, count, play, ulaw)
+	case webrtc.MimeTypePCMA:
+		hearG711(t, count, play, alaw)
+	default:
+		hearOpus(t, count, play)
+	}
+}
+
+func hearOpus(t *webrtc.TrackRemote, count *counters, play func([]int16)) {
 	dec, err := opus.NewDecoderWithOutput(PlayRate, PlayChannels)
 	if err != nil {
 		slog.Error("call decoder", "err", err)
@@ -430,24 +449,48 @@ func (l *Link) receive(t *webrtc.TrackRemote, _ *webrtc.RTPReceiver) {
 				continue
 			}
 			if gap := int(step) - 1; gap > 0 {
-				l.count.audioLost.Add(uint64(gap))
+				count.audioLost.Add(uint64(gap))
 			}
 			if gap := int(step) - 1; gap > 0 && gap <= maxConceal {
 				for range gap {
 					if dec.DecodePLC(conceal) == nil {
-						l.media.Audio.Play(append([]int16(nil), conceal...))
+						play(append([]int16(nil), conceal...))
 					}
 				}
 			}
 		}
 		started, last = true, p.SequenceNumber
-		l.count.audioRecv.Add(1)
+		count.audioRecv.Add(1)
 		n, err := dec.DecodeToInt16(p.Payload, out)
 		if err != nil {
 			slog.Debug("call decode", "err", err)
 			continue
 		}
-		l.media.Audio.Play(append([]int16(nil), out[:n*PlayChannels]...))
+		play(append([]int16(nil), out[:n*PlayChannels]...))
+	}
+}
+
+func hearG711(
+	t *webrtc.TrackRemote,
+	count *counters,
+	play func([]int16),
+	decode func(byte) int16,
+) {
+	var last int16
+	for {
+		p, _, err := t.ReadRTP()
+		if err != nil {
+			return
+		}
+		count.audioRecv.Add(1)
+		narrow := make([]int16, len(p.Payload))
+		for i, b := range p.Payload {
+			narrow[i] = decode(b)
+		}
+		play(widen(narrow, last))
+		if len(narrow) > 0 {
+			last = narrow[len(narrow)-1]
+		}
 	}
 }
 
@@ -486,21 +529,25 @@ func (l *Link) film() {
 }
 
 func (l *Link) watch(t *webrtc.TrackRemote) {
+	l.remote.Store(uint32(t.SSRC()))
+	follow(t, l.pc, &l.count, l.media.Screen.Show)
+}
+
+func follow(t *webrtc.TrackRemote, pc *webrtc.PeerConnection, count *counters, show func(Frame)) {
 	sb := samplebuilder.New(videoLate, &codecs.H264Packet{}, videoClock)
 	var first uint32
 	var asked time.Time
-	l.remote.Store(uint32(t.SSRC()))
 	started, broken := false, true
 	ask := func() {
 		if time.Since(asked) < keyEvery {
 			return
 		}
 		asked = time.Now()
-		l.count.keysRequested.Add(1)
-		if err := l.pc.WriteRTCP(
+		count.keysRequested.Add(1)
+		if err := pc.WriteRTCP(
 			[]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(t.SSRC())}},
 		); err != nil {
-			slog.Debug("call keyframe request", "err", err)
+			slog.Debug("keyframe request", "err", err)
 		}
 	}
 	for {
@@ -511,15 +558,15 @@ func (l *Link) watch(t *webrtc.TrackRemote) {
 		sb.Push(p)
 		for s := sb.Pop(); s != nil; s = sb.Pop() {
 			key := Keyframe(s.Data)
-			l.count.videoRecv.Add(1)
+			count.videoRecv.Add(1)
 			if key {
-				l.count.videoKeys.Add(1)
+				count.videoKeys.Add(1)
 			}
 			if s.PrevDroppedPackets > 0 && !broken {
 				broken, asked = true, time.Time{}
 			}
 			if broken && !key {
-				l.count.videoWaiting.Add(1)
+				count.videoWaiting.Add(1)
 				ask()
 				continue
 			}
@@ -528,7 +575,7 @@ func (l *Link) watch(t *webrtc.TrackRemote) {
 				first, started = s.PacketTimestamp, true
 			}
 			pts := time.Duration(s.PacketTimestamp-first) * time.Second / videoClock
-			l.media.Screen.Show(Frame{Data: s.Data, PTS: pts, Key: key})
+			show(Frame{Data: s.Data, PTS: pts, Key: key})
 		}
 	}
 }

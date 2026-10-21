@@ -110,6 +110,7 @@ calendar.setting.span: Days to show
 calendar.today: Today
 calendar.tomorrow: Tomorrow
 call.address: Address
+call.caps: Can do
 call.answer.count: "{{.N}} selected"
 call.answer.everyone: Everyone
 call.answer.from: Answer from
@@ -132,14 +133,20 @@ cameras.loading: Loading cameras
 cameras.none: No cameras selected
 cameras.nosite: Home Assistant's address isn't known. Set it in Settings, Cameras.
 cameras.off: "Off"
-cameras.page: "{{.N}} of {{.Of}}"
-cameras.pick: Cameras
+cameras.pick: Select
 cameras.seconds: "{{.N}} s"
 cameras.setting.refresh: Refresh
 cameras.setting.rotate: Auto paginate
 cameras.setting.scale: Thumbnail size
 cameras.setting.url: Home Assistant URL
+peer.cap.audio: Calls
+peer.cap.broadcast: Broadcasts
+peer.cap.sync: Settings sync
+peer.cap.video: Video calls
+peer.checking: Checking
 peer.foreign: Not in this home
+peer.home: In this home
+peer.open: No home key
 call.failed: Call failed
 call.group.calls: Intercom
 call.gone: No longer on the network
@@ -167,6 +174,7 @@ call.setting.stream: Call video stream
 call.setting.video_ring: Video ring tone
 call.settings: Intercom
 call.settings.hint: Incoming calls and auto-answer
+call.standing: Home
 call.stream: Video stream
 call.stream.hint: Sub uses less bandwidth; falls back to main when the sub stream is off
 call.stream.main: Main
@@ -177,10 +185,8 @@ call.unavailable: Not taking calls
 call.unreachable: Can't be reached
 call.unmute: Unmute
 call.version: Version
-call.video: Video calls
 call.videoring: Video ring
 call.volume: Volume
-call.yes: "Yes"
 camera.group.exposure: Exposure
 camera.group.picture: Picture
 camera.group.streams: Streams
@@ -388,6 +394,7 @@ home.devices: Select devices
 home.empty: Nothing to show
 home.enable: Enable
 home.enabled: Enable home control
+home.everything.cameras: All cameras
 home.everything.lights: All lights
 home.everything.switches: All switches
 home.failed: Couldn't load from Home Assistant
@@ -691,7 +698,6 @@ settings.features: Connected services
 settings.language: Language
 settings.network: Network & internet
 settings.power: Restart
-settings.secret.set: Set
 settings.sync: Config sync
 settings.system: System
 settings.title: Settings

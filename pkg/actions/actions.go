@@ -75,6 +75,7 @@ type declared struct {
 type declaredAction struct {
 	Name     string        `json:"name"`
 	Title    string        `json:"title"`
+	Switch   string        `json:"switch,omitempty"`
 	Args     []declaredArg `json:"args"`
 	Triggers []Trigger     `json:"triggers,omitempty"`
 }
@@ -101,12 +102,19 @@ func (r *Registry) Names() []string {
 	return out
 }
 
-func (r *Registry) Declaration(voiced func(name string) bool) map[string]string {
+func (r *Registry) Declaration(
+	voiced func(name string) bool,
+	switched func(name string) string,
+) map[string]string {
 	d := declared{Version: Version, Actions: []declaredAction{}}
 	for _, a := range r.all() {
 		triggers := a.Triggers
 		if !voiced(a.Name) {
 			triggers = nil
+		}
+		var toggle string
+		if switched != nil {
+			toggle = switched(a.Name)
 		}
 		args := make([]declaredArg, len(a.Args))
 		for i, arg := range a.Args {
@@ -118,6 +126,7 @@ func (r *Registry) Declaration(voiced func(name string) bool) map[string]string 
 		d.Actions = append(d.Actions, declaredAction{
 			Name:     a.Name,
 			Title:    a.Title,
+			Switch:   toggle,
 			Args:     args,
 			Triggers: triggers,
 		})

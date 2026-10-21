@@ -65,9 +65,7 @@ func (c *Controller) Tick(at time.Duration, p []Progress, ready, skip bool) {
 		if c.listed == 0 {
 			c.listed = at
 		}
-		if ready {
-			c.done, c.finishing, c.Ready = at, at, 1
-		}
+		c.done, c.finishing, c.Ready = at, at, 1
 		return
 	}
 	if at > 2*time.Second {
@@ -136,7 +134,7 @@ func Run(ctx context.Context, h Hooks) bool {
 			p := h.Progress()
 			c.Tick(now.Sub(began), p, h.Ready(), h.Skipped())
 			if c.Header >= 1 {
-				h.OfferSkip(!Settled(p))
+				h.OfferSkip(true)
 				if s := Summary(p); s != said {
 					said = s
 					h.Draw(p)

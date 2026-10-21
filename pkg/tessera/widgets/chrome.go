@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"math"
+	"slices"
 	"strconv"
 	"time"
 
@@ -193,7 +194,8 @@ func (v *View) bottomStrip(at ui.Rect, l tessera.Layout, page int) gogui.View {
 			},
 		}))
 	}
-	return v.dots(at, pages(l), page)
+	shown := pages(l)
+	return widgets.PageDots("tessera-dot", at, len(shown), slices.Index(shown, page))
 }
 
 func (v *View) key(id, glyph string, tap func(*gogui.Window)) gogui.View {

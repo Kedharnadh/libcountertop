@@ -36,7 +36,8 @@ type Value struct {
 	Entity    string
 	Attribute string
 
-	Changed hook.Hook[string]
+	Changed  hook.Hook[string]
+	Reported hook.Hook[string]
 
 	mu    sync.Mutex
 	state string
@@ -167,4 +168,5 @@ func (v *Value) set(state string) {
 	if !same {
 		v.Changed.Emit(state)
 	}
+	v.Reported.Emit(state)
 }

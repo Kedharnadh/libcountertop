@@ -113,14 +113,12 @@ func (p *BasicPages) System() *shell.Page {
 				Glyph: gogui.IconHome,
 				Label: say.T("network.setting.home_key"),
 				Kind:  menu.Password,
+				Value: k.HomeKey(),
 				Save: func(v string) {
 					if err := k.SetHomeKey(v); err != nil {
 						slog.Warn("saving the home key failed", "err", err)
 					}
 				},
-			}
-			if k.HasHomeKey() {
-				row.Hint = say.T("settings.secret.set")
 			}
 			rows = append(rows, row)
 			acts = append(acts, nil)
